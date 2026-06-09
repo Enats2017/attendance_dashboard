@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/attendance-dashboard/login/static/css/main.4f49b243.css",
+    "main.js": "/attendance-dashboard/login/static/js/main.21405770.js",
+    "index.html": "/attendance-dashboard/login/index.html",
+    "main.4f49b243.css.map": "/attendance-dashboard/login/static/css/main.4f49b243.css.map",
+    "main.21405770.js.map": "/attendance-dashboard/login/static/js/main.21405770.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.4f49b243.css",
+    "static/js/main.21405770.js"
+  ]
+}

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>HRMS Attendance Dashboard</title>
+    <meta name="description" content="HRMS Biometric Attendance Analytics and Reports Dashboard." />
+    <!-- ApexCharts -->
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.45.2/dist/apexcharts.min.js"></script>
+    <!-- SheetJS (xlsx) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- jsPDF -->
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <!-- html2canvas -->
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+    <style>
+        /* ── Auth overlay (shown while checking session) ── */
+        #auth-check-overlay {
+            position: fixed;
+            inset: 0;
+            background: #0b0f1e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            flex-direction: column;
+            gap: 16px;
+            transition: opacity 0.4s;
+        }
+
+        #auth-check-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .auth-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid rgba(79, 142, 247, 0.2);
+            border-top-color: #4f8ef7;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        #auth-check-overlay p {
+            color: #94a3b8;
+            font-family: 'Segoe UI', sans-serif;
+            font-size: 14px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Auth check overlay -->
+    <div id="auth-check-overlay">
+        <div class="auth-spinner"></div>
+        <p>Verifying session…</p>
+    </div>
+
+    <div id="app"></div>
+
+    <!-- Configuration -->
+    <script src="js/config.js"></script>
+    <script src="js/charts.js"></script>
+    
+    <!-- MVC Architecture -->
+    <script src="js/model.js"></script>
+    <script src="js/view.js"></script>
+    <script src="js/controller.js"></script>
+
+    <script>
+        // ── Session guard ─────────────────────────────────────────────────────
+        (function () {
+            var overlay = document.getElementById('auth-check-overlay');
+
+            try {
+                var userSession = localStorage.getItem('hrms_user');
+                if (!userSession) {
+                    window.location.replace('/attendance-dashboard/login/');
+                    return;
+                }
+                var user = JSON.parse(userSession);
+                // Store user info globally
+                window.HRMS_USER = user;
+                
+                // Load main app entry point
+                var s = document.createElement('script');
+                s.src = 'js/app.js';
+                document.body.appendChild(s);
+            } catch (e) {
+                window.location.replace('/attendance-dashboard/login/');
+            }
+
+            // Logout function
+            window.doLogout = async function () {
+                try {
+                    await fetch('/attendance-dashboard/api/index.php?action=logout');
+                } catch (e) {
+                    console.error(e);
+                }
+                localStorage.removeItem('hrms_user');
+                window.location.href = '/attendance-dashboard/login/';
+            };
+        })();
+    </script>
+
+</body>
+
+</html>
