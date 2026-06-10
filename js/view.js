@@ -19,7 +19,12 @@ class AttendanceView {
     }
 
     render(state, model) {
-        const stats = model.getSummaryStats();
+        let stats = model.getSummaryStats();
+     
+        if (state.activeTab === 'night') {
+            stats = state.nightShiftStats || stats;
+        }
+     
         const { logs, emps, empMap } = model.getFilteredData();
         const filterOpts = model.getFilterOptions();
 
@@ -184,15 +189,33 @@ class AttendanceView {
                 const featureCounts = { in: stats.filteredIn, out: stats.filteredOut };
                 content = this._renderFeature(featureCounts); 
                 break;
-            case 'all': content = this._renderAll(logs, emps, empMap, filters); break;
-            case 'age': content = this._renderAgeWise(logs, emps, empMap, model); break;
-            case 'company': content = this._renderCompanyWise(logs, emps, empMap, model); break;
-            case 'dept': content = this._renderDeptWise(logs, emps, empMap, model); break;
-            case 'gender': content = this._renderGenderWise(logs, emps, empMap, model); break;
-            case 'late': content = this._renderLateEarly(logs, emps, empMap); break;
-            case 'night': content = this._renderNightShift(logs, emps, empMap); break;
-            case 'special': content = this._renderSpecial(logs, emps, empMap, filters, model); break;
-            default: content = { html: '<p>Tab not found</p>' };
+            case 'all': 
+                content = this._renderAll(logs, emps, empMap, filters); 
+                break;
+            case 'age': 
+                content = this._renderAgeWise(logs, emps, empMap, model); 
+                break;
+            case 'company': 
+                content = this._renderCompanyWise(logs, emps, empMap, model); 
+                break;
+            case 'dept': 
+                content = this._renderDeptWise(logs, emps, empMap, model); 
+                break;
+            case 'gender': 
+                content = this._renderGenderWise(logs, emps, empMap, model); 
+                break;
+            case 'late': 
+                content = this._renderLateEarly(logs, emps, empMap); 
+                break;
+            case 'night': 
+                const nightData = model.getNightShiftData();
+                content = this._renderNightShift(nightData.logs, nightData.emps, nightData.empMap);
+                break;
+            case 'special': 
+                content = this._renderSpecial(logs, emps, empMap, filters, model); 
+                break;
+            default: 
+                content = { html: '<p>Tab not found</p>' };
         }
         return typeof content === 'object' ? content.html : content;
     }
@@ -205,14 +228,31 @@ class AttendanceView {
                 const featureCounts = { in: stats.filteredIn, out: stats.filteredOut };
                 content = this._renderFeature(featureCounts); 
                 break;
-            case 'all': content = this._renderAll(logs, emps, empMap, filters); break;
-            case 'age': content = this._renderAgeWise(logs, emps, empMap, model); break;
-            case 'company': content = this._renderCompanyWise(logs, emps, empMap, model); break;
-            case 'dept': content = this._renderDeptWise(logs, emps, empMap, model); break;
-            case 'gender': content = this._renderGenderWise(logs, emps, empMap, model); break;
-            case 'late': content = this._renderLateEarly(logs, emps, empMap); break;
-            case 'night': content = this._renderNightShift(logs, emps, empMap); break;
-            case 'special': content = this._renderSpecial(logs, emps, empMap, filters, model); break;
+            case 'all': 
+                content = this._renderAll(logs, emps, empMap, filters); 
+                break;
+            case 'age': 
+                content = this._renderAgeWise(logs, emps, empMap, model); 
+                break;
+            case 'company': 
+                content = this._renderCompanyWise(logs, emps, empMap, model); 
+                break;
+            case 'dept': 
+                content = this._renderDeptWise(logs, emps, empMap, model); 
+                break;
+            case 'gender': 
+                content = this._renderGenderWise(logs, emps, empMap, model); 
+                break;
+            case 'late': 
+                content = this._renderLateEarly(logs, emps, empMap); 
+                break;
+            case 'night': 
+                const nightData = model.getNightShiftData();
+                content = this._renderNightShift(nightData.logs, nightData.emps, nightData.empMap);
+                break;
+            case 'special': 
+                content = this._renderSpecial(logs, emps, empMap, filters, model); 
+                break;
         }
 
         if (content && typeof content.renderCharts === 'function') {
@@ -287,7 +327,11 @@ class AttendanceView {
     }
 
     exportExcel(data, filename) {
-        if (!window.XLSX) return console.error('SheetJS not loaded');
+        console.log('FINAL EXCEL DATA:', data);   
+        console.table(data);
+        if (!window.XLSX) {
+            return console.error('SheetJS not loaded');
+        }
         const ws = XLSX.utils.json_to_sheet(data);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Report');
@@ -381,6 +425,8 @@ class AttendanceView {
     }
 
     _renderAll(logs, emps, empMap, filters) {
+        console.log('RAW LOGS:', logs); 
+        console.log('RAW EMPS:', emps); 
         const rows = logs.slice(0, 200).map(l => {
             const e = empMap[l.empId] || {};
             return [e.code || '', e.name || '', e.dept || '', e.company || '', l.date, l.inTime || '-', l.outTime || '-',
@@ -393,6 +439,7 @@ class AttendanceView {
             const e = empMap[l.empId] || {};
             return { Code: e.code, Name: e.name, Dept: e.dept, Company: e.company, Date: l.date, In: l.inTime, Out: l.outTime, Hours: l.hoursWorked, LateIn: l.lateIn, EarlyOut: l.earlyOut, Status: l.status };
         });
+        console.log('EXCEL DATA:', this._lastData['all-attendance']);
 
         const byDate = this._countBy(logs, l => l.date);
         const dates = Object.keys(byDate).sort();
@@ -526,7 +573,8 @@ class AttendanceView {
     }
 
     _renderNightShift(logs, emps, empMap) {
-        const filtered = logs.filter(l => (empMap[l.empId] || {}).shift === 'Night');
+        // const filtered = logs.filter(l => (empMap[l.empId] || {}).shift === 'Night');
+        const filtered = logs;
         const rows = filtered.slice(0, 100).map(l => {
             const e = empMap[l.empId] || {};
             return [e.name, e.dept, l.date, l.inTime, l.outTime, l.hoursWorked, l.status];

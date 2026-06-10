@@ -103,9 +103,20 @@ class AttendanceModel {
                 this.state.data = {
                     employees: data.employees,
                     attendanceLogs: data.attendanceLogs,
+                    nightShiftEmployees: data.nightShiftEmployees || [],
+                    nightShiftLogs: data.nightShiftLogs || [],
                     counts: data.counts
                 };
                 this.state.todayStats = data.todayStats || {
+                    present: 0,
+                    absent: 0,
+                    total: 0,
+                    singlePunch: 0,
+                    lateIn: 0,
+                    earlyOut: 0,
+                    avgHours: 0
+                };
+                this.state.nightShiftStats = data.nightShiftStats || {
                     present: 0,
                     absent: 0,
                     total: 0,
@@ -187,6 +198,20 @@ class AttendanceModel {
         const m = {};
         this.state.data.employees.forEach(e => { m[e.id] = e; });
         return m;
+    }
+
+    getNightShiftData() {
+        const empMap = {};
+
+        (this.state.data.nightShiftEmployees || []).forEach(e => {
+            empMap[e.id] = e;
+        });
+
+        return {
+            logs: this.state.data.nightShiftLogs || [],
+            emps: this.state.data.nightShiftEmployees || [],
+            empMap
+        };
     }
 
     getAge(dob) {
