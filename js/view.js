@@ -13,6 +13,8 @@ class AttendanceView {
             { id: 'gender', label: 'Gender Split', icon: 'ph-gender-intersex' },
             { id: 'late', label: 'Late/Early', icon: 'ph-clock' },
             { id: 'night', label: 'Night Shift', icon: 'ph-moon' },
+            { id: 'designation', label: 'Designation Stats', icon: 'ph-identification-badge' },
+            { id: 'shift', label: 'Shift Stats', icon: 'ph-clock-clockwise' },
             { id: 'special', label: 'Critical Alerts', icon: 'ph-warning-circle' }
         ];
         this._lastData = {};
@@ -211,6 +213,12 @@ class AttendanceView {
                 const nightData = model.getNightShiftData();
                 content = this._renderNightShift(nightData.logs, nightData.emps, nightData.empMap);
                 break;
+            case 'designation':
+                content = this._renderDesignationWise(logs, emps, empMap, model);
+                break;
+            case 'shift':
+                content = this._renderShiftWise(logs, emps, empMap, model);
+                break;
             case 'special': 
                 content = this._renderSpecial(logs, emps, empMap, filters, model); 
                 break;
@@ -249,6 +257,12 @@ class AttendanceView {
             case 'night': 
                 const nightData = model.getNightShiftData();
                 content = this._renderNightShift(nightData.logs, nightData.emps, nightData.empMap);
+                break;
+            case 'designation':
+                content = this._renderDesignationWise(logs, emps, empMap, model);
+                break;
+            case 'shift':
+                content = this._renderShiftWise(logs, emps, empMap, model);
                 break;
             case 'special': 
                 content = this._renderSpecial(logs, emps, empMap, filters, model); 
@@ -582,6 +596,70 @@ class AttendanceView {
         return {
             html: `<h2 class="section-title"><i class="ph-fill ph-moon"></i> Night Shift</h2>${this._tableHTML('tbl-ns', ['Name', 'Dept', 'Date', 'In', 'Out', 'Hours', 'Status'], rows, 'night-shift')}`,
             renderCharts: () => { }
+        };
+    }
+
+    _renderDesignationWise(logs, emps, empMap, model) {
+        const desigs = [...new Set(emps.map(e => e.designation || 'Staff'))].sort();
+        const eBD = model.groupBy(emps, e => e.designation || 'Staff');
+        const lBD = model.groupBy(logs, l => (empMap[l.empId] || {}).designation || 'Staff');
+        const rows = desigs.map(d => {
+            const t = (eBD[d] || []).length;
+            const ls = lBD[d] || [];
+            const p = new Set(ls.filter(l => l.present === 1).map(l => l.empId)).size;
+            return [d, t, p, t - p, t ? Math.round(p / t * 100) + '%' : '0%'];
+        });
+        this._lastData['designation-wise'] = rows.map(r => ({
+            Designation: r[0], Total: r[1], Present: r[2], Absent: r[3], Rate: r[4]
+        }));
+        return {
+            html: `<h2 class="section-title"><i class="ph-fill ph-identification-badge"></i> Designation Statistics</h2>
+                <div class="charts-grid">
+                    ${this._chartCard('ch-desig-bar', '<i class="ph-fill ph-chart-bar"></i>', 'teal', 'Present by Designation', 'Click for detail')}
+                </div>
+                ${this._tableHTML('tbl-desig', ['Designation', 'Total', 'Present', 'Absent', 'Rate'], rows, 'designation-wise')}
+                <div id="drilldown-table" style="margin-top:16px"></div>`,
+            renderCharts: () => {
+                Charts.bar('ch-desig-bar', desigs, rows.map(r => r[2]), 'Designation Attendance', true, d => {
+                    this._renderDrillDown(
+                        logs.filter(l => (empMap[l.empId] || {}).designation === d),
+                        `Designation: ${d}`,
+                        empMap
+                    );
+                });
+            }
+        };
+    }
+
+    _renderShiftWise(logs, emps, empMap, model) {
+        const shifts = [...new Set(emps.map(e => e.shift || 'Unknown'))].sort();
+        const eBS = model.groupBy(emps, e => e.shift || 'Unknown');
+        const lBS = model.groupBy(logs, l => (empMap[l.empId] || {}).shift || 'Unknown');
+        const rows = shifts.map(s => {
+            const t = (eBS[s] || []).length;
+            const ls = lBS[s] || [];
+            const p = new Set(ls.filter(l => l.present === 1).map(l => l.empId)).size;
+            return [s, t, p, t - p, t ? Math.round(p / t * 100) + '%' : '0%'];
+        });
+        this._lastData['shift-wise'] = rows.map(r => ({
+            Shift: r[0], Total: r[1], Present: r[2], Absent: r[3], Rate: r[4]
+        }));
+        return {
+            html: `<h2 class="section-title"><i class="ph-fill ph-clock-clockwise"></i> Shift Statistics</h2>
+                <div class="charts-grid">
+                    ${this._chartCard('ch-shift-bar', '<i class="ph-fill ph-chart-bar"></i>', 'amber', 'Present by Shift', 'Click for detail')}
+                </div>
+                ${this._tableHTML('tbl-shift', ['Shift', 'Total', 'Present', 'Absent', 'Rate'], rows, 'shift-wise')}
+                <div id="drilldown-table" style="margin-top:16px"></div>`,
+            renderCharts: () => {
+                Charts.bar('ch-shift-bar', shifts, rows.map(r => r[2]), 'Shift Attendance', false, s => {
+                    this._renderDrillDown(
+                        logs.filter(l => (empMap[l.empId] || {}).shift === s),
+                        `Shift: ${s}`,
+                        empMap
+                    );
+                });
+            }
         };
     }
 

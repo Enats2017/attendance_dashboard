@@ -168,14 +168,35 @@ function handleLogin($data) {
         $locations[] = intval($row['LocationId']);
     }
 
+    if (empty($locations)) {
+        $stmtAllLoc = sqlsrv_query($conn, "SELECT LocationId FROM Locations");
+        while ($row = sqlsrv_fetch_array($stmtAllLoc, SQLSRV_FETCH_ASSOC)) {
+            $locations[] = intval($row['LocationId']);
+        }
+    }
+
     $stmtComp = sqlsrv_query($conn, "SELECT CompanyId FROM UserCompanies WHERE UserId = ?", [$user['UserId']]);
     while ($row = sqlsrv_fetch_array($stmtComp, SQLSRV_FETCH_ASSOC)) {
         $companies[] = intval($row['CompanyId']);
+    }
+    
+    if (empty($companies)) {
+        $stmtAllComp = sqlsrv_query($conn, "SELECT CompanyId FROM Companies");
+        while ($row = sqlsrv_fetch_array($stmtAllComp, SQLSRV_FETCH_ASSOC)) {
+            $companies[] = intval($row['CompanyId']);
+        }
     }
 
     $stmtDept = sqlsrv_query($conn, "SELECT DepartmentId FROM UserDepartments WHERE UserId = ?", [$user['UserId']]);
     while ($row = sqlsrv_fetch_array($stmtDept, SQLSRV_FETCH_ASSOC)) {
         $departments[] = intval($row['DepartmentId']);
+    }
+
+    if (empty($departments)) {
+        $stmtAllDept = sqlsrv_query($conn, "SELECT DepartmentId FROM Departments");
+        while ($row = sqlsrv_fetch_array($stmtAllDept, SQLSRV_FETCH_ASSOC)) {
+            $departments[] = intval($row['DepartmentId']);
+        }
     }
 
     // $user = $result->fetch_assoc();
@@ -293,8 +314,7 @@ function handleDashboardData($input) {
         $shiftFilteredIds = [-1];
     }
 
-    // 1. Employees
-    $sqlEmp = "SELECT E.EmployeeId, E.EmployeeName, E.EmployeeCode, E.Gender, E.DOB, E.Designation, C.CompanyFName as company, L.LocationName as location, D.DepartmentFName as dept, D.std_hc FROM Employees E WITH (NOLOCK) LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working'";
+    $sqlEmp = "SELECT E.EmployeeId, E.EmployeeName, E.EmployeeCode, E.Gender, E.DOB, E.Designation, DG.DesignationsName as DesignationName, C.CompanyFName as company, L.LocationName as location, D.DepartmentFName as dept, D.std_hc FROM Employees E WITH (NOLOCK) LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working'";
 
     $paramsEmp = [];
     if ($deptName) { $sqlEmp .= " AND D.DepartmentFName = ?"; $paramsEmp[] = $deptName; }
@@ -315,7 +335,7 @@ function handleDashboardData($input) {
                 'dept' => $row['dept'] ?: 'Dept ' . $row['DepartmentId'],
                 'std_hc' => intval($row['std_hc']),
                 'company' => $row['company'] ?: 'Unknown',
-                'designation' => $row['Designation'] ?: 'Staff',
+                'designation' => $row['DesignationName'] ?: 'Staff',
                 'shift' => isset($empShifts[$row['EmployeeId']]) ? $empShifts[$row['EmployeeId']] : 'Unknown',
                 'location' => $row['location'] ?: 'Head Office'
             ];
@@ -366,7 +386,7 @@ function handleDashboardData($input) {
                     'outTime' => $row['OutTime'],
                     'status' => $row['Status'] ?: 'Present',
                     'present' => intval($row['Present']),
-                    'hoursWorked' => floatval($row['Duration']),
+                    'hoursWorked' => round(floatval($row['Duration']) / 60, 2),
                     'lateBy' => intval($row['LateBy']),
                     'earlyBy' => intval($row['EarlyBy']),
                     'missedInPunch'  => intval($row['MissedInPunch']),
@@ -415,23 +435,11 @@ function handleDashboardData($input) {
         }
     }
 
-    $totalEmployees = 0;
+    $totalEmployees = count($employees);
     $presentEmployees = 0;
 
-    $sqlTotal = "SELECT COUNT(*) AS TotalEmployees  FROM Employees E WITH (NOLOCK) LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId WHERE E.Status = 'Working' AND E.RecordStatus = 1  AND E.Location IN ($locationList)  AND E.CompanyId IN ($companyList)  AND E.DepartmentId IN ($departmentList)";
-
-    $paramsTotal = [];
-    if ($deptName) { $sqlTotal .= " AND D.DepartmentFName = ?"; $paramsTotal[] = $deptName; }
-    if ($compName) { $sqlTotal .= " AND C.CompanyFName = ?"; $paramsTotal[] = $compName; }
-    if ($shiftName) { $sqlTotal .= " AND E.EmployeeId IN (" . implode(',', $shiftFilteredIds) . ")"; }
-
-    $stmtTotal = sqlsrv_query($conn, $sqlTotal, $paramsTotal);
-
-    if ($stmtTotal && ($row = sqlsrv_fetch_array($stmtTotal, SQLSRV_FETCH_ASSOC))) {
-        $totalEmployees = intval($row['TotalEmployees']);
-    }
-
-    if (!empty($logs)) {
+    $useAttendanceLogs = !empty($logs);
+    if ($useAttendanceLogs) {
         $presentEmpIds = [];
         foreach ($logs as $log) {
             if ($log['present'] == 1) {
@@ -444,7 +452,7 @@ function handleDashboardData($input) {
 
         $paramsPresent = [];
         if ($deptName) { $sqlPresent .= " AND D2.DepartmentFName = ?"; $paramsPresent[] = $deptName; }
-        if ($compName)  { $sqlPresent .= " AND C.CompanyFName = ?";    $paramsPresent[] = $compName; }
+        if ($compName)  { $sqlPresent .= " AND C.CompanyFName = ?"; $paramsPresent[] = $compName; }
         if ($shiftName) { $sqlPresent .= " AND E.EmployeeId IN (" . implode(',', $shiftFilteredIds) . ")"; }
 
         $stmtPresent = sqlsrv_query($conn, $sqlPresent, $paramsPresent);
@@ -452,7 +460,7 @@ function handleDashboardData($input) {
             $presentEmployees = intval($row['PresentEmployees']);
         }
     }
-    $dataSource = !empty($logs) ? 'attendance' : 'device';
+    $dataSource = $useAttendanceLogs ? 'attendance' : 'device';
 
     $singlePunch = 0;
     $lateIn = 0;
@@ -512,7 +520,8 @@ function handleDashboardData($input) {
         PHP_EOL,
         FILE_APPEND
     );
-    if (!empty($nightShiftLogs)) {
+
+    if ($useAttendanceLogs && !empty($nightShiftLogs)) {
         $nightPresentIds = [];
         foreach ($nightShiftLogs as $log) {
             if ($log['present'] == 1) {
@@ -523,6 +532,7 @@ function handleDashboardData($input) {
     } else {
         $nightPresentEmployees = getNightShiftPresentCount($conn, $devTable, $dayFrom, $dayTo, $nightShiftEmployeeIds);
     }
+
     $nightAbsentEmployees = max(0, $nightTotalEmployees - $nightPresentEmployees);
     
     echo json_encode([
@@ -730,16 +740,18 @@ function handleGetReport($input) {
  */
 function handleGetDepts() {
     $conn = getSQLServer();
-    $userId = $_SESSION['userId'];
+
     $locationList = implode(',', array_map('intval', $_SESSION['locations']));
     $departmentList = implode(',', array_map('intval', $_SESSION['departments']));
 
-    $sql = "SELECT DISTINCT D.DepartmentId, D.DepartmentFName as DepartmentName, D.std_hc  FROM Departments D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON D.DepartmentId = E.DepartmentId INNER JOIN UserDepartments UD WITH (NOLOCK) ON D.DepartmentId = UD.DepartmentId WHERE E.Location IN ($locationList)  AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working'  AND UD.UserId = $userId ORDER BY D.DepartmentFName ASC";
+    $sql = "SELECT DISTINCT D.DepartmentId, D.DepartmentFName as DepartmentName, D.std_hc FROM Departments D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON D.DepartmentId = E.DepartmentId WHERE E.Location IN ($locationList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working' ORDER BY D.DepartmentFName ASC";
 
     $stmt = sqlsrv_query($conn, $sql);
-    
+
     $data = [];
-    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) $data[] = $row;
+    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+        $data[] = $row;
+    }
     echo json_encode($data);
 }
 
@@ -748,16 +760,18 @@ function handleGetDepts() {
  */
 function handleGetCompanies() {
     $conn = getSQLServer();
-    $userId = $_SESSION['userId'];
+
     $locationList = implode(',', array_map('intval', $_SESSION['locations']));
     $companyList = implode(',', array_map('intval', $_SESSION['companies']));
 
-    $sql = "SELECT DISTINCT C.CompanyId, C.CompanyFName as CompanyName  FROM Companies C WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON C.CompanyId = E.CompanyId INNER JOIN UserCompanies UC WITH (NOLOCK) ON C.CompanyId = UC.CompanyId WHERE E.Location IN ($locationList)  AND E.CompanyId IN ($companyList) AND E.Status = 'Working'  AND UC.UserId = $userId ORDER BY C.CompanyFName ASC";
- 
+    $sql = "SELECT DISTINCT C.CompanyId, C.CompanyFName as CompanyName FROM Companies C WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON C.CompanyId = E.CompanyId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.Status = 'Working' ORDER BY C.CompanyFName ASC";
+
     $stmt = sqlsrv_query($conn, $sql);
- 
+
     $data = [];
-    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) $data[] = $row;
+    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+        $data[] = $row;
+    }
     echo json_encode($data);
 }
 
@@ -769,16 +783,18 @@ function handleGetCompanies() {
  */
 function handleGetShifts() {
     $conn = getSQLServer();
-    $userId = $_SESSION['userId'];
+
     $locationList = implode(',', array_map('intval', $_SESSION['locations']));
     $companyList = implode(',', array_map('intval', $_SESSION['companies']));
 
-    $sql = "SELECT DISTINCT S.ShiftId, S.ShiftName FROM Employees E WITH (NOLOCK) INNER JOIN UserCompanies UC WITH (NOLOCK) ON E.CompanyId = UC.CompanyId CROSS APPLY (SELECT TOP 1 S.ShiftId, S.ShiftName FROM EmployeeShift ES WITH (NOLOCK) JOIN Shifts S WITH (NOLOCK) ON ES.ShiftId = S.ShiftId WHERE ES.EmployeeId = E.EmployeeId AND S.RecordStatus = '1' ORDER BY ES.Shiftdate DESC) S WHERE E.Location IN ($locationList)  AND E.CompanyId IN ($companyList) AND E.Status = 'Working'  AND UC.UserId = $userId ORDER BY S.ShiftName ASC";
- 
+    $sql = "SELECT DISTINCT S.ShiftId, S.ShiftName FROM Employees E WITH (NOLOCK) CROSS APPLY (SELECT TOP 1 S.ShiftId, S.ShiftName FROM EmployeeShift ES WITH (NOLOCK) JOIN Shifts S WITH (NOLOCK) ON ES.ShiftId = S.ShiftId WHERE ES.EmployeeId = E.EmployeeId AND S.RecordStatus = '1' ORDER BY ES.Shiftdate DESC) S WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.Status = 'Working' ORDER BY S.ShiftName ASC";
+
     $stmt = sqlsrv_query($conn, $sql);
- 
+
     $data = [];
-    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) $data[] = $row;
+    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+        $data[] = $row;
+    }
     echo json_encode($data);
 }
 
