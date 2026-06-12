@@ -89,6 +89,9 @@ switch ($action) {
     case 'login':
         handleLogin($input);
         break;
+    case 'setup_password':
+        setupPassword($input);
+        break;
     case 'dashboard_data':
         handleDashboardData($input);
         break;
@@ -137,7 +140,7 @@ function handleLogin($data) {
 
     $conn = getSQLServer();
 
-    $sql = "SELECT TOP 1 UserId, LoginName, LoginPassword, RoleName, RecordStatus, EmployeeId FROM SystemUsers WHERE LoginName = ?";
+    $sql = "SELECT TOP 1 UserId, LoginName, LoginPassword, NewLoginPassword, RoleName, RecordStatus, EmployeeId FROM SystemUsers WHERE LoginName = ?";
 
     $stmt = sqlsrv_query($conn, $sql, [$username]);
 
@@ -156,6 +159,27 @@ function handleLogin($data) {
             'success' => false,
             'message' => 'Invalid credentials'
         ]);
+        return;
+    }
+
+    if ($user['RecordStatus'] != 1) {
+        echo json_encode(['success' => false, 'message' => 'Account deactivated']);
+        return;
+    }
+
+    if (is_null($user['NewLoginPassword']) || trim($user['NewLoginPassword']) === '') {
+        $_SESSION['temp_user_id'] = $user['UserId'];
+        echo json_encode([
+            'success' => false,
+            'require_password_setup' => true,
+            'message' => 'First time login. Please set your password.',
+            'user_id' => $user['UserId']
+        ]);
+        return;
+    }
+
+    if (!password_verify($password, $user['NewLoginPassword'])) {
+        echo json_encode(['success' => false, 'message' => 'Invalid credentials']);
         return;
     }
 
@@ -199,37 +223,10 @@ function handleLogin($data) {
         }
     }
 
-    // $user = $result->fetch_assoc();
-    // if (!$user['is_active']) {
-    //     echo json_encode(['success' => false, 'message' => 'Account deactivated']);
-    //     return;
-    // }
-
-    if ($user['RecordStatus'] != 1) {
-        echo json_encode(['success' => false, 'message' => 'Account deactivated']);
-        return;
-    }
-
     $_SESSION['userId'] = $user['UserId'];
     $_SESSION['locations'] = $locations;
     $_SESSION['companies'] = $companies;
     $_SESSION['departments'] = $departments;
-
-    // if (!password_verify($password, $user['password_hash'])) {
-    //     echo json_encode(['success' => false, 'message' => 'Invalid credentials']);
-    //     return;
-    // }
-
-    // echo json_encode([
-    //     'success' => true,
-    //     'message' => 'Login successful',
-    //     'user' => [
-    //         'id' => $user['id'],
-    //         'username' => $user['username'],
-    //         'name' => $user['name'],
-    //         'role' => $user['role']
-    //     ]
-    // ]);
 
     echo json_encode([
         'success' => true,
@@ -241,6 +238,98 @@ function handleLogin($data) {
             'role' => $user['RoleName']
         ]
     ]);
+}
+
+
+function setupPassword($data) {
+    $userId = isset($data['user_id']) ? intval($data['user_id']) : 0;
+    $newPassword = isset($data['new_password']) ? $data['new_password'] : '';
+    $confirmPassword = isset($data['confirm_password']) ? $data['confirm_password'] : '';
+    
+    if ($newPassword !== $confirmPassword) {
+        echo json_encode(['success' => false, 'message' => 'Passwords do not match']);
+        return;
+    }
+    
+    if (strlen($newPassword) < 4) {
+        echo json_encode(['success' => false, 'message' => 'Password must be at least 4 characters']);
+        return;
+    }
+    
+    $hashedPassword = password_hash($newPassword, PASSWORD_BCRYPT);
+    
+    $conn = getSQLServer();
+    
+    $sql = "UPDATE SystemUsers SET NewLoginPassword = ? WHERE UserId = ?";
+    $params = [$hashedPassword, $userId];
+    $stmt = sqlsrv_query($conn, $sql, $params);
+    
+    if ($stmt) {
+        $sql2 = "SELECT TOP 1 UserId, LoginName, RoleName, EmployeeId FROM SystemUsers WHERE UserId = ?";
+        $stmt2 = sqlsrv_query($conn, $sql2, [$userId]);
+        $user = sqlsrv_fetch_array($stmt2, SQLSRV_FETCH_ASSOC);
+        
+        $locations = [];
+        $companies = [];
+        $departments = [];
+
+        $stmtLoc = sqlsrv_query($conn, "SELECT LocationId FROM UserLocations WHERE UserId = ?", [$userId]);
+        while ($row = sqlsrv_fetch_array($stmtLoc, SQLSRV_FETCH_ASSOC)) {
+            $locations[] = intval($row['LocationId']);
+        }
+        
+        if (empty($locations)) {
+            $stmtAllLoc = sqlsrv_query($conn, "SELECT LocationId FROM Locations");
+            while ($row = sqlsrv_fetch_array($stmtAllLoc, SQLSRV_FETCH_ASSOC)) {
+                $locations[] = intval($row['LocationId']);
+            }
+        }
+
+        $stmtComp = sqlsrv_query($conn, "SELECT CompanyId FROM UserCompanies WHERE UserId = ?", [$userId]);
+        while ($row = sqlsrv_fetch_array($stmtComp, SQLSRV_FETCH_ASSOC)) {
+            $companies[] = intval($row['CompanyId']);
+        }
+        
+        if (empty($companies)) {
+            $stmtAllComp = sqlsrv_query($conn, "SELECT CompanyId FROM Companies");
+            while ($row = sqlsrv_fetch_array($stmtAllComp, SQLSRV_FETCH_ASSOC)) {
+                $companies[] = intval($row['CompanyId']);
+            }
+        }
+
+        $stmtDept = sqlsrv_query($conn, "SELECT DepartmentId FROM UserDepartments WHERE UserId = ?", [$userId]);
+        while ($row = sqlsrv_fetch_array($stmtDept, SQLSRV_FETCH_ASSOC)) {
+            $departments[] = intval($row['DepartmentId']);
+        }
+        
+        if (empty($departments)) {
+            $stmtAllDept = sqlsrv_query($conn, "SELECT DepartmentId FROM Departments");
+            while ($row = sqlsrv_fetch_array($stmtAllDept, SQLSRV_FETCH_ASSOC)) {
+                $departments[] = intval($row['DepartmentId']);
+            }
+        }
+        
+        $_SESSION['userId'] = $userId;
+        $_SESSION['locations'] = $locations;
+        $_SESSION['companies'] = $companies;
+        $_SESSION['departments'] = $departments;
+        
+        echo json_encode([
+            'success' => true,
+            'message' => 'Password setup successful',
+            'user' => [
+                'id' => $user['UserId'],
+                'username' => $user['LoginName'],
+                'employee_id' => $user['EmployeeId'],
+                'role' => $user['RoleName']
+            ]
+        ]);
+    } else {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Failed to save password. Please try again.'
+        ]);
+    }
 }
 
 
@@ -570,14 +659,12 @@ function handleDashboardData($input) {
  */
 function handleGetStdHC() {
     $sqlConn = getSQLServer();
+    $locationList = !empty($_SESSION['locations']) ? implode(',', array_map('intval', $_SESSION['locations'])) : '0';
     
-    // Fetch departments and their std_hc from SQL Server, filtered by Location 14
-    $sqlDepts = "SELECT DISTINCT D.DepartmentId, D.DepartmentFName as DepartmentName, D.std_hc 
-                 FROM Departments D WITH (NOLOCK)
-                 INNER JOIN Employees E WITH (NOLOCK) ON D.DepartmentId = E.DepartmentId
-                 WHERE E.Location = 14 AND E.Status = 'Working'
-                 ORDER BY D.DepartmentFName ASC";
+    $sqlDepts = "SELECT DISTINCT D.DepartmentId, D.DepartmentFName as DepartmentName, D.std_hc FROM Departments D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON D.DepartmentId = E.DepartmentId WHERE E.Location IN ($locationList) AND E.Status = 'Working' ORDER BY D.DepartmentFName ASC";
+    
     $stmt = sqlsrv_query($sqlConn, $sqlDepts);
+    
     $data = [];
     while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
         $data[] = [
@@ -587,8 +674,8 @@ function handleGetStdHC() {
         ];
     }
 
-    // Fetch unit_config from LocationId 14
-    $sqlLoc = "SELECT LocationName as unit_name, unit_capacity FROM Locations WHERE LocationId = 14";
+    $firstLocation = !empty($_SESSION['locations']) ? intval($_SESSION['locations'][0]) : 0;
+    $sqlLoc = "SELECT LocationName as unit_name, unit_capacity FROM Locations WHERE LocationId = $firstLocation";
     $stmtLoc = sqlsrv_query($sqlConn, $sqlLoc);
     $unitConfig = ['unit_name' => 'PSF', 'unit_capacity' => '150 Tons']; // default
     if ($rowLoc = sqlsrv_fetch_array($stmtLoc, SQLSRV_FETCH_ASSOC)) {
@@ -630,13 +717,13 @@ function handleGetReport($input) {
     
     $sqlConn = getSQLServer();
 
+    $locationList = !empty($_SESSION['locations']) ? implode(',', array_map('intval', $_SESSION['locations'])) : '0';
+
     // 1. Departments and HC from SQL Server, filtered by Location 14
-    $sqlD = "SELECT DISTINCT D.DepartmentId, D.DepartmentFName as DepartmentName, D.std_hc 
-             FROM Departments D WITH (NOLOCK)
-             INNER JOIN Employees E WITH (NOLOCK) ON D.DepartmentId = E.DepartmentId
-             WHERE E.Location = 14 AND E.Status = 'Working'
-             ORDER BY D.DepartmentFName ASC";
+    $sqlD = "SELECT DISTINCT D.DepartmentId, D.DepartmentFName as DepartmentName, D.std_hc FROM Departments D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON D.DepartmentId = E.DepartmentId WHERE E.Location IN ($locationList) AND E.Status = 'Working' ORDER BY D.DepartmentFName ASC";
+
     $stmtD = sqlsrv_query($sqlConn, $sqlD);
+    
     $depts = [];
     $hcMap = [];
     while ($row = sqlsrv_fetch_array($stmtD, SQLSRV_FETCH_ASSOC)) {
@@ -658,15 +745,7 @@ function handleGetReport($input) {
 
     $liveData = [];
     if ($tableExists) {
-        $sql = "SELECT E.DepartmentId, DAY(A.AttendanceDate) as AttDay, 
-                       COUNT(CASE WHEN A.Present = 1 THEN 1 END) as PresentCount,
-                       COUNT(CASE WHEN A.OverTime > 0 THEN 1 END) as OTCount,
-                       COUNT(CASE WHEN A.WeeklyOff = 1 THEN 1 END) as WOCount,
-                       COUNT(CASE WHEN A.IsOnLeave = 1 THEN 1 END) as LeaveCount
-                FROM $tableName A WITH (NOLOCK)
-                JOIN Employees E WITH (NOLOCK) ON A.EmployeeId = E.EmployeeId
-                WHERE A.AttendanceDate >= '$dayFrom' AND A.AttendanceDate <= '$dayTo 23:59:59' AND E.Location = 14 AND E.Status = 'Working'
-                GROUP BY E.DepartmentId, DAY(A.AttendanceDate)";
+        $sql = "SELECT E.DepartmentId, DAY(A.AttendanceDate) as AttDay, COUNT(CASE WHEN A.Present = 1 THEN 1 END) as PresentCount, COUNT(CASE WHEN A.OverTime > 0 THEN 1 END) as OTCount, COUNT(CASE WHEN A.WeeklyOff = 1 THEN 1 END) as WOCount, COUNT(CASE WHEN A.IsOnLeave = 1 THEN 1 END) as LeaveCount FROM $tableName A WITH (NOLOCK) JOIN Employees E WITH (NOLOCK) ON A.EmployeeId = E.EmployeeId WHERE A.AttendanceDate >= '$dayFrom' AND A.AttendanceDate <= '$dayTo 23:59:59' AND E.Location IN ($locationList) AND E.Status = 'Working' GROUP BY E.DepartmentId, DAY(A.AttendanceDate)";
     
         $stmt = sqlsrv_query($sqlConn, $sql);
         if ($stmt) {

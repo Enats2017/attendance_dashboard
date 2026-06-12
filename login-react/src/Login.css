@@ -237,6 +237,118 @@ body,
     animation: cardIn .55s cubic-bezier(.16, 1, .3, 1) both;
 }
 
+/* Modal Styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 0.2s ease;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 32px;
+    padding: 32px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+    animation: slideUp 0.3s ease;
+}
+
+.modal-header {
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+.setup-avatar {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.setup-avatar svg {
+    width: 28px;
+    height: 28px;
+    color: white;
+}
+
+.password-strength {
+    font-size: 12px;
+    margin-top: 8px;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+.password-strength.weak {
+    color: #dc2626;
+    background: #fee2e2;
+}
+
+.password-strength.medium {
+    color: #f59e0b;
+    background: #fedfaa;
+}
+
+.password-strength.strong {
+    color: #10b981;
+    background: #d1fae5;
+}
+
+.password-error {
+    color: #dc2626;
+    font-size: 13px;
+    margin-top: 8px;
+    padding: 8px;
+    background: #fee2e2;
+    border-radius: 8px;
+}
+
+.logout-link {
+    background: none;
+    border: none;
+    color: #667eea;
+    cursor: pointer;
+    font-size: 14px;
+    margin-top: 16px;
+    padding: 8px;
+    width: 100%;
+    text-align: center;
+}
+
+.logout-link:hover {
+    text-decoration: underline;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    } to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
 @keyframes cardIn {
     from {
         opacity: 0;

@@ -5,12 +5,35 @@ const API = '/attendance-dashboard/api/index.php';
 const DASH = '/attendance-dashboard/index.html';
 
 export default function Login() {
+    console.log('🔴🔴🔴 LOGIN COMPONENT MOUNTED - MODAL DEBUG ENABLED 🔴🔴🔴');
     const [form, setForm] = useState({ username: '', password: '' });
     const [errors, setErrors] = useState({});
     const [showPass, setShowPass] = useState(false);
     const [remember, setRemember] = useState(false);
     const [loading, setLoading] = useState(false);
     const [alert, setAlert] = useState(null);   // { type, msg }
+
+    const [showPasswordSetup, setShowPasswordSetup] = useState(false);
+    const [tempUserId, setTempUserId] = useState(null);
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [passwordError, setPasswordError] = useState('');
+    const [passwordStrength, setPasswordStrength] = useState('');
+
+    // Debug useEffect - Add this
+    useEffect(() => {
+        console.log('🔴🔴🔴 showPasswordSetup VALUE CHANGED TO:', showPasswordSetup);
+        if (showPasswordSetup === true) {
+            console.log('🔴🔴🔴 MODAL SHOULD BE VISIBLE NOW!');
+            setTimeout(() => {
+                const modal = document.querySelector('.modal-overlay');
+                console.log('Modal element in DOM:', modal ? 'YES - FOUND' : 'NO - NOT FOUND');
+                if (modal) {
+                    console.log('Modal display style:', window.getComputedStyle(modal).display);
+                }
+            }, 100);
+        }
+    }, [showPasswordSetup]);
 
     // Restore remembered username & check session
     useEffect(() => {
@@ -36,39 +59,177 @@ export default function Login() {
         return !Object.keys(e).length;
     }
 
+    function checkPasswordStrength(password) {
+        if (!password) {
+            return '';
+        } 
+        let strength = 0;
+        if (password.length >= 8) {
+            strength++;
+        } 
+        if (/[A-Z]/.test(password)) {
+            strength++;
+        }
+        if (/[a-z]/.test(password)) {
+            strength++;
+        }
+        if (/[0-9]/.test(password)) {
+            strength++;
+        }
+        
+        if (strength <= 2) {
+            return 'Weak';
+        }
+        if (strength <= 3) {
+            return 'Medium';
+        }
+        return 'Strong';
+    }
+
     async function handleSubmit(e) {
         e.preventDefault();
         setAlert(null);
-        if (!validate()) return;
+        if (!validate()) {
+            return;
+        } 
+        setLoading(true);
 
+        try {
+            const res = await fetch(API, {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    action: 'login',
+                    username: form.username.trim(),
+                    password: form.password
+                })
+            });
+
+            const data = await res.json();
+
+            setLoading(false);
+
+            console.log('FULL RESPONSE:', data);
+            console.log('require_password_setup value:', data.require_password_setup);
+
+            if (data.require_password_setup === true) {
+                console.log('PASSWORD SETUP REQUIRED');
+
+                setTempUserId(data.user_id);
+                setShowPasswordSetup(true);
+
+                setAlert({
+                    type: 'info',
+                    msg: 'First time login! Please set your password.'
+                });
+
+                return;
+            }
+
+            if (data.success) {
+
+                if (remember) {
+                    localStorage.setItem(
+                        'hrms_remember',
+                        JSON.stringify({
+                            username: form.username.trim()
+                        })
+                    );
+                } else {
+                    localStorage.removeItem('hrms_remember');
+                }
+
+                localStorage.setItem(
+                    'hrms_user',
+                    JSON.stringify(data.user)
+                );
+
+                setAlert({
+                    type: 'success',
+                    msg: 'Login successful! Redirecting...'
+                });
+
+                setTimeout(() => {
+                    window.location.replace(DASH);
+                }, 900);
+
+            } else {
+
+                setAlert({
+                    type: 'error',
+                    msg: data.message || 'Invalid credentials.'
+                });
+
+                if (res.status === 401) {
+                    setForm(f => ({
+                        ...f,
+                        password: ''
+                    }));
+
+                    setErrors({
+                        password: 'Incorrect credentials'
+                    });
+                }
+            }
+
+        } catch (error) {
+            console.error('Login error:', error);
+
+            setLoading(false);
+
+            setAlert({
+                type: 'error',
+                msg: 'Server error. Please try again.'
+            });
+        }
+    }
+
+    async function handlePasswordSetup(e) {
+        e.preventDefault();
+        setPasswordError('');
+        
+        if (newPassword !== confirmPassword) {
+            setPasswordError('Passwords do not match');
+            return;
+        }
+        
+        if (newPassword.length < 4) {
+            setPasswordError('Password must be at least 4 characters');
+            return;
+        }
+        
         setLoading(true);
         try {
             const res = await fetch(API, {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'login', username: form.username.trim(), password: form.password }),
+                body: JSON.stringify({ 
+                    action: 'setup_password', 
+                    user_id: tempUserId, 
+                    new_password: newPassword,
+                    confirm_password: confirmPassword
+                }),
             });
             const data = await res.json();
             setLoading(false);
-
+            
             if (data.success) {
                 if (remember) localStorage.setItem('hrms_remember', JSON.stringify({ username: form.username.trim() }));
                 else localStorage.removeItem('hrms_remember');
                 
-                // Store session in localStorage
                 localStorage.setItem('hrms_user', JSON.stringify(data.user));
-                
-                setAlert({ type: 'success', msg: 'Login successful! Redirecting…' });
-                // Use replace() so back-button doesn't bring user back to login
+                setAlert({ type: 'success', msg: 'Password set successfully! Redirecting…' });
                 setTimeout(() => { window.location.replace(DASH); }, 900);
             } else {
-                setAlert({ type: 'error', msg: data.message || 'Invalid credentials.' });
-                if (res.status === 401) { setForm(f => ({ ...f, password: '' })); setErrors({ password: 'Incorrect credentials' }); }
+                setPasswordError(data.message);
             }
-        } catch {
+        } catch (error) {
             setLoading(false);
-            setAlert({ type: 'error', msg: 'Server error. Please try again.' });
+            setPasswordError('Server error. Please try again.');
         }
     }
 
@@ -151,6 +312,71 @@ export default function Login() {
                     <p className="copy">&copy; 2025 HRMS Attendance System</p>
                 </main>
             </div>
+                {/* Password Setup Modal */}
+                {showPasswordSetup && (
+                    <div className="modal-overlay" onClick={() => setShowPasswordSetup(false)}>
+                        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                            <div className="modal-header">
+                                <div className="avatar setup-avatar">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    </svg>
+                                </div>
+                                <h3>Set Your Password</h3>
+                                <p>This is your first login. Please create a password.</p>
+                            </div>
+                            
+                            <form onSubmit={handlePasswordSetup}>
+                                <div className="field">
+                                    <label>New Password</label>
+                                    <div className="inp-wrap">
+                                        <input type="password" value={newPassword}
+                                            onChange={(e) => {
+                                                setNewPassword(e.target.value);
+                                                setPasswordStrength(checkPasswordStrength(e.target.value));
+                                                setPasswordError('');
+                                            }} placeholder="Enter new password" autoFocus
+                                        />
+                                    </div>
+                                    {newPassword && (
+                                        <div className={`password-strength ${passwordStrength.toLowerCase()}`}>
+                                            Strength: {passwordStrength}
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                <div className="field">
+                                    <label>Confirm Password</label>
+                                    <div className="inp-wrap">
+                                        <input type="password" value={confirmPassword}
+                                            onChange={(e) => {
+                                                setConfirmPassword(e.target.value);
+                                                setPasswordError('');
+                                            }} placeholder="Confirm your password"
+                                        />
+                                    </div>
+                                </div>
+                                
+                                {passwordError && (
+                                    <div className="password-error">
+                                        ⚠️ {passwordError}
+                                    </div>
+                                )}
+                                
+                                <button type="submit" className="submit" disabled={loading}>{loading ? <><Spinner /> Setting Password…</> : '🔐  Set Password & Continue'}</button>
+                                
+                                <button type="button" className="logout-link" 
+                                    onClick={() => {
+                                        setShowPasswordSetup(false);
+                                        setForm({ username: '', password: '' });
+                                    }}
+                                >
+                                    ← Back to Login
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                )}
         </div>
     );
 }
