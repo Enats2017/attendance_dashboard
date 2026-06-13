@@ -270,7 +270,14 @@ class AttendanceView {
         }
 
         if (content && typeof content.renderCharts === 'function') {
-            setTimeout(() => content.renderCharts(), 50);
+            try {
+                setTimeout(() => {
+                    console.log('Rendering Tab:', tabId);
+                    content.renderCharts();
+                }, 50);
+            } catch (e) {
+                console.error('Chart Error:', e);
+            }
         }
     }
 
@@ -565,7 +572,7 @@ class AttendanceView {
         const eBG = model.groupBy(emps, e => e.gender);
         const rows = genders.map(g => {
             const t = (eBG[g] || []).length, ls = logs.filter(l => (empMap[l.empId] || {}).gender === g);
-            const p = new Set(ls.map(l => l.empId)).size;
+            const p = new Set(ls.filter(l => l.present === 1).map(l => l.empId)).size;
             return [g, t, p, t - p, t ? Math.round(p / t * 100) + '%' : '0%'];
         });
         return {

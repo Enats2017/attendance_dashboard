@@ -95,7 +95,7 @@ class AttendanceModel {
             url.searchParams.set('dept', this.state.filters.dept);
             url.searchParams.set('company', this.state.filters.company);
             url.searchParams.set('shift', this.state.filters.shift);
-
+            console.log('Dashboard URL:', url.toString());
             const response = await fetch(url.toString());
             const data = await response.json();
 

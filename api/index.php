@@ -420,7 +420,7 @@ function handleDashboardData($input) {
                 'code' => $row['EmployeeCode'],
                 'name' => $row['EmployeeName'],
                 'dob' => $row['DOB'] ? $row['DOB']->format('Y-m-d') : '1990-01-01',
-                'gender' => $row['Gender'] == 'Male' || $row['Gender'] == 'M' ? 'Male' : 'Female',
+                'gender' => in_array(strtoupper(trim($row['Gender'])), ['MALE', 'M']) ? 'Male' : 'Female',
                 'dept' => $row['dept'] ?: 'Dept ' . $row['DepartmentId'],
                 'std_hc' => intval($row['std_hc']),
                 'company' => $row['company'] ?: 'Unknown',
@@ -527,29 +527,41 @@ function handleDashboardData($input) {
     $totalEmployees = count($employees);
     $presentEmployees = 0;
 
-    $useAttendanceLogs = !empty($logs);
-    if ($useAttendanceLogs) {
-        $presentEmpIds = [];
-        foreach ($logs as $log) {
-            if ($log['present'] == 1) {
-                $presentEmpIds[$log['empId']] = true;
-            }
-        }
-        $presentEmployees = count($presentEmpIds);
-    } else {
-        $sqlPresent = "SELECT COUNT(DISTINCT E.EmployeeId) AS PresentEmployees FROM $devTable D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON CAST(D.UserId AS VARCHAR(50)) = CAST(E.EmployeeCodeInDevice AS VARCHAR(50)) LEFT JOIN Departments D2 WITH (NOLOCK) ON E.DepartmentId = D2.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId WHERE D.LogDate >= '$dayFrom' AND D.LogDate <= '$dayTo 23:59:59' AND E.Status = 'Working' AND E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList)";
-
-        $paramsPresent = [];
-        if ($deptName) { $sqlPresent .= " AND D2.DepartmentFName = ?"; $paramsPresent[] = $deptName; }
-        if ($compName)  { $sqlPresent .= " AND C.CompanyFName = ?"; $paramsPresent[] = $compName; }
-        if ($shiftName) { $sqlPresent .= " AND E.EmployeeId IN (" . implode(',', $shiftFilteredIds) . ")"; }
-
-        $stmtPresent = sqlsrv_query($conn, $sqlPresent, $paramsPresent);
-        if ($stmtPresent && ($row = sqlsrv_fetch_array($stmtPresent, SQLSRV_FETCH_ASSOC))) {
-            $presentEmployees = intval($row['PresentEmployees']);
+    $attendancePresentEmpIds = [];
+    foreach ($logs as $log) {
+        if ($log['present'] == 1) {
+            $attendancePresentEmpIds[$log['empId']] = true;
         }
     }
-    $dataSource = $useAttendanceLogs ? 'attendance' : 'device';
+
+    $missingEmployeeIds = [];
+    foreach ($employees as $emp) {
+        if (!isset($attendancePresentEmpIds[$emp['id']])) {
+            $missingEmployeeIds[] = $emp['id'];
+        }
+    }
+
+    $devicePresentEmpIds = [];
+    if (!empty($missingEmployeeIds)) {
+        $sqlDevicePresent = "SELECT DISTINCT E.EmployeeId FROM $devTable D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON CAST(D.UserId AS VARCHAR(50)) = CAST(E.EmployeeCodeInDevice AS VARCHAR(50)) WHERE E.EmployeeId IN (" . implode(',', $missingEmployeeIds) . ") AND D.LogDate >= '$dayFrom' AND D.LogDate <= '$dayTo 23:59:59' AND E.Status = 'Working' AND E.RecordStatus = 1";
+
+        $stmtDevicePresent = sqlsrv_query($conn, $sqlDevicePresent);
+
+        if ($stmtDevicePresent) {
+            while ($row = sqlsrv_fetch_array($stmtDevicePresent, SQLSRV_FETCH_ASSOC)) {
+                $devicePresentEmpIds[(string)$row['EmployeeId']] = true;
+            }
+        }
+    }
+
+    $finalPresentEmpIds = $attendancePresentEmpIds;
+
+    foreach ($devicePresentEmpIds as $empId => $value) {
+        $finalPresentEmpIds[$empId] = true;
+    }
+
+    $presentEmployees = count($finalPresentEmpIds);
+    $dataSource = 'attendance+device';
 
     $singlePunch = 0;
     $lateIn = 0;
@@ -610,7 +622,7 @@ function handleDashboardData($input) {
         FILE_APPEND
     );
 
-    if ($useAttendanceLogs && !empty($nightShiftLogs)) {
+    if (!empty($nightShiftLogs)) {
         $nightPresentIds = [];
         foreach ($nightShiftLogs as $log) {
             if ($log['present'] == 1) {
