@@ -445,44 +445,64 @@ function handleDashboardData($input) {
     );
 
     // 2. Attendance Logs
-    $logTable = "AttendanceLogs_{$month}_{$year}";
     $logs = [];
-    $tableExists = false;
-    $checkTable = sqlsrv_query($conn, "SELECT 1 FROM sys.tables WHERE name = ?", [$logTable]);
-    if ($checkTable && sqlsrv_fetch_array($checkTable)) {
-        $tableExists = true;
-    } else {
-        $logTable = "AttendanceLogs_" . sprintf("%02d", $month) . "_{$year}";
-        $checkTable = sqlsrv_query($conn, "SELECT 1 FROM sys.tables WHERE name = ?", [$logTable]);
-        if ($checkTable && sqlsrv_fetch_array($checkTable)) $tableExists = true;
-    }
 
-    if ($tableExists) {
-        $sqlLogs = "SELECT A.EmployeeId, A.AttendanceDate, A.InTime, A.OutTime, A.Status, A.Duration, A.LateBy, A.EarlyBy, A.Present, A.MissedInPunch, A.MissedOutPunch FROM $logTable A WITH (NOLOCK) JOIN Employees E WITH (NOLOCK) ON A.EmployeeId = E.EmployeeId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND A.AttendanceDate >= '$dayFrom' AND A.AttendanceDate <= '$dayTo 23:59:59' AND E.Status = 'Working'";
-        
-        $paramsLogs = [];
-        if ($deptName) { $sqlLogs .= " AND D.DepartmentFName = ?"; $paramsLogs[] = $deptName; }
-        if ($compName) { $sqlLogs .= " AND C.CompanyFName = ?"; $paramsLogs[] = $compName; }
-        if ($shiftName) { $sqlLogs .= " AND A.EmployeeId IN (" . implode(',', $shiftFilteredIds) . ")"; }
-    
-        $stmtLogs = sqlsrv_query($conn, $sqlLogs, $paramsLogs);
-        if ($stmtLogs) {
-            while ($row = sqlsrv_fetch_array($stmtLogs, SQLSRV_FETCH_ASSOC)) {
-                $logs[] = [
-                    'empId' => (string)$row['EmployeeId'],
-                    'date' => $row['AttendanceDate'] ? $row['AttendanceDate']->format('Y-m-d') : null,
-                    'inTime' => $row['InTime'],
-                    'outTime' => $row['OutTime'],
-                    'status' => $row['Status'] ?: 'Present',
-                    'present' => intval($row['Present']),
-                    'hoursWorked' => round(floatval($row['Duration']) / 60, 2),
-                    'lateBy' => intval($row['LateBy']),
-                    'earlyBy' => intval($row['EarlyBy']),
-                    'missedInPunch'  => intval($row['MissedInPunch']),
-                    'missedOutPunch' => intval($row['MissedOutPunch'])
-                ];
+    $curDate = new DateTime(date('Y-m-01', strtotime($dayFrom)));
+    $endDate = new DateTime(date('Y-m-01', strtotime($dayTo)));
+
+    while ($curDate <= $endDate) {
+        $m = (int)$curDate->format('n');
+        $y = (int)$curDate->format('Y');
+
+        $logTable = "AttendanceLogs_{$m}_{$y}";
+        $tableExists = false;
+        $checkTable = sqlsrv_query($conn, "SELECT 1 FROM sys.tables WHERE name = ?", [$logTable]);
+        if ($checkTable && sqlsrv_fetch_array($checkTable)) {
+            $tableExists = true;
+        } else {
+            $logTable = "AttendanceLogs_" . sprintf("%02d", $m) . "_{$y}";
+            $checkTable = sqlsrv_query($conn, "SELECT 1 FROM sys.tables WHERE name = ?", [$logTable]);
+            if ($checkTable && sqlsrv_fetch_array($checkTable)) {
+                $tableExists = true;
             }
         }
+
+        if ($tableExists) {
+            $sqlLogs = "SELECT A.EmployeeId, A.AttendanceDate, A.InTime, A.OutTime, A.Status, A.Duration, A.LateBy, A.EarlyBy, A.Present, A.MissedInPunch, A.MissedOutPunch FROM $logTable A WITH (NOLOCK) JOIN Employees E WITH (NOLOCK) ON A.EmployeeId = E.EmployeeId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND A.AttendanceDate >= '$dayFrom' AND A.AttendanceDate <= '$dayTo 23:59:59' AND E.Status = 'Working'";
+
+            $paramsLogs = [];
+            if ($deptName) { 
+                $sqlLogs .= " AND D.DepartmentFName = ?"; 
+                $paramsLogs[] = $deptName; 
+            }
+            if ($compName) { 
+                $sqlLogs .= " AND C.CompanyFName = ?"; 
+                $paramsLogs[] = $compName; 
+            }
+            if ($shiftName) { 
+                $sqlLogs .= " AND A.EmployeeId IN (" . implode(',', $shiftFilteredIds) . ")"; 
+            }
+
+            $stmtLogs = sqlsrv_query($conn, $sqlLogs, $paramsLogs);
+            if ($stmtLogs) {
+                while ($row = sqlsrv_fetch_array($stmtLogs, SQLSRV_FETCH_ASSOC)) {
+                    $logs[] = [
+                        'empId' => (string)$row['EmployeeId'],
+                        'date' => $row['AttendanceDate'] ? $row['AttendanceDate']->format('Y-m-d') : null,
+                        'inTime' => $row['InTime'],
+                        'outTime' => $row['OutTime'],
+                        'status' => $row['Status'] ?: 'Present',
+                        'present' => intval($row['Present']),
+                        'hoursWorked' => round(floatval($row['Duration']) / 60, 2),
+                        'lateBy' => intval($row['LateBy']),
+                        'earlyBy' => intval($row['EarlyBy']),
+                        'missedInPunch'  => intval($row['MissedInPunch']),
+                        'missedOutPunch' => intval($row['MissedOutPunch'])
+                    ];
+                }
+            }
+        }
+        $curDate->modify('+1 month');
     }
 
     $nightShiftLogs = [];
@@ -493,35 +513,51 @@ function handleDashboardData($input) {
     }
 
     // 3. Device Counts
-    $devTable = "DeviceLogs_{$month}_{$year}";
     $counts = ['in' => 0, 'out' => 0];
-    $tableExists = false;
-    $checkTable = sqlsrv_query($conn, "SELECT 1 FROM sys.tables WHERE name = ?", [$devTable]);
-    if ($checkTable && sqlsrv_fetch_array($checkTable)) {
-        $tableExists = true;
-    } else {
-        $devTable = "DeviceLogs_" . sprintf("%02d", $month) . "_{$year}";
+    $devTables = [];
+
+    $curDate = new DateTime(date('Y-m-01', strtotime($dayFrom)));
+    $endDate = new DateTime(date('Y-m-01', strtotime($dayTo)));
+
+    while ($curDate <= $endDate) {
+        $m = (int)$curDate->format('n');
+        $y = (int)$curDate->format('Y');
+
+        $devTable = "DeviceLogs_{$m}_{$y}";
+        $tableExists = false;
         $checkTable = sqlsrv_query($conn, "SELECT 1 FROM sys.tables WHERE name = ?", [$devTable]);
-        if ($checkTable && sqlsrv_fetch_array($checkTable)) $tableExists = true;
-    }
-
-    if ($tableExists) {
-        $sqlDev = "SELECT D.Direction, COUNT(D.DeviceLogId) as total FROM $devTable D WITH (NOLOCK) LEFT JOIN Employees E WITH (NOLOCK) ON CAST(D.UserId AS VARCHAR(50)) = CAST(E.EmployeeCodeInDevice AS VARCHAR(50)) LEFT JOIN Departments De WITH (NOLOCK) ON E.DepartmentId = De.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND D.Direction != '' AND D.LogDate >= '$dayFrom' AND D.LogDate <= '$dayTo 23:59:59' AND E.Status = 'Working'";
-
-        $paramsDev = [];
-        if ($deptName) { $sqlDev .= " AND De.DepartmentFName = ?"; $paramsDev[] = $deptName; }
-        if ($compName) { $sqlDev .= " AND C.CompanyFName = ?"; $paramsDev[] = $compName; }
-        if ($shiftName) { $sqlDev .= " AND D.UserId IN (" . implode(',', $shiftFilteredIds) . ")"; }
-        $sqlDev .= " GROUP BY D.Direction";
-
-        $stmtDev = sqlsrv_query($conn, $sqlDev, $paramsDev);
-        if ($stmtDev) {
-            while ($row = sqlsrv_fetch_array($stmtDev, SQLSRV_FETCH_ASSOC)) {
-                $dir = trim($row['Direction']);
-                if (strcasecmp($dir, 'in') == 0 || $dir === '0') $counts['in'] += $row['total'];
-                else if (strcasecmp($dir, 'out') == 0 || $dir === '1') $counts['out'] += $row['total'];
+        if ($checkTable && sqlsrv_fetch_array($checkTable)) {
+            $tableExists = true;
+        } else {
+            $devTable = "DeviceLogs_" . sprintf("%02d", $m) . "_{$y}";
+            $checkTable = sqlsrv_query($conn, "SELECT 1 FROM sys.tables WHERE name = ?", [$devTable]);
+            if ($checkTable && sqlsrv_fetch_array($checkTable)) {
+                $tableExists = true;
             }
         }
+
+        if ($tableExists) {
+            $devTables[] = $devTable;
+
+            $sqlDev = "SELECT D.Direction, COUNT(D.DeviceLogId) as total FROM $devTable D WITH (NOLOCK) LEFT JOIN Employees E WITH (NOLOCK) ON CAST(D.UserId AS VARCHAR(50)) = CAST(E.EmployeeCodeInDevice AS VARCHAR(50)) LEFT JOIN Departments De WITH (NOLOCK) ON E.DepartmentId = De.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND D.Direction != '' AND D.LogDate >= '$dayFrom' AND D.LogDate <= '$dayTo 23:59:59' AND E.Status = 'Working'";
+
+            $paramsDev = [];
+            if ($deptName) { $sqlDev .= " AND De.DepartmentFName = ?"; $paramsDev[] = $deptName; }
+            if ($compName) { $sqlDev .= " AND C.CompanyFName = ?"; $paramsDev[] = $compName; }
+            if ($shiftName) { $sqlDev .= " AND D.UserId IN (" . implode(',', $shiftFilteredIds) . ")"; }
+            $sqlDev .= " GROUP BY D.Direction";
+
+            $stmtDev = sqlsrv_query($conn, $sqlDev, $paramsDev);
+            if ($stmtDev) {
+                while ($row = sqlsrv_fetch_array($stmtDev, SQLSRV_FETCH_ASSOC)) {
+                    $dir = trim($row['Direction']);
+                    if (strcasecmp($dir, 'in') == 0 || $dir === '0') $counts['in'] += $row['total'];
+                    else if (strcasecmp($dir, 'out') == 0 || $dir === '1') $counts['out'] += $row['total'];
+                }
+            }
+        }
+
+        $curDate->modify('+1 month');
     }
 
     $totalEmployees = count($employees);
@@ -542,14 +578,16 @@ function handleDashboardData($input) {
     }
 
     $devicePresentEmpIds = [];
-    if (!empty($missingEmployeeIds)) {
-        $sqlDevicePresent = "SELECT DISTINCT E.EmployeeId FROM $devTable D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON CAST(D.UserId AS VARCHAR(50)) = CAST(E.EmployeeCodeInDevice AS VARCHAR(50)) WHERE E.EmployeeId IN (" . implode(',', $missingEmployeeIds) . ") AND D.LogDate >= '$dayFrom' AND D.LogDate <= '$dayTo 23:59:59' AND E.Status = 'Working' AND E.RecordStatus = 1";
+    if (!empty($missingEmployeeIds) && !empty($devTables)) {
+        foreach ($devTables as $devTable) {
+            $sqlDevicePresent = "SELECT DISTINCT E.EmployeeId FROM $devTable D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON CAST(D.UserId AS VARCHAR(50)) = CAST(E.EmployeeCodeInDevice AS VARCHAR(50)) WHERE E.EmployeeId IN (" . implode(',', $missingEmployeeIds) . ") AND D.LogDate >= '$dayFrom' AND D.LogDate <= '$dayTo 23:59:59' AND E.Status = 'Working' AND E.RecordStatus = 1";
 
-        $stmtDevicePresent = sqlsrv_query($conn, $sqlDevicePresent);
+            $stmtDevicePresent = sqlsrv_query($conn, $sqlDevicePresent);
 
-        if ($stmtDevicePresent) {
-            while ($row = sqlsrv_fetch_array($stmtDevicePresent, SQLSRV_FETCH_ASSOC)) {
-                $devicePresentEmpIds[(string)$row['EmployeeId']] = true;
+            if ($stmtDevicePresent) {
+                while ($row = sqlsrv_fetch_array($stmtDevicePresent, SQLSRV_FETCH_ASSOC)) {
+                    $devicePresentEmpIds[(string)$row['EmployeeId']] = true;
+                }
             }
         }
     }
