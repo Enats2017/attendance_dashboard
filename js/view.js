@@ -725,72 +725,149 @@ class AttendanceView {
   //     };
   // }
 
-  _renderCompanyWise(logs, emps, empMap, model) {
-    const comps = [...new Set(emps.map((e) => e.company))].sort();
-    const eBC = model.groupBy(emps, (e) => e.company);
-    const lBC = model.groupBy(logs, (l) => (empMap[l.empId] || {}).company);
+//   _renderCompanyWise(logs, emps, empMap, model) {
+//     const comps = [...new Set(emps.map((e) => e.company))].sort();
+//     const eBC = model.groupBy(emps, (e) => e.company);
+//     const lBC = model.groupBy(logs, (l) => (empMap[l.empId] || {}).company);
 
-    const rows = comps.map((c) => {
-      const t = (eBC[c] || []).length;
-      const ls = lBC[c] || [];
+//     const rows = comps.map((c) => {
+//       const t = (eBC[c] || []).length;
+//       const ls = lBC[c] || [];
 
-      // Har employee ka ek record — present value check karo
-      // Ek hi din ka data ho tab: empId → present value map
-      const empPresentMap = {};
-      ls.forEach((l) => {
-        const pval = parseFloat(l.present);
-        const existing = empPresentMap[l.empId];
-        // Present=1 ko priority do, phir 0.5, phir 0
-        if (existing === undefined || pval > existing) {
-          empPresentMap[l.empId] = pval;
-        }
-      });
+//       // Har employee ka ek record — present value check karo
+//       // Ek hi din ka data ho tab: empId → present value map
+//       const empPresentMap = {};
+//       ls.forEach((l) => {
+//         const pval = parseFloat(l.present);
+//         const existing = empPresentMap[l.empId];
+//         // Present=1 ko priority do, phir 0.5, phir 0
+//         if (existing === undefined || pval > existing) {
+//           empPresentMap[l.empId] = pval;
+//         }
+//       });
 
-      const empIds = Object.keys(empPresentMap);
-      const p = empIds.filter((id) => empPresentMap[id] === 1).length;
-      const hp = empIds.filter((id) => empPresentMap[id] === 0.5).length;
-      const ab = empIds.filter((id) => empPresentMap[id] === 0).length;
+//       const empIds = Object.keys(empPresentMap);
+//       const p = empIds.filter((id) => empPresentMap[id] === 1).length;
+//       const hp = empIds.filter((id) => empPresentMap[id] === 0.5).length;
+//       const ab = empIds.filter((id) => empPresentMap[id] === 0).length;
 
-      return [c, t, p, hp, ab, t ? Math.round((p / t) * 100) + "%" : "0%"];
+//       return [c, t, p, hp, ab, t ? Math.round((p / t) * 100) + "%" : "0%"];
+//     });
+
+//     this._lastData["company-wise"] = rows.map((r) => ({
+//       Company: r[0],
+//       Total: r[1],
+//       Present: r[2],
+//       HalfPresent: r[3],
+//       Absent: r[4],
+//       Rate: r[5],
+//     }));
+
+//     return {
+//       html: `<h2 class="section-title"><i class="ph-fill ph-buildings"></i> Company Statistics</h2>
+//       <div class="charts-grid">
+//         ${this._chartCard("ch-comp-bar", '<i class="ph-fill ph-chart-bar"></i>', "violet", "Company Breakdown")}
+//       </div>
+//       ${this._tableHTML("tbl-comp", ["Company", "Total", "Present", "Half Present", "Absent", "Rate"], rows, "company-wise")}
+//       <div id="drilldown-table" style="margin-top:16px"></div>`,
+//       renderCharts: () => {
+//         Charts.stacked(
+//           "ch-comp-bar",
+//           comps,
+//           [
+//             // Present + Half Present ek saath green mein dikhao
+//             { name: "Present", data: rows.map((r) => r[2] + r[3]) }, // 53 + 2 = 55
+//             { name: "Absent", data: rows.map((r) => r[4]) }, // 19
+//           ],
+//           "Company Attendance",
+//           (c) => {
+//             this._renderDrillDown(
+//               logs.filter((l) => (empMap[l.empId] || {}).company === c),
+//               `Company: ${c}`,
+//               empMap,
+//             );
+//           },
+//         );
+//       },
+//     };
+//   }
+
+_renderCompanyWise(logs, emps, empMap, model) {
+  const comps = [...new Set(emps.map((e) => e.company))].sort();
+  const eBC = model.groupBy(emps, (e) => e.company);
+  const lBC = model.groupBy(logs, (l) => (empMap[l.empId] || {}).company);
+
+  const rows = comps.map((c) => {
+    const compEmps = eBC[c] || [];
+    const t = compEmps.length;  // Total = Employees table se
+    const ls = lBC[c] || [];
+
+    // Logs mein present value map banao
+    const empPresentMap = {};
+    ls.forEach((l) => {
+      const pval = parseFloat(l.present);
+      const existing = empPresentMap[l.empId];
+      if (existing === undefined || pval > existing) {
+        empPresentMap[l.empId] = pval;
+      }
     });
 
-    this._lastData["company-wise"] = rows.map((r) => ({
-      Company: r[0],
-      Total: r[1],
-      Present: r[2],
-      HalfPresent: r[3],
-      Absent: r[4],
-      Rate: r[5],
-    }));
+    // Present = present===1 wale (logs mein hain)
+    const p = Object.keys(empPresentMap)
+      .filter((id) => empPresentMap[id] === 1).length;
 
-    return {
-      html: `<h2 class="section-title"><i class="ph-fill ph-buildings"></i> Company Statistics</h2>
+    // Half Present = present===0.5 wale
+    const hp = Object.keys(empPresentMap)
+      .filter((id) => empPresentMap[id] === 0.5).length;
+
+    // Absent = jo employees logs mein hain aur present=0
+    //        + jo employees logs mein HAIN HI NAHI (no record)
+    const loggedAbsent = Object.keys(empPresentMap)
+      .filter((id) => empPresentMap[id] === 0).length;
+
+    // No log record wale employees
+    const noLogEmps = compEmps.filter(
+      (e) => empPresentMap[e.id] === undefined
+    ).length;
+
+    const ab = loggedAbsent + noLogEmps;  // ← Yahan fix hai
+
+    return [c, t, p, hp, ab, t ? Math.round((p / t) * 100) + "%" : "0%"];
+  });
+
+  this._lastData["company-wise"] = rows.map((r) => ({
+    Company: r[0], Total: r[1], Present: r[2],
+    HalfPresent: r[3], Absent: r[4], Rate: r[5],
+  }));
+
+  return {
+    html: `<h2 class="section-title"><i class="ph-fill ph-buildings"></i> Company Statistics</h2>
       <div class="charts-grid">
         ${this._chartCard("ch-comp-bar", '<i class="ph-fill ph-chart-bar"></i>', "violet", "Company Breakdown")}
       </div>
       ${this._tableHTML("tbl-comp", ["Company", "Total", "Present", "Half Present", "Absent", "Rate"], rows, "company-wise")}
       <div id="drilldown-table" style="margin-top:16px"></div>`,
-      renderCharts: () => {
-        Charts.stacked(
-          "ch-comp-bar",
-          comps,
-          [
-            // Present + Half Present ek saath green mein dikhao
-            { name: "Present", data: rows.map((r) => r[2] + r[3]) }, // 53 + 2 = 55
-            { name: "Absent", data: rows.map((r) => r[4]) }, // 19
-          ],
-          "Company Attendance",
-          (c) => {
-            this._renderDrillDown(
-              logs.filter((l) => (empMap[l.empId] || {}).company === c),
-              `Company: ${c}`,
-              empMap,
-            );
-          },
-        );
-      },
-    };
-  }
+    renderCharts: () => {
+      Charts.stacked(
+        "ch-comp-bar",
+        comps,
+        [
+          { name: "Present", data: rows.map((r) => r[2] + r[3]) }, // Present + Half Present
+          { name: "Absent",  data: rows.map((r) => r[4]) },
+        ],
+        "Company Attendance",
+        (c) => {
+          this._renderDrillDown(
+            logs.filter((l) => (empMap[l.empId] || {}).company === c),
+            `Company: ${c}`,
+            empMap,
+          );
+        },
+      );
+    },
+  };
+}
+
 
   _renderDeptWise(logs, emps, empMap, model) {
     const depts = [...new Set(emps.map((e) => e.dept))].sort();
