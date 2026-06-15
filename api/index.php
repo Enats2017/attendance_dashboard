@@ -335,6 +335,61 @@ function setupPassword($data) {
     }
 }
 
+
+function computeShiftStats($employees, $logs, $conn) {
+    $shiftMaster = [];
+    $stmt = sqlsrv_query($conn, "SELECT ShiftId, ShiftCode, ShiftName FROM Shifts WHERE RecordStatus = 1");
+    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+        $shiftMaster[intval($row['ShiftId'])] = [
+            'code' => $row['ShiftCode'],
+            'name' => $row['ShiftName']
+        ];
+    }
+
+    $shiftEmpIds = [];
+    $shiftMeta   = [];
+
+    foreach ($logs as $log) {
+        $shiftId = intval($log['shiftId']);
+        if (!isset($shiftMaster[$shiftId])) continue;
+
+        $shiftCode = $shiftMaster[$shiftId]['code'];
+        $shiftName = $shiftMaster[$shiftId]['name'];
+        $key = $shiftName;
+
+        if (!isset($shiftEmpIds[$key])) {
+            $shiftEmpIds[$key] = [];
+            $shiftMeta[$key]   = ['shiftCode' => $shiftCode, 'shiftName' => $shiftName];
+        }
+        $shiftEmpIds[$key][$log['empId']] = true;
+    }
+
+    $shiftTotals = [];
+    foreach ($employees as $emp) {
+        $sn = $emp['shift'] ?? 'Unknown';
+        $shiftTotals[$sn] = ($shiftTotals[$sn] ?? 0) + 1;
+    }
+
+    $shiftCounts = [];
+    foreach ($shiftEmpIds as $key => $empMap) {
+        $present = count($empMap);
+        $total = $shiftTotals[$key] ?? $present;
+        $absent = max(0, $total - $present);
+        $rate = $total > 0 ? round(($present / $total) * 100) : 0;
+
+        $shiftCounts[] = [
+            'shiftCode' => $shiftMeta[$key]['shiftCode'],
+            'shiftName' => $shiftMeta[$key]['shiftName'],
+            'present' => $present,
+            'total' => $total,
+            'absent' => $absent,
+            'rate' => $rate
+        ];
+    }
+    return $shiftCounts;
+}
+
+
 /**
  * Handle Dashboard Data Fetch (Employees, Logs, Counts)
  */
@@ -448,7 +503,7 @@ function handleDashboardData($input, $returnData = false) {
         }
 
         if ($tableExists) {
-            $sqlLogs = "SELECT A.EmployeeId, A.AttendanceDate, A.InTime, A.OutTime, A.Status, A.Duration, A.LateBy, A.EarlyBy, A.Present, A.MissedInPunch, A.MissedOutPunch FROM $logTable A WITH (NOLOCK) JOIN Employees E WITH (NOLOCK) ON A.EmployeeId = E.EmployeeId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND A.AttendanceDate >= '$dayFrom' AND A.AttendanceDate <= '$dayTo 23:59:59' AND E.Status = 'Working'";
+            $sqlLogs = "SELECT A.EmployeeId, A.AttendanceDate, A.InTime, A.OutTime, A.Status, A.Duration, A.LateBy, A.EarlyBy, A.Present, A.MissedInPunch, A.MissedOutPunch, A.ShiftId FROM $logTable A WITH (NOLOCK) JOIN Employees E WITH (NOLOCK) ON A.EmployeeId = E.EmployeeId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND A.AttendanceDate >= '$dayFrom' AND A.AttendanceDate <= '$dayTo 23:59:59' AND E.Status = 'Working'";
 
             $paramsLogs = [];
             if ($deptName) { 
@@ -478,7 +533,8 @@ function handleDashboardData($input, $returnData = false) {
                         'lateBy' => intval($row['LateBy']),
                         'earlyBy' => intval($row['EarlyBy']),
                         'missedInPunch'  => intval($row['MissedInPunch']),
-                        'missedOutPunch' => intval($row['MissedOutPunch'])
+                        'missedOutPunch' => intval($row['MissedOutPunch']),
+                        'shiftId' => intval($row['ShiftId']),
                     ];
                 }
             }
@@ -530,7 +586,6 @@ function handleDashboardData($input, $returnData = false) {
                 }
             }
         }
-
         $curDate->modify('+1 month');
     }
 
@@ -606,8 +661,11 @@ function handleDashboardData($input, $returnData = false) {
         }
     }
     $avgHours = $hoursCount > 0 ? round($totalHours / $hoursCount, 2) : 0;
-    $absentEmployees = max(0, $totalEmployees - $presentEmployees);
     
+    $absentEmployees = max(0, $totalEmployees - $presentEmployees);
+
+    $shiftStats = computeShiftStats($employees, $logs, $conn);
+
     if ($returnData) {
         return [
             'conn' => $conn,
@@ -615,7 +673,8 @@ function handleDashboardData($input, $returnData = false) {
             'logs' => $logs,
             'devTables' => $devTables,
             'dayFrom' => $dayFrom,
-            'dayTo' => $dayTo
+            'dayTo' => $dayTo,
+            'shiftStats' => $shiftStats
         ];
     }
 
@@ -633,6 +692,7 @@ function handleDashboardData($input, $returnData = false) {
         'employees' => $employees,
         'attendanceLogs' => $logs,
         'counts' => $counts,
+        'shiftStats' => $shiftStats,
         'timestamp' => date('Y-m-d H:i:s'),
         'dataSource' => $dataSource
     ]);
@@ -732,6 +792,7 @@ function handleNightShiftData($input) {
         'timestamp' => date('Y-m-d H:i:s')
     ]);
 }
+
 
 /**
  * Handle Dept Report - Get STD Headcounts
