@@ -95,6 +95,9 @@ switch ($action) {
     case 'dashboard_data':
         handleDashboardData($input);
         break;
+    case 'night_shift_dashboard_data':
+        handleNightShiftData($input);
+        break;
     case 'get_std_hc':
         handleGetStdHC();
         break;
@@ -332,28 +335,10 @@ function setupPassword($data) {
     }
 }
 
-
-function getNightShiftPresentCount($conn, $devTable, $dayFrom, $dayTo, $nightShiftEmployeeIds) {
-    if (empty($nightShiftEmployeeIds)) {
-        return 0;
-    }
-
-    $sql = "SELECT COUNT(DISTINCT E.EmployeeId) AS PresentEmployees FROM $devTable D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON CAST(D.UserId AS VARCHAR(50)) = CAST(E.EmployeeCodeInDevice AS VARCHAR(50)) WHERE D.LogDate >= '$dayFrom' AND D.LogDate <= '$dayTo 23:59:59' AND E.EmployeeId IN (" . implode(',', $nightShiftEmployeeIds) . ")";
-
-    $stmt = sqlsrv_query($conn, $sql);
-
-    if ($stmt && ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC))) {
-        return intval($row['PresentEmployees']);
-    }
-
-    return 0;
-}
-
-
 /**
  * Handle Dashboard Data Fetch (Employees, Logs, Counts)
  */
-function handleDashboardData($input) {
+function handleDashboardData($input, $returnData = false) {
     $userId = isset($input['userId']) ? intval($input['userId']) : 0;
     $month = isset($input['month']) ? intval($input['month']) : intval(date('n'));
     $year = isset($input['year']) ? intval($input['year']) : intval(date('Y'));
@@ -406,9 +391,17 @@ function handleDashboardData($input) {
     $sqlEmp = "SELECT E.EmployeeId, E.EmployeeName, E.EmployeeCode, E.Gender, E.DOB, E.Designation, DG.DesignationsName as DesignationName, C.CompanyFName as company, L.LocationName as location, D.DepartmentFName as dept, D.std_hc FROM Employees E WITH (NOLOCK) LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working'";
 
     $paramsEmp = [];
-    if ($deptName) { $sqlEmp .= " AND D.DepartmentFName = ?"; $paramsEmp[] = $deptName; }
-    if ($compName) { $sqlEmp .= " AND C.CompanyFName = ?"; $paramsEmp[] = $compName; }
-    if ($shiftName) { $sqlEmp .= " AND E.EmployeeId IN (" . implode(',', $shiftFilteredIds) . ")"; }
+    if ($deptName) { 
+        $sqlEmp .= " AND D.DepartmentFName = ?"; 
+        $paramsEmp[] = $deptName; 
+    }
+    if ($compName) { 
+        $sqlEmp .= " AND C.CompanyFName = ?"; 
+        $paramsEmp[] = $compName; 
+    }
+    if ($shiftName) { 
+        $sqlEmp .= " AND E.EmployeeId IN (" . implode(',', $shiftFilteredIds) . ")"; 
+    }
     $sqlEmp .= " ORDER BY D.DepartmentFName ASC, E.EmployeeName ASC";
 
     $stmtEmp = sqlsrv_query($conn, $sqlEmp, $paramsEmp);
@@ -430,19 +423,6 @@ function handleDashboardData($input) {
             ];
         }
     }
-
-    $nightShiftEmployees = [];
-    foreach ($employees as $emp) {
-        if (in_array($emp['shift'], ['DSTN', 'CPC'])) {
-            $nightShiftEmployees[] = $emp;
-        }
-    }
-    $nightShiftEmployeeIds = array_column($nightShiftEmployees, 'id');
-
-    file_put_contents(
-        'night_debug.txt',
-        "Night Employees: " . count($nightShiftEmployeeIds) . PHP_EOL
-    );
 
     // 2. Attendance Logs
     $logs = [];
@@ -503,13 +483,6 @@ function handleDashboardData($input) {
             }
         }
         $curDate->modify('+1 month');
-    }
-
-    $nightShiftLogs = [];
-    foreach ($logs as $log) {
-        if (in_array($log['empId'], $nightShiftEmployeeIds)) {
-            $nightShiftLogs[] = $log;
-        }
     }
 
     // 3. Device Counts
@@ -579,14 +552,19 @@ function handleDashboardData($input) {
 
     $devicePresentEmpIds = [];
     if (!empty($missingEmployeeIds) && !empty($devTables)) {
+        $missingLookup = array_flip($missingEmployeeIds); 
+
         foreach ($devTables as $devTable) {
-            $sqlDevicePresent = "SELECT DISTINCT E.EmployeeId FROM $devTable D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON CAST(D.UserId AS VARCHAR(50)) = CAST(E.EmployeeCodeInDevice AS VARCHAR(50)) WHERE E.EmployeeId IN (" . implode(',', $missingEmployeeIds) . ") AND D.LogDate >= '$dayFrom' AND D.LogDate <= '$dayTo 23:59:59' AND E.Status = 'Working' AND E.RecordStatus = 1";
+            $sqlDevicePresent = "SELECT DISTINCT E.EmployeeId FROM $devTable D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON CAST(D.UserId AS VARCHAR(50)) = CAST(E.EmployeeCodeInDevice AS VARCHAR(50)) WHERE D.LogDate >= '$dayFrom' AND D.LogDate <= '$dayTo 23:59:59' AND E.Status = 'Working' AND E.RecordStatus = 1";
 
             $stmtDevicePresent = sqlsrv_query($conn, $sqlDevicePresent);
 
             if ($stmtDevicePresent) {
                 while ($row = sqlsrv_fetch_array($stmtDevicePresent, SQLSRV_FETCH_ASSOC)) {
-                    $devicePresentEmpIds[(string)$row['EmployeeId']] = true;
+                    $empId = (string)$row['EmployeeId'];
+                    if (isset($missingLookup[$empId])) {
+                        $devicePresentEmpIds[$empId] = true;
+                    }
                 }
             }
         }
@@ -628,7 +606,61 @@ function handleDashboardData($input) {
     }
     $avgHours = $hoursCount > 0 ? round($totalHours / $hoursCount, 2) : 0;
     $absentEmployees = max(0, $totalEmployees - $presentEmployees);
- 
+    
+    if ($returnData) {
+        return [
+            'conn' => $conn,
+            'employees' => $employees,
+            'logs' => $logs,
+            'devTables' => $devTables,
+            'dayFrom' => $dayFrom,
+            'dayTo' => $dayTo
+        ];
+    }
+
+    echo json_encode([
+        'success' => true,
+        'todayStats' => [
+            'present' => $presentEmployees,
+            'absent' => $absentEmployees,
+            'total' => $totalEmployees,
+            'singlePunch' => $singlePunch,
+            'lateIn' => $lateIn,
+            'earlyOut' => $earlyOut,
+            'avgHours' => $avgHours
+        ],
+        'employees' => $employees,
+        'attendanceLogs' => $logs,
+        'counts' => $counts,
+        'timestamp' => date('Y-m-d H:i:s'),
+        'dataSource' => $dataSource
+    ]);
+}
+
+function handleNightShiftData($input) {
+    $data = handleDashboardData($input, true);
+    $conn = $data['conn'];
+    $employees = $data['employees'];
+    $logs = $data['logs'];
+    $devTables = $data['devTables'];
+    $dayFrom = $data['dayFrom'];
+    $dayTo = $data['dayTo'];
+
+    $nightShiftEmployees = [];
+    foreach ($employees as $emp) {
+        if (in_array($emp['shift'], ['DSTN', 'CPC'])) {
+            $nightShiftEmployees[] = $emp;
+        }
+    }
+    $nightShiftEmployeeIds = array_column($nightShiftEmployees, 'id');
+
+    $nightShiftLogs = [];
+    foreach ($logs as $log) {
+        if (in_array($log['empId'], $nightShiftEmployeeIds)) {
+            $nightShiftLogs[] = $log;
+        }
+    }
+
     $nightSinglePunch = 0;
     $nightLateIn = 0;
     $nightEarlyOut = 0;
@@ -652,13 +684,6 @@ function handleDashboardData($input) {
 
     $nightAvgHours = $nightHoursCount > 0 ? round($nightTotalHours / $nightHoursCount, 2) : 0;
     $nightTotalEmployees = count($nightShiftEmployees);
-    file_put_contents(
-        'night_debug.txt',
-        "Night Logs Employees: " .
-        count(array_unique(array_column($nightShiftLogs, 'empId'))) .
-        PHP_EOL,
-        FILE_APPEND
-    );
 
     if (!empty($nightShiftLogs)) {
         $nightPresentIds = [];
@@ -669,22 +694,29 @@ function handleDashboardData($input) {
         }
         $nightPresentEmployees = count($nightPresentIds);
     } else {
-        $nightPresentEmployees = getNightShiftPresentCount($conn, $devTable, $dayFrom, $dayTo, $nightShiftEmployeeIds);
+        $nightPresentEmployees = 0;
+
+        if (!empty($nightShiftEmployeeIds) && !empty($devTables)) {
+            $unionParts = [];
+            foreach ($devTables as $devTable) {
+                $unionParts[] = "SELECT D.UserId, D.LogDate FROM $devTable D WITH (NOLOCK) WHERE D.LogDate >= '$dayFrom' AND D.LogDate <= '$dayTo 23:59:59'";
+            }
+            $unionSql = implode(" UNION ALL ", $unionParts);
+
+            $sql = "SELECT COUNT(DISTINCT E.EmployeeId) AS PresentEmployees FROM ($unionSql) D INNER JOIN Employees E WITH (NOLOCK) ON CAST(D.UserId AS VARCHAR(50)) = CAST(E.EmployeeCodeInDevice AS VARCHAR(50)) WHERE E.EmployeeId IN (" . implode(',', $nightShiftEmployeeIds) . ")";
+
+            $stmt = sqlsrv_query($conn, $sql);
+
+            if ($stmt && ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC))) {
+                $nightPresentEmployees = intval($row['PresentEmployees']);
+            }
+        }
     }
 
     $nightAbsentEmployees = max(0, $nightTotalEmployees - $nightPresentEmployees);
-    
+
     echo json_encode([
         'success' => true,
-        'todayStats' => [
-            'present' => $presentEmployees,
-            'absent' => $absentEmployees,
-            'total' => $totalEmployees,
-            'singlePunch' => $singlePunch,
-            'lateIn' => $lateIn,
-            'earlyOut' => $earlyOut,
-            'avgHours' => $avgHours
-        ],
         'nightShiftStats' => [
             'present' => $nightPresentEmployees,
             'absent' => $nightAbsentEmployees,
@@ -694,13 +726,9 @@ function handleDashboardData($input) {
             'earlyOut' => $nightEarlyOut,
             'avgHours' => $nightAvgHours
         ],
-        'employees' => $employees,
-        'attendanceLogs' => $logs,
         'nightShiftEmployees' => $nightShiftEmployees,
         'nightShiftLogs' => $nightShiftLogs,
-        'counts' => $counts,
-        'timestamp' => date('Y-m-d H:i:s'),
-        'dataSource' => $dataSource
+        'timestamp' => date('Y-m-d H:i:s')
     ]);
 }
 
