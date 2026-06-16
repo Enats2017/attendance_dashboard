@@ -6,14 +6,18 @@ class AttendanceModel {
         this.state = {
             activeTab: 'feature',
             lastUpdated: null,
+            
             data: {
                 employees: [],
                 attendanceLogs: [],
                 counts: { In: 0, Out: 0 }
             },
+            
             filterLists: null,
+            
             filters: {
-                dateFrom: this._getMonthStart(),
+                // dateFrom: this._getMonthStart(),
+                dateFrom: this._getToday(),
                 dateTo: this._getToday(),
                 company: 'All',
                 dept: 'All',
@@ -22,6 +26,7 @@ class AttendanceModel {
                 location: 'All'
             }
         };
+
         this.onDataChanged = null;
     }
 
@@ -48,12 +53,17 @@ class AttendanceModel {
     }
 
     async fetchFilterOptions() {
-        if (this.state.filterLists) return { success: true };
+        if (this.state.filterLists) {
+            return { success: true };
+        }
+
         try {
             const urlDepts = new URL(window.APP_CONFIG.API_URL, window.location.origin);
             urlDepts.searchParams.set('action', 'get_depts');
+
             const urlComps = new URL(window.APP_CONFIG.API_URL, window.location.origin);
             urlComps.searchParams.set('action', 'get_companies');
+            
             const urlShifts = new URL(window.APP_CONFIG.API_URL, window.location.origin);
             urlShifts.searchParams.set('action', 'get_shifts');
 
@@ -95,7 +105,6 @@ class AttendanceModel {
             url.searchParams.set('dept', this.state.filters.dept);
             url.searchParams.set('company', this.state.filters.company);
             url.searchParams.set('shift', this.state.filters.shift);
-            console.log('Dashboard URL:', url.toString());
             const response = await fetch(url.toString());
             const data = await response.json();
 
@@ -103,6 +112,7 @@ class AttendanceModel {
                 this.state.data = {
                     employees: data.employees,
                     attendanceLogs: data.attendanceLogs,
+                    shiftStats: data.shiftStats || [],
                     nightShiftEmployees: data.nightShiftEmployees || [],
                     nightShiftLogs: data.nightShiftLogs || [],
                     counts: data.counts
@@ -171,23 +181,49 @@ class AttendanceModel {
 
         const logs = data.attendanceLogs.filter(log => {
             const emp = empMap[log.empId];
-            if (!emp) return false;
-            if (filters.dateFrom && log.date < filters.dateFrom) return false;
-            if (filters.dateTo && log.date > filters.dateTo) return false;
-            if (filters.company !== 'All' && emp.company !== filters.company) return false;
-            if (filters.dept !== 'All' && emp.dept !== filters.dept) return false;
-            if (filters.gender !== 'All' && emp.gender !== filters.gender) return false;
-            if (filters.shift !== 'All' && emp.shift !== filters.shift) return false;
-            if (filters.location !== 'All' && emp.location !== filters.location) return false;
+            if (!emp) {
+                return false;
+            }
+            if (filters.dateFrom && log.date < filters.dateFrom) {
+                return false;
+            }
+            if (filters.dateTo && log.date > filters.dateTo) {
+                return false;
+            }
+            if (filters.company !== 'All' && emp.company !== filters.company) {
+                return false;
+            }
+            if (filters.dept !== 'All' && emp.dept !== filters.dept) {
+                return false;
+            }
+            if (filters.gender !== 'All' && emp.gender !== filters.gender) {
+                return false;
+            }
+            if (filters.shift !== 'All' && emp.shift !== filters.shift) {
+                return false;
+            }
+            if (filters.location !== 'All' && emp.location !== filters.location) {
+                return false;
+            }
             return true;
         });
 
         const emps = data.employees.filter(emp => {
-            if (filters.company !== 'All' && emp.company !== filters.company) return false;
-            if (filters.dept !== 'All' && emp.dept !== filters.dept) return false;
-            if (filters.gender !== 'All' && emp.gender !== filters.gender) return false;
-            if (filters.shift !== 'All' && emp.shift !== filters.shift) return false;
-            if (filters.location !== 'All' && emp.location !== filters.location) return false;
+            if (filters.company !== 'All' && emp.company !== filters.company) {
+                return false;
+            }
+            if (filters.dept !== 'All' && emp.dept !== filters.dept) {
+                return false;
+            }
+            if (filters.gender !== 'All' && emp.gender !== filters.gender) {
+                return false;
+            }
+            if (filters.shift !== 'All' && emp.shift !== filters.shift) {
+                return false;
+            }
+            if (filters.location !== 'All' && emp.location !== filters.location) {
+                return false;
+            }
             return true;
         });
 
@@ -219,16 +255,26 @@ class AttendanceModel {
         const now = new Date();
         let age = now.getFullYear() - birth.getFullYear();
         const m = now.getMonth() - birth.getMonth();
-        if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
+        if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) {
+            age--;
+        }
         return age;
     }
 
     getAgeGroup(dob) {
         const age = this.getAge(dob);
-        if (age < 25) return 'Under 25';
-        if (age < 35) return '25–34';
-        if (age < 45) return '35–44';
-        if (age < 55) return '45–54';
+        if (age < 25) {
+            return 'Under 25';
+        }
+        if (age < 35) {
+            return '25–34';
+        }
+        if (age < 45) {
+            return '35–44';
+        }
+        if (age < 55) {
+            return '45–54';
+        }
         return '55+';
     }
 
@@ -267,7 +313,9 @@ class AttendanceModel {
         const out = {};
         arr.forEach(item => {
             const k = keyFn(item);
-            if (!out[k]) out[k] = [];
+            if (!out[k]) {
+                out[k] = [];
+            }
             out[k].push(item);
         });
         return out;
