@@ -994,40 +994,88 @@ class AttendanceView {
 
 		    const noLogEmps = compEmps.filter((e) => empPresentMap[e.id] === undefined).length;
 
-		    const ab = loggedAbsent + noLogEmps;  // ← Yahan fix hai
+		    const wo = ls.filter(l => l.weeklyOff == 1 && parseFloat(l.present) === 0).length;
 
-		    return [c, t, p, hp, ab, t ? Math.round((p / t) * 100) + "%" : "0%"];
+			const ab = loggedAbsent + noLogEmps;
+
+			return [c, t, p, hp, wo, ab, t ? Math.round((p / t) * 100) + "%" : "0%"];
 		});
 
 		this._lastData["company-wise"] = rows.map((r) => ({
-			Company: r[0], Total: r[1], Present: r[2],
-			HalfPresent: r[3], Absent: r[4], Rate: r[5],
+		    Company: r[0],
+		    Total: r[1],
+		    Present: r[2],
+		    HalfPresent: r[3],
+		    WeeklyOff: r[4],
+		    Absent: r[5],
+		    Rate: r[6],
 		}));
 
 		return {
 			html: `
-			<h2 class="section-title"><i class="ph-fill ph-buildings"></i> Company Statistics</h2>
+			<h2 class="section-title">
+				<i class="ph-fill ph-buildings"></i> Company Statistics
+			</h2>
 		  	<div class="charts-grid">
 		    	${this._chartCard("ch-comp-bar", '<i class="ph-fill ph-chart-bar"></i>', "violet", "Company Breakdown")}
 			</div>
-			${this._tableHTML("tbl-comp", ["Company", "Total", "Present", "Half Present", "Absent", "Rate"], rows, "company-wise")}
+			${this._tableHTML("tbl-comp", ["Company", "Total", "Present", "Half Present", "Weekly Off", "Absent", "Rate"], rows, "company-wise")}
 			<div id="drilldown-table" style="margin-top:16px"></div>`,
 			renderCharts: () => {
 				Charts.stacked(
 				    "ch-comp-bar",
 				    comps,
 				    [
-						{ name: "Present", data: rows.map((r) => r[2] + r[3]) }, // Present + Half Present
-						{ name: "Absent",  data: rows.map((r) => r[4]) },
-				    ],
+					    {
+					        name: "Present",
+					        data: rows.map((r) => r[2])
+					    },
+					    {
+					        name: "Half Present",
+					        data: rows.map((r) => r[3])
+					    },
+					    {
+					        name: "Weekly Off",
+					        data: rows.map((r) => r[4])
+					    },
+					    {
+					        name: "Absent",
+					        data: rows.map((r) => r[5])
+					    }
+					],
 				    "Company Attendance",
-				    (c) => {
-						this._renderDrillDown(
-							logs.filter((l) => (empMap[l.empId] || {}).company === c),
-							`Company: ${c}`,
-							empMap,
-						);
-				    },
+				    (company, index, seriesIndex, seriesName) => {
+					    const filteredLogs = logs.filter((l) => {
+					        const e = empMap[l.empId];
+
+					        if (!e) {
+					            return false;
+					        }
+
+					        if (e.company !== company) {
+					            return false;
+					        }
+
+					        switch (seriesName) {
+					            case "Present":
+					                return (l.status === "Present" || l.status === "Present On WeeklyOff");
+
+					            case "Half Present":
+					                return (l.status === "1/2Present" || l.status === "1/2Present On WeeklyOff");
+
+					            case "Weekly Off":
+					                return (l.status === "On WeeklyOff");
+
+					            case "Absent":
+					                return (l.status === "Absent");
+
+					            default:
+					                return false;
+					        }
+					    });
+
+					    this._renderDrillDown(filteredLogs, `Company: ${company} - ${seriesName}`, empMap);
+					}
 			    );
 			},
 		};

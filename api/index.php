@@ -338,7 +338,7 @@ function setupPassword($data) {
 
 function computeShiftStats($employees, $logs, $finalPresentEmpIds, $conn) {
     $shiftMaster = [];
-    
+
     $stmt = sqlsrv_query($conn, "SELECT ShiftId, ShiftCode, ShiftName FROM Shifts WHERE RecordStatus = 1");
 
     while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
@@ -581,6 +581,7 @@ function handleDashboardData($input, $returnData = false) {
     }
 
     // 3. Device Counts
+    $deviceEmployeeStats = [];
     $counts = ['in' => 0, 'out' => 0];
     $devTables = [];
 
@@ -639,12 +640,27 @@ function handleDashboardData($input, $returnData = false) {
                     else if (strcasecmp($dir, 'out') == 0 || $dir === '1') $counts['out'] += $row['total'];
                 }
             }
+
+            $sqlDeviceEmployeeStats = "SELECT E.EmployeeId, COUNT(*) AS PunchCount, MIN(D.LogDate) AS FirstPunch, MAX(D.LogDate) AS LastPunch FROM $devTable D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON CAST(D.UserId AS VARCHAR(50))  = CAST(E.EmployeeCodeInDevice AS VARCHAR(50)) WHERE D.LogDate >= '$dayFrom' AND D.LogDate <= '$dayTo 23:59:59' AND E.Status = 'Working' AND E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) GROUP BY E.EmployeeId";
+
+            $stmtDeviceEmployeeStats = sqlsrv_query($conn, $sqlDeviceEmployeeStats);
+
+            if ($stmtDeviceEmployeeStats) {
+                while ($row = sqlsrv_fetch_array($stmtDeviceEmployeeStats, SQLSRV_FETCH_ASSOC)) {
+                    $deviceEmployeeStats[(string)$row['EmployeeId']] = [
+                        'punchCount' => intval($row['PunchCount']),
+                        'firstPunch' => $row['FirstPunch'],
+                        'lastPunch' => $row['LastPunch']
+                    ];
+                }
+            }
         }
 
         $curDate->modify('+1 month');
     }
 
     $totalEmployees = count($employees);
+    
     $presentEmployees = 0;
 
     $attendancePresentEmpIds = [];
@@ -696,17 +712,15 @@ function handleDashboardData($input, $returnData = false) {
     $avgHours = 0;
     $totalHours = 0;
     $hoursCount = 0;
-    
+    $attendanceSinglePunchEmpIds = [];
     foreach ($logs as $log) {
-    
         if (($log['missedInPunch'] ?? 0) == 1 || ($log['missedOutPunch'] ?? 0) == 1) {
             $singlePunch++;
+            $attendanceSinglePunchEmpIds[$log['empId']] = true;
         }
-
         if (($log['lateBy'] ?? 0) > 0) {
             $lateIn++;
         }
-
         if (($log['earlyBy'] ?? 0) > 0) {
             $earlyOut++;
         }
@@ -715,6 +729,24 @@ function handleDashboardData($input, $returnData = false) {
 
         if ($log['hoursWorked'] > 0) {
             $hoursCount++;
+        }
+    }
+
+    foreach ($deviceEmployeeStats as $empId => $stat) {
+        if (isset($attendanceSinglePunchEmpIds[$empId])) {
+            continue;
+        }
+
+        if ($stat['punchCount'] == 1) {
+            $singlePunch++;
+        }
+
+        if ($stat['firstPunch'] && $stat['lastPunch']) {
+            $minutes = ($stat['lastPunch']->getTimestamp() - $stat['firstPunch']->getTimestamp()) / 60;
+            if ($minutes > 0) {
+                $totalHours += ($minutes / 60);
+                $hoursCount++;
+            }
         }
     }
 

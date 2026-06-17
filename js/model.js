@@ -22,6 +22,7 @@ class AttendanceModel {
                 location: 'All'
             }
         };
+        
         this.onDataChanged = null;
     }
 
