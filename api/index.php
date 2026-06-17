@@ -382,7 +382,7 @@ function handleDashboardData($input) {
     $shiftFilteredIds = [];
     $shiftParams = [];
     
-    $sqlShifts = "SELECT ES.EmployeeId, S.ShiftName FROM (SELECT EmployeeId, ShiftId, ROW_NUMBER() OVER(PARTITION BY EmployeeId ORDER BY Shiftdate DESC) as rn FROM EmployeeShift WITH (NOLOCK)) ES JOIN Shifts S WITH (NOLOCK) ON ES.ShiftId = S.ShiftId INNER JOIN Employees E WITH (NOLOCK) ON ES.EmployeeId = E.EmployeeId INNER JOIN UserCompanies UC WITH (NOLOCK) ON E.CompanyId = UC.CompanyId WHERE ES.rn = 1 AND E.Location IN ($locationList) AND E.Status = 'Working' AND UC.UserId = $userId AND S.RecordStatus = '1'";
+    $sqlShifts = "SELECT ES.EmployeeId, S.ShiftName FROM (SELECT EmployeeId, ShiftId, ROW_NUMBER() OVER(PARTITION BY EmployeeId ORDER BY Shiftdate DESC) as rn FROM EmployeeShift WITH (NOLOCK)) ES JOIN Shifts S WITH (NOLOCK) ON ES.ShiftId = S.ShiftId INNER JOIN Employees E WITH (NOLOCK) ON ES.EmployeeId = E.EmployeeId INNER JOIN UserCompanies UC WITH (NOLOCK) ON E.CompanyId = UC.CompanyId WHERE ES.rn = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working' AND UC.UserId = $userId AND S.RecordStatus = '1'";
                   
     if ($shiftName) {
         $sqlShifts .= " AND S.ShiftName = ?";
