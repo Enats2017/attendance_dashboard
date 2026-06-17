@@ -395,32 +395,39 @@ class AttendanceView {
 	}
 
 	_tableHTML(id, headers, rows, exportName) {
-		    const ths = `<th>Sr No</th>` + headers.map((h) => `<th>${h}</th>`).join("");
+	    const ths = `<th class="sr-col">Sr No</th>` + headers.map((h) => `<th>${h}</th>`).join("");
 
-		    const trs = rows.map((r, index) =>
-		        `<tr>
-		            <td>${index + 1}</td>
-		            ${r.map((c) => `<td>${c}</td>`).join("")}
-		        </tr>`
-		    ).join("");
-		return `
-				<div id="main-table-wrap">
-					<div class="table-wrap">
-						<div class="table-header">
-							<h3>📄 Detail Records</h3>
-							<div class="table-actions">
-								<button class="btn btn-success btn-sm" onclick="AppController.view.exportExcel(AppController.view._lastData['${exportName}'], '${exportName}')">⬇ Excel</button>
-								<button class="btn btn-danger btn-sm" onclick="AppController.view.exportPDF('${id}', '${exportName}')">⬇ PDF</button>
-							</div>
-						</div>
-						<div style="overflow-x:auto">
-							<table class="data-table" id="${id}">
-								<thead><tr>${ths}</tr></thead>
-								<tbody>${trs}</tbody>
-							</table>
-						</div>
-					</div>
-				</div>`;
+	    const trs = rows.map((r, index) =>
+	        `<tr>
+	            <td class="sr-col">${index + 1}</td>
+	            ${r.map((c) => `<td>${c}</td>`).join("")}
+	        </tr>`
+	    ).join("");
+
+	    return `
+	        <div id="main-table-wrap">
+	            <div class="table-wrap">
+	                <div class="table-header">
+	                    <h3>📄 Detail Records</h3>
+	                    <div class="table-actions">
+	                        <button class="btn-tbl btn-tbl-excel"
+	                            onclick="AppController.view.exportExcel(AppController.view._lastData['${exportName}'], '${exportName}')">
+	                            ↓ Excel
+	                        </button>
+	                        <button class="btn-tbl btn-tbl-pdf"
+	                            onclick="AppController.view.exportPDF('${id}', '${exportName}')">
+	                            ↓ PDF
+	                        </button>
+	                    </div>
+	                </div>
+	                <div style="overflow-x:auto">
+	                    <table class="data-table" id="${id}">
+	                        <thead><tr>${ths}</tr></thead>
+	                        <tbody>${trs}</tbody>
+	                    </table>
+	                </div>
+	            </div>
+	        </div>`;
 	}
 
 	_renderFeature(counts) {
@@ -499,7 +506,6 @@ class AttendanceView {
 				Status: l.status,
 			};
 		});
-		console.log("EXCEL DATA:", this._lastData["all-attendance"]);
 
 		const byDate = this._countBy(logs, (l) => l.date);
 		const dates = Object.keys(byDate).sort();
@@ -547,98 +553,146 @@ class AttendanceView {
 		};
 	}
 
-	_renderDrillDown(logs, title, empMap) {
-		const container = document.getElementById("drilldown-table");
-		if (!container) return;
-		const mainWrap = document.getElementById("main-table-wrap");
-		if (mainWrap) mainWrap.style.display = "none";
-		if (!logs || logs.length === 0) {
-			container.innerHTML = `<div class="drilldown-box"><div class="drilldown-header"><span>🔍 ${title}</span><button class="btn btn-sm" onclick="AppController.view.closeDrillDown()">✕ Back</button></div><p style="padding:32px">No records found.</p></div>`;
-			return;
-		}
-		const rows = logs.map((l, index) => {
-			const e = empMap[l.empId] || {};
-			return `
-				<tr>
-					<td>${index + 1}</td>
-					<td><b>${e.code || "–"}</b></td>
-					<td>${e.name || "–"}</td>
-					<td>${e.dept || "–"}</td>
-					<td>${e.company || "–"}</td>
-					<td>${e.shift || "–"}</td>
-					<td>${l.date}</td>
-					<td>${l.inTime || "–"}</td>
-					<td>${l.outTime || "–"}</td>
-					<td><b>${l.hoursWorked || 0}h</b></td>
-					<td>${l.lateIn ? "Yes" : "No"}</td>
-					<td>${l.earlyOut ? "Yes" : "No"}</td>
-					<td>${l.status}</td>
-				</tr>`;
-		}).join("");
-		this._drillData = logs.map((l) => {
-			const e = empMap[l.empId] || {};
-			return {
-				Code: e.code,
-				Name: e.name,
-				Dept: e.dept,
-				Company: e.company,
-				Shift: e.shift,
-				Date: l.date,
-				In: l.inTime,
-				Out: l.outTime,
-				Hours: l.hoursWorked,
-				Late: l.lateIn,
-				Early: l.earlyOut,
-				Status: l.status,
-			};
-		});
-		container.innerHTML = `
-			<div class="drilldown-box">
-				<div class="drilldown-header">
-					<span>🔍 ${title}<small>(${logs.length} records)</small></span>
-					<div style="display:flex; gap:8px;">
-						<button class="btn btn-success btn-sm" onclick="AppController.view.exportExcel(AppController.view._drillData, 'drilldown')">
-							⬇ Excel
-						</button>
-						<button class="btn btn-sm" onclick="AppController.view.closeDrillDown()">
-							✕ Back
-						</button>
-					</div>
-				</div>
+	_renderDrillDown(logs, title, empMap, page = 1) {
+	    this._currentDrillLogs = logs;
+	    this._currentDrillTitle = title;
+	    this._currentDrillEmpMap = empMap;
 
-				<div style="overflow-x:auto;">
-					<table class="data-table">
-						<thead>
-							<tr>
-								<th>Sr.No</th>
-								<th>Code</th>
-								<th>Name</th>
-								<th>Dept</th>
-								<th>Company</th>
-								<th>Shift</th>
-								<th>Date</th>
-								<th>In</th>
-								<th>Out</th>
-								<th>Hours</th>
-								<th>Late</th>
-								<th>Early</th>
-								<th>Status</th>
-							</tr>
-						</thead>
-						<tbody>
-							${rows}
-						</tbody>
-					</table>
-				</div>
-			</div>
-		`;
+	    const container = document.getElementById("drilldown-table");
+	    if (!container) return;
 
-		container.scrollIntoView({
-			behavior: "smooth",
-			block: "start"
-		});
+	    const mainWrap = document.getElementById("main-table-wrap");
+	    if (mainWrap) mainWrap.style.display = "none";
+
+	    if (!logs || logs.length === 0) {
+	        container.innerHTML = `
+	            <div class="drilldown-box">
+	                <div class="drilldown-header">
+	                    <span class="drilldown-title">🔍 ${title}</span>
+	                    <div class="drilldown-btn-group">
+	                        <button class="btn-drill btn-drill-back" onclick="AppController.view.closeDrillDown()">
+	                            ← Back
+	                        </button>
+	                    </div>
+	                </div>
+	                <p style="padding:32px; color:#6b7280;">No records found.</p>
+	            </div>`;
+	        return;
+	    }
+
+	    const pageSize = 25;
+	    const currentPage = page;
+	    const totalPages = Math.ceil(logs.length / pageSize);
+	    const pageLogs = logs.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+	    const rows = pageLogs.map((l, index) => {
+	        const e = empMap[l.empId] || {};
+	        return `
+	            <tr>
+	                <td>${((currentPage - 1) * pageSize) + index + 1}</td>
+	                <td><b>${e.code || "–"}</b></td>
+	                <td>${e.name || "–"}</td>
+	                <td>${e.dept || "–"}</td>
+	                <td>${e.company || "–"}</td>
+	                <td>${e.shift || "–"}</td>
+	                <td>${l.date}</td>
+	                <td>${l.inTime || "–"}</td>
+	                <td>${l.outTime || "–"}</td>
+	                <td><b>${l.hoursWorked || 0}h</b></td>
+	                <td>${l.lateIn ? "Yes" : "No"}</td>
+	                <td>${l.earlyOut ? "Yes" : "No"}</td>
+	                <td>${l.status}</td>
+	            </tr>`;
+	    }).join("");
+
+	    this._drillData = logs.map((l) => {
+	        const e = empMap[l.empId] || {};
+	        return {
+	            Code: e.code, Name: e.name, Dept: e.dept,
+	            Company: e.company, Shift: e.shift, Date: l.date,
+	            In: l.inTime, Out: l.outTime, Hours: l.hoursWorked,
+	            Late: l.lateIn, Early: l.earlyOut, Status: l.status,
+	        };
+	    });
+
+	    // Page number buttons (show current ± 2)
+	    let pageButtons = "";
+	    const startPage = Math.max(1, currentPage - 2);
+	    const endPage = Math.min(totalPages, currentPage + 2);
+	    for (let i = startPage; i <= endPage; i++) {
+	        pageButtons += `
+	            <button class="btn-page ${i === currentPage ? "btn-page-active" : ""}"
+	                onclick="AppController.view._renderDrillDown(
+	                    AppController.view._currentDrillLogs,
+	                    AppController.view._currentDrillTitle,
+	                    AppController.view._currentDrillEmpMap,
+	                    ${i})">
+	                ${i}
+	            </button>`;
+	    }
+
+	    container.innerHTML = `
+	        <div class="drilldown-box">
+
+	            <div class="drilldown-header">
+	                <div class="drilldown-title">
+	                    🔍 ${title}
+	                    <small>${logs.length} records</small>
+	                </div>
+	                <div class="drilldown-btn-group">
+	                    <button class="btn-drill btn-drill-excel"
+	                        onclick="AppController.view.exportExcel(AppController.view._drillData, 'drilldown')">
+	                        ↓ Excel
+	                    </button>
+	                    <button class="btn-drill btn-drill-back"
+	                        onclick="AppController.view.closeDrillDown()">
+	                        ← Back
+	                    </button>
+	                </div>
+	            </div>
+
+	            <div style="overflow-x:auto;">
+	                <table class="data-table">
+	                    <thead>
+	                        <tr>
+	                            <th>Sr.No</th><th>Code</th><th>Name</th><th>Dept</th>
+	                            <th>Company</th><th>Shift</th><th>Date</th><th>In</th>
+	                            <th>Out</th><th>Hours</th><th>Late</th><th>Early</th><th>Status</th>
+	                        </tr>
+	                    </thead>
+	                    <tbody>${rows}</tbody>
+	                </table>
+	            </div>
+
+	            <div class="pagination-bar">
+	                <div class="pagination-text">
+	                    Showing ${((currentPage - 1) * pageSize) + 1}–${Math.min(currentPage * pageSize, logs.length)} of ${logs.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
+	                </div>
+	                <div class="pagination-buttons">
+	                    <button class="btn-page" ${currentPage === 1 ? "disabled" : ""}
+	                        onclick="AppController.view._renderDrillDown(AppController.view._currentDrillLogs,AppController.view._currentDrillTitle,AppController.view._currentDrillEmpMap,1)">
+	                        «
+	                    </button>
+	                    <button class="btn-page" ${currentPage === 1 ? "disabled" : ""}
+	                        onclick="AppController.view._renderDrillDown(AppController.view._currentDrillLogs,AppController.view._currentDrillTitle,AppController.view._currentDrillEmpMap,${currentPage - 1})">
+	                        ‹
+	                    </button>
+	                    ${pageButtons}
+	                    <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""}
+	                        onclick="AppController.view._renderDrillDown(AppController.view._currentDrillLogs,AppController.view._currentDrillTitle,AppController.view._currentDrillEmpMap,${currentPage + 1})">
+	                        ›
+	                    </button>
+	                    <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""}
+	                        onclick="AppController.view._renderDrillDown(AppController.view._currentDrillLogs,AppController.view._currentDrillTitle,AppController.view._currentDrillEmpMap,${totalPages})">
+	                        »
+	                    </button>
+	                </div>
+	            </div>
+
+	        </div>`;
+
+	    container.scrollIntoView({ behavior: "smooth", block: "start" });
 	}
-
 	_renderAgeWise(logs, emps, empMap, model) {
 	    const groups = ["Under 25", "25–34", "35–44", "45–54", "55+"];
 
