@@ -338,6 +338,7 @@ function setupPassword($data) {
 
 function computeShiftStats($employees, $logs, $finalPresentEmpIds, $conn) {
     $shiftMaster = [];
+    
     $stmt = sqlsrv_query($conn, "SELECT ShiftId, ShiftCode, ShiftName FROM Shifts WHERE RecordStatus = 1");
 
     while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
@@ -350,6 +351,7 @@ function computeShiftStats($employees, $logs, $finalPresentEmpIds, $conn) {
     $shiftStats = [];
     foreach ($logs as $log) {
         $shiftId = intval($log['shiftId']);
+
         if (!isset($shiftMaster[$shiftId])) {
             continue;
         }
@@ -362,26 +364,44 @@ function computeShiftStats($employees, $logs, $finalPresentEmpIds, $conn) {
                 'shiftCode' => $shiftCode,
                 'shiftName' => $shiftName,
                 'total' => 0,
-                'present' => 0
+                'present' => 0,
+                'halfPresent' => 0,
+                'weeklyOff' => 0,
+                'holiday' => 0,
+                'leave' => 0,
+                'absent' => 0
             ];
         }
 
         $shiftStats[$shiftName]['total']++;
 
-        if ($log['present'] > 0) {
+        if (intval($log['weeklyOff']) == 1 && floatval($log['present']) == 0) {
+            $shiftStats[$shiftName]['weeklyOff']++;
+        } elseif (intval($log['holiday']) == 1) {
+            $shiftStats[$shiftName]['holiday']++;
+        } elseif (intval($log['isOnLeave']) == 1) {
+            $shiftStats[$shiftName]['leave']++;
+        } elseif (floatval($log['present']) == 1) {
             $shiftStats[$shiftName]['present']++;
+        } elseif (floatval($log['present']) == 0.5) {
+            $shiftStats[$shiftName]['halfPresent']++;
+        } else {
+            $shiftStats[$shiftName]['absent']++;
         }
     }
 
     $result = [];
     foreach ($shiftStats as $row) {
-        $absent = $row['total'] - $row['present'];
         $result[] = [
             'shiftCode' => $row['shiftCode'],
             'shiftName' => $row['shiftName'],
-            'present' => $row['present'],
             'total' => $row['total'],
-            'absent' => $absent,
+            'present' => $row['present'],
+            'halfPresent' => $row['halfPresent'],
+            'weeklyOff' => $row['weeklyOff'],
+            'holiday' => $row['holiday'],
+            'leave' => $row['leave'],
+            'absent' => $row['absent'],
             'rate' => $row['total'] > 0 ? round(($row['present'] / $row['total']) * 100) : 0
         ];
     }
@@ -510,7 +530,7 @@ function handleDashboardData($input, $returnData = false) {
         }
 
         if ($tableExists) {
-            $sqlLogs = "SELECT A.EmployeeId, A.AttendanceDate, A.InTime, A.OutTime, A.Status, A.Duration, A.LateBy, A.EarlyBy, A.Present, A.MissedInPunch, A.MissedOutPunch, A.ShiftId, S.ShiftCode, S.ShiftName FROM $logTable A WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON A.EmployeeId = E.EmployeeId LEFT JOIN Shifts S WITH (NOLOCK) ON A.ShiftId = S.ShiftId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND A.AttendanceDate >= '$dayFrom' AND A.AttendanceDate <= '$dayTo 23:59:59' AND E.Status = 'Working'";
+            $sqlLogs = "SELECT A.EmployeeId, A.AttendanceDate, A.InTime, A.OutTime, A.Status, A.Duration, A.LateBy, A.EarlyBy, A.Present, A.Absent, A.WeeklyOff, A.Holiday, A.IsOnLeave, A.IsPartialDay, A.MissedInPunch, A.MissedOutPunch, A.ShiftId, S.ShiftCode, S.ShiftName FROM $logTable A WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON A.EmployeeId = E.EmployeeId LEFT JOIN Shifts S WITH (NOLOCK) ON A.ShiftId = S.ShiftId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND A.AttendanceDate >= '$dayFrom' AND A.AttendanceDate <= '$dayTo 23:59:59' AND E.Status = 'Working'";
 
             $paramsLogs = [];
             
@@ -538,8 +558,12 @@ function handleDashboardData($input, $returnData = false) {
                         'inTime' => $row['InTime'],
                         'outTime' => $row['OutTime'],
                         'status' => $row['Status'] ?: 'Present',
-                        // 'present' => intval($row['Present']),
                         'present' => floatval($row['Present']),
+                        'weeklyOff' => intval($row['WeeklyOff']),
+                        'holiday' => intval($row['Holiday']),
+                        'isOnLeave' => intval($row['IsOnLeave']),
+                        'absent' => intval($row['Absent']),
+                        'isPartialDay' => intval($row['IsPartialDay']),
                         'hoursWorked' => round(floatval($row['Duration']) / 60, 2),
                         'lateBy' => intval($row['LateBy']),
                         'earlyBy' => intval($row['EarlyBy']),
@@ -761,6 +785,7 @@ function handleNightShiftData($input) {
             $nightShiftEmployees[] = $emp;
         }
     }
+    
     $nightShiftEmployeeIds = array_column($nightShiftEmployees, 'id');
 
     $nightShiftLogs = [];

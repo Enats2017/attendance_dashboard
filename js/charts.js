@@ -359,11 +359,27 @@ var Charts = (function () {
 
         var stackColors = seriesArr.map(function (s, i) {
             var n = (s.name || '').toLowerCase();
-            if (n.indexOf('present')  !== -1) return '#10b981';
-            if (n.indexOf('absent')   !== -1) return '#f43f5e';
-            if (n.indexOf('late')     !== -1) return '#f59e0b';
-            if (n.indexOf('early')    !== -1) return '#f97316';
-            if (n.indexOf('single')   !== -1) return '#0ea5e9';
+            if (n.indexOf('half present') !== -1) {
+                return '#f59e0b';
+            } 
+            if (n.indexOf('weekly off') !== -1) {
+                return '#3b82f6';
+            } 
+            if (n.indexOf('present') !== -1) {
+                return '#10b981';
+            } 
+            if (n.indexOf('absent') !== -1) {
+                return '#f43f5e';
+            } 
+            if (n.indexOf('late') !== -1) {
+                return '#f59e0b';
+            }
+            if (n.indexOf('early') !== -1) {
+                return '#f97316';
+            }
+            if (n.indexOf('single') !== -1) {
+                return '#0ea5e9';
+            }
             return palette[i % palette.length];
         });
 
@@ -374,7 +390,7 @@ var Charts = (function () {
                 height: 300,
                 events: onDataClick ? {
                     dataPointSelection: function (e, ctx, cfg) {
-                        onDataClick(categories[cfg.dataPointIndex], cfg.dataPointIndex, cfg.seriesIndex);
+                        onDataClick(categories[cfg.dataPointIndex], cfg.dataPointIndex, cfg.seriesIndex, seriesArr[cfg.seriesIndex].name);
                     }
                 } : {}
             }),

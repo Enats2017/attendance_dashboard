@@ -31,21 +31,21 @@ class AttendanceView {
 		const filterOpts = model.getFilterOptions();
 
 		this.app.innerHTML = `
-				<div class="dashboard-layout">
-					${this._renderSidebar(state.activeTab)}
-					<div class="main-content">
-						${this._renderTopbar(state)}
-						<div class="content-body">
-							${this._renderFilters(state.filters, filterOpts)}
-							${this._renderSummaryCards(stats)}
-							<div class="tab-pane-container">
-								${this._renderTabContent(state.activeTab, logs, emps, empMap, state.filters, state.data.counts, model)}
-							</div>
+			<div class="dashboard-layout">
+				${this._renderSidebar(state.activeTab)}
+				<div class="main-content">
+					${this._renderTopbar(state)}
+					<div class="content-body">
+						${this._renderFilters(state.filters, filterOpts)}
+						${this._renderSummaryCards(stats)}
+						<div class="tab-pane-container">
+							${this._renderTabContent(state.activeTab, logs, emps, empMap, state.filters, state.data.counts, model)}
 						</div>
 					</div>
 				</div>
-				<div id="drilldown-overlay" class="overlay hidden"></div>
-			`;
+			</div>
+			<div id="drilldown-overlay" class="overlay hidden"></div>
+		`;
 
 		this._restoreFilterValues(state.filters);
 		this._initChartRendering(state.activeTab, logs, emps, empMap, state.filters, state.data.counts, model,);
@@ -53,38 +53,38 @@ class AttendanceView {
 
 	_renderSidebar(activeTab) {
 		return `
-				<aside class="sidebar">
-					<div class="sidebar-header">
-						<div class="logo-box">
-							<i class="ph-fill ph-buildings"></i>
-						</div>
-						<div class="logo-text">
-							<span>HRMS</span>
-							<small>Attendance</small>
-						</div>
+			<aside class="sidebar">
+				<div class="sidebar-header">
+					<div class="logo-box">
+						<i class="ph-fill ph-buildings"></i>
 					</div>
-					<nav class="sidebar-nav">
-						${this.TABS.map(
-						(tab) => `
-							<button class="nav-item ${activeTab === tab.id ? "active" : ""}" data-tab="${tab.id}">
-								<i class="ph ${tab.icon}"></i>
-								<span>${tab.label}</span>
-							</button>
-						`,
-						).join("")}
-						<button class="nav-item" onclick="window.open('/attendance-dashboard/login/#/dept-attendance', '_blank')">
-							<i class="ph ph-table"></i>
-							<span>Unit HC Report</span>
-						</button>
-					</nav>
-					<div class="sidebar-footer">
-						<button class="btn-logout-alt" onclick="doLogout()">
-							<i class="ph ph-sign-out"></i>
-							<span>Logout System</span>
-						</button>
+					<div class="logo-text">
+						<span>HRMS</span>
+						<small>Attendance</small>
 					</div>
-				</aside>
-			`;
+				</div>
+				<nav class="sidebar-nav">
+					${this.TABS.map(
+					(tab) => `
+						<button class="nav-item ${activeTab === tab.id ? "active" : ""}" data-tab="${tab.id}">
+							<i class="ph ${tab.icon}"></i>
+							<span>${tab.label}</span>
+						</button>
+					`,
+					).join("")}
+					<button class="nav-item" onclick="window.open('/attendance-dashboard/login/#/dept-attendance', '_blank')">
+						<i class="ph ph-table"></i>
+						<span>Unit HC Report</span>
+					</button>
+				</nav>
+				<div class="sidebar-footer">
+					<button class="btn-logout-alt" onclick="doLogout()">
+						<i class="ph ph-sign-out"></i>
+						<span>Logout System</span>
+					</button>
+				</div>
+			</aside>
+		`;
 	}
 
 	_renderTopbar(state) {
@@ -93,26 +93,26 @@ class AttendanceView {
 		const initials = displayName.split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase();
 
 		return `
-				<header class="topbar">
-					<div class="topbar-left">
-						<h1 class="page-title">${this.TABS.find((t) => t.id === state.activeTab).label}</h1>
-						<span class="breadcrumb">Home / ${state.activeTab}</span>
+			<header class="topbar">
+				<div class="topbar-left">
+					<h1 class="page-title">${this.TABS.find((t) => t.id === state.activeTab).label}</h1>
+					<span class="breadcrumb">Home / ${state.activeTab}</span>
+				</div>
+				<div class="topbar-right">
+					<div class="sync-status">
+						<i class="ph ph-clock"></i>
+						<span>Sync: ${state.lastUpdated || "Never"}</span>
 					</div>
-					<div class="topbar-right">
-						<div class="sync-status">
-							<i class="ph ph-clock"></i>
-							<span>Sync: ${state.lastUpdated || "Never"}</span>
+					<div class="user-profile">
+						<div class="user-info">
+							<span class="user-name">${displayName}</span>
+							<span class="user-role">${user.role}</span>
 						</div>
-						<div class="user-profile">
-							<div class="user-info">
-								<span class="user-name">${displayName}</span>
-								<span class="user-role">${user.role}</span>
-							</div>
-							<div class="user-avatar">${initials}</div>
-						</div>
+						<div class="user-avatar">${initials}</div>
 					</div>
-				</header>
-			`;
+				</div>
+			</header>
+		`;
 	}
 
 	_renderFilters(filters, opts) {
@@ -121,42 +121,42 @@ class AttendanceView {
 		};
 
 		return `
-				<div class="filter-panel">
-					<div class="filter-grid">
-						<div class="filter-field">
-							<label>Start Date</label>
-							<input type="date" id="f-from" value="${filters.dateFrom}">
-						</div>
-						<div class="filter-field">
-							<label>End Date</label>
-							<input type="date" id="f-to" value="${filters.dateTo}">
-						</div>
-						<div class="filter-field">
-							<label>Company</label>
-							<select id="f-company">${selectOpts(opts.companies)}</select>
-						</div>
-						<div class="filter-field">
-							<label>Department</label>
-							<select id="f-dept">${selectOpts(opts.depts)}</select>
-						</div>
-						<div class="filter-field">
-							<label>Shift</label>
-							<select id="f-shift">${selectOpts(opts.shifts || [])}</select>
-						</div>
+			<div class="filter-panel">
+				<div class="filter-grid">
+					<div class="filter-field">
+						<label>Start Date</label>
+						<input type="date" id="f-from" value="${filters.dateFrom}">
 					</div>
-					<div class="filter-actions">
-						<button class="btn btn-primary" id="btn-apply-filters">
-							<i class="ph ph-funnel"></i> Apply
-						</button>
-						<button class="btn btn-ghost" id="btn-refresh-data">
-							<i class="ph ph-arrows-clockwise"></i> Refresh
-						</button>
-						<button class="btn btn-ghost-danger" id="btn-reset-filters">
-							<i class="ph ph-arrow-counter-clockwise"></i>
-						</button>
+					<div class="filter-field">
+						<label>End Date</label>
+						<input type="date" id="f-to" value="${filters.dateTo}">
+					</div>
+					<div class="filter-field">
+						<label>Company</label>
+						<select id="f-company">${selectOpts(opts.companies)}</select>
+					</div>
+					<div class="filter-field">
+						<label>Department</label>
+						<select id="f-dept">${selectOpts(opts.depts)}</select>
+					</div>
+					<div class="filter-field">
+						<label>Shift</label>
+						<select id="f-shift">${selectOpts(opts.shifts || [])}</select>
 					</div>
 				</div>
-			`;
+				<div class="filter-actions">
+					<button class="btn btn-primary" id="btn-apply-filters">
+						<i class="ph ph-funnel"></i> Apply
+					</button>
+					<button class="btn btn-ghost" id="btn-refresh-data">
+						<i class="ph ph-arrows-clockwise"></i> Refresh
+					</button>
+					<button class="btn btn-ghost-danger" id="btn-reset-filters">
+						<i class="ph ph-arrow-counter-clockwise"></i>
+					</button>
+				</div>
+			</div>
+		`;
 	}
 
 	_renderSummaryCards(stats) {
@@ -171,19 +171,19 @@ class AttendanceView {
 		];
 
 		return `
-				<div class="summary-grid">
-					${cards.map((c) => `
-						<div class="stat-card ${c.cls}">
-							<div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-							<div class="stat-content">
-								<span class="stat-label">${c.label}</span>
-								<span class="stat-value">${c.val}</span>
-							</div>
+			<div class="summary-grid">
+				${cards.map((c) => `
+					<div class="stat-card ${c.cls}">
+						<div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+						<div class="stat-content">
+							<span class="stat-label">${c.label}</span>
+							<span class="stat-value">${c.val}</span>
 						</div>
-					`,
-					).join("")}
-				</div>
-			`;
+					</div>
+				`,
+				).join("")}
+			</div>
+		`;
 	}
 
 	_renderTabContent(tabId, logs, emps, empMap, filters, counts, model) {
@@ -395,8 +395,14 @@ class AttendanceView {
 	}
 
 	_tableHTML(id, headers, rows, exportName) {
-		const ths = headers.map((h) => `<th>${h}</th>`).join("");
-		const trs = rows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("");
+		    const ths = `<th>Sr No</th>` + headers.map((h) => `<th>${h}</th>`).join("");
+
+		    const trs = rows.map((r, index) =>
+		        `<tr>
+		            <td>${index + 1}</td>
+		            ${r.map((c) => `<td>${c}</td>`).join("")}
+		        </tr>`
+		    ).join("");
 		return `
 				<div id="main-table-wrap">
 					<div class="table-wrap">
@@ -423,7 +429,9 @@ class AttendanceView {
 					<h2 class="section-title"><i class="ph-fill ph-chart-bar"></i> Employee Entry/Exit Overview</h2>
 					<div class="summary-cards" style="margin-bottom:24px; display:flex; gap:16px;">
 						<div class="stat-card info" style="flex:1">
-							<div class="stat-icon"><i class="ph ph-sign-in"></i></div>
+							<div class="stat-icon">
+								<i class="ph ph-sign-in"></i>
+							</div>
 							<div class="stat-content">
 								<span class="stat-label">Total In Punches</span>
 								<span class="stat-value">${counts.in || 0}</span>
@@ -548,10 +556,11 @@ class AttendanceView {
 			container.innerHTML = `<div class="drilldown-box"><div class="drilldown-header"><span>🔍 ${title}</span><button class="btn btn-sm" onclick="AppController.view.closeDrillDown()">✕ Back</button></div><p style="padding:32px">No records found.</p></div>`;
 			return;
 		}
-		const rows = logs.map((l) => {
+		const rows = logs.map((l, index) => {
 			const e = empMap[l.empId] || {};
 			return `
 				<tr>
+					<td>${index + 1}</td>
 					<td><b>${e.code || "–"}</b></td>
 					<td>${e.name || "–"}</td>
 					<td>${e.dept || "–"}</td>
@@ -601,6 +610,7 @@ class AttendanceView {
 					<table class="data-table">
 						<thead>
 							<tr>
+								<th>Sr.No</th>
 								<th>Code</th>
 								<th>Name</th>
 								<th>Dept</th>
@@ -629,67 +639,192 @@ class AttendanceView {
 		});
 	}
 
-  _renderAgeWise(logs, emps, empMap, model) {
-    const groups = ["Under 25", "25–34", "35–44", "45–54", "55+"];
-    const gC = {};
-    const gP = {};
-    groups.forEach((g) => {
-      gC[g] = 0;
-      gP[g] = 0;
-    });
-    const seen = new Set();
-    emps.forEach((e) => {
-      const g = model.getAgeGroup(e.dob);
-      gC[g]++;
-    });
-    logs.forEach((l) => {
-      if (!seen.has(l.empId)) {
-        seen.add(l.empId);
-        const e = empMap[l.empId];
-        if (e) {
-          const g = model.getAgeGroup(e.dob);
-          gP[g]++;
-        }
-      }
-    });
-    const rows = groups.map((g) => [
-      g,
-      gC[g],
-      gP[g],
-      gC[g] - gP[g],
-      gC[g] ? Math.round((gP[g] / gC[g]) * 100) + "%" : "0%",
-    ]);
-    this._lastData["age-wise"] = rows.map((r) => ({
-      AgeGroup: r[0],
-      Total: r[1],
-      Present: r[2],
-      Absent: r[3],
-      Rate: r[4],
-    }));
-    return {
-      html: `<h2 class="section-title"><i class="ph-fill ph-users-three"></i> Age-Wise Analysis</h2><div class="charts-grid">${this._chartCard("ch-age-bar", '<i class="ph-fill ph-chart-bar"></i>', "amber", "Attendance by Age Group")}</div>${this._tableHTML("tbl-age", ["Age Group", "Total Emp", "Present", "Absent", "Attendance %"], rows, "age-wise")}<div id="drilldown-table" style="margin-top:16px"></div>`,
-      renderCharts: () => {
-        Charts.stacked(
-          "ch-age-bar",
-          groups,
-          [
-            { name: "Present", data: groups.map((g) => gP[g]) },
-            { name: "Absent", data: groups.map((g) => gC[g] - gP[g]) },
-          ],
-          "Age-wise",
-          (g) => {
-            this._renderDrillDown(
-              logs.filter(
-                (l) => model.getAgeGroup((empMap[l.empId] || {}).dob) === g,
-              ),
-              `Age: ${g}`,
-              empMap,
-            );
-          },
-        );
-      },
-    };
-  }
+	_renderAgeWise(logs, emps, empMap, model) {
+	    const groups = ["Under 25", "25–34", "35–44", "45–54", "55+"];
+
+		const gTotal = {};
+		const gPresent = {};
+		const gHalfPresent = {};
+		const gWeeklyOff = {};
+		const gHoliday = {};
+		const gLeave = {};
+		const gAbsent = {};
+
+	    groups.forEach((g) => {
+		    gTotal[g] = 0;
+		    gPresent[g] = 0;
+		    gHalfPresent[g] = 0;
+		    gWeeklyOff[g] = 0;
+		    gHoliday[g] = 0;
+		    gLeave[g] = 0;
+		    gAbsent[g] = 0;
+		});
+
+	    const isSingleDay = model.state.filters.dateFrom === model.state.filters.dateTo;
+
+	    emps.forEach((e) => {
+	        const g = model.getAgeGroup(e.dob);
+	        gTotal[g]++;
+	    });
+
+	    if (isSingleDay) {
+	        const empStatusMap = {};
+
+			logs.forEach((l) => {
+			    empStatusMap[l.empId] = l;
+			});
+
+			console.log(logs.slice(0,20));
+
+			Object.values(empStatusMap).forEach((l) => {
+			    const e = empMap[l.empId];
+
+			    if (!e) {
+			    	return;
+			    }
+
+			    const g = model.getAgeGroup(e.dob);
+
+			    if (l.weeklyOff == 1 && l.present == 0) {
+			        gWeeklyOff[g]++;
+			    } else if (l.holiday == 1) {
+			        gHoliday[g]++;
+			    } else if (l.isOnLeave == 1) {
+			        gLeave[g]++;
+			    } else if (parseFloat(l.present) === 1) {
+			        gPresent[g]++;
+			    } else if (parseFloat(l.present) === 0.5) {
+			        gHalfPresent[g]++;
+			    } else {
+			        gAbsent[g]++;
+			    }
+			});
+
+	    } else {
+	        logs.forEach((l) => {
+	            const e = empMap[l.empId];
+
+	            if (!e) return;
+
+	            const g = model.getAgeGroup(e.dob);
+
+	            if (parseFloat(l.present) === 1) {
+	                gPresent[g]++;
+	            } else {
+	                gAbsent[g]++;
+	            }
+	        });
+	    }
+
+	    const rows = groups.map((g) => {
+	        const attendancePercent = isSingleDay ? (gTotal[g] ? ((gPresent[g] / gTotal[g]) * 100) : 0) : ((gPresent[g] + gAbsent[g]) ? ((gPresent[g] / (gPresent[g] + gAbsent[g])) * 100) : 0);
+
+	        return [
+			    g,
+			    gTotal[g],
+			    gPresent[g],
+			    gHalfPresent[g],
+			    gWeeklyOff[g],
+			    gAbsent[g],
+			    attendancePercent.toFixed(2) + "%"
+			];
+	    });
+
+	    this._lastData["age-wise"] = rows.map((r) => ({
+		    AgeGroup: r[0],
+		    Total: r[1],
+		    Present: r[2],
+		    HalfPresent: r[3],
+		    WeeklyOff: r[4],
+		    Absent: r[5],
+		    Rate: r[6],
+		}));
+
+	    return {
+	        html: `
+	            <h2 class="section-title">
+	                <i class="ph-fill ph-users-three"></i>
+	                Age-Wise Analysis
+	            </h2>
+
+	            <div class="charts-grid">
+	                ${this._chartCard(
+	                    "ch-age-bar",
+	                    '<i class="ph-fill ph-chart-bar"></i>',
+	                    "amber",
+	                    "Attendance by Age Group"
+	                )}
+	            </div>
+
+	            ${this._tableHTML(
+	                "tbl-age",
+					["Age Group", "Total Emp", "Present", "Half Present", "Weekly Off", "Absent", "Attendance %"],
+	                rows,
+	                "age-wise"
+	            )}
+
+	            <div id="drilldown-table" style="margin-top:16px"></div>
+	        `,
+
+	        renderCharts: () => {
+	            Charts.stacked(
+	                "ch-age-bar",
+	                groups,
+	                [
+					    {
+					        name: "Present",
+					        data: groups.map((g) => gPresent[g]),
+					    },
+					    {
+					        name: "Half Present",
+					        data: groups.map((g) => gHalfPresent[g]),
+					    },
+					    {
+					        name: "Weekly Off",
+					        data: groups.map((g) => gWeeklyOff[g]),
+					    },
+					    {
+					        name: "Absent",
+					        data: groups.map((g) => gAbsent[g]),
+					    },
+					],
+	                "Age-wise",
+	                (g, index, seriesIndex, seriesName) => {
+					    const filteredLogs = logs.filter((l) => {
+					        const e = empMap[l.empId];
+
+					        if (!e) {
+					            return false;
+					        }
+
+					        if (model.getAgeGroup(e.dob) !== g) {
+					            return false;
+					        }
+
+					        switch (seriesName) {
+							    case "Present":
+							        return (l.status === "Present" || l.status === "Present On WeeklyOff");
+
+							    case "Half Present":
+							        return (l.status === "1/2Present" || l.status === "1/2Present On WeeklyOff");
+
+							    case "Weekly Off":
+							        return l.status === "On WeeklyOff";
+
+							    case "Absent":
+							        return l.status === "Absent";
+
+							    default:
+							        return false;
+							}
+					    });
+
+					    this._renderDrillDown(filteredLogs, `Age: ${g} - ${seriesName}`, empMap);
+					}
+	            );
+	        },
+	    };
+	}
 
   // _renderCompanyWise(logs, emps, empMap, model) {
   //     const comps = [...new Set(emps.map(e => e.company))].sort();
@@ -778,126 +913,116 @@ class AttendanceView {
 //     };
 //   }
 
-_renderCompanyWise(logs, emps, empMap, model) {
-  const comps = [...new Set(emps.map((e) => e.company))].sort();
-  const eBC = model.groupBy(emps, (e) => e.company);
-  const lBC = model.groupBy(logs, (l) => (empMap[l.empId] || {}).company);
+	_renderCompanyWise(logs, emps, empMap, model) {
+		const comps = [...new Set(emps.map((e) => e.company))].sort();
+		const eBC = model.groupBy(emps, (e) => e.company);
+		const lBC = model.groupBy(logs, (l) => (empMap[l.empId] || {}).company);
 
-  const rows = comps.map((c) => {
-    const compEmps = eBC[c] || [];
-    const t = compEmps.length;  // Total = Employees table se
-    const ls = lBC[c] || [];
+		const rows = comps.map((c) => {
+		    const compEmps = eBC[c] || [];
+		    const t = compEmps.length;  // Total = Employees table se
+		    const ls = lBC[c] || [];
 
-    // Logs mein present value map banao
-    const empPresentMap = {};
-    ls.forEach((l) => {
-      const pval = parseFloat(l.present);
-      const existing = empPresentMap[l.empId];
-      if (existing === undefined || pval > existing) {
-        empPresentMap[l.empId] = pval;
-      }
-    });
+		    const empPresentMap = {};
+			    ls.forEach((l) => {
+					const pval = parseFloat(l.present);
+					const existing = empPresentMap[l.empId];
+					if (existing === undefined || pval > existing) {
+						empPresentMap[l.empId] = pval;
+					}
+		    });
 
-    // Present = present===1 wale (logs mein hain)
-    const p = Object.keys(empPresentMap)
-      .filter((id) => empPresentMap[id] === 1).length;
+		    const p = Object.keys(empPresentMap).filter((id) => empPresentMap[id] === 1).length;
 
-    // Half Present = present===0.5 wale
-    const hp = Object.keys(empPresentMap)
-      .filter((id) => empPresentMap[id] === 0.5).length;
+		    const hp = Object.keys(empPresentMap).filter((id) => empPresentMap[id] === 0.5).length;
 
-    // Absent = jo employees logs mein hain aur present=0
-    //        + jo employees logs mein HAIN HI NAHI (no record)
-    const loggedAbsent = Object.keys(empPresentMap)
-      .filter((id) => empPresentMap[id] === 0).length;
+		    const loggedAbsent = Object.keys(empPresentMap).filter((id) => empPresentMap[id] === 0).length;
 
-    // No log record wale employees
-    const noLogEmps = compEmps.filter(
-      (e) => empPresentMap[e.id] === undefined
-    ).length;
+		    const noLogEmps = compEmps.filter((e) => empPresentMap[e.id] === undefined).length;
 
-    const ab = loggedAbsent + noLogEmps;  // ← Yahan fix hai
+		    const ab = loggedAbsent + noLogEmps;  // ← Yahan fix hai
 
-    return [c, t, p, hp, ab, t ? Math.round((p / t) * 100) + "%" : "0%"];
-  });
+		    return [c, t, p, hp, ab, t ? Math.round((p / t) * 100) + "%" : "0%"];
+		});
 
-  this._lastData["company-wise"] = rows.map((r) => ({
-    Company: r[0], Total: r[1], Present: r[2],
-    HalfPresent: r[3], Absent: r[4], Rate: r[5],
-  }));
+		this._lastData["company-wise"] = rows.map((r) => ({
+			Company: r[0], Total: r[1], Present: r[2],
+			HalfPresent: r[3], Absent: r[4], Rate: r[5],
+		}));
 
-  return {
-    html: `<h2 class="section-title"><i class="ph-fill ph-buildings"></i> Company Statistics</h2>
-      <div class="charts-grid">
-        ${this._chartCard("ch-comp-bar", '<i class="ph-fill ph-chart-bar"></i>', "violet", "Company Breakdown")}
-      </div>
-      ${this._tableHTML("tbl-comp", ["Company", "Total", "Present", "Half Present", "Absent", "Rate"], rows, "company-wise")}
-      <div id="drilldown-table" style="margin-top:16px"></div>`,
-    renderCharts: () => {
-      Charts.stacked(
-        "ch-comp-bar",
-        comps,
-        [
-          { name: "Present", data: rows.map((r) => r[2] + r[3]) }, // Present + Half Present
-          { name: "Absent",  data: rows.map((r) => r[4]) },
-        ],
-        "Company Attendance",
-        (c) => {
-          this._renderDrillDown(
-            logs.filter((l) => (empMap[l.empId] || {}).company === c),
-            `Company: ${c}`,
-            empMap,
-          );
-        },
-      );
-    },
-  };
-}
+		return {
+			html: `
+			<h2 class="section-title"><i class="ph-fill ph-buildings"></i> Company Statistics</h2>
+		  	<div class="charts-grid">
+		    	${this._chartCard("ch-comp-bar", '<i class="ph-fill ph-chart-bar"></i>', "violet", "Company Breakdown")}
+			</div>
+			${this._tableHTML("tbl-comp", ["Company", "Total", "Present", "Half Present", "Absent", "Rate"], rows, "company-wise")}
+			<div id="drilldown-table" style="margin-top:16px"></div>`,
+			renderCharts: () => {
+				Charts.stacked(
+				    "ch-comp-bar",
+				    comps,
+				    [
+						{ name: "Present", data: rows.map((r) => r[2] + r[3]) }, // Present + Half Present
+						{ name: "Absent",  data: rows.map((r) => r[4]) },
+				    ],
+				    "Company Attendance",
+				    (c) => {
+						this._renderDrillDown(
+							logs.filter((l) => (empMap[l.empId] || {}).company === c),
+							`Company: ${c}`,
+							empMap,
+						);
+				    },
+			    );
+			},
+		};
+	}
 
 
-  _renderDeptWise(logs, emps, empMap, model) {
-    const depts = [...new Set(emps.map((e) => e.dept))].sort();
-    const eBD = model.groupBy(emps, (e) => e.dept);
-    const lBD = model.groupBy(logs, (l) => (empMap[l.empId] || {}).dept);
-    const rows = depts.map((d) => {
-      const t = (eBD[d] || []).length,
-        ls = lBD[d] || [];
-      const p = new Set(ls.map((l) => l.empId)).size;
-      const avg = ls.length
-        ? (
-            ls.reduce((s, l) => s + (l.hoursWorked || 0), 0) / ls.length
-          ).toFixed(1)
-        : 0;
-      return [d, t, p, t - p, avg, t ? Math.round((p / t) * 100) + "%" : "0%"];
-    });
-    this._lastData["dept-wise"] = rows.map((r) => ({
-      Dept: r[0],
-      Total: r[1],
-      Present: r[2],
-      Absent: r[3],
-      AvgHours: r[4],
-      Rate: r[5],
-    }));
-    return {
-      html: `<h2 class="section-title"><i class="ph-fill ph-briefcase-metal"></i> Department Statistics</h2><div class="charts-grid">${this._chartCard("ch-dept-bar", '<i class="ph-fill ph-chart-bar"></i>', "violet", "Present by Dept")}</div>${this._tableHTML("tbl-dept", ["Dept", "Total", "Present", "Absent", "Avg Hours", "Rate"], rows, "dept-wise")}<div id="drilldown-table" style="margin-top:16px"></div>`,
-      renderCharts: () => {
-        Charts.bar(
-          "ch-dept-bar",
-          depts,
-          rows.map((r) => r[2]),
-          "Dept Attendance",
-          true,
-          (d) => {
-            this._renderDrillDown(
-              logs.filter((l) => (empMap[l.empId] || {}).dept === d),
-              `Dept: ${d}`,
-              empMap,
-            );
-          },
-        );
-      },
-    };
-  }
+	_renderDeptWise(logs, emps, empMap, model) {
+		const depts = [...new Set(emps.map((e) => e.dept))].sort();
+		const eBD = model.groupBy(emps, (e) => e.dept);
+		const lBD = model.groupBy(logs, (l) => (empMap[l.empId] || {}).dept);
+		const rows = depts.map((d) => {
+			const t = (eBD[d] || []).length,
+			ls = lBD[d] || [];
+			const p = new Set(ls.map((l) => l.empId)).size;
+			const avg = ls.length ? (
+				ls.reduce((s, l) => s + (l.hoursWorked || 0), 0) / ls.length
+			).toFixed(1) : 0;
+			return [d, t, p, t - p, avg, t ? Math.round((p / t) * 100) + "%" : "0%"];
+		});
+		
+		this._lastData["dept-wise"] = rows.map((r) => ({
+			Dept: r[0],
+			Total: r[1],
+			Present: r[2],
+			Absent: r[3],
+			AvgHours: r[4],
+			Rate: r[5],
+		}));
+		
+		return {
+			html: `<h2 class="section-title"><i class="ph-fill ph-briefcase-metal"></i> Department Statistics</h2><div class="charts-grid">${this._chartCard("ch-dept-bar", '<i class="ph-fill ph-chart-bar"></i>', "violet", "Present by Dept")}</div>${this._tableHTML("tbl-dept", ["Dept", "Total", "Present", "Absent", "Avg Hours", "Rate"], rows, "dept-wise")}<div id="drilldown-table" style="margin-top:16px"></div>`,
+			renderCharts: () => {
+				Charts.bar(
+					"ch-dept-bar",
+					depts,
+					rows.map((r) => r[2]),
+					"Dept Attendance",
+					true,
+					(d) => {
+						this._renderDrillDown(
+							logs.filter((l) => (empMap[l.empId] || {}).dept === d),
+							`Dept: ${d}`,
+							empMap,
+						);
+					},
+				);
+			},
+		};
+	}
 
   _renderGenderWise(logs, emps, empMap, model) {
     const genders = ["Male", "Female"];
@@ -1002,14 +1127,24 @@ _renderCompanyWise(logs, emps, empMap, model) {
 
 	_renderShiftWise(logs, emps, empMap, model) {
 		const shiftStats = model.state.data.shiftStats || [];
-		const rows = shiftStats.map(s => [s.shiftName, s.total, s.present, s.absent, s.rate + "%"]);
+		const rows = shiftStats.map(s => [
+		    s.shiftName,
+		    s.total,
+		    s.present,
+		    s.halfPresent,
+		    s.weeklyOff,
+		    s.absent,
+		    s.rate + "%"
+		]);
 
 		this._lastData["shift-wise"] = rows.map(r => ({
-			Shift: r[0],
-			Total: r[1],
-			Present: r[2],
-			Absent: r[3],
-			Rate: r[4]
+		    Shift: r[0],
+		    Total: r[1],
+		    Present: r[2],
+		    HalfPresent: r[3],
+		    WeeklyOff: r[4],
+		    Absent: r[5],
+		    Rate: r[6]
 		}));
 
 		return {
@@ -1030,7 +1165,7 @@ _renderCompanyWise(logs, emps, empMap, model) {
 
 				${this._tableHTML(
 					"tbl-shift",
-					["Shift", "Total", "Present", "Absent", "Rate"],
+					["Shift", "Total", "Present", "Half Present", "Weekly Off", "Absent", "Rate"],
 					rows,
 					"shift-wise"
 				)}
@@ -1043,38 +1178,41 @@ _renderCompanyWise(logs, emps, empMap, model) {
 					"ch-shift-bar",
 					shiftStats.map(s => s.shiftName),
 					[
-						{ name: "Present", data: shiftStats.map(s => s.present) },
-						{ name: "Absent", data: shiftStats.map(s => s.absent) }
+					    { name: "Present", data: shiftStats.map(s => s.present) },
+					    { name: "Half Present", data: shiftStats.map(s => s.halfPresent) },
+					    { name: "Weekly Off", data: shiftStats.map(s => s.weeklyOff) },
+					    { name: "Absent", data: shiftStats.map(s => s.absent) }
 					],
 					"Shift Attendance",
-					(shiftName) => {
-						const shiftEmployees = emps.filter(e => e.shift === shiftName);
+					(shiftName, index, seriesIndex, seriesName) => {
+					    const filteredLogs = logs.filter(l => {
+					        const e = empMap[l.empId];
+					        if (!e) {
+					            return false;
+					        }
+					        if (e.shift !== shiftName) {
+					            return false;
+					        }
 
-						console.log("SHIFT CLICK", shiftName, shiftEmployees.map(x => ({ id: x.id, code: x.code, shift: x.shift })));
+					        switch (seriesName) {
+					            case "Present":
+					                return (l.status === "Present" || l.status === "Present On WeeklyOff");
 
-						const shiftLogs = [];
+					            case "Half Present":
+					                return (l.status === "1/2Present" || l.status === "1/2Present On WeeklyOff");
 
-						shiftEmployees.forEach(emp => {
-							const empLogs = logs.filter(l => String(l.empId) === String(emp.id));
+					            case "Weekly Off":
+					                return (l.status === "On WeeklyOff");
 
-							if (empLogs.length > 0) {
-								shiftLogs.push(...empLogs);
-							} else {
-								shiftLogs.push({
-									empId: emp.id,
-									date: "",
-									inTime: "",
-									outTime: "",
-									hoursWorked: 0,
-									lateIn: false,
-									earlyOut: false,
-									status: "No Record",
-									present: 0
-								});
-							}
-						});
+					            case "Absent":
+					                return (l.status === "Absent");
 
-						this._renderDrillDown(shiftLogs, `Shift: ${shiftName}`, empMap);
+					            default:
+					                return false;
+					        }
+					    });
+
+					    this._renderDrillDown(filteredLogs, `Shift: ${shiftName} - ${seriesName}`, empMap);
 					}
 				);
 			}

@@ -103,6 +103,7 @@ class AttendanceModel {
                 this.state.data = {
                     employees: data.employees,
                     attendanceLogs: data.attendanceLogs,
+                    shiftStats: data.shiftStats || [],
                     nightShiftEmployees: data.nightShiftEmployees || [],
                     nightShiftLogs: data.nightShiftLogs || [],
                     counts: data.counts
