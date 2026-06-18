@@ -337,31 +337,24 @@ function setupPassword($data) {
 
 
 function computeShiftStats($employees, $logs, $finalPresentEmpIds, $conn) {
-    $shiftMaster = [];
-
-    $stmt = sqlsrv_query($conn, "SELECT ShiftId, ShiftCode, ShiftName FROM Shifts WHERE RecordStatus = 1");
-
-    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
-        $shiftMaster[intval($row['ShiftId'])] = [
-            'code' => $row['ShiftCode'],
-            'name' => $row['ShiftName']
-        ];
+    // Build empId => shiftName from corrected employees array (EmployeeShift based)
+    $empShiftLookup = [];
+    foreach ($employees as $e) {
+        $empShiftLookup[$e['id']] = $e['shift'];
     }
 
     $shiftStats = [];
+
     foreach ($logs as $log) {
-        $shiftId = intval($log['shiftId']);
+        $shiftName = $empShiftLookup[$log['empId']] ?? 'Unknown';
 
-        if (!isset($shiftMaster[$shiftId])) {
-            continue;
+        if ($shiftName === 'Unknown') {
+            continue; // skip if employee/shift not found
         }
-
-        $shiftName = $shiftMaster[$shiftId]['name'];
-        $shiftCode = $shiftMaster[$shiftId]['code'];
 
         if (!isset($shiftStats[$shiftName])) {
             $shiftStats[$shiftName] = [
-                'shiftCode' => $shiftCode,
+                'shiftCode' => $shiftName,
                 'shiftName' => $shiftName,
                 'total' => 0,
                 'present' => 0,
@@ -409,7 +402,6 @@ function computeShiftStats($employees, $logs, $finalPresentEmpIds, $conn) {
     return $result;
 }
 
-
 /**
  * Handle Dashboard Data Fetch (Employees, Logs, Counts)
  */
@@ -437,31 +429,52 @@ function handleDashboardData($input, $returnData = false) {
     $companyList = !empty($userCompanies) ? implode(',', array_map('intval', $userCompanies)) : '0';
     $departmentList = !empty($userDepartments) ? implode(',', array_map('intval', $userDepartments)) : '0';
 
-    // Pre-fetch shifts
-    // $empShifts = [];
-    // $shiftFilteredIds = [];
-    // $shiftParams = [];
-    
-    $sqlShifts = "SELECT ES.EmployeeId, S.ShiftName FROM (SELECT EmployeeId, ShiftId, ROW_NUMBER() OVER(PARTITION BY EmployeeId ORDER BY Shiftdate DESC) as rn FROM EmployeeShift WITH (NOLOCK)) ES JOIN Shifts S WITH (NOLOCK) ON ES.ShiftId = S.ShiftId INNER JOIN Employees E WITH (NOLOCK) ON ES.EmployeeId = E.EmployeeId INNER JOIN UserCompanies UC WITH (NOLOCK) ON E.CompanyId = UC.CompanyId WHERE ES.rn = 1 AND E.Location IN ($locationList) AND E.Status = 'Working' AND UC.UserId = $userId AND S.RecordStatus = '1'";
-                  
-    // if ($shiftName) {
-    //     $sqlShifts .= " AND S.ShiftName = ?";
-    //     $shiftParams[] = $shiftName;
-    // }
-    
-    // $stmtShifts = sqlsrv_query($conn, $sqlShifts, $shiftParams);
-    // if ($stmtShifts) {
-    //     while ($r = sqlsrv_fetch_array($stmtShifts, SQLSRV_FETCH_ASSOC)) {
-    //         $empShifts[$r['EmployeeId']] = $r['ShiftName'];
-    //         if ($shiftName) {
-    //             $shiftFilteredIds[] = $r['EmployeeId'];
-    //         }
-    //     }
-    // }
+    $empShifts = [];
+    $shiftFilteredIds = [];
+    $shiftParams = [];
 
-    // if ($shiftName && empty($shiftFilteredIds)) {
-    //     $shiftFilteredIds = [-1];
-    // }
+    $sqlShifts = "SELECT ES.EmployeeId, ES.ShiftId, ES.Shiftdate, ES.ToDate, S.ShiftName, S.ShiftCode 
+    FROM (SELECT EmployeeId, ShiftId, Shiftdate, ToDate,
+        ROW_NUMBER() OVER(PARTITION BY EmployeeId ORDER BY Shiftdate DESC) as rn 
+        FROM EmployeeShift WITH (NOLOCK) 
+        WHERE Shiftdate <= '$dayTo 23:59:59'
+        AND (ToDate IS NULL OR ToDate >= '$dayFrom')) ES 
+    JOIN Shifts S WITH (NOLOCK) ON ES.ShiftId = S.ShiftId 
+    INNER JOIN Employees E WITH (NOLOCK) ON ES.EmployeeId = E.EmployeeId 
+    WHERE ES.rn = 1 
+    AND E.Location IN ($locationList) 
+    AND E.CompanyId IN ($companyList) 
+    AND E.DepartmentId IN ($departmentList) 
+    AND E.Status = 'Working' 
+    AND E.RecordStatus = 1
+    AND S.RecordStatus = '1'";
+
+    $shiftParams = [];
+    if ($shiftName) {
+        $sqlShifts .= " AND S.ShiftName = ?";
+        $shiftParams[] = $shiftName;
+    }
+
+    $stmtShifts = sqlsrv_query($conn, $sqlShifts, $shiftParams);
+
+    $empShiftMap = [];
+    $shiftFilteredIds = [];
+
+    if ($stmtShifts) {
+        while ($r = sqlsrv_fetch_array($stmtShifts, SQLSRV_FETCH_ASSOC)) {
+            $empId = (string)$r['EmployeeId'];
+            $empShiftMap[$empId] = $r['ShiftName'];
+            if ($shiftName) {
+                $shiftFilteredIds[$r['EmployeeId']] = true;
+            }
+        }
+    }
+
+    if ($shiftName && empty($shiftFilteredIds)) {
+        $shiftFilteredIds = [-1];
+    } else {
+        $shiftFilteredIds = array_keys($shiftFilteredIds);
+    }
 
     $sqlEmp = "SELECT E.EmployeeId, E.EmployeeName, E.EmployeeCode, E.Gender, E.DOB, E.Designation, DG.DesignationsName as DesignationName, C.CompanyFName as company, L.LocationName as location, D.DepartmentFName as dept, D.std_hc FROM Employees E WITH (NOLOCK) LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working'";
 
@@ -499,8 +512,7 @@ function handleDashboardData($input, $returnData = false) {
                 'std_hc' => intval($row['std_hc']),
                 'company' => $row['company'] ?: 'Unknown',
                 'designation' => $row['DesignationName'] ?: 'Staff',
-                // 'shift' => isset($empShifts[$row['EmployeeId']]) ? $empShifts[$row['EmployeeId']] : 'Unknown',
-                'shift' => 'Unknown',
+                'shift' => isset($empShiftMap[(string)$row['EmployeeId']]) ? $empShiftMap[(string)$row['EmployeeId']] : 'No Shift',
                 'location' => $row['location'] ?: 'Head Office'
             ];
         }
@@ -664,7 +676,9 @@ function handleDashboardData($input, $returnData = false) {
     $presentEmployees = 0;
 
     $attendancePresentEmpIds = [];
+    $employeesInAttendanceLogs = [];
     foreach ($logs as $log) {
+        $employeesInAttendanceLogs[$log['empId']] = true;
         if ($log['present'] > 0) {
             $attendancePresentEmpIds[$log['empId']] = true;
         }
@@ -672,7 +686,7 @@ function handleDashboardData($input, $returnData = false) {
 
     $missingEmployeeIds = [];
     foreach ($employees as $emp) {
-        if (!isset($attendancePresentEmpIds[$emp['id']])) {
+        if (!isset($employeesInAttendanceLogs[$emp['id']])) { // ✅ correct check
             $missingEmployeeIds[] = $emp['id'];
         }
     }
@@ -733,7 +747,7 @@ function handleDashboardData($input, $returnData = false) {
     }
 
     foreach ($deviceEmployeeStats as $empId => $stat) {
-        if (isset($attendanceSinglePunchEmpIds[$empId])) {
+        if (isset($employeesInAttendanceLogs[$empId])) {
             continue;
         }
 
@@ -753,20 +767,6 @@ function handleDashboardData($input, $returnData = false) {
     $avgHours = $hoursCount > 0 ? round($totalHours / $hoursCount, 2) : 0;
     
     $absentEmployees = max(0, $totalEmployees - $presentEmployees);
-
-    $attendanceShiftMap = [];
-    foreach ($logs as $log) {
-        if (!empty($log['shiftName'])) {
-            $attendanceShiftMap[$log['empId']] = $log['shiftName'];
-        }
-    }
-
-    foreach ($employees as &$emp) {
-        if (isset($attendanceShiftMap[$emp['id']])) {
-            $emp['shift'] = $attendanceShiftMap[$emp['id']];
-        }
-    }
-    unset($emp);
 
     $shiftStats = computeShiftStats($employees, $logs, $finalPresentEmpIds, $conn);
 
