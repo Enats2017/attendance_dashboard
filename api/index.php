@@ -336,22 +336,12 @@ function setupPassword($data) {
 }
 
 
-function computeShiftStats($employees, $logs, $finalPresentEmpIds, $conn) {
-    // Build empId => shiftName from corrected employees array (EmployeeShift based)
-    $empShiftLookup = [];
-    foreach ($employees as $e) {
-        $empShiftLookup[$e['id']] = $e['shift'];
-    }
-
+function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesInAttendanceLogs, $todayDate, $conn) {
     $shiftStats = [];
 
-    foreach ($logs as $log) {
-        $shiftName = $empShiftLookup[$log['empId']] ?? 'Unknown';
-
-        if ($shiftName === 'Unknown') {
-            continue; // skip if employee/shift not found
-        }
-
+    // Step 1: seed every employee's shift bucket so totals always match Total Staff
+    foreach ($employees as $e) {
+        $shiftName = $e['shift'] ?: 'No Shift';   // already 'No Shift' if unmapped
         if (!isset($shiftStats[$shiftName])) {
             $shiftStats[$shiftName] = [
                 'shiftCode' => $shiftName,
@@ -365,8 +355,20 @@ function computeShiftStats($employees, $logs, $finalPresentEmpIds, $conn) {
                 'absent' => 0
             ];
         }
-
         $shiftStats[$shiftName]['total']++;
+    }
+
+    // Step 2: build empId => shiftName lookup (same as before)
+    $empShiftLookup = [];
+    foreach ($employees as $e) {
+        $empShiftLookup[$e['id']] = $e['shift'] ?: 'No Shift';
+    }
+
+    // Step 3: apply AttendanceLogs-based status
+    $coveredEmpIds = [];
+    foreach ($logs as $log) {
+        $shiftName = $empShiftLookup[$log['empId']] ?? 'No Shift';
+        $coveredEmpIds[$log['empId']] = true;
 
         if (intval($log['weeklyOff']) == 1 && floatval($log['present']) == 0) {
             $shiftStats[$shiftName]['weeklyOff']++;
@@ -379,6 +381,22 @@ function computeShiftStats($employees, $logs, $finalPresentEmpIds, $conn) {
         } elseif (floatval($log['present']) == 0.5) {
             $shiftStats[$shiftName]['halfPresent']++;
         } else {
+            $shiftStats[$shiftName]['absent']++;
+        }
+    }
+
+    // Step 4: apply DeviceLogs-only presence (employees with punches but no AttendanceLogs row)
+    foreach ($employees as $e) {
+        $key = $e['id'] . '_' . $todayDate;
+        if (isset($coveredEmpIds[$e['id']])) {
+            continue; // already counted via AttendanceLogs above
+        }
+        if (isset($deviceEmployeeStats[$key])) {
+            $shiftName = $empShiftLookup[$e['id']] ?? 'No Shift';
+            $shiftStats[$shiftName]['present']++;
+        } else {
+            // no attendance row AND no device punch -> absent
+            $shiftName = $empShiftLookup[$e['id']] ?? 'No Shift';
             $shiftStats[$shiftName]['absent']++;
         }
     }
@@ -433,21 +451,7 @@ function handleDashboardData($input, $returnData = false) {
     $shiftFilteredIds = [];
     $shiftParams = [];
 
-    $sqlShifts = "SELECT ES.EmployeeId, ES.ShiftId, ES.Shiftdate, ES.ToDate, S.ShiftName, S.ShiftCode 
-    FROM (SELECT EmployeeId, ShiftId, Shiftdate, ToDate,
-        ROW_NUMBER() OVER(PARTITION BY EmployeeId ORDER BY Shiftdate DESC) as rn 
-        FROM EmployeeShift WITH (NOLOCK) 
-        WHERE Shiftdate <= '$dayTo 23:59:59'
-        AND (ToDate IS NULL OR ToDate >= '$dayFrom')) ES 
-    JOIN Shifts S WITH (NOLOCK) ON ES.ShiftId = S.ShiftId 
-    INNER JOIN Employees E WITH (NOLOCK) ON ES.EmployeeId = E.EmployeeId 
-    WHERE ES.rn = 1 
-    AND E.Location IN ($locationList) 
-    AND E.CompanyId IN ($companyList) 
-    AND E.DepartmentId IN ($departmentList) 
-    AND E.Status = 'Working' 
-    AND E.RecordStatus = 1
-    AND S.RecordStatus = '1'";
+    $sqlShifts = "SELECT ES.EmployeeId, ES.ShiftId, ES.Shiftdate, ES.ToDate, S.ShiftName, S.ShiftCode FROM (SELECT EmployeeId, ShiftId, Shiftdate, ToDate, ROW_NUMBER() OVER(PARTITION BY EmployeeId ORDER BY Shiftdate DESC) as rn FROM EmployeeShift WITH (NOLOCK)  WHERE Shiftdate <= '$dayTo 23:59:59' AND (ToDate IS NULL OR ToDate >= '$dayFrom')) ES JOIN Shifts S WITH (NOLOCK) ON ES.ShiftId = S.ShiftId INNER JOIN Employees E WITH (NOLOCK) ON ES.EmployeeId = E.EmployeeId WHERE ES.rn = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working' AND E.RecordStatus = 1 AND S.RecordStatus = '1'";
 
     $shiftParams = [];
     if ($shiftName) {
@@ -518,7 +522,14 @@ function handleDashboardData($input, $returnData = false) {
         }
     }
 
-    // 2. Attendance Logs
+    $allTableNames = [];
+    $stmtAllTables = sqlsrv_query($conn, "SELECT name FROM sys.tables WHERE name LIKE 'AttendanceLogs_%' OR name LIKE 'DeviceLogs_%'");
+    if ($stmtAllTables) {
+        while ($rowT = sqlsrv_fetch_array($stmtAllTables, SQLSRV_FETCH_ASSOC)) {
+            $allTableNames[$rowT['name']] = true;
+        }
+    }
+
     $logs = [];
 
     $curDate = new DateTime(date('Y-m-01', strtotime($dayFrom)));
@@ -530,16 +541,10 @@ function handleDashboardData($input, $returnData = false) {
 
         $logTable = "AttendanceLogs_{$m}_{$y}";
         $tableExists = false;
-        $checkTable = sqlsrv_query($conn, "SELECT 1 FROM sys.tables WHERE name = ?", [$logTable]);
-        if ($checkTable && sqlsrv_fetch_array($checkTable)) {
-            $tableExists = true;
-        } else {
+        if (!isset($allTableNames[$logTable])) {
             $logTable = "AttendanceLogs_" . sprintf("%02d", $m) . "_{$y}";
-            $checkTable = sqlsrv_query($conn, "SELECT 1 FROM sys.tables WHERE name = ?", [$logTable]);
-            if ($checkTable && sqlsrv_fetch_array($checkTable)) {
-                $tableExists = true;
-            }
         }
+        $tableExists = isset($allTableNames[$logTable]);
 
         if ($tableExists) {
             $sqlLogs = "SELECT A.EmployeeId, A.AttendanceDate, A.InTime, A.OutTime, A.Status, A.Duration, A.LateBy, A.EarlyBy, A.Present, A.Absent, A.WeeklyOff, A.Holiday, A.IsOnLeave, A.IsPartialDay, A.MissedInPunch, A.MissedOutPunch, A.ShiftId, S.ShiftCode, S.ShiftName FROM $logTable A WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON A.EmployeeId = E.EmployeeId LEFT JOIN Shifts S WITH (NOLOCK) ON A.ShiftId = S.ShiftId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND A.AttendanceDate >= '$dayFrom' AND A.AttendanceDate <= '$dayTo 23:59:59' AND E.Status = 'Working'";
@@ -606,65 +611,71 @@ function handleDashboardData($input, $returnData = false) {
 
         $devTable = "DeviceLogs_{$m}_{$y}";
         $tableExists = false;
-        $checkTable = sqlsrv_query($conn, "SELECT 1 FROM sys.tables WHERE name = ?", [$devTable]);
-        
-        if ($checkTable && sqlsrv_fetch_array($checkTable)) {
-            $tableExists = true;
-        } else {
+        if (!isset($allTableNames[$devTable])) {
             $devTable = "DeviceLogs_" . sprintf("%02d", $m) . "_{$y}";
-            $checkTable = sqlsrv_query($conn, "SELECT 1 FROM sys.tables WHERE name = ?", [$devTable]);
-         
-            if ($checkTable && sqlsrv_fetch_array($checkTable)) {
-                $tableExists = true;
-            }
         }
+        $tableExists = isset($allTableNames[$devTable]);
 
         if ($tableExists) {
             
             $devTables[] = $devTable;
 
-            $sqlDev = "SELECT D.Direction, COUNT(D.DeviceLogId) as total FROM $devTable D WITH (NOLOCK) LEFT JOIN Employees E WITH (NOLOCK) ON CAST(D.UserId AS VARCHAR(50)) = CAST(E.EmployeeCodeInDevice AS VARCHAR(50)) LEFT JOIN Departments De WITH (NOLOCK) ON E.DepartmentId = De.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND D.Direction != '' AND D.LogDate >= '$dayFrom' AND D.LogDate <= '$dayTo 23:59:59' AND E.Status = 'Working'";
+            $sqlDevRaw = "SELECT D.AttDirection, D.LogDate, CAST(D.LogDate AS DATE) AS PunchDate, E.EmployeeId FROM $devTable D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON CAST(D.UserId AS VARCHAR(50)) = CAST(E.EmployeeCodeInDevice AS VARCHAR(50)) LEFT JOIN Departments De WITH (NOLOCK) ON E.DepartmentId = De.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND D.LogDate >= '$dayFrom' AND D.LogDate <= '$dayTo 23:59:59' AND E.Status = 'Working' AND E.RecordStatus = 1";
 
-            $paramsDev = [];
-            
-            if ($deptName) { 
-                $sqlDev .= " AND De.DepartmentFName = ?"; 
-                $paramsDev[] = $deptName; 
-            }
-            
-            if ($compName) { 
-                $sqlDev .= " AND C.CompanyFName = ?"; 
-                $paramsDev[] = $compName; 
-            }
-            
-            if ($shiftName) { 
-                $sqlDev .= " AND D.UserId IN (" . implode(',', $shiftFilteredIds) . ")"; 
+            $paramsDevRaw = [];
+
+            if ($deptName) {
+                $sqlDevRaw .= " AND De.DepartmentFName = ?";
+                $paramsDevRaw[] = $deptName;
             }
 
-            $sqlDev .= " GROUP BY D.Direction";
+            if ($compName) {
+                $sqlDevRaw .= " AND C.CompanyFName = ?";
+                $paramsDevRaw[] = $compName;
+            }
 
-            $stmtDev = sqlsrv_query($conn, $sqlDev, $paramsDev);
-            
-            if ($stmtDev) {
-                while ($row = sqlsrv_fetch_array($stmtDev, SQLSRV_FETCH_ASSOC)) {
-                    $dir = trim($row['Direction']);
-                    if (strcasecmp($dir, 'in') == 0 || $dir === '0') $counts['in'] += $row['total'];
-                    else if (strcasecmp($dir, 'out') == 0 || $dir === '1') $counts['out'] += $row['total'];
+            if ($shiftName) {
+                $sqlDevRaw .= " AND D.UserId IN (" . implode(',', $shiftFilteredIds) . ")";
+            }
+
+            $stmtDevRaw = sqlsrv_query($conn, $sqlDevRaw, $paramsDevRaw);
+
+            $devEmpDayBuckets = [];
+            if ($stmtDevRaw) {
+                while ($row = sqlsrv_fetch_array($stmtDevRaw, SQLSRV_FETCH_ASSOC)) {
+                    $dir = trim($row['AttDirection'] ?? '');
+                    if ($dir !== '') {
+                        if (strcasecmp($dir, 'in') == 0 || $dir === '0') {
+                            $counts['in']++;
+                        } else if (strcasecmp($dir, 'out') == 0 || $dir === '1') {
+                            $counts['out']++;
+                        }
+                    }
+
+                    $punchDate = $row['PunchDate']->format('Y-m-d');
+                    $key = (string)$row['EmployeeId'] . '_' . $punchDate;
+
+                    if (!isset($devEmpDayBuckets[$key])) {
+                        $devEmpDayBuckets[$key] = ['count' => 0, 'first' => $row['LogDate'], 'last' => $row['LogDate']];
+                    }
+                    
+                    $devEmpDayBuckets[$key]['count']++;
+                    
+                    if ($row['LogDate'] < $devEmpDayBuckets[$key]['first']) {
+                        $devEmpDayBuckets[$key]['first'] = $row['LogDate'];
+                    }
+                    if ($row['LogDate'] > $devEmpDayBuckets[$key]['last']) {
+                        $devEmpDayBuckets[$key]['last'] = $row['LogDate'];
+                    }
                 }
             }
 
-            $sqlDeviceEmployeeStats = "SELECT E.EmployeeId, COUNT(*) AS PunchCount, MIN(D.LogDate) AS FirstPunch, MAX(D.LogDate) AS LastPunch FROM $devTable D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON CAST(D.UserId AS VARCHAR(50))  = CAST(E.EmployeeCodeInDevice AS VARCHAR(50)) WHERE D.LogDate >= '$dayFrom' AND D.LogDate <= '$dayTo 23:59:59' AND E.Status = 'Working' AND E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) GROUP BY E.EmployeeId";
-
-            $stmtDeviceEmployeeStats = sqlsrv_query($conn, $sqlDeviceEmployeeStats);
-
-            if ($stmtDeviceEmployeeStats) {
-                while ($row = sqlsrv_fetch_array($stmtDeviceEmployeeStats, SQLSRV_FETCH_ASSOC)) {
-                    $deviceEmployeeStats[(string)$row['EmployeeId']] = [
-                        'punchCount' => intval($row['PunchCount']),
-                        'firstPunch' => $row['FirstPunch'],
-                        'lastPunch' => $row['LastPunch']
-                    ];
-                }
+            foreach ($devEmpDayBuckets as $key => $bucket) {
+                $deviceEmployeeStats[$key] = [
+                    'punchCount' => $bucket['count'],
+                    'firstPunch' => $bucket['first'],
+                    'lastPunch' => $bucket['last']
+                ];
             }
         }
 
@@ -672,65 +683,69 @@ function handleDashboardData($input, $returnData = false) {
     }
 
     $totalEmployees = count($employees);
-    
-    $presentEmployees = 0;
 
-    $attendancePresentEmpIds = [];
+    // Step 1: mark which empId_date keys already exist in AttendanceLogs
     $employeesInAttendanceLogs = [];
+    $presentRecordCount = 0;
     foreach ($logs as $log) {
-        $employeesInAttendanceLogs[$log['empId']] = true;
-        if ($log['present'] > 0) {
-            $attendancePresentEmpIds[$log['empId']] = true;
+        $key = $log['empId'] . '_' . $log['date'];
+        $employeesInAttendanceLogs[$key] = true;
+
+        if (floatval($log['present']) > 0) {
+            $presentRecordCount++;
         }
     }
 
-    $missingEmployeeIds = [];
-    foreach ($employees as $emp) {
-        if (!isset($employeesInAttendanceLogs[$emp['id']])) { // ✅ correct check
-            $missingEmployeeIds[] = $emp['id'];
+    // Step 2: merge DeviceLogs-only empId_date into $logs as synthesized rows
+    $devicePresentDayCount = 0;
+    foreach ($deviceEmployeeStats as $key => $stat) {
+        if (isset($employeesInAttendanceLogs[$key])) {
+            continue; // already covered by a real AttendanceLogs row
         }
+
+        list($empId, $date) = explode('_', $key, 2);
+
+        $logs[] = [
+            'empId' => $empId,
+            'date' => $date,
+            'inTime' => $stat['firstPunch'] ? $stat['firstPunch']->format('H:i') : null,
+            'outTime' => $stat['lastPunch'] ? $stat['lastPunch']->format('H:i') : null,
+            'status' => 'Present',
+            'present' => 1,
+            'weeklyOff' => 0,
+            'holiday' => 0,
+            'isOnLeave' => 0,
+            'absent' => 0,
+            'isPartialDay' => 0,
+            'hoursWorked' => ($stat['firstPunch'] && $stat['lastPunch'])
+                ? round(($stat['lastPunch']->getTimestamp() - $stat['firstPunch']->getTimestamp()) / 3600, 2)
+                : 0,
+            'lateBy' => 0,
+            'earlyBy' => 0,
+            'missedInPunch' => $stat['punchCount'] == 1 ? 1 : 0,
+            'missedOutPunch' => $stat['punchCount'] == 1 ? 1 : 0,
+            'shiftId' => 0,
+            'shiftName' => null,
+            'shiftCode' => null
+        ];
+
+        $employeesInAttendanceLogs[$key] = true;
+        $devicePresentDayCount++;
     }
 
-    $devicePresentEmpIds = [];
-    if (!empty($missingEmployeeIds) && !empty($devTables)) {
-        $missingLookup = array_flip($missingEmployeeIds); 
-
-        foreach ($devTables as $devTable) {
-            $sqlDevicePresent = "SELECT DISTINCT E.EmployeeId FROM $devTable D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON CAST(D.UserId AS VARCHAR(50)) = CAST(E.EmployeeCodeInDevice AS VARCHAR(50)) WHERE D.LogDate >= '$dayFrom' AND D.LogDate <= '$dayTo 23:59:59' AND E.Status = 'Working' AND E.RecordStatus = 1";
-
-            $stmtDevicePresent = sqlsrv_query($conn, $sqlDevicePresent);
-
-            if ($stmtDevicePresent) {
-                while ($row = sqlsrv_fetch_array($stmtDevicePresent, SQLSRV_FETCH_ASSOC)) {
-                    $empId = (string)$row['EmployeeId'];
-                    if (isset($missingLookup[$empId])) {
-                        $devicePresentEmpIds[$empId] = true;
-                    }
-                }
-            }
-        }
-    }
-
-    $finalPresentEmpIds = $attendancePresentEmpIds;
-
-    foreach ($devicePresentEmpIds as $empId => $value) {
-        $finalPresentEmpIds[$empId] = true;
-    }
-
-    $presentEmployees = count($finalPresentEmpIds);
+    $presentEmployees = $presentRecordCount + $devicePresentDayCount;
     $dataSource = 'attendance+device';
 
+    // Step 3: now compute singlePunch/lateIn/earlyOut/avgHours by looping $logs ONLY
+    // (synthetic device rows are now part of $logs, so no separate device loop needed)
     $singlePunch = 0;
     $lateIn = 0;
     $earlyOut = 0;
-    $avgHours = 0;
     $totalHours = 0;
     $hoursCount = 0;
-    $attendanceSinglePunchEmpIds = [];
     foreach ($logs as $log) {
         if (($log['missedInPunch'] ?? 0) == 1 || ($log['missedOutPunch'] ?? 0) == 1) {
             $singlePunch++;
-            $attendanceSinglePunchEmpIds[$log['empId']] = true;
         }
         if (($log['lateBy'] ?? 0) > 0) {
             $lateIn++;
@@ -746,29 +761,11 @@ function handleDashboardData($input, $returnData = false) {
         }
     }
 
-    foreach ($deviceEmployeeStats as $empId => $stat) {
-        if (isset($employeesInAttendanceLogs[$empId])) {
-            continue;
-        }
-
-        if ($stat['punchCount'] == 1) {
-            $singlePunch++;
-        }
-
-        if ($stat['firstPunch'] && $stat['lastPunch']) {
-            $minutes = ($stat['lastPunch']->getTimestamp() - $stat['firstPunch']->getTimestamp()) / 60;
-            if ($minutes > 0) {
-                $totalHours += ($minutes / 60);
-                $hoursCount++;
-            }
-        }
-    }
-
     $avgHours = $hoursCount > 0 ? round($totalHours / $hoursCount, 2) : 0;
-    
+
     $absentEmployees = max(0, $totalEmployees - $presentEmployees);
 
-    $shiftStats = computeShiftStats($employees, $logs, $finalPresentEmpIds, $conn);
+    $shiftStats = computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesInAttendanceLogs, $dayFrom, $conn);
 
     if ($returnData) {
         return [

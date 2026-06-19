@@ -471,86 +471,95 @@ class AttendanceView {
 		};
 	}
 
-	_renderAll(logs, emps, empMap, filters) {
-		console.log("RAW LOGS:", logs);
-		console.log("RAW EMPS:", emps);
-		const rows = logs.slice(0, 200).map((l) => {
-			const e = empMap[l.empId] || {};
-			return [
-				e.code || "",
-				e.name || "",
-				e.dept || "",
-				e.company || "",
-				l.date,
-				l.inTime || "-",
-				l.outTime || "-",
-				l.hoursWorked || 0,
-				l.lateIn ? '<span class="badge badge-warning">Yes</span>' : "No",
-				l.earlyOut ? '<span class="badge badge-warning">Yes</span>' : "No",
-				`<span class="badge ${l.status === "Present" ? "badge-success" : "badge-danger"}">${l.status}</span>`,
-			];
-		});
-		this._lastData["all-attendance"] = logs.map((l) => {
-			const e = empMap[l.empId] || {};
-			return {
-				Code: e.code,
-				Name: e.name,
-				Dept: e.dept,
-				Company: e.company,
-				Date: l.date,
-				In: l.inTime,
-				Out: l.outTime,
-				Hours: l.hoursWorked,
-				LateIn: l.lateIn,
-				EarlyOut: l.earlyOut,
-				Status: l.status,
-			};
-		});
+	_renderAll(logs, emps, empMap, filters, page = 1) {
+	    this._currentAllLogs = logs;
+	    this._currentAllEmpMap = empMap;
 
-		const byDate = this._countBy(logs, (l) => l.date);
-		const dates = Object.keys(byDate).sort();
-		const counts = dates.map((d) => byDate[d]);
-		const byDept = this._countBy(logs, (l) => (empMap[l.empId] || {}).dept || "Unknown",);
+	    const pageSize = 25; // same as drilldown
+	    const currentPage = page;
+	    const totalPages = Math.ceil(logs.length / pageSize);
+	    const pageLogs = logs.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-		return {
-			html: `
-					<h2 class="section-title"><i class="ph-fill ph-stack"></i> All Attendance Records</h2>
-					<div class="charts-grid">
-						${this._chartCard("ch-all-trend", '<i class="ph ph-trend-up"></i>', "violet", "Daily Attendance Trend", "Click for detail")}
-						${this._chartCard("ch-all-dept", '<i class="ph ph-briefcase"></i>', "teal", "By Department (Punches)", "Click for detail")}
-					</div>
-					${this._tableHTML("tbl-all", ["Code", "Name", "Dept", "Company", "Date", "In", "Out", "Hours", "Late In", "Early Out", "Status"], rows, "all-attendance")}
-					<div id="drilldown-table" style="margin-top:16px"></div>`,
+	    const rows = pageLogs.map((l) => {
+	        const e = empMap[l.empId] || {};
+	        return [
+	            e.code || "",
+	            e.name || "",
+	            e.dept || "",
+	            e.company || "",
+	            l.date,
+	            l.inTime || "-",
+	            l.outTime || "-",
+	            l.hoursWorked || 0,
+	            l.lateIn ? '<span class="badge badge-warning">Yes</span>' : "No",
+	            l.earlyOut ? '<span class="badge badge-warning">Yes</span>' : "No",
+	            `<span class="badge ${l.status === "Present" ? "badge-success" : "badge-danger"}">${l.status}</span>`,
+	        ];
+	    });
 
-			renderCharts: () => {
-				Charts.line(
-					"ch-all-trend",
-					dates,
-					[{ name: "Total Punches", data: counts }],
-					"Daily Attendance",
-					(date) => {
-						this._renderDrillDown(
-							logs.filter((l) => l.date === date),
-							`Date: ${date}`,
-							empMap,
-						);
-					},
-				);
-				Charts.donut(
-					"ch-all-dept",
-					Object.keys(byDept),
-					Object.values(byDept),
-					"Dept Distribution",
-					(dept) => {
-						this._renderDrillDown(
-							logs.filter((l) => (empMap[l.empId] || {}).dept === dept),
-							`Department: ${dept}`,
-							empMap,
-						);
-					},
-				);
-			},
-		};
+	    // Excel export should still use FULL logs, not just current page
+	    this._lastData["all-attendance"] = logs.map((l) => {
+	        const e = empMap[l.empId] || {};
+	        return {
+	            Code: e.code, Name: e.name, Dept: e.dept, Company: e.company,
+	            Date: l.date, In: l.inTime, Out: l.outTime, Hours: l.hoursWorked,
+	            LateIn: l.lateIn, EarlyOut: l.earlyOut, Status: l.status,
+	        };
+	    });
+
+	    const byDate = this._countBy(logs, (l) => l.date);
+	    const dates = Object.keys(byDate).sort();
+	    const counts = dates.map((d) => byDate[d]);
+	    const byDept = this._countBy(logs, (l) => (empMap[l.empId] || {}).dept || "Unknown");
+
+	    // pagination buttons (current ± 2), same logic as drilldown
+	    let pageButtons = "";
+	    const startPage = Math.max(1, currentPage - 2);
+	    const endPage = Math.min(totalPages, currentPage + 2);
+	    for (let i = startPage; i <= endPage; i++) {
+	        pageButtons += `
+	            <button class="btn-page ${i === currentPage ? "btn-page-active" : ""}"
+	                onclick="AppController.view._reRenderAllPage(${i})">
+	                ${i}
+	            </button>`;
+	    }
+
+	    return {
+	        html: `
+	            <h2 class="section-title"><i class="ph-fill ph-stack"></i> All Attendance Records</h2>
+	            <div class="charts-grid">
+	                ${this._chartCard("ch-all-trend", '<i class="ph ph-trend-up"></i>', "violet", "Daily Attendance Trend", "Click for detail")}
+	                ${this._chartCard("ch-all-dept", '<i class="ph ph-briefcase"></i>', "teal", "By Department (Punches)", "Click for detail")}
+	            </div>
+	            ${this._tableHTML("tbl-all", ["Code", "Name", "Dept", "Company", "Date", "In", "Out", "Hours", "Late In", "Early Out", "Status"], rows, "all-attendance")}
+	            <div class="pagination-bar">
+	                <div class="pagination-text">
+	                    Showing ${((currentPage - 1) * pageSize) + 1}–${Math.min(currentPage * pageSize, logs.length)} of ${logs.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
+	                </div>
+	                <div class="pagination-buttons">
+	                    <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderAllPage(1)">«</button>
+	                    <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderAllPage(${currentPage - 1})">‹</button>
+	                    ${pageButtons}
+	                    <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderAllPage(${currentPage + 1})">›</button>
+	                    <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderAllPage(${totalPages})">»</button>
+	                </div>
+	            </div>
+	            <div id="drilldown-table" style="margin-top:16px"></div>`,
+
+	        renderCharts: () => {
+	            Charts.line("ch-all-trend", dates, [{ name: "Total Punches", data: counts }], "Daily Attendance",
+	                (date) => this._renderDrillDown(logs.filter((l) => l.date === date), `Date: ${date}`, empMap));
+	            Charts.donut("ch-all-dept", Object.keys(byDept), Object.values(byDept), "Dept Distribution",
+	                (dept) => this._renderDrillDown(logs.filter((l) => (empMap[l.empId] || {}).dept === dept), `Department: ${dept}`, empMap));
+	        },
+	    };
+	}
+
+	// New helper to re-render just this tab on page change, without full re-render
+	_reRenderAllPage(page) {
+	    const content = this._renderAll(this._currentAllLogs, null, this._currentAllEmpMap, null, page);
+	    document.querySelector(".tab-pane-container").innerHTML = content.html;
+	    content.renderCharts();
 	}
 
 	_renderDrillDown(logs, title, empMap, page = 1) {
