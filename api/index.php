@@ -644,23 +644,46 @@ function handleDashboardData($input, $returnData = false) {
             if ($stmtDevRaw) {
                 while ($row = sqlsrv_fetch_array($stmtDevRaw, SQLSRV_FETCH_ASSOC)) {
                     $dir = trim($row['AttDirection'] ?? '');
-                    if ($dir !== '') {
-                        if (strcasecmp($dir, 'in') == 0 || $dir === '0') {
-                            $counts['in']++;
-                        } else if (strcasecmp($dir, 'out') == 0 || $dir === '1') {
-                            $counts['out']++;
-                        }
+                    $isIn = (strcasecmp($dir, 'in') == 0 || $dir === '0');
+                    $isOut = (strcasecmp($dir, 'out') == 0 || $dir === '1');
+
+                    if ($isIn) {
+                        $counts['in']++;
+                    } else if ($isOut) {
+                        $counts['out']++;
                     }
 
                     $punchDate = $row['PunchDate']->format('Y-m-d');
                     $key = (string)$row['EmployeeId'] . '_' . $punchDate;
 
                     if (!isset($devEmpDayBuckets[$key])) {
-                        $devEmpDayBuckets[$key] = ['count' => 0, 'first' => $row['LogDate'], 'last' => $row['LogDate']];
+                        $devEmpDayBuckets[$key] = [
+                            'count' => 0,
+                            'inCount' => 0,
+                            'outCount' => 0,
+                            'firstIn' => null,
+                            'lastOut' => null,
+                            'first' => $row['LogDate'],
+                            'last' => $row['LogDate']
+                        ];
                     }
-                    
+
                     $devEmpDayBuckets[$key]['count']++;
-                    
+
+                    if ($isIn) {
+                        $devEmpDayBuckets[$key]['inCount']++;
+                        if ($devEmpDayBuckets[$key]['firstIn'] === null || $row['LogDate'] < $devEmpDayBuckets[$key]['firstIn']) {
+                            $devEmpDayBuckets[$key]['firstIn'] = $row['LogDate'];
+                        }
+                    }
+
+                    if ($isOut) {
+                        $devEmpDayBuckets[$key]['outCount']++;
+                        if ($devEmpDayBuckets[$key]['lastOut'] === null || $row['LogDate'] > $devEmpDayBuckets[$key]['lastOut']) {
+                            $devEmpDayBuckets[$key]['lastOut'] = $row['LogDate'];
+                        }
+                    }
+
                     if ($row['LogDate'] < $devEmpDayBuckets[$key]['first']) {
                         $devEmpDayBuckets[$key]['first'] = $row['LogDate'];
                     }
@@ -673,6 +696,10 @@ function handleDashboardData($input, $returnData = false) {
             foreach ($devEmpDayBuckets as $key => $bucket) {
                 $deviceEmployeeStats[$key] = [
                     'punchCount' => $bucket['count'],
+                    'inCount' => $bucket['inCount'],
+                    'outCount' => $bucket['outCount'],
+                    'firstIn' => $bucket['firstIn'],
+                    'lastOut' => $bucket['lastOut'],
                     'firstPunch' => $bucket['first'],
                     'lastPunch' => $bucket['last']
                 ];
@@ -700,16 +727,22 @@ function handleDashboardData($input, $returnData = false) {
     $devicePresentDayCount = 0;
     foreach ($deviceEmployeeStats as $key => $stat) {
         if (isset($employeesInAttendanceLogs[$key])) {
-            continue; // already covered by a real AttendanceLogs row
+            continue; 
+        }
+
+        if (($stat['inCount'] ?? 0) < 1) {
+            continue;
         }
 
         list($empId, $date) = explode('_', $key, 2);
 
+        $hasOut = ($stat['outCount'] ?? 0) >= 1;
+
         $logs[] = [
             'empId' => $empId,
             'date' => $date,
-            'inTime' => $stat['firstPunch'] ? $stat['firstPunch']->format('H:i') : null,
-            'outTime' => $stat['lastPunch'] ? $stat['lastPunch']->format('H:i') : null,
+            'inTime' => $stat['firstIn'] ? $stat['firstIn']->format('H:i') : null,
+            'outTime' => $hasOut ? $stat['lastOut']->format('H:i') : null,
             'status' => 'Present',
             'present' => 1,
             'weeklyOff' => 0,
@@ -717,13 +750,11 @@ function handleDashboardData($input, $returnData = false) {
             'isOnLeave' => 0,
             'absent' => 0,
             'isPartialDay' => 0,
-            'hoursWorked' => ($stat['firstPunch'] && $stat['lastPunch'])
-                ? round(($stat['lastPunch']->getTimestamp() - $stat['firstPunch']->getTimestamp()) / 3600, 2)
-                : 0,
+            'hoursWorked' => ($hasOut && $stat['firstIn']) ? round(($stat['lastOut']->getTimestamp() - $stat['firstIn']->getTimestamp()) / 3600, 2) : 0,
             'lateBy' => 0,
             'earlyBy' => 0,
-            'missedInPunch' => $stat['punchCount'] == 1 ? 1 : 0,
-            'missedOutPunch' => $stat['punchCount'] == 1 ? 1 : 0,
+            'missedInPunch' => 0,                  
+            'missedOutPunch' => $hasOut ? 0 : 1,   
             'shiftId' => 0,
             'shiftName' => null,
             'shiftCode' => null
@@ -763,7 +794,39 @@ function handleDashboardData($input, $returnData = false) {
 
     $avgHours = $hoursCount > 0 ? round($totalHours / $hoursCount, 2) : 0;
 
-    $absentEmployees = max(0, $totalEmployees - $presentEmployees);
+    $presentKeySet = [];
+    foreach ($logs as $log) {
+        if (floatval($log['present']) > 0) {
+            $presentKeySet[$log['empId'] . '_' . $log['date']] = true;
+        }
+    }
+
+    $rangeStart = new DateTime($dayFrom);
+    $rangeEnd = new DateTime($dayTo);
+    $totalEmployeeDays = 0;
+    $presentEmployeeDays = 0;
+    $absentEmployeeDays = 0;
+
+    for ($d = clone $rangeStart; $d <= $rangeEnd; $d->modify('+1 day')) {
+        $dateStr = $d->format('Y-m-d');
+        foreach ($employees as $e) {
+            $totalEmployeeDays++;
+            $k = $e['id'] . '_' . $dateStr;
+            if (isset($presentKeySet[$k])) {
+                $presentEmployeeDays++;
+            } else {
+                $absentEmployeeDays++;
+            }
+        }
+    }
+
+    if ($dayFrom === $dayTo) {
+        $presentEmployees = $presentEmployeeDays;
+        $absentEmployees = $absentEmployeeDays;
+    } else {
+        $presentEmployees = $presentEmployeeDays;   
+        $absentEmployees = $absentEmployeeDays;     
+    }
 
     $shiftStats = computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesInAttendanceLogs, $dayFrom, $conn);
 
