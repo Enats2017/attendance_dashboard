@@ -642,9 +642,10 @@ function handleDashboardData($input, $returnData = false) {
             
             if ($stmtLogs) {
                 while ($row = sqlsrv_fetch_array($stmtLogs, SQLSRV_FETCH_ASSOC)) {
-					$hasInPunch = !empty($row['InTime']) && $row['InTime'] !== '00:00:00';
-					$hasOutPunch = !empty($row['OutTime']) && $row['OutTime'] !== '00:00:00';
+					$hasInPunch = !empty($row['InTime']) && $row['InTime'] !== '00:00' && $row['InTime'] !== '00:00:00';
+					$hasOutPunch = !empty($row['OutTime']) && $row['OutTime'] !== '00:00' && $row['OutTime'] !== '00:00:00';
 					$status = $row['Status'] ?: 'Present';
+					
 					if (floatval($row['Present']) <= 0 && ($hasInPunch || $hasOutPunch)) {
 						$status = 'Present';
 					}
@@ -857,7 +858,9 @@ function handleDashboardData($input, $returnData = false) {
     $totalHours = 0;
     $hoursCount = 0;
     foreach ($logs as $log) {
-        if (($log['missedInPunch'] ?? 0) == 1 || ($log['missedOutPunch'] ?? 0) == 1) {
+        $hasInPunch = !empty($log['inTime']) && $log['inTime'] !== '00:00' && $log['inTime'] !== '00:00:00';
+		$hasOutPunch = !empty($log['outTime']) && $log['outTime'] !== '00:00' && $log['outTime'] !== '00:00:00';
+		if (($hasInPunch && !$hasOutPunch) || (!$hasInPunch && $hasOutPunch)) {
 			$singlePunch++;
 		}
         if (($log['lateBy'] ?? 0) > 0) {
