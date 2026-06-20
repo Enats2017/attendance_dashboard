@@ -328,42 +328,72 @@ class AttendanceModel {
     }
 
     getPresentEmployees() {
+        const { filters, data } = this.state;
         const { logs, emps, empMap } = this.getFilteredData();
-        const isSingleDay = this.state.filters.dateFrom === this.state.filters.dateTo;
 
-        if (isSingleDay) {
-            const seen = {};
-            const result = [];
-            logs.forEach(l => {
-                if (seen[l.empId]) return;
-                if (parseFloat(l.present) > 0) {
-                    seen[l.empId] = true;
-                    result.push({ log: l, emp: empMap[l.empId] });
+        // Build a lookup: empId_date -> log (prefer the row with higher 'present')
+        const logMap = {};
+        logs.forEach(l => {
+            const key = l.empId + '_' + l.date;
+            const existing = logMap[key];
+            if (!existing || parseFloat(l.present) > parseFloat(existing.present)) {
+                logMap[key] = l;
+            }
+        });
+
+        const from = new Date(filters.dateFrom);
+        const to = new Date(filters.dateTo);
+        const result = [];
+
+        emps.forEach(emp => {
+            for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+                const dateStr = d.toISOString().slice(0, 10);
+                const log = logMap[emp.id + '_' + dateStr];
+                if (log && parseFloat(log.present) > 0) {
+                    result.push({ log, emp, date: dateStr });
                 }
-            });
-            return result;
-        } else {
-            return logs.filter(l => parseFloat(l.present) > 0).map(l => ({ log: l, emp: empMap[l.empId] }));
-        }
+            }
+        });
+
+        return result;
     }
 
     getAbsentEmployees() {
+        const { filters, data } = this.state;
         const { logs, emps, empMap } = this.getFilteredData();
-        const isSingleDay = this.state.filters.dateFrom === this.state.filters.dateTo;
 
-        if (isSingleDay) {
-            const coveredIds = new Set(logs.filter(l => parseFloat(l.present) > 0 || l.weeklyOff == 1 || l.holiday == 1 || l.isOnLeave == 1).map(l => l.empId));
-            const absentLogIds = new Set(
-                logs.filter(l => parseFloat(l.present) === 0 && l.weeklyOff != 1 && l.holiday != 1 && l.isOnLeave != 1).map(l => l.empId));
+        const logMap = {};
+        logs.forEach(l => {
+            const key = l.empId + '_' + l.date;
+            const existing = logMap[key];
+            if (!existing || parseFloat(l.present) > parseFloat(existing.present)) {
+                logMap[key] = l;
+            }
+        });
 
-            return emps.filter(e => !coveredIds.has(e.id) || absentLogIds.has(e.id))
-                .map(e => {
-                    const log = logs.find(l => l.empId === e.id) || null;
-                    return { log, emp: e };
-                });
-        } else {
-            return logs.filter(l => parseFloat(l.present) === 0 && l.weeklyOff != 1 && l.holiday != 1 && l.isOnLeave != 1).map(l => ({ log: l, emp: empMap[l.empId] }));
-        }
+        const from = new Date(filters.dateFrom);
+        const to = new Date(filters.dateTo);
+        const result = [];
+
+        emps.forEach(emp => {
+            for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+                const dateStr = d.toISOString().slice(0, 10);
+                const log = logMap[emp.id + '_' + dateStr];
+
+                // Same rule as the PHP $absentEmployeeDays loop:
+                // no record present at all => absent for that day
+                const isPresent = log && parseFloat(log.present) > 0;
+                const isWeeklyOff = log && log.weeklyOff == 1;
+                const isHoliday = log && log.holiday == 1;
+                const isOnLeave = log && log.isOnLeave == 1;
+
+                if (!isPresent && !isWeeklyOff && !isHoliday && !isOnLeave) {
+                    result.push({ log: log || null, emp, date: dateStr });
+                }
+            }
+        });
+
+        return result;
     }
 
     getSinglePunchEmployees() {

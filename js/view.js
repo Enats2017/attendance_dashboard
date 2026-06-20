@@ -1948,7 +1948,7 @@ class AttendanceView {
 
 		let headers, ths;
 		if (isAbsentOnly) {
-			headers = ['Sr.No', 'Code', 'Name', 'Dept', 'Company', 'Shift'];
+			headers = ['Sr.No', 'Code', 'Name', 'Dept', 'Company', 'Shift', 'Date'];
 		} else if (key === 'lateIn') {
 			headers = ['Sr.No', 'Code', 'Name', 'Dept', 'Company', 'Shift', 'Date', 'In', 'Out', 'Hours', 'Late By'];
 		} else if (key === 'earlyOut') {
@@ -1958,8 +1958,10 @@ class AttendanceView {
 		}
 		ths = headers.map(h => `<th>${h}</th>`).join('');
 
-		const trs = pageItems.map(({ log, emp }, i) => {
-			if (!emp) return '';
+		const trs = pageItems.map(({ log, emp, date }, i) => {
+			if (!emp) {
+				return '';
+			}
 			const sr = (currentPage - 1) * pageSize + i + 1;
 			if (isAbsentOnly) {
 				return `
@@ -1970,6 +1972,7 @@ class AttendanceView {
 					<td>${emp.dept || '–'}</td>
 					<td>${emp.company || '–'}</td>
 					<td>${emp.shift || '–'}</td>
+					<td>${date || '–'}</td>
 				</tr>`;
 			}
 			const lastCol = key === 'lateIn'
@@ -1979,19 +1982,19 @@ class AttendanceView {
 					: `<td>${log?.status || '–'}</td>`;
 
 			return `
-			<tr>
-				<td>${sr}</td>
-				<td><b>${emp.code || '–'}</b></td>
-				<td>${emp.name || '–'}</td>
-				<td>${emp.dept || '–'}</td>
-				<td>${emp.company || '–'}</td>
-				<td>${emp.shift || '–'}</td>
-				<td>${log?.date || '–'}</td>
-				<td>${log?.inTime || '–'}</td>
-				<td>${log?.outTime || '–'}</td>
-				<td><b>${log?.hoursWorked || 0}h</b></td>
-				${lastCol}
-			</tr>`;
+				<tr>
+					<td>${sr}</td>
+					<td><b>${emp.code || '–'}</b></td>
+					<td>${emp.name || '–'}</td>
+					<td>${emp.dept || '–'}</td>
+					<td>${emp.company || '–'}</td>
+					<td>${emp.shift || '–'}</td>
+					<td>${log?.date || '–'}</td>
+					<td>${log?.inTime || '–'}</td>
+					<td>${log?.outTime || '–'}</td>
+					<td><b>${log?.hoursWorked || 0}h</b></td>
+					${lastCol}
+				</tr>`;
 		}).join('');
 
 		let pageButtons = '';
@@ -2011,6 +2014,7 @@ class AttendanceView {
 			Dept: emp?.dept,
 			Company: emp?.company,
 			Shift: emp?.shift,
+			Date: date || log?.date,
 			Date: log?.date,
 			In: log?.inTime,
 			Out: log?.outTime,
