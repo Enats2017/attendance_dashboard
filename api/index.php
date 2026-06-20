@@ -425,14 +425,18 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
  */
 function handleDashboardData($input, $returnData = false) {
     $userId = isset($input['userId']) ? intval($input['userId']) : 0;
-    $month = isset($input['month']) ? intval($input['month']) : intval(date('n'));
-    $year = isset($input['year']) ? intval($input['year']) : intval(date('Y'));
-    
-    $fromDay = isset($input['day_from']) ? intval($input['day_from']) : 1;
-    $toDay = isset($input['day_to']) ? intval($input['day_to']) : date('t', strtotime("$year-$month-01"));
-    
-    $dayFrom = "$year-" . sprintf("%02d", $month) . "-" . sprintf("%02d", $fromDay);
-    $dayTo = "$year-" . sprintf("%02d", $month) . "-" . sprintf("%02d", $toDay);
+	if (isset($input['date_from']) && isset($input['date_to'])) {
+        $dayFrom = $input['date_from'];
+        $dayTo = $input['date_to'];
+    } else {
+        // Backward-compatible fallback for any old caller still using month/year/day_from/day_to
+        $month = isset($input['month']) ? intval($input['month']) : intval(date('n'));
+        $year = isset($input['year']) ? intval($input['year']) : intval(date('Y'));
+        $fromDay = isset($input['day_from']) ? intval($input['day_from']) : 1;
+        $toDay = isset($input['day_to']) ? intval($input['day_to']) : date('t', strtotime("$year-$month-01"));
+        $dayFrom = "$year-" . sprintf("%02d", $month) . "-" . sprintf("%02d", $fromDay);
+        $dayTo = "$year-" . sprintf("%02d", $month) . "-" . sprintf("%02d", $toDay);
+    }
     
     $deptName = isset($input['dept']) && $input['dept'] !== 'All' ? $input['dept'] : null;
     $compName = isset($input['company']) && $input['company'] !== 'All' ? $input['company'] : null;
@@ -638,12 +642,19 @@ function handleDashboardData($input, $returnData = false) {
             
             if ($stmtLogs) {
                 while ($row = sqlsrv_fetch_array($stmtLogs, SQLSRV_FETCH_ASSOC)) {
+					$hasInPunch = !empty($row['InTime']) && $row['InTime'] !== '00:00:00';
+					$hasOutPunch = !empty($row['OutTime']) && $row['OutTime'] !== '00:00:00';
+					$status = $row['Status'] ?: 'Present';
+					if (floatval($row['Present']) <= 0 && ($hasInPunch || $hasOutPunch)) {
+						$status = 'Present';
+					}
+
                     $logs[] = [
                         'empId' => (string)$row['EmployeeId'],
                         'date' => $row['AttendanceDate'] ? $row['AttendanceDate']->format('Y-m-d') : null,
                         'inTime' => $row['InTime'],
                         'outTime' => $row['OutTime'],
-                        'status' => $row['Status'] ?: 'Present',
+                        'status' => $status,
                         'present' => floatval($row['Present']),
                         'weeklyOff' => intval($row['WeeklyOff']),
                         'holiday' => intval($row['Holiday']),
@@ -782,15 +793,17 @@ function handleDashboardData($input, $returnData = false) {
 
     // Step 1: mark which empId_date keys already exist in AttendanceLogs
     $employeesInAttendanceLogs = [];
-    $presentRecordCount = 0;
-    foreach ($logs as $log) {
-        $key = $log['empId'] . '_' . $log['date'];
-        $employeesInAttendanceLogs[$key] = true;
+	$presentRecordCount = 0;
+	foreach ($logs as $log) {
+		$key = $log['empId'] . '_' . $log['date'];
+		$employeesInAttendanceLogs[$key] = true;
+		$hasInPunch = !empty($log['inTime']) && $log['inTime'] !== '00:00' && $log['inTime'] !== '00:00:00';
+		$hasOutPunch = !empty($log['outTime']) &&$log['outTime'] !== '00:00' &&$log['outTime'] !== '00:00:00';
 
-        if (floatval($log['present']) > 0) {
-            $presentRecordCount++;
-        }
-    }
+		if (floatval($log['present']) > 0 || $hasInPunch || $hasOutPunch) {
+			$presentRecordCount++;
+		}
+	}
 
     // Step 2: merge DeviceLogs-only empId_date into $logs as synthesized rows
     $devicePresentDayCount = 0;
@@ -845,8 +858,8 @@ function handleDashboardData($input, $returnData = false) {
     $hoursCount = 0;
     foreach ($logs as $log) {
         if (($log['missedInPunch'] ?? 0) == 1 || ($log['missedOutPunch'] ?? 0) == 1) {
-            $singlePunch++;
-        }
+			$singlePunch++;
+		}
         if (($log['lateBy'] ?? 0) > 0) {
             $lateIn++;
         }
@@ -864,11 +877,14 @@ function handleDashboardData($input, $returnData = false) {
     $avgHours = $hoursCount > 0 ? round($totalHours / $hoursCount, 2) : 0;
 
     $presentKeySet = [];
-    foreach ($logs as $log) {
-        if (floatval($log['present']) > 0) {
-            $presentKeySet[$log['empId'] . '_' . $log['date']] = true;
-        }
-    }
+	foreach ($logs as $log) {
+		$hasInPunch = !empty($log['inTime']) && $log['inTime'] !== '00:00' && $log['inTime'] !== '00:00:00';
+		$hasOutPunch = !empty($log['outTime']) && $log['outTime'] !== '00:00' && $log['outTime'] !== '00:00:00';
+
+		if (floatval($log['present']) > 0 || $hasInPunch || $hasOutPunch) {
+			$presentKeySet[$log['empId'] . '_' . $log['date']] = true;
+		}
+	}
 
     $rangeStart = new DateTime($dayFrom);
     $rangeEnd = new DateTime($dayTo);

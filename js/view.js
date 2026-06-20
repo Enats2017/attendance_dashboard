@@ -1944,7 +1944,6 @@ class AttendanceView {
 			earlyOut: '🚪 Early Out Employees',
 		};
 
-		const isAbsentOnly = (key === 'absent');
 		const isResignedOnly = (key === 'resigned');
 		const isNewJoinedOnly = (key === 'newJoined');
 		const pageSize = 10;
@@ -1953,9 +1952,7 @@ class AttendanceView {
 		const pageItems = items.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
 		let headers, ths;
-		if (isAbsentOnly) {
-			headers = ['Sr.No', 'Code', 'Name', 'Dept', 'Company', 'Shift', 'Date'];
-		} else if (isResignedOnly) {
+		if (isResignedOnly) {
 			headers = ['Sr.No', 'Code', 'Name', 'Dept', 'Company', 'DOJ', 'DOR', 'Status'];
 		} else if (isNewJoinedOnly) {
 			headers = ['Sr.No', 'Code', 'Name', 'Dept', 'Company', 'DOJ', 'Status'];
@@ -1973,18 +1970,7 @@ class AttendanceView {
 				return '';
 			}
 			const sr = (currentPage - 1) * pageSize + i + 1;
-			if (isAbsentOnly) {
-				return `
-				<tr>
-					<td>${sr}</td>
-					<td><b>${emp.code || '–'}</b></td>
-					<td>${emp.name || '–'}</td>
-					<td>${emp.dept || '–'}</td>
-					<td>${emp.company || '–'}</td>
-					<td>${emp.shift || '–'}</td>
-					<td>${date || '–'}</td>
-				</tr>`;
-			}
+
 			if (isResignedOnly) {
 				return `
 				<tr>
@@ -2011,11 +1997,14 @@ class AttendanceView {
 					<td><span class="badge ${badgeClass}">${emp.status || 'Working'}</span></td>
 				</tr>`;
 			}
+
+			// Generic template — used by Present, Absent, Late In, Early Out
+			// Show raw data only. No fallback text like "Absent" or "0h" — blank if missing.
 			const lastCol = key === 'lateIn'
-				? `<td>${log?.lateBy || 0} min</td>`
+				? `<td>${log?.lateBy ?? ''}</td>`
 				: key === 'earlyOut'
-					? `<td>${log?.earlyBy || 0} min</td>`
-					: `<td>${log?.status || '–'}</td>`;
+					? `<td>${log?.earlyBy ?? ''}</td>`
+					: `<td>${log?.status ?? ''}</td>`;
 
 			return `
 				<tr>
@@ -2025,10 +2014,10 @@ class AttendanceView {
 					<td>${emp.dept || '–'}</td>
 					<td>${emp.company || '–'}</td>
 					<td>${emp.shift || '–'}</td>
-					<td>${log?.date || '–'}</td>
-					<td>${log?.inTime || '–'}</td>
-					<td>${log?.outTime || '–'}</td>
-					<td><b>${log?.hoursWorked || 0}h</b></td>
+					<td>${date || log?.date || ''}</td>
+					<td>${log?.inTime ?? ''}</td>
+					<td>${log?.outTime ?? ''}</td>
+					<td>${log?.hoursWorked ?? ''}</td>
 					${lastCol}
 				</tr>`;
 		}).join('');
@@ -2044,7 +2033,7 @@ class AttendanceView {
 			</button>`;
 		}
 
-		this._statCardExportData = items.map(({ log, emp }) => {
+		this._statCardExportData = items.map(({ log, emp, date }) => {
 			if (key === 'resigned') {
 				return {
 					Code: emp?.code,
@@ -2072,7 +2061,7 @@ class AttendanceView {
 				Dept: emp?.dept,
 				Company: emp?.company,
 				Shift: emp?.shift,
-				Date: log?.date,
+				Date: date || log?.date,
 				In: log?.inTime,
 				Out: log?.outTime,
 				Hours: log?.hoursWorked,

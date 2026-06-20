@@ -77,22 +77,12 @@ class AttendanceModel {
     }
 
     async fetchData() {
-        const dFrom = new Date(this.state.filters.dateFrom);
-        const dTo = new Date(this.state.filters.dateTo);
-        
-        const month = dFrom.getMonth() + 1;
-        const year = dFrom.getFullYear();
-        const dayFrom = dFrom.getDate();
-        const dayTo = dTo.getDate();
-
         try {
             const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
             url.searchParams.set('action', 'dashboard_data');
             url.searchParams.set('userId', (window.HRMS_USER || {}).id || 0);
-            url.searchParams.set('month', month);
-            url.searchParams.set('year', year);
-            url.searchParams.set('day_from', dayFrom);
-            url.searchParams.set('day_to', dayTo);
+            url.searchParams.set('date_from', this.state.filters.dateFrom);
+            url.searchParams.set('date_to', this.state.filters.dateTo);
             url.searchParams.set('dept', this.state.filters.dept);
             url.searchParams.set('company', this.state.filters.company);
             url.searchParams.set('shift', this.state.filters.shift);
@@ -334,10 +324,109 @@ class AttendanceModel {
     }
 
     getPresentEmployees() {
-        const { filters, data } = this.state;
-        const { logs, emps, empMap } = this.getFilteredData();
+        const { filters } = this.state;
+        const { logs, emps } = this.getFilteredData();
 
-        // Build a lookup: empId_date -> log (prefer the row with higher 'present')
+        const presentKeySet = {};
+
+        logs.forEach(l => {
+            const hasInPunch = l.inTime && l.inTime !== '00:00' && l.inTime !== '00:00:00';
+            const hasOutPunch = l.outTime && l.outTime !== '00:00' && l.outTime !== '00:00:00';
+
+            if (parseFloat(l.present) > 0 || hasInPunch || hasOutPunch) {
+                presentKeySet[l.empId + '_' + l.date] = true;
+            }
+        });
+
+        const logMap = {};
+
+        logs.forEach(l => {
+            const key = l.empId + '_' + l.date;
+            const existing = logMap[key];
+
+            if (!existing || parseFloat(l.present) > parseFloat(existing.present)) {
+                logMap[key] = l;
+            }
+        });
+
+        const from = new Date(filters.dateFrom);
+        const to = new Date(filters.dateTo);
+        const result = [];
+
+        emps.forEach(emp => {
+            for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+
+                const dateStr = d.toISOString().slice(0, 10);
+                const key = emp.id + '_' + dateStr;
+
+                if (presentKeySet[key]) {
+                    result.push({
+                        log: logMap[key] || null,
+                        emp,
+                        date: dateStr
+                    });
+                }
+            }
+        });
+
+        result.sort((a, b) => b.date.localeCompare(a.date));
+        return result;
+    }
+
+    getAbsentEmployees() {
+        const { filters } = this.state;
+        const { logs, emps } = this.getFilteredData();
+
+        const presentKeySet = {};
+
+        logs.forEach(l => {
+            const hasInPunch = l.inTime && l.inTime !== '00:00' && l.inTime !== '00:00:00';
+            const hasOutPunch = l.outTime && l.outTime !== '00:00' && l.outTime !== '00:00:00';
+
+            if (parseFloat(l.present) > 0 || hasInPunch || hasOutPunch) {
+                presentKeySet[l.empId + '_' + l.date] = true;
+            }
+        });
+
+        const logMap = {};
+
+        logs.forEach(l => {
+            const key = l.empId + '_' + l.date;
+            const existing = logMap[key];
+
+            if (!existing || parseFloat(l.present) > parseFloat(existing.present)) {
+                logMap[key] = l;
+            }
+        });
+
+        const from = new Date(filters.dateFrom);
+        const to = new Date(filters.dateTo);
+        const result = [];
+
+        emps.forEach(emp => {
+            for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+
+                const dateStr = d.toISOString().slice(0, 10);
+                const key = emp.id + '_' + dateStr;
+
+                if (!presentKeySet[key]) {
+                    result.push({
+                        log: logMap[key] || null,
+                        emp,
+                        date: dateStr
+                    });
+                }
+            }
+        });
+
+        result.sort((a, b) => b.date.localeCompare(a.date));
+        return result;
+    }
+
+    getSinglePunchEmployees() {
+        const { filters } = this.state;
+        const { logs, emps } = this.getFilteredData();
+
         const logMap = {};
         logs.forEach(l => {
             const key = l.empId + '_' + l.date;
@@ -355,18 +444,20 @@ class AttendanceModel {
             for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
                 const dateStr = d.toISOString().slice(0, 10);
                 const log = logMap[emp.id + '_' + dateStr];
-                if (log && parseFloat(log.present) > 0) {
+
+                if (log && (log.missedInPunch == 1 || log.missedOutPunch == 1)) {
                     result.push({ log, emp, date: dateStr });
                 }
             }
         });
 
+        result.sort((a, b) => b.date.localeCompare(a.date));
         return result;
     }
 
-    getAbsentEmployees() {
-        const { filters, data } = this.state;
-        const { logs, emps, empMap } = this.getFilteredData();
+    getLateInEmployees() {
+        const { filters } = this.state;
+        const { logs, emps } = this.getFilteredData();
 
         const logMap = {};
         logs.forEach(l => {
@@ -386,35 +477,46 @@ class AttendanceModel {
                 const dateStr = d.toISOString().slice(0, 10);
                 const log = logMap[emp.id + '_' + dateStr];
 
-                // Same rule as the PHP $absentEmployeeDays loop:
-                // no record present at all => absent for that day
-                const isPresent = log && parseFloat(log.present) > 0;
-                const isWeeklyOff = log && log.weeklyOff == 1;
-                const isHoliday = log && log.holiday == 1;
-                const isOnLeave = log && log.isOnLeave == 1;
-
-                if (!isPresent && !isWeeklyOff && !isHoliday && !isOnLeave) {
-                    result.push({ log: log || null, emp, date: dateStr });
+                if (log && (log.lateBy || 0) > 0) {
+                    result.push({ log, emp, date: dateStr });
                 }
             }
         });
 
+        result.sort((a, b) => b.date.localeCompare(a.date));
         return result;
     }
 
-    getSinglePunchEmployees() {
-        const { logs, empMap } = this.getFilteredData();
-        return logs.filter(l => l.missedInPunch == 1 || l.missedOutPunch == 1).map(l => ({ log: l, emp: empMap[l.empId] }));
-    }
-
-    getLateInEmployees() {
-        const { logs, empMap } = this.getFilteredData();
-        return logs.filter(l => (l.lateBy || 0) > 0).map(l => ({ log: l, emp: empMap[l.empId] }));
-    }
-
     getEarlyOutEmployees() {
-        const { logs, empMap } = this.getFilteredData();
-        return logs.filter(l => (l.earlyBy || 0) > 0).map(l => ({ log: l, emp: empMap[l.empId] }));
+        const { filters } = this.state;
+        const { logs, emps } = this.getFilteredData();
+
+        const logMap = {};
+        logs.forEach(l => {
+            const key = l.empId + '_' + l.date;
+            const existing = logMap[key];
+            if (!existing || parseFloat(l.present) > parseFloat(existing.present)) {
+                logMap[key] = l;
+            }
+        });
+
+        const from = new Date(filters.dateFrom);
+        const to = new Date(filters.dateTo);
+        const result = [];
+
+        emps.forEach(emp => {
+            for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+                const dateStr = d.toISOString().slice(0, 10);
+                const log = logMap[emp.id + '_' + dateStr];
+
+                if (log && (log.earlyBy || 0) > 0) {
+                    result.push({ log, emp, date: dateStr });
+                }
+            }
+        });
+
+        result.sort((a, b) => b.date.localeCompare(a.date));
+        return result;
     }
 
     getResignedEmployees() {
@@ -426,7 +528,8 @@ class AttendanceModel {
             if (filters.gender !== 'All' && emp.gender !== filters.gender) return false;
             if (filters.location !== 'All' && emp.location !== filters.location) return false;
             return true;
-        }).map(emp => ({ log: null, emp }));
+        }).sort((a, b) => (b.dor || '').localeCompare(a.dor || ''))
+          .map(emp => ({ log: null, emp }));
     }
 
     getNewJoinedEmployees() {
@@ -438,7 +541,8 @@ class AttendanceModel {
             if (filters.gender !== 'All' && emp.gender !== filters.gender) return false;
             if (filters.location !== 'All' && emp.location !== filters.location) return false;
             return true;
-        }).map(emp => ({ log: null, emp }));
+        }).sort((a, b) => (b.doj || '').localeCompare(a.doj || ''))
+          .map(emp => ({ log: null, emp }));
     }
 }
 
