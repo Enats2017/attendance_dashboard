@@ -598,6 +598,50 @@ var Charts = (function () {
       tooltip: Object.assign({}, baseTooltip, {
         shared: true,
         intersect: false,
+        custom: function (opts) {
+          var series = opts.series;
+          var dataPointIndex = opts.dataPointIndex;
+          var w = opts.w;
+
+          var total = series.reduce(function (sum, s) {
+            return sum + (s[dataPointIndex] || 0);
+          }, 0);
+
+          var label = categories[dataPointIndex];
+
+          var rows = series
+            .map(function (s, i) {
+              var name = w.globals.seriesNames[i];
+              var color = w.globals.colors[i];
+              var val = s[dataPointIndex] || 0;
+              return (
+                '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">' +
+                '<span style="width:8px;height:8px;border-radius:50%;background:' +
+                color +
+                ';display:inline-block;"></span> ' +
+                name +
+                ': <b style="margin-left:auto;">' +
+                val +
+                "</b></div>"
+              );
+            })
+            .join("");
+
+          return (
+            '<div style="padding:10px 14px;font-family:' +
+            font +
+            ';min-width:170px;">' +
+            '<div style="font-weight:700;margin-bottom:8px;color:#fff;">' +
+            label +
+            "</div>" +
+            rows +
+            '<div style="display:flex;align-items:center;gap:6px;margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.15);">' +
+            '<span style="width:8px;height:8px;border-radius:50%;background:#94a3b8;display:inline-block;"></span> Total: <b style="margin-left:auto;">' +
+            total +
+            "</b></div>" +
+            "</div>"
+          );
+        },
       }),
       states: {
         hover: { filter: { type: "lighten", value: 0.04 } },
