@@ -4,6 +4,9 @@
 class AttendanceView {
 	constructor() {
 		this.app = document.getElementById("app");
+		this.app.addEventListener("click", (e) =>this._handleDeptAccordionClick(e),);
+		this.app.addEventListener("mousemove", (e) => this._handleDeptAccordionHover(e),);
+		this.app.addEventListener("mouseleave", () => this._hideDeptAccTooltip());
 		this.TABS = [
 			{ id: "feature", label: "Dashboard", icon: "ph-house" },
 			{ id: "all", label: "Attendance Logs", icon: "ph-list-dashes" },
@@ -52,8 +55,152 @@ class AttendanceView {
 		this._initChartRendering(state.activeTab, logs, emps, empMap, state.filters, state.data.counts, model,);
 	}
 
+	_handleDeptAccordionClick(e) {
+		const seg = e.target.closest(".dept-acc-seg");
+		if (seg) {
+			e.stopPropagation();
+			const data = this._currentDeptData;
+			if (!data) {
+				return;
+			}
+			const status = seg.dataset.status;
+			const { dateFrom, dateTo } = data.model.state.filters;
+
+			const row = seg.closest(".dept-acc-row");
+			const header = row ? row.querySelector(".dept-acc-header") : null;
+			const dept = header ? header.dataset.dept : null;
+			const subRow = seg.closest(".dept-acc-sub-row");
+
+			let scopedEmps;
+			let title;
+
+			if (subRow) {
+				const designation = subRow.dataset.designation;
+				scopedEmps = data.emps.filter((emp) => emp.dept === dept && (emp.designation || "Staff") === designation,);
+				title = `Dept: ${dept} - ${designation} - ${status}`;
+			} else {
+				scopedEmps = data.emps.filter((emp) => emp.dept === dept);
+				title = `Dept: ${dept} - ${status}`;
+			}
+
+			const dayLogs = this._buildEmployeeDayLogs(scopedEmps, data.logs, dateFrom, dateTo,);
+
+			const filteredLogs = dayLogs.filter((l) => {
+				switch (status) {
+					case "Present":
+						return (l.status === "Present" || l.status === "Present On WeeklyOff");
+					case "Half Present":
+						return (l.status === "1/2Present" || l.status === "1/2Present On WeeklyOff");
+					case "Weekly Off":
+						return l.status === "On WeeklyOff";
+					case "Absent":
+						return l.status === "Absent";
+					default:
+						return false;
+				}
+			});
+
+			this._renderDrillDown(filteredLogs, title, data.empMap);
+			return;
+    	}
+
+    	const header = e.target.closest(".dept-acc-header");
+		if (header) {
+			const row = header.closest(".dept-acc-row");
+			const expandEl = row ? row.querySelector(".dept-acc-expand") : null;
+			if (!expandEl) {
+				return;
+			}
+			const dept = header.dataset.dept;
+			const data = this._currentDeptData;
+			if (!data) {
+				return;
+			}
+			this._toggleDeptAccordionEl(expandEl, dept, data.emps, data.logs, data.model,);
+		}
+  	}
+
+	_handleDeptAccordionHover(e) {
+		const header = e.target.closest(".dept-acc-header");
+		const subRow = e.target.closest(".dept-acc-sub-row");
+		const target = header || subRow;
+
+		if (!target) {
+			this._hideDeptAccTooltip();
+			return;
+		}
+
+		const stats = {
+			present: target.dataset.present || 0,
+			half: target.dataset.half || 0,
+			weeklyOff: target.dataset.weeklyoff || 0,
+			absent: target.dataset.absent || 0,
+			total: target.dataset.total || 0,
+		};
+		const label = header ? header.dataset.dept : subRow.dataset.designation;
+
+		this._showDeptAccTooltip(e, label, stats);
+	}
+
+	_showDeptAccTooltip(e, label, stats) {
+		let tip = document.getElementById("dept-acc-tooltip");
+		if (!tip) {
+			tip = document.createElement("div");
+			tip.id = "dept-acc-tooltip";
+			tip.style.position = "fixed";
+			tip.style.zIndex = "9999";
+			tip.style.pointerEvents = "none";
+			tip.style.background = "#0f172a";
+			tip.style.color = "#fff";
+			tip.style.borderRadius = "10px";
+			tip.style.padding = "12px 16px";
+			tip.style.fontFamily = "'Plus Jakarta Sans','Inter','Segoe UI',sans-serif";
+			tip.style.fontSize = "12px";
+			tip.style.boxShadow = "0 8px 24px rgba(0,0,0,0.25)";
+			tip.style.minWidth = "160px";
+			document.body.appendChild(tip);
+		}
+
+		tip.innerHTML = `
+			<div style="font-weight:700;margin-bottom:8px;">
+				${label}
+			</div>
+			<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+				<span style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block;"></span> Present: 
+				<b style="margin-left:auto;">${stats.present}</b>
+			</div>
+			<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+				<span style="width:8px;height:8px;border-radius:50%;background:#f59e0b;display:inline-block;"></span> Half Present: 
+				<b style="margin-left:auto;">${stats.half}</b>
+			</div>
+			<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+				<span style="width:8px;height:8px;border-radius:50%;background:#3b82f6;display:inline-block;"></span> Weekly Off: 
+				<b style="margin-left:auto;">${stats.weeklyOff}</b>
+			</div>
+			<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+				<span style="width:8px;height:8px;border-radius:50%;background:#f43f5e;display:inline-block;"></span> Absent: 
+				<b style="margin-left:auto;">${stats.absent}</b>
+			</div>
+			<div style="display:flex;align-items:center;gap:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.15);">
+				<span style="width:8px;height:8px;border-radius:50%;background:#94a3b8;display:inline-block;"></span> Total: 
+				<b style="margin-left:auto;">${stats.total}</b>
+			</div>
+		`;
+
+		tip.style.display = "block";
+		tip.style.left = e.clientX + 16 + "px";
+		tip.style.top = e.clientY + 16 + "px";
+	}
+
+	_hideDeptAccTooltip() {
+		const tip = document.getElementById("dept-acc-tooltip");
+		if (tip) {
+			tip.style.display = "none";
+		}
+	}
+
 	_renderSidebar(activeTab) {
-		return `
+    	return `
 			<aside class="sidebar">
 				<div class="sidebar-header">
 					<div class="logo-box">
@@ -65,14 +212,13 @@ class AttendanceView {
 					</div>
 				</div>
 				<nav class="sidebar-nav">
-					${this.TABS.map(
-					(tab) => `
+					${this.TABS.map((tab) => `
 						<button class="nav-item ${activeTab === tab.id ? "active" : ""}" data-tab="${tab.id}">
 							<i class="ph ${tab.icon}"></i>
 							<span>${tab.label}</span>
 						</button>
 					`,
-					).join("")}
+          		).join("")}
 					<button class="nav-item" onclick="window.open('/attendance-dashboard/login/#/dept-attendance', '_blank')">
 						<i class="ph ph-table"></i>
 						<span>Unit HC Report</span>
@@ -160,28 +306,29 @@ class AttendanceView {
 		`;
 	}
 
+
 	_renderSummaryCards(stats) {
 		const cards = [
-			{ label: "Present", val: stats.present, icon: "ph-check-circle", cls: "success", key: "present" },
-			{ label: "Absent", val: stats.absent, icon: "ph-x-circle", cls: "danger", key: "absent" },
-			{ label: "Single Punch", val: stats.singlePunch, icon: "ph-lightning", cls: "warning", key: "singlePunch" },
-			{ label: "Late In", val: stats.lateIn, icon: "ph-clock-afternoon", cls: "info", key: "lateIn" },
-			{ label: "Early Out", val: stats.earlyOut, icon: "ph-sign-out", cls: "accent",  key: "earlyOut" },
-			{ label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", key: null },
-			{ label: "Total Staff", val: stats.total, icon: "ph-users", cls: "", key: null },
+			{ key: "present", label: "Present", val: stats.present, icon: "ph-check-circle", cls: "success" },
+			{ key: "absent", label: "Absent", val: stats.absent, icon: "ph-x-circle", cls: "danger" },
+			{ key: "singlePunch", label: "Single Punch", val: stats.singlePunch, icon: "ph-lightning", cls: "warning" },
+			{ key: "lateIn", label: "Late In", val: stats.lateIn, icon: "ph-clock-afternoon", cls: "info" },
+			{ key: "earlyOut", label: "Early Out", val: stats.earlyOut, icon: "ph-sign-out", cls: "accent" },
+			{ key: null, label: "Avg Hours", val: stats.avgHours+"h", icon: "ph-timer", cls: "" },
+			{ key: null, label: "Total Staff", val: stats.total, icon: "ph-users", cls: "" },
 		];
 
 		return `
 			<div class="summary-grid">
-				${cards.map((c) => `
+				${cards.map(c => `
 					<div class="stat-card ${c.cls} ${c.key ? 'stat-card-clickable' : ''}"
 						${c.key ? `data-card-key="${c.key}"` : ''}>
 						<div class="stat-icon"><i class="ph ${c.icon}"></i></div>
 						<div class="stat-content">
 							<span class="stat-label">${c.label}</span>
 							<span class="stat-value">${c.val}</span>
+							${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ''}
 						</div>
-						${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ''}
 					</div>
 				`).join("")}
 			</div>
@@ -290,14 +437,16 @@ class AttendanceView {
 		const fields = ["company", "dept", "shift"];
 		fields.forEach((f) => {
 			const el = document.getElementById("f-" + f);
-			if (el) el.value = filters[f];
+			if (el) {
+				el.value = filters[f];
+			}
 		});
 	}
 
 	bindSwitchTab(handler) {
 		this.app.addEventListener("click", (event) => {
 			const navItem = event.target.closest(".nav-item");
-			if (navItem && navItem.dataset.tab) {          
+			if (navItem) {
 				const tabId = navItem.dataset.tab;
 				handler(tabId);
 			}
@@ -368,9 +517,13 @@ class AttendanceView {
 
 	closeDrillDown() {
 		const d = document.getElementById("drilldown-table");
-		if (d) d.innerHTML = "";
+		if (d) {
+			d.innerHTML = "";
+		}
 		const m = document.getElementById("main-table-wrap");
-		if (m) m.style.display = "";
+		if (m) {
+			m.style.display = "";
+		}
 	}
 
 	_countBy(arr, keyFn) {
@@ -382,54 +535,159 @@ class AttendanceView {
 		return out;
 	}
 
+	_getDateRange(dateFrom, dateTo) {
+		const dates = [];
+		const [fy, fm, fd] = dateFrom.split("-").map(Number);
+		const [ty, tm, td] = dateTo.split("-").map(Number);
+
+		let cur = new Date(Date.UTC(fy, fm - 1, fd));
+		const end = new Date(Date.UTC(ty, tm - 1, td));
+
+		while (cur <= end) {
+			dates.push(cur.toISOString().slice(0, 10));
+			cur.setUTCDate(cur.getUTCDate() + 1);
+		}
+		return dates;
+	}
+
+	_buildEmployeeDayLogs(emps, logs, dateFrom, dateTo) {
+		const logMap = {};
+		logs.forEach((l) => {
+			const key = l.empId + "_" + l.date;
+			const existing = logMap[key];
+			if (!existing || parseFloat(l.present) > parseFloat(existing.present)) {
+				logMap[key] = l;
+			}
+		});
+
+		const dates = this._getDateRange(dateFrom, dateTo);
+		const result = [];
+
+		emps.forEach((e) => {
+			dates.forEach((date) => {
+				const log = logMap[e.id + "_" + date];
+				if (log) {
+					result.push(log);
+				} else {
+					result.push({
+						empId: e.id,
+						date: date,
+						inTime: null,
+						outTime: null,
+						status: "Absent",
+						present: 0,
+						weeklyOff: 0,
+						holiday: 0,
+						isOnLeave: 0,
+						hoursWorked: 0,
+						lateIn: false,
+						earlyOut: false,
+					});
+				}
+			});
+		});
+
+		return result;
+	}
+
+	_computeGroupedDayStats(emps, logs, dateFrom, dateTo, groupKeyFn) {
+		const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
+		const empGroupMap = {};
+		emps.forEach((e) => {
+			empGroupMap[e.id] = groupKeyFn(e);
+		});
+
+		const groups = {};
+		emps.forEach((e) => {
+			const g = groupKeyFn(e);
+			if (!groups[g]) {
+				groups[g] = {
+				total: 0,
+				present: 0,
+				halfPresent: 0,
+				weeklyOff: 0,
+				holiday: 0,
+				leave: 0,
+				absent: 0,
+				};
+			}
+		});
+
+		dayLogs.forEach((log) => {
+			const g = empGroupMap[log.empId];
+			if (g === undefined) {
+				return;
+			}
+			groups[g].total++;
+
+			if (log.weeklyOff == 1 && parseFloat(log.present) === 0) {
+				groups[g].weeklyOff++;
+			} else if (log.holiday == 1) {
+				groups[g].holiday++;
+			} else if (log.isOnLeave == 1) {
+				groups[g].leave++;
+			} else if (parseFloat(log.present) === 1) {
+				groups[g].present++;
+			} else if (parseFloat(log.present) === 0.5) {
+				groups[g].halfPresent++;
+			} else {
+				groups[g].absent++;
+			}
+		});
+
+		return groups;
+	}
+
 	_chartCard(id, icon, iconClass, title, hint) {
 		return `
-				<div class="chart-card">
-					<div class="chart-card-header">
-						<div class="chart-card-title">
-							<div class="chart-card-icon ${iconClass || "violet"}">${icon}</div>
-							<h3>${title}</h3>
-						</div>
-						${hint ? `<span class="chart-card-drill">🖱 ${hint}</span>` : ""}
+			<div class="chart-card">
+				<div class="chart-card-header">
+					<div class="chart-card-title">
+						<div class="chart-card-icon ${iconClass || "violet"}">${icon}</div>
+						<h3>${title}</h3>
 					</div>
-					<div class="chart-body"><div id="${id}"></div></div>
-				</div>`;
+					${hint ? `<span class="chart-card-drill">🖱 ${hint}</span>` : ""}
+				</div>
+				<div class="chart-body"><div id="${id}"></div></div>
+			</div>
+		`;
 	}
 
 	_tableHTML(id, headers, rows, exportName) {
-	    const ths = `<th class="sr-col">Sr No</th>` + headers.map((h) => `<th>${h}</th>`).join("");
+		const ths = `<th class="sr-col">Sr No</th>` + headers.map((h) => `<th>${h}</th>`).join("");
 
-	    const trs = rows.map((r, index) =>
-	        `<tr>
-	            <td class="sr-col">${index + 1}</td>
-	            ${r.map((c) => `<td>${c}</td>`).join("")}
-	        </tr>`
-	    ).join("");
+		const trs = rows.map((r, index) =>
+			`<tr>
+				<td class="sr-col">${index + 1}</td>
+				${r.map((c) => `<td>${c}</td>`).join("")}
+			</tr>`,
+		).join("");
 
-	    return `
-	        <div id="main-table-wrap">
-	            <div class="table-wrap">
-	                <div class="table-header">
-	                    <h3>📄 Detail Records</h3>
-	                    <div class="table-actions">
-	                        <button class="btn-tbl btn-tbl-excel"
-	                            onclick="AppController.view.exportExcel(AppController.view._lastData['${exportName}'], '${exportName}')">
-	                            ↓ Excel
-	                        </button>
-	                        <button class="btn-tbl btn-tbl-pdf"
-	                            onclick="AppController.view.exportPDF('${id}', '${exportName}')">
-	                            ↓ PDF
-	                        </button>
-	                    </div>
-	                </div>
-	                <div style="overflow-x:auto">
-	                    <table class="data-table" id="${id}">
-	                        <thead><tr>${ths}</tr></thead>
-	                        <tbody>${trs}</tbody>
-	                    </table>
-	                </div>
-	            </div>
-	        </div>`;
+		return `
+				<div id="main-table-wrap">
+					<div class="table-wrap">
+						<div class="table-header">
+							<h3>📄 Detail Records</h3>
+							<div class="table-actions">
+								<button class="btn-tbl btn-tbl-excel"
+									onclick="AppController.view.exportExcel(AppController.view._lastData['${exportName}'], '${exportName}')">
+									↓ Excel
+								</button>
+								<button class="btn-tbl btn-tbl-pdf"
+									onclick="AppController.view.exportPDF('${id}', '${exportName}')">
+									↓ PDF
+								</button>
+							</div>
+						</div>
+						<div style="overflow-x:auto">
+							<table class="data-table" id="${id}">
+								<thead><tr>${ths}</tr></thead>
+								<tbody>${trs}</tbody>
+							</table>
+						</div>
+					</div>
+				</div>
+			`;
 	}
 
 	_renderFeature(counts) {
@@ -456,78 +714,75 @@ class AttendanceView {
 					</div>
 					<div class="charts-grid">
 						${this._chartCard("ch-feat-io", '<i class="ph-fill ph-chart-pie-slice"></i>', "sky", "In vs Out Distribution")}
-					</div>`,
-						
-			renderCharts: () => {
-				const inCount = counts.in || 0;
-				const outCount = counts.out || 0;
-				if (inCount === 0 && outCount === 0) {
-				const el = document.getElementById("ch-feat-io");
-				if (el)
-					el.innerHTML =
-					'<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:14px;font-weight:600;">No data available</div>';
-				} else {
-					Charts.donut("ch-feat-io", ["in", "out"], [inCount, outCount], "In vs Out Punches",);
-				}
-			},
+					</div>
+				`,
 		};
 	}
 
 	_renderAll(logs, emps, empMap, filters, page = 1) {
-	    this._currentAllLogs = logs;
-	    this._currentAllEmpMap = empMap;
+		this._currentAllLogs = logs;
+		this._currentAllEmpMap = empMap;
 
-	    const pageSize = 25; // same as drilldown
-	    const currentPage = page;
-	    const totalPages = Math.ceil(logs.length / pageSize);
-	    const pageLogs = logs.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+		const pageSize = 25; 
+		const currentPage = page;
+		const totalPages = Math.ceil(logs.length / pageSize);
+		const pageLogs = logs.slice((currentPage - 1) * pageSize, currentPage * pageSize,);
 
-	    const rows = pageLogs.map((l) => {
-	        const e = empMap[l.empId] || {};
-	        return [
-	            e.code || "",
-	            e.name || "",
-	            e.dept || "",
-	            e.company || "",
-	            l.date,
-	            l.inTime || "-",
-	            l.outTime || "-",
-	            l.hoursWorked || 0,
-	            l.lateIn ? '<span class="badge badge-warning">Yes</span>' : "No",
-	            l.earlyOut ? '<span class="badge badge-warning">Yes</span>' : "No",
-	            `<span class="badge ${l.status === "Present" ? "badge-success" : "badge-danger"}">${l.status}</span>`,
-	        ];
-	    });
+		const rows = pageLogs.map((l) => {
+			const e = empMap[l.empId] || {};
+			return [
+				e.code || "",
+				e.name || "",
+				e.dept || "",
+				e.company || "",
+				l.date,
+				l.inTime || "-",
+				l.outTime || "-",
+				l.hoursWorked || 0,
+				l.lateIn ? '<span class="badge badge-warning">Yes</span>' : "No",
+				l.earlyOut ? '<span class="badge badge-warning">Yes</span>' : "No",
+				`<span class="badge ${l.status === "Present" ? "badge-success" : "badge-danger"}">${l.status}</span>`,
+			];
+		});
 
-	    // Excel export should still use FULL logs, not just current page
 	    this._lastData["all-attendance"] = logs.map((l) => {
-	        const e = empMap[l.empId] || {};
-	        return {
-	            Code: e.code, Name: e.name, Dept: e.dept, Company: e.company,
-	            Date: l.date, In: l.inTime, Out: l.outTime, Hours: l.hoursWorked,
-	            LateIn: l.lateIn, EarlyOut: l.earlyOut, Status: l.status,
-	        };
-	    });
+			const e = empMap[l.empId] || {};
+			return {
+				Code: e.code,
+				Name: e.name,
+				Dept: e.dept,
+				Company: e.company,
+				Date: l.date,
+				In: l.inTime,
+				Out: l.outTime,
+				Hours: l.hoursWorked,
+				LateIn: l.lateIn,
+				EarlyOut: l.earlyOut,
+				Status: l.status,
+			};
+		});
 
-	    const byDate = this._countBy(logs, (l) => l.date);
-	    const dates = Object.keys(byDate).sort();
-	    const counts = dates.map((d) => byDate[d]);
-	    const byDept = this._countBy(logs, (l) => (empMap[l.empId] || {}).dept || "Unknown");
+		const byDate = this._countBy(logs, (l) => l.date);
+		const dates = Object.keys(byDate).sort();
+		const counts = dates.map((d) => byDate[d]);
+		const byDept = this._countBy(logs, (l) => (empMap[l.empId] || {}).dept || "Unknown",);
 
-	    // pagination buttons (current ± 2), same logic as drilldown
-	    let pageButtons = "";
-	    const startPage = Math.max(1, currentPage - 2);
-	    const endPage = Math.min(totalPages, currentPage + 2);
-	    for (let i = startPage; i <= endPage; i++) {
-	        pageButtons += `
-	            <button class="btn-page ${i === currentPage ? "btn-page-active" : ""}"
-	                onclick="AppController.view._reRenderAllPage(${i})">
-	                ${i}
-	            </button>`;
-	    }
+  
+		let pageButtons = "";
+		const startPage = Math.max(1, currentPage - 2);
+		const endPage = Math.min(totalPages, currentPage + 2);
+		for (let i = startPage; i <= endPage; i++) {
+		pageButtons += `
+				<button class="btn-page ${i === currentPage ? "btn-page-active" : ""}"
+					onclick="AppController.view._reRenderAllPage(${i})"
+				>
+					${i}
+				</button>
+			`;
+		}
 
-	    return {
-	        html: `
+    	return {
+			html: `
 	            <h2 class="section-title"><i class="ph-fill ph-stack"></i> All Attendance Records</h2>
 	            <div class="charts-grid">
 	                ${this._chartCard("ch-all-trend", '<i class="ph ph-trend-up"></i>', "violet", "Daily Attendance Trend", "Click for detail")}
@@ -536,7 +791,7 @@ class AttendanceView {
 	            ${this._tableHTML("tbl-all", ["Code", "Name", "Dept", "Company", "Date", "In", "Out", "Hours", "Late In", "Early Out", "Status"], rows, "all-attendance")}
 	            <div class="pagination-bar">
 	                <div class="pagination-text">
-	                    Showing ${((currentPage - 1) * pageSize) + 1}–${Math.min(currentPage * pageSize, logs.length)} of ${logs.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
+	                    Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, logs.length)} of ${logs.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
 	                </div>
 	                <div class="pagination-buttons">
 	                    <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderAllPage(1)">«</button>
@@ -546,101 +801,135 @@ class AttendanceView {
 	                    <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderAllPage(${totalPages})">»</button>
 	                </div>
 	            </div>
-	            <div id="drilldown-table" style="margin-top:16px"></div>`,
+	            <div id="drilldown-table" style="margin-top:16px"></div>
+			`,
 
-	        renderCharts: () => {
-	            Charts.line("ch-all-trend", dates, [{ name: "Total Punches", data: counts }], "Daily Attendance",
-	                (date) => this._renderDrillDown(logs.filter((l) => l.date === date), `Date: ${date}`, empMap));
-	            Charts.donut("ch-all-dept", Object.keys(byDept), Object.values(byDept), "Dept Distribution",
-	                (dept) => this._renderDrillDown(logs.filter((l) => (empMap[l.empId] || {}).dept === dept), `Department: ${dept}`, empMap));
-	        },
-	    };
+			renderCharts: () => {
+				Charts.line(
+					"ch-all-trend",
+					dates,
+					[{ name: "Total Punches", data: counts }],
+					"Daily Attendance",
+					(date) =>
+						this._renderDrillDown(
+							logs.filter((l) => l.date === date),
+							`Date: ${date}`,
+							empMap,
+						),
+					);
+					Charts.donut(
+						"ch-all-dept",
+						Object.keys(byDept),
+						Object.values(byDept),
+						"Dept Distribution",
+						(dept) =>
+							this._renderDrillDown(
+								logs.filter((l) => (empMap[l.empId] || {}).dept === dept),
+								`Department: ${dept}`,
+								empMap,
+							),
+					);
+			},
+		};
 	}
 
-	// New helper to re-render just this tab on page change, without full re-render
+
 	_reRenderAllPage(page) {
-	    const content = this._renderAll(this._currentAllLogs, null, this._currentAllEmpMap, null, page);
-	    document.querySelector(".tab-pane-container").innerHTML = content.html;
-	    content.renderCharts();
+		const content = this._renderAll(this._currentAllLogs, null, this._currentAllEmpMap, null, page,);
+		document.querySelector(".tab-pane-container").innerHTML = content.html;
+		content.renderCharts();
 	}
 
 	_renderDrillDown(logs, title, empMap, page = 1) {
-	    this._currentDrillLogs = logs;
-	    this._currentDrillTitle = title;
-	    this._currentDrillEmpMap = empMap;
+		this._currentDrillLogs = logs;
+		this._currentDrillTitle = title;
+		this._currentDrillEmpMap = empMap;
+	
+		const container = document.getElementById("drilldown-table");
+		if (!container) {
+			return;
+		}
+	
+		const mainWrap = document.getElementById("main-table-wrap");
+		if (mainWrap) {
+			mainWrap.style.display = "none";
+		}
+	
+		if (!logs || logs.length === 0) {
+			container.innerHTML = `
+				<div class="drilldown-box">
+					<div class="drilldown-header">
+						<span class="drilldown-title">🔍 ${title}</span>
+						<div class="drilldown-btn-group">
+							<button class="btn-drill btn-drill-back" onclick="AppController.view.closeDrillDown()">
+								← Back
+							</button>
+						</div>
+					</div>
+					<p style="padding:32px; color:#6b7280;">No records found.</p>
+				</div>
+			`;
+			return;
+		}
+	
+		const pageSize = 25;
+		const currentPage = page;
+		const totalPages = Math.ceil(logs.length / pageSize);
+		const pageLogs = logs.slice((currentPage - 1) * pageSize, currentPage * pageSize,);
 
-	    const container = document.getElementById("drilldown-table");
-	    if (!container) return;
+		const rows = pageLogs.map((l, index) => {
+			const e = empMap[l.empId] || {};
+			return `
+					<tr>
+						<td>${(currentPage - 1) * pageSize + index + 1}</td>
+						<td><b>${e.code || "–"}</b></td>
+						<td>${e.name || "–"}</td>
+						<td>${e.dept || "–"}</td>
+						<td>${e.company || "–"}</td>
+						<td>${e.shift || "–"}</td>
+						<td>${l.date}</td>
+						<td>${l.inTime || "–"}</td>
+						<td>${l.outTime || "–"}</td>
+						<td><b>${l.hoursWorked || 0}h</b></td>
+						<td>${l.lateIn ? "Yes" : "No"}</td>
+						<td>${l.earlyOut ? "Yes" : "No"}</td>
+						<td>${l.status}</td>
+					</tr>`;
+		}).join("");
 
-	    const mainWrap = document.getElementById("main-table-wrap");
-	    if (mainWrap) mainWrap.style.display = "none";
+		this._drillData = logs.map((l) => {
+			const e = empMap[l.empId] || {};
+			return {
+				Code: e.code,
+				Name: e.name,
+				Dept: e.dept,
+				Company: e.company,
+				Shift: e.shift,
+				Date: l.date,
+				In: l.inTime,
+				Out: l.outTime,
+				Hours: l.hoursWorked,
+				Late: l.lateIn,
+				Early: l.earlyOut,
+				Status: l.status,
+			};
+		});
 
-	    if (!logs || logs.length === 0) {
-	        container.innerHTML = `
-	            <div class="drilldown-box">
-	                <div class="drilldown-header">
-	                    <span class="drilldown-title">🔍 ${title}</span>
-	                    <div class="drilldown-btn-group">
-	                        <button class="btn-drill btn-drill-back" onclick="AppController.view.closeDrillDown()">
-	                            ← Back
-	                        </button>
-	                    </div>
-	                </div>
-	                <p style="padding:32px; color:#6b7280;">No records found.</p>
-	            </div>`;
-	        return;
-	    }
-
-	    const pageSize = 25;
-	    const currentPage = page;
-	    const totalPages = Math.ceil(logs.length / pageSize);
-	    const pageLogs = logs.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-	    const rows = pageLogs.map((l, index) => {
-	        const e = empMap[l.empId] || {};
-	        return `
-	            <tr>
-	                <td>${((currentPage - 1) * pageSize) + index + 1}</td>
-	                <td><b>${e.code || "–"}</b></td>
-	                <td>${e.name || "–"}</td>
-	                <td>${e.dept || "–"}</td>
-	                <td>${e.company || "–"}</td>
-	                <td>${e.shift || "–"}</td>
-	                <td>${l.date}</td>
-	                <td>${l.inTime || "–"}</td>
-	                <td>${l.outTime || "–"}</td>
-	                <td><b>${l.hoursWorked || 0}h</b></td>
-	                <td>${l.lateIn ? "Yes" : "No"}</td>
-	                <td>${l.earlyOut ? "Yes" : "No"}</td>
-	                <td>${l.status}</td>
-	            </tr>`;
-	    }).join("");
-
-	    this._drillData = logs.map((l) => {
-	        const e = empMap[l.empId] || {};
-	        return {
-	            Code: e.code, Name: e.name, Dept: e.dept,
-	            Company: e.company, Shift: e.shift, Date: l.date,
-	            In: l.inTime, Out: l.outTime, Hours: l.hoursWorked,
-	            Late: l.lateIn, Early: l.earlyOut, Status: l.status,
-	        };
-	    });
-
-	    // Page number buttons (show current ± 2)
-	    let pageButtons = "";
-	    const startPage = Math.max(1, currentPage - 2);
-	    const endPage = Math.min(totalPages, currentPage + 2);
-	    for (let i = startPage; i <= endPage; i++) {
-	        pageButtons += `
-	            <button class="btn-page ${i === currentPage ? "btn-page-active" : ""}"
-	                onclick="AppController.view._renderDrillDown(
-	                    AppController.view._currentDrillLogs,
-	                    AppController.view._currentDrillTitle,
-	                    AppController.view._currentDrillEmpMap,
-	                    ${i})">
-	                ${i}
-	            </button>`;
-	    }
+		let pageButtons = "";
+		const startPage = Math.max(1, currentPage - 2);
+		const endPage = Math.min(totalPages, currentPage + 2);
+		for (let i = startPage; i <= endPage; i++) {
+			pageButtons += `
+				<button class="btn-page ${i === currentPage ? "btn-page-active" : ""}"
+					onclick="AppController.view._renderDrillDown(
+						AppController.view._currentDrillLogs,
+						AppController.view._currentDrillTitle,
+						AppController.view._currentDrillEmpMap,
+						${i})">
+					${i}
+				</button>
+			`;
+		}
 
 	    container.innerHTML = `
 	        <div class="drilldown-box">
@@ -677,7 +966,7 @@ class AttendanceView {
 
 	            <div class="pagination-bar">
 	                <div class="pagination-text">
-	                    Showing ${((currentPage - 1) * pageSize) + 1}–${Math.min(currentPage * pageSize, logs.length)} of ${logs.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
+	                    Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, logs.length)} of ${logs.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
 	                </div>
 	                <div class="pagination-buttons">
 	                    <button class="btn-page" ${currentPage === 1 ? "disabled" : ""}
@@ -700,12 +989,194 @@ class AttendanceView {
 	                </div>
 	            </div>
 
-	        </div>`;
+	        </div>
+		`;
 
-	    container.scrollIntoView({ behavior: "smooth", block: "start" });
+		container.scrollIntoView({ behavior: "smooth", block: "start" });
 	}
+
+	_escapeAttr(str) {
+		return String(str).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+	}
+
+	_computeNiceAxis(maxValue, tickCount = 4) {
+		if (maxValue <= 0) {
+			return { ticks: [0, 1], niceMax: 1 };
+		}
+
+		const rawStep = maxValue / tickCount;
+		const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
+		const norm = rawStep / mag;
+
+		let niceNorm;
+		if (norm <= 1) {
+			niceNorm = 1;
+		} else if (norm <= 2) {
+			niceNorm = 2;
+		} else if (norm <= 5) {
+			niceNorm = 5;
+		} else {
+			niceNorm = 10;
+		}
+
+		const step = niceNorm * mag;
+		const niceMax = Math.ceil(maxValue / step) * step;
+
+		const ticks = [];
+		for (let v = 0; v <= niceMax + 1e-9; v += step) {
+			ticks.push(Math.round(v));
+		}
+
+		return { ticks, niceMax: niceMax || 1 };
+	}
+
+	_renderDeptAccordionChart(depts, rows) {
+		const maxTotal = Math.max(1, ...rows.map((r) => r[1]));
+		const { ticks, niceMax } = this._computeNiceAxis(maxTotal);
+		const tickPercents = [0, 25, 50, 75, 100];
+		const tickValues = tickPercents.map((p) => Math.round((p / 100) * niceMax));
+	
+		const rowsHtml = depts.map((d, i) => {
+			const r = rows[i];
+			const total = r[1] || 1;
+			const present = r[2],
+			half = r[3],
+			wo = r[4],
+			absent = r[5];
+			const scale = (r[1] / niceMax) * 100;
+			const pPct = (present / total) * 100;
+			const hPct = (half / total) * 100;
+			const wPct = (wo / total) * 100;
+			const aPct = (absent / total) * 100;
+
+        	return `
+				<div class="dept-acc-row">
+					<div class="dept-acc-header" data-dept="${this._escapeAttr(d)}" data-present="${present}" data-half="${half}" data-weeklyoff="${wo}" data-absent="${absent}" data-total="${total}">
+						<div class="dept-acc-label">${d}</div>
+						<div class="dept-acc-track">
+							${ticks.map((t) => `<div class="dept-acc-gridline" style="left:${(t / niceMax) * 100}%"></div>`).join("")}
+							<div class="dept-acc-bar-wrap" style="width:${scale.toFixed(2)}%">
+								<div class="dept-acc-bar">
+									${present > 0 ? `<div class="dept-acc-seg present" data-status="Present" style="width:${pPct}%">${present}</div>` : ""}
+									${half > 0 ? `<div class="dept-acc-seg half" data-status="Half Present" style="width:${hPct}%">${half}</div>` : ""}
+									${wo > 0 ? `<div class="dept-acc-seg weeklyoff" data-status="Weekly Off" style="width:${wPct}%">${wo}</div>` : ""}
+									${absent > 0 ? `<div class="dept-acc-seg absent" data-status="Absent" style="width:${aPct}%">${absent}</div>` : ""}
+								</div>
+							</div>
+						</div>
+						<i class="ph ph-caret-down dept-acc-caret"></i>
+					</div>
+					<div class="dept-acc-expand" id="dept-acc-expand-${i}" style="display:none;"></div>
+				</div>
+				`;
+		}).join("");
+
+		return `
+			<div class="dept-accordion">
+				<style>
+					.dept-accordion { width:100%; }
+					.dept-acc-legend { display:flex; gap:16px; font-size:12px; font-weight:600; color:#64748b; margin-bottom:14px; }
+					.dept-acc-legend .dot { width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:5px; }
+					.dept-acc-legend .dot.present { background:#10b981; }
+					.dept-acc-legend .dot.half { background:#f59e0b; }
+					.dept-acc-legend .dot.weeklyoff { background:#3b82f6; }
+					.dept-acc-legend .dot.absent { background:#f43f5e; }
+					.dept-acc-row { border-bottom: 1px solid #f1f5f9; }
+					.dept-acc-header { display:flex; align-items:center; gap:12px; padding:10px 0; cursor:pointer; }
+					.dept-acc-label { width:160px; flex-shrink:0; font-size:12px; font-weight:700; color:#475569; }
+					.dept-acc-track { position:relative; flex:1; }
+					.dept-acc-gridline { position:absolute; top:-4px; bottom:-4px; width:1px; background:rgba(99,102,241,0.10); }
+					.dept-acc-bar-wrap { position:relative; z-index:1; max-width: 100%; }
+					.dept-acc-bar { display:flex; height:30px; border-radius:6px; overflow:hidden; background:#f8fafc; }
+					.dept-acc-bar.small { height:24px; }
+					.dept-acc-seg { display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px; font-weight:700; min-width: 18px; cursor:pointer; }
+					.dept-acc-seg.present { background:#10b981; }
+					.dept-acc-seg.half { background:#f59e0b; }
+					.dept-acc-seg.weeklyoff { background:#3b82f6; }
+					.dept-acc-seg.absent { background:#f43f5e; }
+					.dept-acc-caret { color:#94a3b8; font-size:14px; flex-shrink:0; }
+					.dept-acc-expand { padding: 6px 0 14px 172px; }
+					.dept-acc-sub-title { font-size:12px; font-weight:700; color:#7c3aed; margin-bottom:10px; }
+					.dept-acc-sub-row { display:flex; align-items:center; gap:12px; margin-bottom:8px; }
+					.dept-acc-sub-label { width:140px; flex-shrink:0; font-size:11px; font-weight:600; color:#64748b; }
+					.dept-acc-axis { display:flex; justify-content:space-between; font-size:10px; font-weight:700; color:#94a3b8; margin-left:172px; margin-top:6px; padding-top:8px; border-top:1px solid #f1f5f9; }
+					.dept-acc-sub-axis { display:flex; justify-content:space-between; font-size:10px; font-weight:700; color:#94a3b8; margin-left:152px; margin-top:4px; }
+					.dept-acc-legend span { cursor: pointer; }
+					.dept-accordion.dimmed .dept-acc-seg { opacity: 0.15; }
+					.dept-accordion.dimmed .dept-acc-seg.active-highlight { opacity: 1; }
+				</style>
+				<div class="dept-acc-legend">
+					<span data-legend="present"><i class="dot present"></i>Present</span>
+					<span data-legend="half"><i class="dot half"></i>Half Present</span>
+					<span data-legend="weeklyoff"><i class="dot weeklyoff"></i>Weekly Off</span>
+					<span data-legend="absent"><i class="dot absent"></i>Absent</span>
+				</div>
+				${rowsHtml}
+				<div class="dept-acc-axis">
+					${ticks.map((t) => `<span>${t}</span>`).join("")}
+				</div>
+			</div>
+		`;
+	}
+
+	_toggleDeptAccordionEl(expandEl, dept, emps, logs, model) {
+		if (expandEl.style.display !== "none" && expandEl.innerHTML !== "") {
+			expandEl.style.display = "none";
+			expandEl.innerHTML = "";
+			return;
+		}
+	
+		document.querySelectorAll(".dept-acc-expand").forEach((el) => {
+			el.style.display = "none";
+			el.innerHTML = "";
+		});
+	
+		const deptEmps = emps.filter((e) => e.dept === dept);
+		const { dateFrom, dateTo } = model.state.filters;
+		const groups = this._computeGroupedDayStats(deptEmps, logs, dateFrom, dateTo, (e) => e.designation || "Staff",);
+		const desigs = Object.keys(groups).sort();
+		const maxTotal = Math.max(1, ...desigs.map((d) => groups[d].total));
+		const { ticks, niceMax } = this._computeNiceAxis(maxTotal);
+		const tickPercents = [0, 25, 50, 75, 100];
+		const tickValues = tickPercents.map((p) => Math.round((p / 100) * niceMax));
+	
+		const rowsHtml = desigs.map((d) => {
+			const g = groups[d];
+			const total = g.total || 1;
+			const scale = (g.total / niceMax) * 100;
+			const pPct = (g.present / total) * 100;
+			const hPct = (g.halfPresent / total) * 100;
+			const wPct = (g.weeklyOff / total) * 100;
+			const aPct = (g.absent / total) * 100;
+			return `
+			<div class="dept-acc-sub-row" data-designation="${this._escapeAttr(d)}" data-present="${g.present}" data-half="${g.halfPresent}" data-weeklyoff="${g.weeklyOff}" data-absent="${g.absent}" data-total="${g.total}">
+			<div class="dept-acc-sub-label">${d}</div>
+			<div class="dept-acc-track">
+				${ticks.map((t) => `<div class="dept-acc-gridline" style="left:${(t / niceMax) * 100}%"></div>`).join("")}
+				<div class="dept-acc-bar-wrap" style="width:${scale.toFixed(2)}%">
+				<div class="dept-acc-bar small">
+					${g.present > 0 ? `<div class="dept-acc-seg present" data-status="Present" style="width:${pPct}%">${g.present}</div>` : ""}
+					${g.halfPresent > 0 ? `<div class="dept-acc-seg half" data-status="Half Present" style="width:${hPct}%">${g.halfPresent}</div>` : ""}
+					${g.weeklyOff > 0 ? `<div class="dept-acc-seg weeklyoff" data-status="Weekly Off" style="width:${wPct}%">${g.weeklyOff}</div>` : ""}
+					${g.absent > 0 ? `<div class="dept-acc-seg absent" data-status="Absent" style="width:${aPct}%">${g.absent}</div>` : ""}
+				</div>
+				</div>
+			</div>
+			</div>`;
+		}).join("");
+	
+		expandEl.innerHTML = `
+			<div class="dept-acc-sub-title">🔍 ${dept} — Designation Breakdown</div>
+			${rowsHtml}
+			<div class="dept-acc-sub-axis">
+				${ticks.map((t) => `<span>${t}</span>`).join("")}
+			</div>
+		`;
+		expandEl.style.display = "block";
+	}
+
 	_renderAgeWise(logs, emps, empMap, model) {
-	    const groups = ["Under 25", "25–34", "35–44", "45–54", "55+"];
+		const groups = ["Under 25", "25–34", "35–44", "45–54", "55+"];
 
 		const gTotal = {};
 		const gPresent = {};
@@ -714,328 +1185,324 @@ class AttendanceView {
 		const gHoliday = {};
 		const gLeave = {};
 		const gAbsent = {};
-
-	    groups.forEach((g) => {
-		    gTotal[g] = 0;
-		    gPresent[g] = 0;
-		    gHalfPresent[g] = 0;
-		    gWeeklyOff[g] = 0;
-		    gHoliday[g] = 0;
-		    gLeave[g] = 0;
-		    gAbsent[g] = 0;
+	
+		groups.forEach((g) => {
+			gTotal[g] = 0;
+			gPresent[g] = 0;
+			gHalfPresent[g] = 0;
+			gWeeklyOff[g] = 0;
+			gHoliday[g] = 0;
+			gLeave[g] = 0;
+			gAbsent[g] = 0;
 		});
 
-	    const isSingleDay = model.state.filters.dateFrom === model.state.filters.dateTo;
+		const isSingleDay = model.state.filters.dateFrom === model.state.filters.dateTo;
 
-	    emps.forEach((e) => {
-	        const g = model.getAgeGroup(e.dob);
-	        gTotal[g]++;
-	    });
+		emps.forEach((e) => {
+			const g = model.getAgeGroup(e.dob);
+			gTotal[g]++;
+		});
 
-	    if (isSingleDay) {
-	        const empStatusMap = {};
-
+		if (isSingleDay) {
+			const empStatusMap = {};
+	
 			logs.forEach((l) => {
-			    empStatusMap[l.empId] = l;
+				empStatusMap[l.empId] = l;
 			});
-
-			console.log(logs.slice(0,20));
-
+	
+			console.log(logs.slice(0, 20));
+	
 			Object.values(empStatusMap).forEach((l) => {
-			    const e = empMap[l.empId];
-
-			    if (!e) {
-			    	return;
-			    }
-
-			    const g = model.getAgeGroup(e.dob);
-
-			    if (l.weeklyOff == 1 && l.present == 0) {
-			        gWeeklyOff[g]++;
-			    } else if (l.holiday == 1) {
-			        gHoliday[g]++;
-			    } else if (l.isOnLeave == 1) {
-			        gLeave[g]++;
-			    } else if (parseFloat(l.present) === 1) {
-			        gPresent[g]++;
-			    } else if (parseFloat(l.present) === 0.5) {
-			        gHalfPresent[g]++;
-			    } else {
-			        gAbsent[g]++;
-			    }
+				const e = empMap[l.empId];
+	
+				if (!e) {
+					return;
+				}
+	
+				const g = model.getAgeGroup(e.dob);
+	
+				if (l.weeklyOff == 1 && l.present == 0) {
+					gWeeklyOff[g]++;
+				} else if (l.holiday == 1) {
+					gHoliday[g]++;
+				} else if (l.isOnLeave == 1) {
+					gLeave[g]++;
+				} else if (parseFloat(l.present) === 1) {
+					gPresent[g]++;
+				} else if (parseFloat(l.present) === 0.5) {
+					gHalfPresent[g]++;
+				} else {
+					gAbsent[g]++;
+				}
 			});
+		} else {
+			logs.forEach((l) => {
+				const e = empMap[l.empId];
 
-	    } else {
-	        logs.forEach((l) => {
-	            const e = empMap[l.empId];
+				if (!e) {
+					return;
+				}
 
-	            if (!e) return;
+				const g = model.getAgeGroup(e.dob);
 
-	            const g = model.getAgeGroup(e.dob);
+				if (parseFloat(l.present) === 1) {
+					gPresent[g]++;
+				} else {
+					gAbsent[g]++;
+				}
+			});
+		}
 
-	            if (parseFloat(l.present) === 1) {
-	                gPresent[g]++;
-	            } else {
-	                gAbsent[g]++;
-	            }
-	        });
-	    }
+		const rows = groups.map((g) => {
+			const attendancePercent = isSingleDay
+				? gTotal[g]
+				? (gPresent[g] / gTotal[g]) * 100
+				: 0
+				: gPresent[g] + gAbsent[g]
+				? (gPresent[g] / (gPresent[g] + gAbsent[g])) * 100
+				: 0;
 
-	    const rows = groups.map((g) => {
-	        const attendancePercent = isSingleDay ? (gTotal[g] ? ((gPresent[g] / gTotal[g]) * 100) : 0) : ((gPresent[g] + gAbsent[g]) ? ((gPresent[g] / (gPresent[g] + gAbsent[g])) * 100) : 0);
-
-	        return [
-			    g,
-			    gTotal[g],
-			    gPresent[g],
-			    gHalfPresent[g],
-			    gWeeklyOff[g],
-			    gAbsent[g],
-			    attendancePercent.toFixed(2) + "%"
+			return [
+				g,
+				gTotal[g],
+				gPresent[g],
+				gHalfPresent[g],
+				gWeeklyOff[g],
+				gAbsent[g],
+				attendancePercent.toFixed(2) + "%",
 			];
-	    });
-
-	    this._lastData["age-wise"] = rows.map((r) => ({
-		    AgeGroup: r[0],
-		    Total: r[1],
-		    Present: r[2],
-		    HalfPresent: r[3],
-		    WeeklyOff: r[4],
-		    Absent: r[5],
-		    Rate: r[6],
-		}));
-
-	    return {
-	        html: `
-	            <h2 class="section-title">
-	                <i class="ph-fill ph-users-three"></i>
-	                Age-Wise Analysis
-	            </h2>
-
-	            <div class="charts-grid">
-	                ${this._chartCard(
-	                    "ch-age-bar",
-	                    '<i class="ph-fill ph-chart-bar"></i>',
-	                    "amber",
-	                    "Attendance by Age Group"
-	                )}
-	            </div>
-
-	            ${this._tableHTML(
-	                "tbl-age",
-					["Age Group", "Total Emp", "Present", "Half Present", "Weekly Off", "Absent", "Attendance %"],
-	                rows,
-	                "age-wise"
-	            )}
-
-	            <div id="drilldown-table" style="margin-top:16px"></div>
-	        `,
-
-	        renderCharts: () => {
-	            Charts.stacked(
-	                "ch-age-bar",
-	                groups,
-	                [
-					    {
-					        name: "Present",
-					        data: groups.map((g) => gPresent[g]),
-					    },
-					    {
-					        name: "Half Present",
-					        data: groups.map((g) => gHalfPresent[g]),
-					    },
-					    {
-					        name: "Weekly Off",
-					        data: groups.map((g) => gWeeklyOff[g]),
-					    },
-					    {
-					        name: "Absent",
-					        data: groups.map((g) => gAbsent[g]),
-					    },
-					],
-	                "Age-wise",
-	                (g, index, seriesIndex, seriesName) => {
-					    const filteredLogs = logs.filter((l) => {
-					        const e = empMap[l.empId];
-
-					        if (!e) {
-					            return false;
-					        }
-
-					        if (model.getAgeGroup(e.dob) !== g) {
-					            return false;
-					        }
-
-					        switch (seriesName) {
-							    case "Present":
-							        return (l.status === "Present" || l.status === "Present On WeeklyOff");
-
-							    case "Half Present":
-							        return (l.status === "1/2Present" || l.status === "1/2Present On WeeklyOff");
-
-							    case "Weekly Off":
-							        return l.status === "On WeeklyOff";
-
-							    case "Absent":
-							        return l.status === "Absent";
-
-							    default:
-							        return false;
-							}
-					    });
-
-					    this._renderDrillDown(filteredLogs, `Age: ${g} - ${seriesName}`, empMap);
-					}
-	            );
-	        },
-	    };
-	}
-
-
-	_renderCompanyWise(logs, emps, empMap, model) {
-		const comps = [...new Set(emps.map((e) => e.company))].sort();
-		const eBC = model.groupBy(emps, (e) => e.company);
-		const lBC = model.groupBy(logs, (l) => (empMap[l.empId] || {}).company);
-
-		const rows = comps.map((c) => {
-		    const compEmps = eBC[c] || [];
-		    const t = compEmps.length;  
-		    const ls = lBC[c] || [];
-
-		    const empPresentMap = {};
-			    ls.forEach((l) => {
-					const pval = parseFloat(l.present);
-					const existing = empPresentMap[l.empId];
-					if (existing === undefined || pval > existing) {
-						empPresentMap[l.empId] = pval;
-					}
-		    });
-
-		    const p = Object.keys(empPresentMap).filter((id) => empPresentMap[id] === 1).length;
-
-		    const hp = Object.keys(empPresentMap).filter((id) => empPresentMap[id] === 0.5).length;
-
-		    const loggedAbsent = Object.keys(empPresentMap).filter((id) => empPresentMap[id] === 0).length;
-
-		    const noLogEmps = compEmps.filter((e) => empPresentMap[e.id] === undefined).length;
-
-		    const wo = ls.filter(l => l.weeklyOff == 1 && parseFloat(l.present) === 0).length;
-
-			const ab = loggedAbsent + noLogEmps;
-
-			return [c, t, p, hp, wo, ab, t ? Math.round((p / t) * 100) + "%" : "0%"];
 		});
 
-		this._lastData["company-wise"] = rows.map((r) => ({
-		    Company: r[0],
-		    Total: r[1],
-		    Present: r[2],
-		    HalfPresent: r[3],
-		    WeeklyOff: r[4],
-		    Absent: r[5],
-		    Rate: r[6],
+		this._lastData["age-wise"] = rows.map((r) => ({
+			AgeGroup: r[0],
+			Total: r[1],
+			Present: r[2],
+			HalfPresent: r[3],
+			WeeklyOff: r[4],
+			Absent: r[5],
+			Rate: r[6],
 		}));
 
 		return {
 			html: `
-			<h2 class="section-title">
-				<i class="ph-fill ph-buildings"></i> Company Statistics
-			</h2>
-		  	<div class="charts-grid">
-		    	${this._chartCard("ch-comp-bar", '<i class="ph-fill ph-chart-bar"></i>', "violet", "Company Breakdown")}
-			</div>
-			${this._tableHTML("tbl-comp", ["Company", "Total", "Present", "Half Present", "Weekly Off", "Absent", "Rate"], rows, "company-wise")}
-			<div id="drilldown-table" style="margin-top:16px"></div>`,
+				<h2 class="section-title">
+					<i class="ph-fill ph-users-three"></i>
+					Age-Wise Analysis
+				</h2>
+
+				<div class="charts-grid">
+					${this._chartCard(
+						"ch-age-bar",
+						'<i class="ph-fill ph-chart-bar"></i>',
+						"amber",
+						"Attendance by Age Group",
+					)}
+				</div>
+
+				${this._tableHTML(
+					"tbl-age",
+					[
+						"Age Group",
+						"Total Emp",
+						"Present",
+						"Half Present",
+						"Weekly Off",
+						"Absent",
+						"Attendance %",
+					],
+					rows,
+					"age-wise",
+				)}
+
+				<div id="drilldown-table" style="margin-top:16px"></div>
+			`,
+
 			renderCharts: () => {
 				Charts.stacked(
-				    "ch-comp-bar",
-				    comps,
-				    [
-					    {
-					        name: "Present",
-					        data: rows.map((r) => r[2])
-					    },
-					    {
-					        name: "Half Present",
-					        data: rows.map((r) => r[3])
-					    },
-					    {
-					        name: "Weekly Off",
-					        data: rows.map((r) => r[4])
-					    },
-					    {
-					        name: "Absent",
-					        data: rows.map((r) => r[5])
-					    }
+					"ch-age-bar",
+					groups,
+					[
+						{ name: "Present", data: groups.map((g) => gPresent[g]), },
+						{ name: "Half Present", data: groups.map((g) => gHalfPresent[g]), },
+						{ name: "Weekly Off", data: groups.map((g) => gWeeklyOff[g]), },
+						{ name: "Absent", data: groups.map((g) => gAbsent[g]), },
 					],
-				    "Company Attendance",
-				    (company, index, seriesIndex, seriesName) => {
-					    const filteredLogs = logs.filter((l) => {
-					        const e = empMap[l.empId];
-
-					        if (!e) {
-					            return false;
-					        }
-
-					        if (e.company !== company) {
-					            return false;
-					        }
-
-					        switch (seriesName) {
-					            case "Present":
-					                return (l.status === "Present" || l.status === "Present On WeeklyOff");
-
-					            case "Half Present":
-					                return (l.status === "1/2Present" || l.status === "1/2Present On WeeklyOff");
-
-					            case "Weekly Off":
-					                return (l.status === "On WeeklyOff");
-
-					            case "Absent":
-					                return (l.status === "Absent");
-
-					            default:
-					                return false;
-					        }
-					    });
-
-					    this._renderDrillDown(filteredLogs, `Company: ${company} - ${seriesName}`, empMap);
-					}
-			    );
+					"Age-wise",
+					(g, index, seriesIndex, seriesName) => {
+						const filteredLogs = logs.filter((l) => {
+							const e = empMap[l.empId];
+			
+							if (!e) {
+								return false;
+							}
+			
+							if (model.getAgeGroup(e.dob) !== g) {
+								return false;
+							}
+			
+							switch (seriesName) {
+								case "Present":
+									return (l.status === "Present" || l.status === "Present On WeeklyOff");
+			
+								case "Half Present":
+									return (l.status === "1/2Present" || l.status === "1/2Present On WeeklyOff");
+			
+								case "Weekly Off":
+									return l.status === "On WeeklyOff";
+			
+								case "Absent":
+									return l.status === "Absent";
+			
+								default:
+									return false;
+							}
+						});
+		
+						this._renderDrillDown(
+							filteredLogs,
+							`Age: ${g} - ${seriesName}`,
+							empMap,
+						);
+					},
+				);
 			},
 		};
 	}
 
+	_renderCompanyWise(logs, emps, empMap, model) {
+		const comps = [...new Set(emps.map((e) => e.company))].sort();
+		const { dateFrom, dateTo } = model.state.filters;
+		const groups = this._computeGroupedDayStats(
+			emps,
+			logs,
+			dateFrom,
+			dateTo,
+			(e) => e.company,
+		);
+
+		const rows = comps.map((c) => {
+			const g = groups[c] || {
+				total: 0,
+				present: 0,
+				halfPresent: 0,
+				weeklyOff: 0,
+				absent: 0,
+			};
+			const rate = g.total
+				? Math.round((g.present / g.total) * 100) + "%"
+				: "0%";
+			return [
+				c,
+				g.total,
+				g.present,
+				g.halfPresent,
+				g.weeklyOff,
+				g.absent,
+				rate,
+			];
+		});
+
+		this._lastData["company-wise"] = rows.map((r) => ({
+			Company: r[0],
+			Total: r[1],
+			Present: r[2],
+			HalfPresent: r[3],
+			WeeklyOff: r[4],
+			Absent: r[5],
+			Rate: r[6],
+		}));
+
+		return {
+			html: `
+				<h2 class="section-title"><i class="ph-fill ph-buildings"></i> Company Statistics</h2>
+				<div class="charts-grid">
+					${this._chartCard("ch-comp-bar", '<i class="ph-fill ph-chart-bar"></i>', "violet", "Company Breakdown")}
+				</div>
+				${this._tableHTML("tbl-comp", ["Company", "Total", "Present", "Half Present", "Weekly Off", "Absent", "Rate"], rows, "company-wise")}
+				<div id="drilldown-table" style="margin-top:16px"></div>
+			`,
+			renderCharts: () => {
+				Charts.stacked(
+					"ch-comp-bar",
+					comps,
+					[
+						{ name: "Present", data: rows.map((r) => r[2]) },
+						{ name: "Half Present", data: rows.map((r) => r[3]) },
+						{ name: "Weekly Off", data: rows.map((r) => r[4]) },
+						{ name: "Absent", data: rows.map((r) => r[5]) },
+					],
+					"Company Attendance",
+					(company, index, seriesIndex, seriesName) => {
+						const filteredLogs = logs.filter((l) => {
+							const e = empMap[l.empId];
+							if (!e || e.company !== company) {
+								return false;
+							}
+							switch (seriesName) {
+								case "Present":
+									return (l.status === "Present" || l.status === "Present On WeeklyOff");
+								case "Half Present":
+									return (l.status === "1/2Present" || l.status === "1/2Present On WeeklyOff");
+								case "Weekly Off":
+									return l.status === "On WeeklyOff";
+								case "Absent":
+									return l.status === "Absent";
+								default:
+									return false;
+							}
+						});
+						this._renderDrillDown(
+							filteredLogs,
+							`Company: ${company} - ${seriesName}`,
+							empMap,
+						);
+					},
+				);
+			},
+		};
+	}
 
 	_renderDeptWise(logs, emps, empMap, model) {
+		this._currentDeptData = { emps, logs, empMap, model }; // ← yeh add karo
 		const depts = [...new Set(emps.map((e) => e.dept))].sort();
-		const eBD = model.groupBy(emps, (e) => e.dept);
+		const { dateFrom, dateTo } = model.state.filters;
+		const groups = this._computeGroupedDayStats(
+			emps,
+			logs,
+			dateFrom,
+			dateTo,
+			(e) => e.dept,
+		);
+
 		const lBD = model.groupBy(logs, (l) => (empMap[l.empId] || {}).dept);
 
 		const rows = depts.map((d) => {
-			const compEmps = eBD[d] || [];
-			const t = compEmps.length;
+			const g = groups[d] || {
+				total: 0,
+				present: 0,
+				halfPresent: 0,
+				weeklyOff: 0,
+				absent: 0,
+			};
 			const ls = lBD[d] || [];
-
-			const empPresentMap = {};
-			ls.forEach((l) => {
-				const pval = parseFloat(l.present);
-				const existing = empPresentMap[l.empId];
-				if (existing === undefined || pval > existing) {
-				empPresentMap[l.empId] = pval;
-				}
-			});
-
-			const p = Object.keys(empPresentMap).filter((id) => empPresentMap[id] === 1,).length;
-			const hp = Object.keys(empPresentMap).filter((id) => empPresentMap[id] === 0.5,).length;
-			const loggedAbsent = Object.keys(empPresentMap).filter((id) => empPresentMap[id] === 0,).length;
-			const noLogEmps = compEmps.filter((e) => empPresentMap[e.id] === undefined,).length;
-			const wo = ls.filter((l) => l.weeklyOff == 1 && parseFloat(l.present) === 0,).length;
-			const ab = loggedAbsent + noLogEmps;
-
-			const avg = ls.length ? (ls.reduce((s, l) => s + (l.hoursWorked || 0), 0) / ls.length).toFixed(1) : 0;
-
-			return [d, t, p, hp, wo, ab, avg, t ? Math.round((p / t) * 100) + "%" : "0%",];
+			const avg = ls.length
+				? (
+					ls.reduce((s, l) => s + (l.hoursWorked || 0), 0) / ls.length
+				).toFixed(1)
+				: 0;
+			const rate = g.total
+				? Math.round((g.present / g.total) * 100) + "%"
+				: "0%";
+			return [
+				d,
+				g.total,
+				g.present,
+				g.halfPresent,
+				g.weeklyOff,
+				g.absent,
+				avg,
+				rate,
+			];
 		});
 
 		this._lastData["dept-wise"] = rows.map((r) => ({
@@ -1051,50 +1518,120 @@ class AttendanceView {
 
 		return {
 			html: `
-				<h2 class="section-title">
-					<i class="ph-fill ph-briefcase-metal"></i> Department Statistics
-				</h2>
-				<div class="charts-grid">
-					${this._chartCard("ch-dept-bar", '<i class="ph-fill ph-chart-bar"></i>', "violet", "Present by Dept")}
-				</div>
-				${this._tableHTML("tbl-dept", ["Dept", "Total", "Present", "Half Present", "Weekly Off", "Absent", "Avg Hours", "Rate"], rows, "dept-wise")}
-				<div id="drilldown-table" style="margin-top:16px"></div>`,
-		
-			renderCharts: () => {
-				Charts.stacked(
-					"ch-dept-bar", depts,
-					[
-						{ name: "Present", data: rows.map((r) => r[2]) },
-						{ name: "Half Present", data: rows.map((r) => r[3]) },
-						{ name: "Weekly Off", data: rows.map((r) => r[4]) },
-						{ name: "Absent", data: rows.map((r) => r[5]) },
-					],
-					"Dept Attendance",
-					(dept, index, seriesIndex, seriesName) => {
-						const filteredLogs = logs.filter((l) => {
-							const e = empMap[l.empId];
-							if (!e) return false;
-							if (e.dept !== dept) return false;
+					<h2 class="section-title">
+						<i class="ph-fill ph-briefcase-metal"></i> Department Statistics
+					</h2>
+					<div class="charts-grid">
+						<div class="chart-card">
+							<div class="chart-card-header">
+								<div class="chart-card-title">
+									<div class="chart-card-icon violet"><i class="ph-fill ph-chart-bar"></i></div>
+									<h3>Present by Dept</h3>
+								</div>
+								<span class="chart-card-drill">🖱 Naam pe click = Designation breakdown · Bar pe click = Detail</span>
+							</div>
+							<div class="chart-body">
+								${this._renderDeptAccordionChart(depts, rows)}
+							</div>
+						</div>
+					</div>
+					${this._tableHTML("tbl-dept", ["Dept", "Total", "Present", "Half Present", "Weekly Off", "Absent", "Avg Hours", "Rate"], rows, "dept-wise")}
+					<div id="drilldown-table" style="margin-top:16px"></div>
+				`,
 
-							switch (seriesName) {
-								case "Present":
-									return (l.status === "Present" || l.status === "Present On WeeklyOff");
-								case "Half Present":
-									return (l.status === "1/2Present" || l.status === "1/2Present On WeeklyOff");
-								case "Weekly Off":
-									return l.status === "On WeeklyOff";
-								case "Absent":
-									return l.status === "Absent";
-								default:
-									return false;
-							}
+			renderCharts: () => {
+				const legendItems = document.querySelectorAll(".dept-accordion .dept-acc-legend span",);
+				const accordion = document.querySelector(".dept-accordion");
+
+				legendItems.forEach((item) => {
+					item.addEventListener("mouseenter", () => {
+						const status = item.dataset.legend; 
+						accordion.classList.add("dimmed");
+						document.querySelectorAll(".dept-acc-seg." + status)
+						.forEach((seg) => {
+							seg.classList.add("active-highlight");
 						});
-						this._renderDrillDown(filteredLogs, `Dept: ${dept} - ${seriesName}`, empMap,);
-					},
-					true, 
-				);
+					});
+	
+					item.addEventListener("mouseleave", () => {
+						accordion.classList.remove("dimmed");
+						document.querySelectorAll(".dept-acc-seg").forEach((seg) => {
+						seg.classList.remove("active-highlight");
+						});
+					});
+				});
 			},
 		};
+	}
+
+	_renderDeptDesignationDrilldown(dept, emps, logs, model, anchorEl) {
+		const deptEmps = emps.filter((e) => e.dept === dept);
+		const { dateFrom, dateTo } = model.state.filters;
+		const groups = this._computeGroupedDayStats(
+			deptEmps,
+			logs,
+			dateFrom,
+			dateTo,
+			(e) => e.designation || "Staff",
+		);
+		const desigs = Object.keys(groups).sort();
+
+		const old = document.getElementById("dept-desig-popover");
+		if (old) {
+			old.remove();
+		}
+	
+		const chartEl = document.getElementById("ch-dept-bar");
+		const chartCard = chartEl ? chartEl.closest(".chart-card") : null;
+		if (!chartCard) {
+			return;
+		}
+		chartCard.style.position = "relative";
+	
+		const cardRect = chartCard.getBoundingClientRect();
+		const anchorRect = anchorEl.getBoundingClientRect();
+		const topOffset = anchorRect.bottom - cardRect.top + 6;
+	
+		const popover = document.createElement("div");
+		popover.id = "dept-desig-popover";
+		popover.style.position = "absolute";
+		popover.style.left = "60px";
+		popover.style.right = "12px";
+		popover.style.top = topOffset + "px";
+		popover.style.background = "#fff";
+		popover.style.border = "1px solid #e2e8f0";
+		popover.style.borderRadius = "12px";
+		popover.style.boxShadow = "0 12px 32px rgba(0,0,0,0.18)";
+		popover.style.padding = "16px";
+		popover.style.zIndex = "50";
+
+	    popover.innerHTML = `
+			<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+				<strong>🔍 Dept: ${dept} - Designation Breakdown</strong>
+				<button class="btn-drill btn-drill-back" id="dept-desig-popover-close">✕ Close</button>
+			</div>
+			<div id="ch-dept-desig-drill" style="min-height:200px;"></div>
+		`;
+
+		chartCard.appendChild(popover);
+
+		document.getElementById("dept-desig-popover-close").addEventListener("click", () => popover.remove());
+
+		setTimeout(() => {
+			Charts.stacked(
+				"ch-dept-desig-drill",
+				desigs,
+				[
+					{ name: "Present", data: desigs.map((d) => groups[d].present) },
+					{ name: "Half Present", data: desigs.map((d) => groups[d].halfPresent), },
+					{ name: "Weekly Off", data: desigs.map((d) => groups[d].weeklyOff) },
+					{ name: "Absent", data: desigs.map((d) => groups[d].absent) },
+				],
+				`${dept} - Designation Attendance`,
+				null,
+				true,
+			);
+		}, 50);
 	}
 
 	_renderGenderWise(logs, emps, empMap, model) {
@@ -1111,7 +1648,8 @@ class AttendanceView {
 				<h2 class="section-title"><i class="ph-fill ph-gender-intersex">
 					</i> Gender Split
 				</h2>
-				${this._tableHTML("tbl-gen", ["Gender", "Total", "Present", "Absent", "Rate"], rows, "gender-wise")}`,
+				${this._tableHTML("tbl-gen", ["Gender", "Total", "Present", "Absent", "Rate"], rows, "gender-wise")}
+			`,
 			renderCharts: () => {},
 		};
 	}
@@ -1131,7 +1669,12 @@ class AttendanceView {
 			];
 		});
 		return {
-			html: `<h2 class="section-title"><i class="ph-fill ph-clock"></i> Late/Early</h2>${this._tableHTML("tbl-le", ["Name", "Dept", "Date", "In", "Out", "Late", "Early"], rows, "late-early")}`,
+			html: `
+				<h2 class="section-title"><i class="ph-fill ph-clock">
+					</i> Late/Early
+				</h2>
+				${this._tableHTML("tbl-le", ["Name", "Dept", "Date", "In", "Out", "Late", "Early"], rows, "late-early")}
+			`,
 			renderCharts: () => {},
 		};
 	}
@@ -1141,10 +1684,23 @@ class AttendanceView {
 		const filtered = logs;
 		const rows = filtered.slice(0, 100).map((l) => {
 			const e = empMap[l.empId] || {};
-			return [e.name, e.dept, l.date, l.inTime, l.outTime, l.hoursWorked, l.status,];
+			return [
+				e.name,
+				e.dept,
+				l.date,
+				l.inTime,
+				l.outTime,
+				l.hoursWorked,
+				l.status,
+			];
 		});
 		return {
-			html: `<h2 class="section-title"><i class="ph-fill ph-moon"></i> Night Shift</h2>${this._tableHTML("tbl-ns", ["Name", "Dept", "Date", "In", "Out", "Hours", "Status"], rows, "night-shift")}`,
+			html: `
+				<h2 class="section-title"><i class="ph-fill ph-moon">
+					</i> Night Shift
+				</h2>
+				${this._tableHTML("tbl-ns", ["Name", "Dept", "Date", "In", "Out", "Hours", "Status"], rows, "night-shift")}
+			`,
 			renderCharts: () => {},
 		};
 	}
@@ -1167,12 +1723,16 @@ class AttendanceView {
 			Rate: r[4],
 		}));
 		return {
-			html: `<h2 class="section-title"><i class="ph-fill ph-identification-badge"></i> Designation Statistics</h2>
-					<div class="charts-grid">
-						${this._chartCard("ch-desig-bar", '<i class="ph-fill ph-chart-bar"></i>', "teal", "Present by Designation", "Click for detail")}
-					</div>
-					${this._tableHTML("tbl-desig", ["Designation", "Total", "Present", "Absent", "Rate"], rows, "designation-wise")}
-					<div id="drilldown-table" style="margin-top:16px"></div>`,
+			html: `
+				<h2 class="section-title"><i class="ph-fill ph-identification-badge">
+					</i> Designation Statistics
+				</h2>
+				<div class="charts-grid">
+					${this._chartCard("ch-desig-bar", '<i class="ph-fill ph-chart-bar"></i>', "teal", "Present by Designation", "Click for detail")}
+				</div>
+				${this._tableHTML("tbl-desig", ["Designation", "Total", "Present", "Absent", "Rate"], rows, "designation-wise")}
+				<div id="drilldown-table" style="margin-top:16px"></div>
+			`,
 
 			renderCharts: () => {
 				Charts.bar(
@@ -1195,108 +1755,127 @@ class AttendanceView {
 
 	_renderShiftWise(logs, emps, empMap, model) {
 		const shiftStats = model.state.data.shiftStats || [];
-		const rows = shiftStats.map(s => [
-		    s.shiftName,
-		    s.total,
-		    s.present,
-		    s.halfPresent,
-		    s.weeklyOff,
-		    s.absent,
-		    s.rate + "%"
+		const rows = shiftStats.map((s) => [
+			s.shiftName,
+			s.total,
+			s.present,
+			s.halfPresent,
+			s.weeklyOff,
+			s.absent,
+			s.rate + "%",
 		]);
-
-		this._lastData["shift-wise"] = rows.map(r => ({
-		    Shift: r[0],
-		    Total: r[1],
-		    Present: r[2],
-		    HalfPresent: r[3],
-		    WeeklyOff: r[4],
-		    Absent: r[5],
-		    Rate: r[6]
+	
+		this._lastData["shift-wise"] = rows.map((r) => ({
+			Shift: r[0],
+			Total: r[1],
+			Present: r[2],
+			HalfPresent: r[3],
+			WeeklyOff: r[4],
+			Absent: r[5],
+			Rate: r[6],
 		}));
 
 		return {
 			html: `
-				<h2 class="section-title">
-					<i class="ph-fill ph-clock-clockwise"></i>
-					Shift Statistics
-				</h2>
+					<h2 class="section-title">
+						<i class="ph-fill ph-clock-clockwise"></i>
+						Shift Statistics
+					</h2>
 
-				<div class="charts-grid">
-					${this._chartCard(
-						"ch-shift-bar",
-						'<i class="ph-fill ph-chart-bar"></i>',
-						"amber",
-						"Present by Shift"
+					<div class="charts-grid">
+						${this._chartCard(
+							"ch-shift-bar",
+							'<i class="ph-fill ph-chart-bar"></i>',
+							"amber",
+							"Present by Shift",
+						)}
+					</div>
+
+					${this._tableHTML(
+						"tbl-shift",
+						[
+							"Shift",
+							"Total",
+							"Present",
+							"Half Present",
+							"Weekly Off",
+							"Absent",
+							"Rate",
+						],
+						rows,
+						"shift-wise",
 					)}
-				</div>
 
-				${this._tableHTML(
-					"tbl-shift",
-					["Shift", "Total", "Present", "Half Present", "Weekly Off", "Absent", "Rate"],
-					rows,
-					"shift-wise"
-				)}
-
-				<div id="drilldown-table" style="margin-top:16px"></div>
+					<div id="drilldown-table" style="margin-top:16px"></div>
 			`,
 
 			renderCharts: () => {
 				Charts.stacked(
 					"ch-shift-bar",
-					shiftStats.map(s => s.shiftName),
+					shiftStats.map((s) => s.shiftName),
 					[
-					    { name: "Present", data: shiftStats.map(s => s.present) },
-					    { name: "Half Present", data: shiftStats.map(s => s.halfPresent) },
-					    { name: "Weekly Off", data: shiftStats.map(s => s.weeklyOff) },
-					    { name: "Absent", data: shiftStats.map(s => s.absent) }
+						{ name: "Present", data: shiftStats.map((s) => s.present) },
+						{ name: "Half Present", data: shiftStats.map((s) => s.halfPresent), },
+						{ name: "Weekly Off", data: shiftStats.map((s) => s.weeklyOff) },
+						{ name: "Absent", data: shiftStats.map((s) => s.absent) },
 					],
 					"Shift Attendance",
 					(shiftName, index, seriesIndex, seriesName) => {
-					    const filteredLogs = logs.filter(l => {
-					        const e = empMap[l.empId];
-					        if (!e) {
-					            return false;
-					        }
-					        if (e.shift !== shiftName) {
-					            return false;
-					        }
-
-					        switch (seriesName) {
-					            case "Present":
-					                return (l.status === "Present" || l.status === "Present On WeeklyOff");
-
-					            case "Half Present":
-					                return (l.status === "1/2Present" || l.status === "1/2Present On WeeklyOff");
-
-					            case "Weekly Off":
-					                return (l.status === "On WeeklyOff");
-
-					            case "Absent":
-					                return (l.status === "Absent");
-
-					            default:
-					                return false;
-					        }
-					    });
-
-					    this._renderDrillDown(filteredLogs, `Shift: ${shiftName} - ${seriesName}`, empMap);
-					}
+						const filteredLogs = logs.filter((l) => {
+							const e = empMap[l.empId];
+							if (!e) {
+								return false;
+							}
+							if (e.shift !== shiftName) {
+								return false;
+							}
+			
+							switch (seriesName) {
+								case "Present":
+									return (l.status === "Present" || l.status === "Present On WeeklyOff");
+			
+								case "Half Present":
+									return (l.status === "1/2Present" || l.status === "1/2Present On WeeklyOff");
+			
+								case "Weekly Off":
+									return l.status === "On WeeklyOff";
+			
+								case "Absent":
+									return l.status === "Absent";
+			
+								default:
+									return false;
+							}
+						});
+		
+						this._renderDrillDown(
+							filteredLogs,
+							`Shift: ${shiftName} - ${seriesName}`,
+							empMap,
+						);
+					},
 				);
-			}
+			},
 		};
 	}
 
 	_renderSpecial(logs, emps, empMap, filters, model) {
 		const noPunch = model.findNoPunchEmployees();
 		const singlePunch = logs.filter((l) => l.status === "Single Punch");
-		const npRows = noPunch.map((x) => [x.emp.name, x.emp.dept, x.maxGap, x.gapStart,]);
+		const npRows = noPunch.map((x) => [
+			x.emp.name,
+			x.emp.dept,
+			x.maxGap,
+			x.gapStart,
+		]);
 		const spRows = singlePunch.slice(0, 100).map((l) => {
 			const e = empMap[l.empId] || {};
 			return [e.name, e.dept, l.date, l.inTime];
 		});
 		return {
-			html: `<h2 class="section-title"><i class="ph-fill ph-warning-circle"></i> Critical Alerts</h2><div class="table-wrap" style="margin-bottom:20px"><div class="table-header"><h3>🚩 No Punch ≥ 5 Days</h3></div><table class="data-table"><thead><tr><th>Name</th><th>Dept</th><th>Gap</th><th>Start</th></tr></thead><tbody>${npRows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("") || '<tr><td colspan="4">None</td></tr>'}</tbody></table></div><div class="table-wrap"><div class="table-header"><h3>⚡ Single Punch</h3></div><table class="data-table"><thead><tr><th>Name</th><th>Dept</th><th>Date</th><th>Time</th></tr></thead><tbody>${spRows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("") || '<tr><td colspan="4">None</td></tr>'}</tbody></table></div>`,
+			html: `
+				<h2 class="section-title"><i class="ph-fill ph-warning-circle"></i> Critical Alerts</h2><div class="table-wrap" style="margin-bottom:20px"><div class="table-header"><h3>🚩 No Punch ≥ 5 Days</h3></div><table class="data-table"><thead><tr><th>Name</th><th>Dept</th><th>Gap</th><th>Start</th></tr></thead><tbody>${npRows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("") || '<tr><td colspan="4">None</td></tr>'}</tbody></table></div><div class="table-wrap"><div class="table-header"><h3>⚡ Single Punch</h3></div><table class="data-table"><thead><tr><th>Name</th><th>Dept</th><th>Date</th><th>Time</th></tr></thead><tbody>${spRows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("") || '<tr><td colspan="4">None</td></tr>'}</tbody></table></div>
+			`,
 			renderCharts: () => {},
 		};
 	}
