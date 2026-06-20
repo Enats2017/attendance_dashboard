@@ -311,6 +311,8 @@ class AttendanceView {
 		const cards = [
 			{ key: "present", label: "Present", val: stats.present, icon: "ph-check-circle", cls: "success" },
 			{ key: "absent", label: "Absent", val: stats.absent, icon: "ph-x-circle", cls: "danger" },
+			{ key: "resigned", label: "Resigned", val: stats.resigned || 0, icon: "ph-user-minus", cls: "danger" },
+			{ key: "newJoined", label: "New Join", val: stats.newJoined || 0, icon: "ph-user-plus", cls: "success" },
 			{ key: "singlePunch", label: "Single Punch", val: stats.singlePunch, icon: "ph-lightning", cls: "warning" },
 			{ key: "lateIn", label: "Late In", val: stats.lateIn, icon: "ph-clock-afternoon", cls: "info" },
 			{ key: "earlyOut", label: "Early Out", val: stats.earlyOut, icon: "ph-sign-out", cls: "accent" },
@@ -1935,12 +1937,16 @@ class AttendanceView {
 		const titleMap = {
 			present: '✅ Present Employees',
 			absent: '❌ Absent Employees',
+			resigned: '👤 Resigned Employees',
+			newJoined: '🆕 New Joined Employees',
 			singlePunch: '⚡ Single Punch Employees',
 			lateIn: '🕐 Late In Employees',
 			earlyOut: '🚪 Early Out Employees',
 		};
 
 		const isAbsentOnly = (key === 'absent');
+		const isResignedOnly = (key === 'resigned');
+		const isNewJoinedOnly = (key === 'newJoined');
 		const pageSize = 10;
 		const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
 		const currentPage = Math.min(page, totalPages);
@@ -1949,6 +1955,10 @@ class AttendanceView {
 		let headers, ths;
 		if (isAbsentOnly) {
 			headers = ['Sr.No', 'Code', 'Name', 'Dept', 'Company', 'Shift'];
+		} else if (isResignedOnly) {
+			headers = ['Sr.No', 'Code', 'Name', 'Dept', 'Company', 'DOJ', 'DOR', 'Status'];
+		} else if (isNewJoinedOnly) {
+			headers = ['Sr.No', 'Code', 'Name', 'Dept', 'Company', 'DOJ', 'Status'];
 		} else if (key === 'lateIn') {
 			headers = ['Sr.No', 'Code', 'Name', 'Dept', 'Company', 'Shift', 'Date', 'In', 'Out', 'Hours', 'Late By'];
 		} else if (key === 'earlyOut') {
@@ -1970,6 +1980,32 @@ class AttendanceView {
 					<td>${emp.dept || '–'}</td>
 					<td>${emp.company || '–'}</td>
 					<td>${emp.shift || '–'}</td>
+				</tr>`;
+			}
+			if (isResignedOnly) {
+				return `
+				<tr>
+					<td>${sr}</td>
+					<td><b>${emp.code || '–'}</b></td>
+					<td>${emp.name || '–'}</td>
+					<td>${emp.dept || '–'}</td>
+					<td>${emp.company || '–'}</td>
+					<td>${emp.doj || '–'}</td>
+					<td>${emp.dor || '–'}</td>
+					<td><span class="badge badge-danger">${emp.status || 'Resigned'}</span></td>
+				</tr>`;
+			}
+			if (isNewJoinedOnly) {
+				const badgeClass = emp.status === 'Resigned' ? 'badge-danger' : 'badge-success';
+				return `
+				<tr>
+					<td>${sr}</td>
+					<td><b>${emp.code || '–'}</b></td>
+					<td>${emp.name || '–'}</td>
+					<td>${emp.dept || '–'}</td>
+					<td>${emp.company || '–'}</td>
+					<td>${emp.doj || '–'}</td>
+					<td><span class="badge ${badgeClass}">${emp.status || 'Working'}</span></td>
 				</tr>`;
 			}
 			const lastCol = key === 'lateIn'
@@ -2005,20 +2041,43 @@ class AttendanceView {
 			</button>`;
 		}
 
-		this._statCardExportData = items.map(({ log, emp }) => ({
-			Code: emp?.code,
-			Name: emp?.name,
-			Dept: emp?.dept,
-			Company: emp?.company,
-			Shift: emp?.shift,
-			Date: log?.date,
-			In: log?.inTime,
-			Out: log?.outTime,
-			Hours: log?.hoursWorked,
-			LateBy: log?.lateBy,
-			EarlyBy: log?.earlyBy,
-			Status: log?.status,
-		}));
+		this._statCardExportData = items.map(({ log, emp }) => {
+			if (key === 'resigned') {
+				return {
+					Code: emp?.code,
+					Name: emp?.name,
+					Dept: emp?.dept,
+					Company: emp?.company,
+					DOJ: emp?.doj,
+					DOR: emp?.dor,
+					Status: emp?.status,
+				};
+			}
+			if (key === 'newJoined') {
+				return {
+					Code: emp?.code,
+					Name: emp?.name,
+					Dept: emp?.dept,
+					Company: emp?.company,
+					DOJ: emp?.doj,
+					Status: emp?.status,
+				};
+			}
+			return {
+				Code: emp?.code,
+				Name: emp?.name,
+				Dept: emp?.dept,
+				Company: emp?.company,
+				Shift: emp?.shift,
+				Date: log?.date,
+				In: log?.inTime,
+				Out: log?.outTime,
+				Hours: log?.hoursWorked,
+				LateBy: log?.lateBy,
+				EarlyBy: log?.earlyBy,
+				Status: log?.status,
+			};
+		});
 
 		panel.style.display = 'block';
 		panel.innerHTML = `
