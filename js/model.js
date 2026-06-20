@@ -445,8 +445,13 @@ class AttendanceModel {
                 const dateStr = d.toISOString().slice(0, 10);
                 const log = logMap[emp.id + '_' + dateStr];
 
-                if (log && (log.missedInPunch == 1 || log.missedOutPunch == 1)) {
-                    result.push({ log, emp, date: dateStr });
+                if (log) {
+                    const hasInPunch = log.inTime && log.inTime !== '00:00' && log.inTime !== '00:00:00';
+                    const hasOutPunch = log.outTime && log.outTime !== '00:00' && log.outTime !== '00:00:00';
+
+                    if ((hasInPunch && !hasOutPunch) || (!hasInPunch && hasOutPunch)) {
+                        result.push({ log, emp, date: dateStr });
+                    }
                 }
             }
         });
