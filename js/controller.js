@@ -49,6 +49,12 @@ class AttendanceController {
                 case 'absent':      
                     items = this.model.getAbsentEmployees(); 
                     break;
+                case 'resigned':
+                    items = this.model.getResignedEmployees();
+                    break;
+                case 'newJoined':
+                    items = this.model.getNewJoinedEmployees();
+                    break;
                 case 'singlePunch': 
                     items = this.model.getSinglePunchEmployees(); 
                     break;

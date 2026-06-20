@@ -103,6 +103,8 @@ class AttendanceModel {
             if (data.success) {
                 this.state.data = {
                     employees: data.employees,
+                    resignedEmployees: data.resignedEmployees || [],
+                    newJoinedEmployees: data.newJoinedEmployees || [],
                     attendanceLogs: data.attendanceLogs,
                     shiftStats: data.shiftStats || [],
                     nightShiftEmployees: data.nightShiftEmployees || [],
@@ -116,7 +118,9 @@ class AttendanceModel {
                     singlePunch: 0,
                     lateIn: 0,
                     earlyOut: 0,
-                    avgHours: 0
+                    avgHours: 0,
+                    resigned: 0,
+                    newJoined: 0
                 };
                 this.state.nightShiftStats = data.nightShiftStats || {
                     present: 0,
@@ -309,6 +313,8 @@ class AttendanceModel {
             earlyOut: todayStats ? todayStats.earlyOut : 0,
             avgHours: todayStats ? todayStats.avgHours : 0,
             total: todayStats ? todayStats.total : emps.length,
+            resigned: todayStats ? todayStats.resigned : (this.state.data.resignedEmployees || []).length,
+            newJoined: todayStats ? todayStats.newJoined : (this.state.data.newJoinedEmployees || []).length,
             filteredIn: totalIn,
             filteredOut: totalOut
         };
@@ -409,6 +415,30 @@ class AttendanceModel {
     getEarlyOutEmployees() {
         const { logs, empMap } = this.getFilteredData();
         return logs.filter(l => (l.earlyBy || 0) > 0).map(l => ({ log: l, emp: empMap[l.empId] }));
+    }
+
+    getResignedEmployees() {
+        const resigned = this.state.data.resignedEmployees || [];
+        const { filters } = this.state;
+        return resigned.filter(emp => {
+            if (filters.company !== 'All' && emp.company !== filters.company) return false;
+            if (filters.dept !== 'All' && emp.dept !== filters.dept) return false;
+            if (filters.gender !== 'All' && emp.gender !== filters.gender) return false;
+            if (filters.location !== 'All' && emp.location !== filters.location) return false;
+            return true;
+        }).map(emp => ({ log: null, emp }));
+    }
+
+    getNewJoinedEmployees() {
+        const newJoined = this.state.data.newJoinedEmployees || [];
+        const { filters } = this.state;
+        return newJoined.filter(emp => {
+            if (filters.company !== 'All' && emp.company !== filters.company) return false;
+            if (filters.dept !== 'All' && emp.dept !== filters.dept) return false;
+            if (filters.gender !== 'All' && emp.gender !== filters.gender) return false;
+            if (filters.location !== 'All' && emp.location !== filters.location) return false;
+            return true;
+        }).map(emp => ({ log: null, emp }));
     }
 }
 
