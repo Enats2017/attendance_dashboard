@@ -693,29 +693,37 @@ class AttendanceView {
 	_renderFeature(counts) {
 		return {
 			html: `
-					<h2 class="section-title"><i class="ph-fill ph-chart-bar"></i> Employee Entry/Exit Overview</h2>
-					<div class="summary-cards" style="margin-bottom:24px; display:flex; gap:16px;">
-						<div class="stat-card info" style="flex:1">
-							<div class="stat-icon">
-								<i class="ph ph-sign-in"></i>
-							</div>
-							<div class="stat-content">
-								<span class="stat-label">Total In Punches</span>
-								<span class="stat-value">${counts.in || 0}</span>
-							</div>
-						</div>
-						<div class="stat-card accent" style="flex:1">
-							<div class="stat-icon"><i class="ph ph-sign-out"></i></div>
-							<div class="stat-content">
-								<span class="stat-label">Total Out Punches</span>
-								<span class="stat-value">${counts.out || 0}</span>
-							</div>
+				<h2 class="section-title"><i class="ph-fill ph-chart-bar"></i> Employee Entry/Exit Overview</h2>
+				<div class="summary-cards" style="margin-bottom:24px; display:flex; gap:16px;">
+					<div class="stat-card info" style="flex:1">
+						<div class="stat-icon"><i class="ph ph-sign-in"></i></div>
+						<div class="stat-content">
+							<span class="stat-label">Total In Punches</span>
+							<span class="stat-value">${counts.in || 0}</span>
 						</div>
 					</div>
-					<div class="charts-grid">
-						${this._chartCard("ch-feat-io", '<i class="ph-fill ph-chart-pie-slice"></i>', "sky", "In vs Out Distribution")}
+					<div class="stat-card accent" style="flex:1">
+						<div class="stat-icon"><i class="ph ph-sign-out"></i></div>
+						<div class="stat-content">
+							<span class="stat-label">Total Out Punches</span>
+							<span class="stat-value">${counts.out || 0}</span>
+						</div>
 					</div>
-				`,
+				</div>
+				<div class="charts-grid">
+					${this._chartCard("ch-feat-io", '<i class="ph-fill ph-chart-pie-slice"></i>', "sky", "In vs Out Distribution")}
+				</div>
+			`,
+
+			// ← This was missing entirely
+			renderCharts: () => {
+				Charts.donut(
+					"ch-feat-io",
+					["In Punches", "Out Punches"],
+					[counts.in || 0, counts.out || 0],
+					"In vs Out"
+				);
+			}
 		};
 	}
 

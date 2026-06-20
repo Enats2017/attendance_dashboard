@@ -13,7 +13,7 @@ class AttendanceModel {
             },
             filterLists: null,
             filters: {
-                dateFrom: this._getMonthStart(),
+                dateFrom: this._getToday(),
                 dateTo: this._getToday(),
                 company: 'All',
                 dept: 'All',
