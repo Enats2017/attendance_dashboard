@@ -522,6 +522,75 @@ function handleDashboardData($input, $returnData = false) {
         }
     }
 
+    $resignedEmployees = [];
+    $newJoinedEmployees = [];
+
+    $sqlResigned = "SELECT E.EmployeeId, E.EmployeeName, E.EmployeeCode, E.Gender, E.DOB, E.Designation, DG.DesignationsName as DesignationName, C.CompanyFName as company, L.LocationName as location, D.DepartmentFName as dept, E.DOJ, E.DOR, E.Status FROM Employees E WITH (NOLOCK) LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Resigned' AND E.DOR >= ? AND E.DOR <= ?";
+
+    $paramsResigned = [$dayFrom, $dayTo];
+    if ($deptName) { 
+        $sqlResigned .= " AND D.DepartmentFName = ?"; 
+        $paramsResigned[] = $deptName; 
+    }
+    if ($compName) { 
+        $sqlResigned .= " AND C.CompanyFName = ?"; 
+        $paramsResigned[] = $compName; 
+    }
+    $sqlResigned .= " ORDER BY D.DepartmentFName ASC, E.EmployeeName ASC";
+
+    $stmtResigned = sqlsrv_query($conn, $sqlResigned, $paramsResigned);
+    if ($stmtResigned) {
+        while ($row = sqlsrv_fetch_array($stmtResigned, SQLSRV_FETCH_ASSOC)) {
+            $resignedEmployees[] = [
+                'id' => (string)$row['EmployeeId'],
+                'code' => $row['EmployeeCode'],
+                'name' => $row['EmployeeName'],
+                'dob' => $row['DOB'] ? $row['DOB']->format('Y-m-d') : '1990-01-01',
+                'gender' => in_array(strtoupper(trim($row['Gender'])), ['MALE', 'M']) ? 'Male' : 'Female',
+                'dept' => $row['dept'] ?: 'Dept ' . $row['DepartmentId'],
+                'company' => $row['company'] ?: 'Unknown',
+                'designation' => $row['DesignationName'] ?: 'Staff',
+                'location' => $row['location'] ?: 'Head Office',
+                'status' => 'Resigned',
+                'doj' => $row['DOJ'] ? $row['DOJ']->format('Y-m-d') : null,
+                'dor' => $row['DOR'] ? $row['DOR']->format('Y-m-d') : null
+            ];
+        }
+    }
+
+    $sqlNewJoined = "SELECT E.EmployeeId, E.EmployeeName, E.EmployeeCode, E.Gender, E.DOB, E.Designation, DG.DesignationsName as DesignationName, C.CompanyFName as company, L.LocationName as location, D.DepartmentFName as dept, E.DOJ, E.DOR, E.Status FROM Employees E WITH (NOLOCK) LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.DOJ >= ? AND E.DOJ <= ?";
+
+    $paramsNewJoined = [$dayFrom, $dayTo];
+    if ($deptName) { 
+        $sqlNewJoined .= " AND D.DepartmentFName = ?"; 
+        $paramsNewJoined[] = $deptName; 
+    }
+    if ($compName) { 
+        $sqlNewJoined .= " AND C.CompanyFName = ?"; 
+        $paramsNewJoined[] = $compName; 
+    }
+    $sqlNewJoined .= " ORDER BY D.DepartmentFName ASC, E.EmployeeName ASC";
+
+    $stmtNewJoined = sqlsrv_query($conn, $sqlNewJoined, $paramsNewJoined);
+    if ($stmtNewJoined) {
+        while ($row = sqlsrv_fetch_array($stmtNewJoined, SQLSRV_FETCH_ASSOC)) {
+            $newJoinedEmployees[] = [
+                'id' => (string)$row['EmployeeId'],
+                'code' => $row['EmployeeCode'],
+                'name' => $row['EmployeeName'],
+                'dob' => $row['DOB'] ? $row['DOB']->format('Y-m-d') : '1990-01-01',
+                'gender' => in_array(strtoupper(trim($row['Gender'])), ['MALE', 'M']) ? 'Male' : 'Female',
+                'dept' => $row['dept'] ?: 'Dept ' . $row['DepartmentId'],
+                'company' => $row['company'] ?: 'Unknown',
+                'designation' => $row['DesignationName'] ?: 'Staff',
+                'location' => $row['location'] ?: 'Head Office',
+                'status' => $row['Status'] ?: 'Working',
+                'doj' => $row['DOJ'] ? $row['DOJ']->format('Y-m-d') : null,
+                'dor' => $row['DOR'] ? $row['DOR']->format('Y-m-d') : null
+            ];
+        }
+    }
+
     $allTableNames = [];
     $stmtAllTables = sqlsrv_query($conn, "SELECT name FROM sys.tables WHERE name LIKE 'AttendanceLogs_%' OR name LIKE 'DeviceLogs_%'");
     if ($stmtAllTables) {
@@ -838,7 +907,9 @@ function handleDashboardData($input, $returnData = false) {
             'devTables' => $devTables,
             'dayFrom' => $dayFrom,
             'dayTo' => $dayTo,
-            'shiftStats' => $shiftStats
+            'shiftStats' => $shiftStats,
+            'resignedEmployees' => $resignedEmployees,
+            'newJoinedEmployees' => $newJoinedEmployees
         ];
     }
 
@@ -851,12 +922,16 @@ function handleDashboardData($input, $returnData = false) {
             'singlePunch' => $singlePunch,
             'lateIn' => $lateIn,
             'earlyOut' => $earlyOut,
-            'avgHours' => $avgHours
+            'avgHours' => $avgHours,
+            'resigned' => count($resignedEmployees),
+            'newJoined' => count($newJoinedEmployees)
         ],
         'employees' => $employees,
         'attendanceLogs' => $logs,
         'counts' => $counts,
         'shiftStats' => $shiftStats,
+        'resignedEmployees' => $resignedEmployees,
+        'newJoinedEmployees' => $newJoinedEmployees,
         'timestamp' => date('Y-m-d H:i:s'),
         'dataSource' => $dataSource
     ]);
