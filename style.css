@@ -654,7 +654,7 @@ body {
     display:flex;
     justify-content:space-between;
     align-items:center;
-    margin-top:15px;
+    margin:15px;
 }
 
 .pagination-text{
@@ -728,3 +728,69 @@ body {
 }
 .btn-page:hover:not(:disabled) { background: #f1f5f9; }
 .btn-page:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* Clickable stat cards */
+.stat-card-clickable {
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.stat-card-clickable:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.13);
+}
+.stat-card-clickable.active {
+    outline: 2px solid #6366f1;
+    outline-offset: 3px;
+}
+.stat-card-hint {
+    display: block;
+    font-size: 10px;
+    color: #94a3b8;
+    margin-top: 4px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+.stat-card-clickable:hover .stat-card-hint,
+.stat-card-clickable.active .stat-card-hint {
+    opacity: 1;
+}
+
+/* Drilldown panel (sits below the cards) */
+.stat-drilldown-panel {
+    margin-bottom: 16px;
+}
+
+/* ── Drilldown Box (used by both chart drilldowns and stat card drilldowns) ── */
+.drilldown-box {
+    background: var(--white);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    margin-top: 8px;
+}
+
+.drilldown-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.drilldown-title small {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-muted);
+    background: var(--bg-main);
+    padding: 2px 8px;
+    border-radius: 20px;
+}
+
+/* Active pagination button */
+.btn-page-active {
+    background: var(--primary) !important;
+    color: white !important;
+    border-color: var(--primary) !important;
+}

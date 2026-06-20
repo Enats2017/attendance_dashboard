@@ -324,12 +324,61 @@ class AttendanceModel {
         const shifts = this.state.filterLists ? this.state.filterLists.shifts : uniq(emps.map(e => e.shift));
         const locations = uniq(emps.map(e => e.location));
         
-        return {
-            companies,
-            depts,
-            shifts,
-            locations
-        };
+        return { companies, depts, shifts, locations };
+    }
+
+    getPresentEmployees() {
+        const { logs, emps, empMap } = this.getFilteredData();
+        const isSingleDay = this.state.filters.dateFrom === this.state.filters.dateTo;
+
+        if (isSingleDay) {
+            const seen = {};
+            const result = [];
+            logs.forEach(l => {
+                if (seen[l.empId]) return;
+                if (parseFloat(l.present) > 0) {
+                    seen[l.empId] = true;
+                    result.push({ log: l, emp: empMap[l.empId] });
+                }
+            });
+            return result;
+        } else {
+            return logs.filter(l => parseFloat(l.present) > 0).map(l => ({ log: l, emp: empMap[l.empId] }));
+        }
+    }
+
+    getAbsentEmployees() {
+        const { logs, emps, empMap } = this.getFilteredData();
+        const isSingleDay = this.state.filters.dateFrom === this.state.filters.dateTo;
+
+        if (isSingleDay) {
+            const coveredIds = new Set(logs.filter(l => parseFloat(l.present) > 0 || l.weeklyOff == 1 || l.holiday == 1 || l.isOnLeave == 1).map(l => l.empId));
+            const absentLogIds = new Set(
+                logs.filter(l => parseFloat(l.present) === 0 && l.weeklyOff != 1 && l.holiday != 1 && l.isOnLeave != 1).map(l => l.empId));
+
+            return emps.filter(e => !coveredIds.has(e.id) || absentLogIds.has(e.id))
+                .map(e => {
+                    const log = logs.find(l => l.empId === e.id) || null;
+                    return { log, emp: e };
+                });
+        } else {
+            return logs.filter(l => parseFloat(l.present) === 0 && l.weeklyOff != 1 && l.holiday != 1 && l.isOnLeave != 1).map(l => ({ log: l, emp: empMap[l.empId] }));
+        }
+    }
+
+    getSinglePunchEmployees() {
+        const { logs, empMap } = this.getFilteredData();
+        return logs.filter(l => l.missedInPunch == 1 || l.missedOutPunch == 1).map(l => ({ log: l, emp: empMap[l.empId] }));
+    }
+
+    getLateInEmployees() {
+        const { logs, empMap } = this.getFilteredData();
+        return logs.filter(l => (l.lateBy || 0) > 0).map(l => ({ log: l, emp: empMap[l.empId] }));
+    }
+
+    getEarlyOutEmployees() {
+        const { logs, empMap } = this.getFilteredData();
+        return logs.filter(l => (l.earlyBy || 0) > 0).map(l => ({ log: l, emp: empMap[l.empId] }));
     }
 }
 

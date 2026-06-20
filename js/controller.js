@@ -40,6 +40,28 @@ class AttendanceController {
             this.model.resetFilters();
         });
 
+        this.view.bindStatCardClick((key) => {
+            let items = [];
+            switch (key) {
+                case 'present': 
+                    items = this.model.getPresentEmployees(); 
+                    break;
+                case 'absent':      
+                    items = this.model.getAbsentEmployees(); 
+                    break;
+                case 'singlePunch': 
+                    items = this.model.getSinglePunchEmployees(); 
+                    break;
+                case 'lateIn':      
+                    items = this.model.getLateInEmployees();      
+                    break;
+                case 'earlyOut':    
+                    items = this.model.getEarlyOutEmployees();    
+                    break;
+            }
+            this.view._renderStatCardDrilldown(key, items);
+        });
+
         // Initial fetch
         this.init();
     }

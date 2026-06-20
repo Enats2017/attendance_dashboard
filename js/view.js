@@ -38,6 +38,7 @@ class AttendanceView {
 					<div class="content-body">
 						${this._renderFilters(state.filters, filterOpts)}
 						${this._renderSummaryCards(stats)}
+						<div id="stat-card-drilldown" class="stat-drilldown-panel" style="display:none;"></div>
 						<div class="tab-pane-container">
 							${this._renderTabContent(state.activeTab, logs, emps, empMap, state.filters, state.data.counts, model)}
 						</div>
@@ -161,27 +162,28 @@ class AttendanceView {
 
 	_renderSummaryCards(stats) {
 		const cards = [
-			{ label: "Present", val: stats.present, icon: "ph-check-circle", cls: "success", },
-			{ label: "Absent", val: stats.absent, icon: "ph-x-circle", cls: "danger", },
-			{ label: "Single Punch", val: stats.singlePunch, icon: "ph-lightning", cls: "warning", },
-			{ label: "Late In", val: stats.lateIn, icon: "ph-clock-afternoon", cls: "info", },
-			{ label: "Early Out", val: stats.earlyOut, icon: "ph-sign-out", cls: "accent", },
-			{ label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", },
-			{ label: "Total Staff", val: stats.total, icon: "ph-users", cls: "" },
+			{ label: "Present", val: stats.present, icon: "ph-check-circle", cls: "success", key: "present" },
+			{ label: "Absent", val: stats.absent, icon: "ph-x-circle", cls: "danger", key: "absent" },
+			{ label: "Single Punch", val: stats.singlePunch, icon: "ph-lightning", cls: "warning", key: "singlePunch" },
+			{ label: "Late In", val: stats.lateIn, icon: "ph-clock-afternoon", cls: "info", key: "lateIn" },
+			{ label: "Early Out", val: stats.earlyOut, icon: "ph-sign-out", cls: "accent",  key: "earlyOut" },
+			{ label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", key: null },
+			{ label: "Total Staff", val: stats.total, icon: "ph-users", cls: "", key: null },
 		];
 
 		return `
 			<div class="summary-grid">
 				${cards.map((c) => `
-					<div class="stat-card ${c.cls}">
+					<div class="stat-card ${c.cls} ${c.key ? 'stat-card-clickable' : ''}"
+						${c.key ? `data-card-key="${c.key}"` : ''}>
 						<div class="stat-icon"><i class="ph ${c.icon}"></i></div>
 						<div class="stat-content">
 							<span class="stat-label">${c.label}</span>
 							<span class="stat-value">${c.val}</span>
 						</div>
+						${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ''}
 					</div>
-				`,
-				).join("")}
+				`).join("")}
 			</div>
 		`;
 	}
@@ -295,7 +297,7 @@ class AttendanceView {
 	bindSwitchTab(handler) {
 		this.app.addEventListener("click", (event) => {
 			const navItem = event.target.closest(".nav-item");
-			if (navItem) {
+			if (navItem && navItem.dataset.tab) {          
 				const tabId = navItem.dataset.tab;
 				handler(tabId);
 			}
@@ -889,92 +891,6 @@ class AttendanceView {
 	    };
 	}
 
-  // _renderCompanyWise(logs, emps, empMap, model) {
-  //     const comps = [...new Set(emps.map(e => e.company))].sort();
-  //     const eBC = model.groupBy(emps, e => e.company);
-  //     const lBC = model.groupBy(logs, l => (empMap[l.empId] || {}).company);
-  //     const rows = comps.map(c => {
-  //         const t = (eBC[c] || []).length, ls = lBC[c] || [];
-  //         const p = new Set(ls.map(l => l.empId)).size;
-  //         return [c, t, p, t - p, t ? Math.round(p / t * 100) + '%' : '0%'];
-  //     });
-  //     this._lastData['company-wise'] = rows.map(r => ({ Company: r[0], Total: r[1], Present: r[2], Absent: r[3], Rate: r[4] }));
-  //     return {
-  //         html: `<h2 class="section-title"><i class="ph-fill ph-buildings"></i> Company Statistics</h2><div class="charts-grid">${this._chartCard('ch-comp-bar', '<i class="ph-fill ph-chart-bar"></i>', 'violet', 'Company Breakdown')}</div>${this._tableHTML('tbl-comp', ['Company', 'Total', 'Present', 'Absent', 'Rate'], rows, 'company-wise')}<div id="drilldown-table" style="margin-top:16px"></div>`,
-  //         renderCharts: () => {
-  //             Charts.bar('ch-comp-bar', comps, rows.map(r => r[2]), 'Attendance', false, c => {
-  //                 this._renderDrillDown(logs.filter(l => (empMap[l.empId] || {}).company === c), `Company: ${c}`, empMap);
-  //             });
-  //         }
-  //     };
-  // }
-
-//   _renderCompanyWise(logs, emps, empMap, model) {
-//     const comps = [...new Set(emps.map((e) => e.company))].sort();
-//     const eBC = model.groupBy(emps, (e) => e.company);
-//     const lBC = model.groupBy(logs, (l) => (empMap[l.empId] || {}).company);
-
-//     const rows = comps.map((c) => {
-//       const t = (eBC[c] || []).length;
-//       const ls = lBC[c] || [];
-
-//       // Har employee ka ek record — present value check karo
-//       // Ek hi din ka data ho tab: empId → present value map
-//       const empPresentMap = {};
-//       ls.forEach((l) => {
-//         const pval = parseFloat(l.present);
-//         const existing = empPresentMap[l.empId];
-//         // Present=1 ko priority do, phir 0.5, phir 0
-//         if (existing === undefined || pval > existing) {
-//           empPresentMap[l.empId] = pval;
-//         }
-//       });
-
-//       const empIds = Object.keys(empPresentMap);
-//       const p = empIds.filter((id) => empPresentMap[id] === 1).length;
-//       const hp = empIds.filter((id) => empPresentMap[id] === 0.5).length;
-//       const ab = empIds.filter((id) => empPresentMap[id] === 0).length;
-
-//       return [c, t, p, hp, ab, t ? Math.round((p / t) * 100) + "%" : "0%"];
-//     });
-
-//     this._lastData["company-wise"] = rows.map((r) => ({
-//       Company: r[0],
-//       Total: r[1],
-//       Present: r[2],
-//       HalfPresent: r[3],
-//       Absent: r[4],
-//       Rate: r[5],
-//     }));
-
-//     return {
-//       html: `<h2 class="section-title"><i class="ph-fill ph-buildings"></i> Company Statistics</h2>
-//       <div class="charts-grid">
-//         ${this._chartCard("ch-comp-bar", '<i class="ph-fill ph-chart-bar"></i>', "violet", "Company Breakdown")}
-//       </div>
-//       ${this._tableHTML("tbl-comp", ["Company", "Total", "Present", "Half Present", "Absent", "Rate"], rows, "company-wise")}
-//       <div id="drilldown-table" style="margin-top:16px"></div>`,
-//       renderCharts: () => {
-//         Charts.stacked(
-//           "ch-comp-bar",
-//           comps,
-//           [
-//             // Present + Half Present ek saath green mein dikhao
-//             { name: "Present", data: rows.map((r) => r[2] + r[3]) }, // 53 + 2 = 55
-//             { name: "Absent", data: rows.map((r) => r[4]) }, // 19
-//           ],
-//           "Company Attendance",
-//           (c) => {
-//             this._renderDrillDown(
-//               logs.filter((l) => (empMap[l.empId] || {}).company === c),
-//               `Company: ${c}`,
-//               empMap,
-//             );
-//           },
-//         );
-//       },
-//     };
-//   }
 
 	_renderCompanyWise(logs, emps, empMap, model) {
 		const comps = [...new Set(emps.map((e) => e.company))].sort();
@@ -983,7 +899,7 @@ class AttendanceView {
 
 		const rows = comps.map((c) => {
 		    const compEmps = eBC[c] || [];
-		    const t = compEmps.length;  // Total = Employees table se
+		    const t = compEmps.length;  
 		    const ls = lBC[c] || [];
 
 		    const empPresentMap = {};
@@ -1225,15 +1141,7 @@ class AttendanceView {
 		const filtered = logs;
 		const rows = filtered.slice(0, 100).map((l) => {
 			const e = empMap[l.empId] || {};
-			return [
-				e.name,
-				e.dept,
-				l.date,
-				l.inTime,
-				l.outTime,
-				l.hoursWorked,
-				l.status,
-			];
+			return [e.name, e.dept, l.date, l.inTime, l.outTime, l.hoursWorked, l.status,];
 		});
 		return {
 			html: `<h2 class="section-title"><i class="ph-fill ph-moon"></i> Night Shift</h2>${this._tableHTML("tbl-ns", ["Name", "Dept", "Date", "In", "Out", "Hours", "Status"], rows, "night-shift")}`,
@@ -1404,6 +1312,185 @@ class AttendanceView {
 			pdf.addImage(imgData, "PNG", 0, 0, w, h);
 			pdf.save(`${filename}.pdf`);
 		});
+	}
+
+	bindStatCardClick(handler) {
+		this.app.addEventListener('click', (event) => {
+			const card = event.target.closest('.stat-card-clickable');
+			if (!card) {
+				return;
+			}
+			const key = card.dataset.cardKey;
+			if (!key) {
+				return;
+			}
+
+			const wasActive = card.classList.contains('active');
+
+			document.querySelectorAll('.stat-card-clickable').forEach(c => c.classList.remove('active'));
+
+			if (wasActive) {
+				this._closeStatCardDrilldown();
+			} else {
+				card.classList.add('active');
+				handler(key);
+			}
+		});
+	}
+
+	_renderStatCardDrilldown(key, items, page = 1) {
+		this._statCardKey = key;
+		this._statCardItems = items;
+
+		const panel = document.getElementById('stat-card-drilldown');
+		if (!panel) return;
+
+		const titleMap = {
+			present: '✅ Present Employees',
+			absent: '❌ Absent Employees',
+			singlePunch: '⚡ Single Punch Employees',
+			lateIn: '🕐 Late In Employees',
+			earlyOut: '🚪 Early Out Employees',
+		};
+
+		const isAbsentOnly = (key === 'absent');
+		const pageSize = 10;
+		const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+		const currentPage = Math.min(page, totalPages);
+		const pageItems = items.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+		let headers, ths;
+		if (isAbsentOnly) {
+			headers = ['Sr.No', 'Code', 'Name', 'Dept', 'Company', 'Shift'];
+		} else if (key === 'lateIn') {
+			headers = ['Sr.No', 'Code', 'Name', 'Dept', 'Company', 'Shift', 'Date', 'In', 'Out', 'Hours', 'Late By'];
+		} else if (key === 'earlyOut') {
+			headers = ['Sr.No', 'Code', 'Name', 'Dept', 'Company', 'Shift', 'Date', 'In', 'Out', 'Hours', 'Early By'];
+		} else {
+			headers = ['Sr.No', 'Code', 'Name', 'Dept', 'Company', 'Shift', 'Date', 'In', 'Out', 'Hours', 'Status'];
+		}
+		ths = headers.map(h => `<th>${h}</th>`).join('');
+
+		const trs = pageItems.map(({ log, emp }, i) => {
+			if (!emp) return '';
+			const sr = (currentPage - 1) * pageSize + i + 1;
+			if (isAbsentOnly) {
+				return `
+				<tr>
+					<td>${sr}</td>
+					<td><b>${emp.code || '–'}</b></td>
+					<td>${emp.name || '–'}</td>
+					<td>${emp.dept || '–'}</td>
+					<td>${emp.company || '–'}</td>
+					<td>${emp.shift || '–'}</td>
+				</tr>`;
+			}
+			const lastCol = key === 'lateIn'
+				? `<td>${log?.lateBy || 0} min</td>`
+				: key === 'earlyOut'
+					? `<td>${log?.earlyBy || 0} min</td>`
+					: `<td>${log?.status || '–'}</td>`;
+
+			return `
+			<tr>
+				<td>${sr}</td>
+				<td><b>${emp.code || '–'}</b></td>
+				<td>${emp.name || '–'}</td>
+				<td>${emp.dept || '–'}</td>
+				<td>${emp.company || '–'}</td>
+				<td>${emp.shift || '–'}</td>
+				<td>${log?.date || '–'}</td>
+				<td>${log?.inTime || '–'}</td>
+				<td>${log?.outTime || '–'}</td>
+				<td><b>${log?.hoursWorked || 0}h</b></td>
+				${lastCol}
+			</tr>`;
+		}).join('');
+
+		let pageButtons = '';
+		const startP = Math.max(1, currentPage - 2);
+		const endP = Math.min(totalPages, currentPage + 2);
+		for (let i = startP; i <= endP; i++) {
+			pageButtons += `
+			<button class="btn-page ${i === currentPage ? 'btn-page-active' : ''}"
+				onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, ${i})">
+				${i}
+			</button>`;
+		}
+
+		this._statCardExportData = items.map(({ log, emp }) => ({
+			Code: emp?.code,
+			Name: emp?.name,
+			Dept: emp?.dept,
+			Company: emp?.company,
+			Shift: emp?.shift,
+			Date: log?.date,
+			In: log?.inTime,
+			Out: log?.outTime,
+			Hours: log?.hoursWorked,
+			LateBy: log?.lateBy,
+			EarlyBy: log?.earlyBy,
+			Status: log?.status,
+		}));
+
+		panel.style.display = 'block';
+		panel.innerHTML = `
+			<div class="drilldown-box">
+				<div class="drilldown-header">
+					<div class="drilldown-title">
+						${titleMap[key] || key}
+						<small>${items.length} records</small>
+					</div>
+					<div class="drilldown-btn-group">
+						<button class="btn-drill btn-drill-excel"
+							onclick="AppController.view.exportExcel(AppController.view._statCardExportData, '${key}-employees')">
+							↓ Excel
+						</button>
+						<button class="btn-drill btn-drill-back"
+							onclick="AppController.view._closeStatCardDrilldown()">
+							✕ Close
+						</button>
+					</div>
+				</div>
+
+				<div style="overflow-x:auto;">
+					<table class="data-table">
+						<thead><tr>${ths}</tr></thead>
+						<tbody>
+							${trs || `<tr><td colspan="${headers.length}" style="text-align:center;padding:32px;color:#94a3b8;">No records found</td></tr>`}
+						</tbody>
+					</table>
+				</div>
+
+				<div class="pagination-bar">
+					<div class="pagination-text">
+						Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, items.length)}
+						of ${items.length} &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
+					</div>
+					<div class="pagination-buttons">
+						<button class="btn-page" ${currentPage === 1 ? 'disabled' : ''}
+							onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, 1)">«</button>
+						<button class="btn-page" ${currentPage === 1 ? 'disabled' : ''}
+							onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, ${currentPage - 1})">‹</button>
+						${pageButtons}
+						<button class="btn-page" ${currentPage === totalPages ? 'disabled' : ''}
+							onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, ${currentPage + 1})">›</button>
+						<button class="btn-page" ${currentPage === totalPages ? 'disabled' : ''}
+							onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, ${totalPages})">»</button>
+					</div>
+				</div>
+			</div>
+		`;
+		panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+	}
+
+	_closeStatCardDrilldown() {
+		const panel = document.getElementById('stat-card-drilldown');
+		if (panel) {
+			panel.style.display = 'none';
+			panel.innerHTML = '';
+		}
+		document.querySelectorAll('.stat-card-clickable').forEach(c => c.classList.remove('active'));
 	}
 }
 
