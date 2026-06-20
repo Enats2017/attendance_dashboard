@@ -544,6 +544,38 @@ class AttendanceModel {
         }).sort((a, b) => (b.doj || '').localeCompare(a.doj || ''))
           .map(emp => ({ log: null, emp }));
     }
+
+    async fetchDesignationsOrder() {
+        try {
+            const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
+            url.searchParams.set('action', 'get_designations_order');
+            const response = await fetch(url.toString());
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            console.error('Fetch Designations Order Error:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async saveDesignationsOrder(items) {
+        try {
+            const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
+            url.searchParams.set('action', 'save_designations_order');
+            const response = await fetch(url.toString(), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ action: 'save_designations_order', items })
+            });
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            console.error('Save Designations Order Error:', error);
+            return { success: false, error: error.message };
+        }
+    }
 }
 
 window.AttendanceModel = AttendanceModel;

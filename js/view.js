@@ -19,6 +19,7 @@ class AttendanceView {
 			{ id: "designation", label: "Designation Stats", icon: "ph-identification-badge", },
 			{ id: "shift", label: "Shift Stats", icon: "ph-clock-clockwise" },
 			{ id: "special", label: "Critical Alerts", icon: "ph-warning-circle" },
+			{ id: "designation_order", label: "Designations Order", icon: "ph-sliders" },
 		];
 		this._lastData = {};
 	}
@@ -376,6 +377,21 @@ class AttendanceView {
 			case "special":
 				content = this._renderSpecial(logs, emps, empMap, filters, model);
 				break;
+			case "designation_order":
+				content = {
+					html: `
+						<div class="designation-order-container">
+							<h2 class="section-title"><i class="ph-fill ph-sliders"></i> Designations Order Settings</h2>
+							<div id="designation-order-content">
+								<div style="display:flex; align-items:center; gap:12px; padding:32px; color:#64748b;">
+									<div class="auth-spinner" style="width:24px; height:24px; border-width:2px; border-top-color:#6366f1;"></div>
+									<span>Loading designations data...</span>
+								</div>
+							</div>
+						</div>
+					`
+				};
+				break;
 			default:
 				content = { html: "<p>Tab not found</p>" };
 		}
@@ -420,6 +436,9 @@ class AttendanceView {
 				break;
 			case "special":
 				content = this._renderSpecial(logs, emps, empMap, filters, model);
+				break;
+			case "designation_order":
+				this._initDesignationOrderTab(model);
 				break;
 		}
 
@@ -1144,7 +1163,16 @@ class AttendanceView {
 		const deptEmps = emps.filter((e) => e.dept === dept);
 		const { dateFrom, dateTo } = model.state.filters;
 		const groups = this._computeGroupedDayStats(deptEmps, logs, dateFrom, dateTo, (e) => e.designation || "Staff",);
-		const desigs = Object.keys(groups).sort();
+		const desigOrderMap = {};
+		deptEmps.forEach(e => {
+			desigOrderMap[e.designation || "Staff"] = e.designationSortOrder || 0;
+		});
+		const desigs = Object.keys(groups).sort((a, b) => {
+			const orderA = desigOrderMap[a] || 0;
+			const orderB = desigOrderMap[b] || 0;
+			if (orderA !== orderB) return orderA - orderB;
+			return a.localeCompare(b);
+		});
 		const maxTotal = Math.max(1, ...desigs.map((d) => groups[d].total));
 		const { ticks, niceMax } = this._computeNiceAxis(maxTotal);
 		const tickPercents = [0, 25, 50, 75, 100];
@@ -1716,7 +1744,20 @@ class AttendanceView {
 	}
 
 	_renderDesignationWise(logs, emps, empMap, model) {
-		const desigs = [...new Set(emps.map((e) => e.designation || "Staff")),].sort();
+		const desigMap = {};
+		emps.forEach(e => {
+			const name = e.designation || "Staff";
+			const order = e.designationSortOrder || 0;
+			if (!desigMap[name] || order < desigMap[name].order) {
+				desigMap[name] = { name, order };
+			}
+		});
+		const desigs = Object.values(desigMap)
+			.sort((a, b) => {
+				if (a.order !== b.order) return a.order - b.order;
+				return a.name.localeCompare(b.name);
+			})
+			.map(d => d.name);
 		const eBD = model.groupBy(emps, (e) => e.designation || "Staff");
 		const lBD = model.groupBy(logs, (l) => (empMap[l.empId] || {}).designation || "Staff",);
 		const rows = desigs.map((d) => {
@@ -2129,6 +2170,365 @@ class AttendanceView {
 			panel.innerHTML = '';
 		}
 		document.querySelectorAll('.stat-card-clickable').forEach(c => c.classList.remove('active'));
+	}
+
+	async _initDesignationOrderTab(model) {
+		const contentEl = document.getElementById("designation-order-content");
+		if (!contentEl) return;
+
+		const response = await model.fetchDesignationsOrder();
+		if (!response || !response.success) {
+			contentEl.innerHTML = `
+				<div class="alert-error-panel" style="padding: 24px; background: rgba(244,63,94,0.05); border: 1px solid rgba(244,63,94,0.2); color: #f43f5e; border-radius: var(--radius-md); display: flex; align-items: center; gap: 12px; font-weight: 500;">
+					<i class="ph-fill ph-warning-circle" style="font-size: 24px;"></i>
+					<span><strong>Error loading designations:</strong> ${response ? response.message : 'Unknown error'}</span>
+				</div>
+			`;
+			return;
+		}
+
+		const departments = response.data;
+		if (!departments || departments.length === 0) {
+			contentEl.innerHTML = `
+				<div class="empty-state-panel" style="padding: 48px; text-align: center; color: var(--text-muted); background: var(--white); border-radius: var(--radius-md); box-shadow: var(--shadow-sm);">
+					<i class="ph ph-mask-sad" style="font-size: 48px; color: #cbd5e1; margin-bottom: 12px; display: block;"></i>
+					<span>No departments or designations found.</span>
+				</div>
+			`;
+			return;
+		}
+
+		let html = `
+			<style>
+				.designation-order-header {
+					display: flex;
+					justify-content: space-between;
+					align-items: center;
+					margin-bottom: 24px;
+					background: var(--white);
+					padding: 20px 24px;
+					border-radius: var(--radius-md);
+					box-shadow: var(--shadow-sm);
+					border: 1px solid var(--border-color);
+					gap: 16px;
+					flex-wrap: wrap;
+				}
+				.designation-order-header-text h3 {
+					font-size: 16px;
+					font-weight: 700;
+					color: var(--text-main);
+					margin-bottom: 4px;
+				}
+				.designation-order-header-text p {
+					font-size: 13px;
+					color: var(--text-muted);
+				}
+				.designation-order-controls {
+					display: flex;
+					align-items: center;
+					gap: 12px;
+				}
+				.select-order-dept {
+					min-width: 240px;
+					padding: 10px 16px;
+					border: 1px solid var(--border-color);
+					border-radius: 10px;
+					font-weight: 500;
+					font-size: 14px;
+					outline: none;
+					background: var(--white);
+					color: var(--text-main);
+					cursor: pointer;
+					transition: border-color 0.2s, box-shadow 0.2s;
+				}
+				.select-order-dept:focus {
+					border-color: var(--primary);
+					box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+				}
+				.order-card-container {
+					max-width: 600px;
+					margin: 0 auto 32px auto;
+				}
+				.dept-order-card {
+					background: var(--white);
+					border: 1px solid var(--border-color);
+					border-radius: var(--radius-md);
+					box-shadow: var(--shadow-sm);
+					padding: 28px;
+					display: flex;
+					flex-direction: column;
+					gap: 20px;
+					animation: fadeIn 0.25s ease-out;
+				}
+				@keyframes fadeIn {
+					from { opacity: 0; transform: translateY(8px); }
+					to { opacity: 1; transform: translateY(0); }
+				}
+				.dept-order-title {
+					font-size: 17px;
+					font-weight: 700;
+					color: var(--text-main);
+					display: flex;
+					align-items: center;
+					justify-content: space-between;
+					border-bottom: 1px solid var(--border-color);
+					padding-bottom: 16px;
+				}
+				.dept-order-title-left {
+					display: flex;
+					align-items: center;
+					gap: 12px;
+				}
+				.dept-order-title-left i {
+					font-size: 22px;
+					color: var(--primary);
+					background: rgba(99, 102, 241, 0.1);
+					width: 42px;
+					height: 42px;
+					border-radius: 10px;
+					display: flex;
+					align-items: center;
+					justify-content: center;
+				}
+				.dept-order-badge {
+					font-size: 12px;
+					font-weight: 600;
+					background: #f1f5f9;
+					color: #475569;
+					padding: 4px 10px;
+					border-radius: 9999px;
+				}
+				.desig-order-list {
+					display: flex;
+					flex-direction: column;
+					gap: 12px;
+				}
+				.desig-order-item {
+					display: flex;
+					align-items: center;
+					justify-content: space-between;
+					padding: 12px 16px;
+					background: #f8fafc;
+					border: 1px solid #f1f5f9;
+					border-radius: 10px;
+					font-size: 14px;
+					transition: border-color 0.2s, background-color 0.2s;
+				}
+				.desig-order-item:hover {
+					background: #f1f5f9;
+					border-color: #e2e8f0;
+				}
+				.desig-order-name-wrap {
+					display: flex;
+					align-items: center;
+					gap: 10px;
+				}
+				.desig-order-drag-handle {
+					color: #94a3b8;
+					font-size: 18px;
+				}
+				.desig-order-name {
+					font-weight: 600;
+					color: #334155;
+				}
+				.desig-order-control-wrap {
+					display: flex;
+					align-items: center;
+					background: var(--white);
+					border: 1px solid #cbd5e1;
+					border-radius: 8px;
+					overflow: hidden;
+					box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+				}
+				.desig-order-btn {
+					background: none;
+					border: none;
+					width: 32px;
+					height: 32px;
+					display: flex;
+					align-items: center;
+					justify-content: center;
+					color: #64748b;
+					cursor: pointer;
+					transition: background-color 0.15s, color 0.15s;
+					font-size: 14px;
+				}
+				.desig-order-btn:hover {
+					background: #f1f5f9;
+					color: var(--primary);
+				}
+				.desig-order-btn:active {
+					background: #e2e8f0;
+				}
+				.desig-order-input {
+					width: 44px;
+					border: none;
+					border-left: 1px solid #cbd5e1;
+					border-right: 1px solid #cbd5e1;
+					text-align: center;
+					font-size: 14px;
+					font-weight: 700;
+					color: #0f172a;
+					padding: 4px 0;
+					outline: none;
+					-moz-appearance: textfield;
+				}
+				.desig-order-input::-webkit-outer-spin-button,
+				.desig-order-input::-webkit-inner-spin-button {
+					-webkit-appearance: none;
+					margin: 0;
+				}
+				.btn-order-save {
+					background: var(--primary);
+					color: var(--white);
+					border: none;
+					padding: 10px 20px;
+					border-radius: 10px;
+					font-size: 14px;
+					font-weight: 600;
+					cursor: pointer;
+					display: flex;
+					align-items: center;
+					gap: 8px;
+					box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
+					transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
+				}
+				.btn-order-save:hover {
+					background: var(--primary-hover);
+					box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+				}
+				.btn-order-save:active {
+					transform: scale(0.97);
+				}
+			</style>
+			<div class="designation-order-header">
+				<div class="designation-order-header-text">
+					<h3>Designations Sorting Order</h3>
+					<p>Set custom sorting priority for designations grouped under each department. Lower numbers show first.</p>
+				</div>
+				<div class="designation-order-controls">
+					<select class="select-order-dept" id="select-order-dept">
+						<option value="">-- Choose Department --</option>
+						${departments.map(d => `<option value="${d.id}">${d.name}</option>`).join('')}
+					</select>
+					<button class="btn-order-save" id="btn-save-designation-order" style="display: none;">
+						<i class="ph-bold ph-floppy-disk"></i>
+						Save Changes
+					</button>
+				</div>
+			</div>
+			<div id="designation-order-details-container">
+				<div class="empty-state-panel" style="padding: 64px 32px; text-align: center; color: var(--text-muted); background: var(--white); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); border: 1px solid var(--border-color);">
+					<i class="ph ph-hand-pointing" style="font-size: 48px; color: var(--primary); opacity: 0.7; margin-bottom: 16px; display: block; margin-left: auto; margin-right: auto;"></i>
+					<h4 style="font-size: 15px; font-weight: 600; color: var(--text-main); margin-bottom: 4px;">Choose a Department</h4>
+					<p style="font-size: 13px;">Select a department from the dropdown menu above to manage its designation priority.</p>
+				</div>
+			</div>
+		`;
+
+		contentEl.innerHTML = html;
+
+		const deptSelect = document.getElementById("select-order-dept");
+		const detailsContainer = document.getElementById("designation-order-details-container");
+		const saveBtn = document.getElementById("btn-save-designation-order");
+
+		deptSelect.addEventListener("change", () => {
+			const deptId = deptSelect.value;
+			if (!deptId) {
+				saveBtn.style.display = "none";
+				detailsContainer.innerHTML = `
+					<div class="empty-state-panel" style="padding: 64px 32px; text-align: center; color: var(--text-muted); background: var(--white); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); border: 1px solid var(--border-color);">
+						<i class="ph ph-hand-pointing" style="font-size: 48px; color: var(--primary); opacity: 0.7; margin-bottom: 16px; display: block; margin-left: auto; margin-right: auto;"></i>
+						<h4 style="font-size: 15px; font-weight: 600; color: var(--text-main); margin-bottom: 4px;">Choose a Department</h4>
+						<p style="font-size: 13px;">Select a department from the dropdown menu above to manage its designation priority.</p>
+					</div>
+				`;
+				return;
+			}
+
+			saveBtn.style.display = "flex";
+
+			const dept = departments.find(d => String(d.id) === String(deptId));
+			if (!dept) return;
+
+			let cardHtml = `
+				<div class="order-card-container">
+					<div class="dept-order-card">
+						<div class="dept-order-title">
+							<div class="dept-order-title-left">
+								<i class="ph ph-briefcase"></i>
+								<span>${dept.name}</span>
+							</div>
+							<span class="dept-order-badge">${dept.designations.length} designations</span>
+						</div>
+						<div class="desig-order-list">
+			`;
+
+			dept.designations.forEach(desig => {
+				cardHtml += `
+					<div class="desig-order-item">
+						<div class="desig-order-name-wrap">
+							<i class="ph ph-dots-six-vertical desig-order-drag-handle"></i>
+							<span class="desig-order-name">${desig.name}</span>
+						</div>
+						<div class="desig-order-control-wrap">
+							<button class="desig-order-btn btn-dec" type="button"><i class="ph ph-minus"></i></button>
+							<input type="number" class="desig-order-input" data-desig-id="${desig.id}" data-dept-id="${dept.id}" value="${desig.sortOrder}">
+							<button class="desig-order-btn btn-inc" type="button"><i class="ph ph-plus"></i></button>
+						</div>
+					</div>
+				`;
+			});
+
+			cardHtml += `
+						</div>
+					</div>
+				</div>
+			`;
+
+			detailsContainer.innerHTML = cardHtml;
+
+			detailsContainer.querySelectorAll(".desig-order-item").forEach(item => {
+				const decBtn = item.querySelector(".btn-dec");
+				const incBtn = item.querySelector(".btn-inc");
+				const input = item.querySelector(".desig-order-input");
+
+				decBtn.addEventListener("click", () => {
+					let val = parseInt(input.value) || 0;
+					input.value = Math.max(0, val - 1);
+				});
+
+				incBtn.addEventListener("click", () => {
+					let val = parseInt(input.value) || 0;
+					input.value = val + 1;
+				});
+			});
+		});
+
+		saveBtn.addEventListener("click", async () => {
+			const inputs = detailsContainer.querySelectorAll(".desig-order-input");
+			const items = [];
+			inputs.forEach(input => {
+				items.push({
+					id: parseInt(input.dataset.desigId),
+					deptId: parseInt(input.dataset.deptId),
+					sortOrder: parseInt(input.value) || 0
+				});
+			});
+
+			this.showOverlay("Saving designation order...");
+			const saveRes = await model.saveDesignationsOrder(items);
+			this.hideOverlay();
+
+			if (saveRes && saveRes.success) {
+				alert("Designation orders saved successfully!");
+				this.showOverlay("Refreshing data...");
+				await model.fetchData();
+				this.hideOverlay();
+			} else {
+				alert("Failed to save designation orders: " + (saveRes ? saveRes.message : "Unknown error"));
+			}
+		});
 	}
 }
 

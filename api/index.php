@@ -83,8 +83,9 @@ function getSQLServer() {
 // --- Input Handling ---
 $input = json_decode(file_get_contents('php://input'), true);
 if (!$input) $input = array_merge($_GET, $_POST);
-
+//
 $action = isset($input['action']) ? $input['action'] : '';
+
 switch ($action) {
     case 'login':
         handleLogin($input);
@@ -115,6 +116,12 @@ switch ($action) {
         break;
     case 'get_shifts':
         handleGetShifts();
+        break;
+    case 'get_designations_order':
+        handleGetDesignationsOrder();
+        break;
+    case 'save_designations_order':
+        handleSaveDesignationsOrder($input);
         break;
     case 'setup_db':
         handleSetupDB();
@@ -484,7 +491,7 @@ function handleDashboardData($input, $returnData = false) {
         $shiftFilteredIds = array_keys($shiftFilteredIds);
     }
 
-    $sqlEmp = "SELECT E.EmployeeId, E.EmployeeName, E.EmployeeCode, E.Gender, E.DOB, E.Designation, DG.DesignationsName as DesignationName, C.CompanyFName as company, L.LocationName as location, D.DepartmentFName as dept, D.std_hc FROM Employees E WITH (NOLOCK) LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working'";
+    $sqlEmp = "SELECT E.EmployeeId, E.EmployeeName, E.EmployeeCode, E.Gender, E.DOB, E.Designation, DG.DesignationsName as DesignationName, ISNULL(DSO.SortOrder, 0) as designationSortOrder, C.CompanyFName as company, L.LocationName as location, D.DepartmentFName as dept, D.std_hc FROM Employees E WITH (NOLOCK) LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId LEFT JOIN departmentDeginationSortOrder DSO WITH (NOLOCK) ON E.DepartmentId = DSO.DepartmentId AND E.Designation = DSO.DesignationId WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working'";
 
     $paramsEmp = [];
     
@@ -520,6 +527,7 @@ function handleDashboardData($input, $returnData = false) {
                 'std_hc' => intval($row['std_hc']),
                 'company' => $row['company'] ?: 'Unknown',
                 'designation' => $row['DesignationName'] ?: 'Staff',
+                'designationSortOrder' => isset($row['designationSortOrder']) ? intval($row['designationSortOrder']) : 0,
                 'shift' => isset($empShiftMap[(string)$row['EmployeeId']]) ? $empShiftMap[(string)$row['EmployeeId']] : 'No Shift',
                 'location' => $row['location'] ?: 'Head Office'
             ];
@@ -1310,6 +1318,103 @@ function handleSetupDB() {
     echo json_encode(['success' => true, 'message' => 'Database setup successful']);
 }
 
+
+function handleGetDesignationsOrder() {
+    $conn = getSQLServer();
+
+    $locationList = !empty($_SESSION['locations']) ? implode(',', array_map('intval', $_SESSION['locations'])) : '0';
+    $companyList = !empty($_SESSION['companies']) ? implode(',', array_map('intval', $_SESSION['companies'])) : '0';
+    $departmentList = !empty($_SESSION['departments']) ? implode(',', array_map('intval', $_SESSION['departments'])) : '0';
+
+    $sql = "SELECT DISTINCT 
+                D.DepartmentId, 
+                D.DepartmentFName as DepartmentName, 
+                DG.DesignationId, 
+                DG.DesignationsName, 
+                ISNULL(DSO.SortOrder, 0) as sortOrder
+            FROM Employees E WITH (NOLOCK)
+            INNER JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId
+            INNER JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId
+            LEFT JOIN departmentDeginationSortOrder DSO WITH (NOLOCK) ON D.DepartmentId = DSO.DepartmentId AND DG.DesignationId = DSO.DesignationId
+            WHERE E.RecordStatus = 1 AND D.RecordStatus = 1 
+              AND E.Location IN ($locationList)
+              AND E.CompanyId IN ($companyList)
+              AND E.DepartmentId IN ($departmentList)
+            ORDER BY D.DepartmentFName ASC, sortOrder ASC, DG.DesignationsName ASC";
+
+    $stmt = sqlsrv_query($conn, $sql);
+    $data = [];
+    if ($stmt) {
+        while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+            $deptId = $row['DepartmentId'];
+            if (!isset($data[$deptId])) {
+                $data[$deptId] = [
+                    'id' => $deptId,
+                    'name' => $row['DepartmentName'],
+                    'designations' => []
+                ];
+            }
+            $data[$deptId]['designations'][] = [
+                'id' => $row['DesignationId'],
+                'name' => $row['DesignationsName'],
+                'sortOrder' => intval($row['sortOrder'])
+            ];
+        }
+    }
+
+    $debugSql = "SELECT * FROM departmentDeginationSortOrder";
+    $debugStmt = sqlsrv_query($conn, $debugSql);
+    $debugData = [];
+    if ($debugStmt) {
+        while ($row = sqlsrv_fetch_array($debugStmt, SQLSRV_FETCH_ASSOC)) {
+            $debugData[] = $row;
+        }
+    }
+
+    echo json_encode([
+        'success' => true,
+        'data' => array_values($data),
+        'debug_raw' => $debugData
+    ]);
+}
+
+function handleSaveDesignationsOrder($input) {
+    $conn = getSQLServer();
+    $items = isset($input['items']) ? $input['items'] : [];
+
+    $success = true;
+
+    foreach ($items as $item) {
+        $deptId = intval($item['deptId']);
+        $id = intval($item['id']);
+        $sortOrder = intval($item['sortOrder']);
+        
+        $sqlUpdate = "UPDATE [eSSLSmartOffice].[dbo].[departmentDeginationSortOrder] 
+                      SET SortOrder = ? 
+                      WHERE DepartmentId = ? AND DesignationId = ?";
+        $stmtUpdate = sqlsrv_query($conn, $sqlUpdate, [$sortOrder, $deptId, $id]);
+        
+        if ($stmtUpdate) {
+            $rowsAffected = sqlsrv_rows_affected($stmtUpdate);
+            if ($rowsAffected === 0) {
+                $sqlInsert = "INSERT INTO [eSSLSmartOffice].[dbo].[departmentDeginationSortOrder] 
+                              (DepartmentId, DesignationId, SortOrder) 
+                              VALUES (?, ?, ?)";
+                $stmtInsert = sqlsrv_query($conn, $sqlInsert, [$deptId, $id, $sortOrder]);
+                if (!$stmtInsert) {
+                    $success = false;
+                }
+            }
+        } else {
+            $success = false;
+        }
+    }
+
+    echo json_encode([
+        'success' => $success,
+        'message' => $success ? 'Designation orders updated successfully' : 'Some updates failed'
+    ]);
+}
 
 function handleLogout() {
     unset($_SESSION['userId']);
