@@ -610,13 +610,13 @@ class AttendanceView {
 			const g = groupKeyFn(e);
 			if (!groups[g]) {
 				groups[g] = {
-				total: 0,
-				present: 0,
-				halfPresent: 0,
-				weeklyOff: 0,
-				holiday: 0,
-				leave: 0,
-				absent: 0,
+					total: 0,
+					present: 0,
+					halfPresent: 0,
+					weeklyOff: 0,
+					holiday: 0,
+					leave: 0,
+					absent: 0,
 				};
 			}
 		});
@@ -632,13 +632,8 @@ class AttendanceView {
 			const hasIn  = log.inTime  && log.inTime  !== '00:00' && log.inTime  !== '00:00:00';
 			const hasOut = log.outTime && log.outTime !== '00:00' && log.outTime !== '00:00:00';
 
-			// FIXED ORDER
 			if (log.weeklyOff == 1 && present === 0 && !hasIn && !hasOut) {
 				groups[g].weeklyOff++;
-			} else if (log.holiday == 1 && present === 0 && !hasIn && !hasOut) {
-				groups[g].holiday++;
-			} else if (log.isOnLeave == 1 && present === 0 && !hasIn && !hasOut) {
-				groups[g].leave++;
 			} else if (present === 0.5) {
 				groups[g].halfPresent++;
 			} else if (present >= 1 || hasIn || hasOut) {
@@ -1212,8 +1207,6 @@ class AttendanceView {
 		const gPresent = {};
 		const gHalfPresent = {};
 		const gWeeklyOff = {};
-		const gHoliday = {};
-		const gLeave = {};
 		const gAbsent = {};
 	
 		groups.forEach((g) => {
@@ -1221,8 +1214,6 @@ class AttendanceView {
 			gPresent[g] = 0;
 			gHalfPresent[g] = 0;
 			gWeeklyOff[g] = 0;
-			gHoliday[g] = 0;
-			gLeave[g] = 0;
 			gAbsent[g] = 0;
 		});
 
@@ -1233,77 +1224,31 @@ class AttendanceView {
 			gTotal[g]++;
 		});
 
-		if (isSingleDay) {
-			const empStatusMap = {};
-	
-			logs.forEach((l) => {
-				empStatusMap[l.empId] = l;
-			});
-	
-			console.log(logs.slice(0, 20));
-	
-			Object.values(empStatusMap).forEach((l) => {
-				const e = empMap[l.empId];
-	
-				if (!e) {
-					return;
-				}
-	
-				const g = model.getAgeGroup(e.dob);
-	
-				const lPresent = parseFloat(l.present);
-				const lHasIn  = l.inTime  && l.inTime  !== '00:00' && l.inTime  !== '00:00:00';
-				const lHasOut = l.outTime && l.outTime !== '00:00' && l.outTime !== '00:00:00';
+		const { dateFrom, dateTo } = model.state.filters;
+		const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
 
-				if (l.weeklyOff == 1 && lPresent === 0 && !lHasIn && !lHasOut) {
-					gWeeklyOff[g]++;
-				} else if (l.holiday == 1 && lPresent === 0 && !lHasIn && !lHasOut) {
-					gHoliday[g]++;
-				} else if (l.isOnLeave == 1 && lPresent === 0 && !lHasIn && !lHasOut) {
-					gLeave[g]++;
-				} else if (lPresent === 0.5) {
-					gHalfPresent[g]++;
-				} else if (lPresent >= 1 || lHasIn || lHasOut) {
-					gPresent[g]++;
-				} else {
-					gAbsent[g]++;
-				}
-			});
-		} else {
-			logs.forEach((l) => {
-				const e = empMap[l.empId];
-				if (!e) return;
-				const g = model.getAgeGroup(e.dob);
+		dayLogs.forEach((l) => {
+			const e = empMap[l.empId];
+			if (!e) return;
+			const g = model.getAgeGroup(e.dob);
 
-				const lPresent = parseFloat(l.present);
-				const lHasIn  = l.inTime  && l.inTime  !== '00:00' && l.inTime  !== '00:00:00';
-				const lHasOut = l.outTime && l.outTime !== '00:00' && l.outTime !== '00:00:00';
+			const lPresent = parseFloat(l.present);
+			const lHasIn  = l.inTime  && l.inTime  !== '00:00' && l.inTime  !== '00:00:00';
+			const lHasOut = l.outTime && l.outTime !== '00:00' && l.outTime !== '00:00:00';
 
-				if (l.weeklyOff == 1 && lPresent === 0 && !lHasIn && !lHasOut) {
-					gWeeklyOff[g]++;
-				} else if (l.holiday == 1 && lPresent === 0 && !lHasIn && !lHasOut) {
-					gHoliday[g]++;
-				} else if (l.isOnLeave == 1 && lPresent === 0 && !lHasIn && !lHasOut) {
-					gLeave[g]++;
-				} else if (lPresent === 0.5) {
-					gHalfPresent[g]++;
-				} else if (lPresent >= 1 || lHasIn || lHasOut) {
-					gPresent[g]++;
-				} else {
-					gAbsent[g]++;
-				}
-			});
-		}
+			if (l.weeklyOff == 1 && lPresent === 0 && !lHasIn && !lHasOut) {
+				gWeeklyOff[g]++;
+			} else if (lPresent === 0.5) {
+				gHalfPresent[g]++;
+			} else if (lPresent >= 1 || lHasIn || lHasOut) {
+				gPresent[g]++;
+			} else {
+				gAbsent[g]++;
+			}
+		});
 
 		const rows = groups.map((g) => {
-			const attendancePercent = isSingleDay
-				? gTotal[g]
-				? (gPresent[g] / gTotal[g]) * 100
-				: 0
-				: gPresent[g] + gAbsent[g]
-				? (gPresent[g] / (gPresent[g] + gAbsent[g])) * 100
-				: 0;
-
+			const attendancePercent = gTotal[g] ? (gPresent[g] / gTotal[g]) * 100 : 0;
 			return [
 				g,
 				gTotal[g],
@@ -1401,10 +1346,6 @@ class AttendanceView {
 			return seriesName === "Present";
 		} else if (log.weeklyOff == 1 && present === 0 && !hasIn && !hasOut) {
 			return seriesName === "Weekly Off";
-		} else if (log.holiday == 1 && present === 0 && !hasIn && !hasOut) {
-			return seriesName === "Holiday";
-		} else if (log.isOnLeave == 1 && present === 0 && !hasIn && !hasOut) {
-			return seriesName === "Leave";
 		} else {
 			return seriesName === "Absent";
 		}

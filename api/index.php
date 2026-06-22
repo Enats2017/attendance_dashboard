@@ -394,12 +394,8 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
                 $hasInPunch  = !empty($log['inTime'])  && $log['inTime']  !== '00:00' && $log['inTime']  !== '00:00:00';
                 $hasOutPunch = !empty($log['outTime']) && $log['outTime'] !== '00:00' && $log['outTime'] !== '00:00:00';
 
-                if (intval($log['weeklyOff']) == 1 && floatval($log['present']) == 0) {
+                if (intval($log['weeklyOff']) == 1 && floatval($log['present']) == 0 && !$hasInPunch && !$hasOutPunch) {
 					$shiftStats[$shiftName]['weeklyOff']++;
-				} elseif (intval($log['holiday']) == 1 && floatval($log['present']) == 0) {
-					$shiftStats[$shiftName]['holiday']++;
-				} elseif (intval($log['isOnLeave']) == 1 && floatval($log['present']) == 0) {
-					$shiftStats[$shiftName]['leave']++;
 				} elseif (floatval($log['present']) == 0.5) {
 					$shiftStats[$shiftName]['halfPresent']++;
 				} elseif (floatval($log['present']) >= 1 || $hasInPunch || $hasOutPunch) {
