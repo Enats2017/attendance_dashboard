@@ -86,20 +86,7 @@ class AttendanceView {
 
 			const dayLogs = this._buildEmployeeDayLogs(scopedEmps, data.logs, dateFrom, dateTo,);
 
-			const filteredLogs = dayLogs.filter((l) => {
-				switch (status) {
-					case "Present":
-						return (l.status === "Present" || l.status === "Present On WeeklyOff");
-					case "Half Present":
-						return (l.status === "1/2Present" || l.status === "1/2Present On WeeklyOff");
-					case "Weekly Off":
-						return l.status === "On WeeklyOff";
-					case "Absent":
-						return l.status === "Absent";
-					default:
-						return false;
-				}
-			});
+			const filteredLogs = dayLogs.filter((l) => this._matchesStatus(l, status));
 
 			this._renderDrillDown(filteredLogs, title, data.empMap);
 			return;
@@ -641,16 +628,21 @@ class AttendanceView {
 			}
 			groups[g].total++;
 
-			if (log.weeklyOff == 1 && parseFloat(log.present) === 0) {
+			const present = parseFloat(log.present);
+			const hasIn  = log.inTime  && log.inTime  !== '00:00' && log.inTime  !== '00:00:00';
+			const hasOut = log.outTime && log.outTime !== '00:00' && log.outTime !== '00:00:00';
+
+			// FIXED ORDER
+			if (log.weeklyOff == 1 && present === 0 && !hasIn && !hasOut) {
 				groups[g].weeklyOff++;
-			} else if (log.holiday == 1) {
+			} else if (log.holiday == 1 && present === 0 && !hasIn && !hasOut) {
 				groups[g].holiday++;
-			} else if (log.isOnLeave == 1) {
+			} else if (log.isOnLeave == 1 && present === 0 && !hasIn && !hasOut) {
 				groups[g].leave++;
-			} else if (parseFloat(log.present) === 1) {
-				groups[g].present++;
-			} else if (parseFloat(log.present) === 0.5) {
+			} else if (present === 0.5) {
 				groups[g].halfPresent++;
+			} else if (present >= 1 || hasIn || hasOut) {
+				groups[g].present++;
 			} else {
 				groups[g].absent++;
 			}
@@ -1259,16 +1251,20 @@ class AttendanceView {
 	
 				const g = model.getAgeGroup(e.dob);
 	
-				if (l.weeklyOff == 1 && l.present == 0) {
+				const lPresent = parseFloat(l.present);
+				const lHasIn  = l.inTime  && l.inTime  !== '00:00' && l.inTime  !== '00:00:00';
+				const lHasOut = l.outTime && l.outTime !== '00:00' && l.outTime !== '00:00:00';
+
+				if (l.weeklyOff == 1 && lPresent === 0 && !lHasIn && !lHasOut) {
 					gWeeklyOff[g]++;
-				} else if (l.holiday == 1) {
+				} else if (l.holiday == 1 && lPresent === 0 && !lHasIn && !lHasOut) {
 					gHoliday[g]++;
-				} else if (l.isOnLeave == 1) {
+				} else if (l.isOnLeave == 1 && lPresent === 0 && !lHasIn && !lHasOut) {
 					gLeave[g]++;
-				} else if (parseFloat(l.present) === 1) {
-					gPresent[g]++;
-				} else if (parseFloat(l.present) === 0.5) {
+				} else if (lPresent === 0.5) {
 					gHalfPresent[g]++;
+				} else if (lPresent >= 1 || lHasIn || lHasOut) {
+					gPresent[g]++;
 				} else {
 					gAbsent[g]++;
 				}
@@ -1276,14 +1272,22 @@ class AttendanceView {
 		} else {
 			logs.forEach((l) => {
 				const e = empMap[l.empId];
-
-				if (!e) {
-					return;
-				}
-
+				if (!e) return;
 				const g = model.getAgeGroup(e.dob);
 
-				if (parseFloat(l.present) === 1) {
+				const lPresent = parseFloat(l.present);
+				const lHasIn  = l.inTime  && l.inTime  !== '00:00' && l.inTime  !== '00:00:00';
+				const lHasOut = l.outTime && l.outTime !== '00:00' && l.outTime !== '00:00:00';
+
+				if (l.weeklyOff == 1 && lPresent === 0 && !lHasIn && !lHasOut) {
+					gWeeklyOff[g]++;
+				} else if (l.holiday == 1 && lPresent === 0 && !lHasIn && !lHasOut) {
+					gHoliday[g]++;
+				} else if (l.isOnLeave == 1 && lPresent === 0 && !lHasIn && !lHasOut) {
+					gLeave[g]++;
+				} else if (lPresent === 0.5) {
+					gHalfPresent[g]++;
+				} else if (lPresent >= 1 || lHasIn || lHasOut) {
 					gPresent[g]++;
 				} else {
 					gAbsent[g]++;
@@ -1369,33 +1373,11 @@ class AttendanceView {
 					(g, index, seriesIndex, seriesName) => {
 						const filteredLogs = logs.filter((l) => {
 							const e = empMap[l.empId];
-			
-							if (!e) {
-								return false;
-							}
-			
-							if (model.getAgeGroup(e.dob) !== g) {
-								return false;
-							}
-			
-							switch (seriesName) {
-								case "Present":
-									return (l.status === "Present" || l.status === "Present On WeeklyOff");
-			
-								case "Half Present":
-									return (l.status === "1/2Present" || l.status === "1/2Present On WeeklyOff");
-			
-								case "Weekly Off":
-									return l.status === "On WeeklyOff";
-			
-								case "Absent":
-									return l.status === "Absent";
-			
-								default:
-									return false;
-							}
+							if (!e) return false;
+							if (model.getAgeGroup(e.dob) !== g) return false;
+							return this._matchesStatus(l, seriesName);
 						});
-		
+
 						this._renderDrillDown(
 							filteredLogs,
 							`Age: ${g} - ${seriesName}`,
@@ -1406,6 +1388,28 @@ class AttendanceView {
 			},
 		};
 	}
+
+
+	_matchesStatus(log, seriesName) {
+		const present = parseFloat(log.present);
+		const hasIn  = log.inTime  && log.inTime  !== '00:00' && log.inTime  !== '00:00:00';
+		const hasOut = log.outTime && log.outTime !== '00:00' && log.outTime !== '00:00:00';
+
+		if (present === 0.5) {
+			return seriesName === "Half Present";
+		} else if (present >= 1 || hasIn || hasOut) {
+			return seriesName === "Present";
+		} else if (log.weeklyOff == 1 && present === 0 && !hasIn && !hasOut) {
+			return seriesName === "Weekly Off";
+		} else if (log.holiday == 1 && present === 0 && !hasIn && !hasOut) {
+			return seriesName === "Holiday";
+		} else if (log.isOnLeave == 1 && present === 0 && !hasIn && !hasOut) {
+			return seriesName === "Leave";
+		} else {
+			return seriesName === "Absent";
+		}
+	}
+
 
 	_renderCompanyWise(logs, emps, empMap, model) {
 		const comps = [...new Set(emps.map((e) => e.company))].sort();
@@ -1473,21 +1477,8 @@ class AttendanceView {
 					(company, index, seriesIndex, seriesName) => {
 						const filteredLogs = logs.filter((l) => {
 							const e = empMap[l.empId];
-							if (!e || e.company !== company) {
-								return false;
-							}
-							switch (seriesName) {
-								case "Present":
-									return (l.status === "Present" || l.status === "Present On WeeklyOff");
-								case "Half Present":
-									return (l.status === "1/2Present" || l.status === "1/2Present On WeeklyOff");
-								case "Weekly Off":
-									return l.status === "On WeeklyOff";
-								case "Absent":
-									return l.status === "Absent";
-								default:
-									return false;
-							}
+							if (!e || e.company !== company) return false;
+							return this._matchesStatus(l, seriesName);
 						});
 						this._renderDrillDown(
 							filteredLogs,
@@ -1806,6 +1797,8 @@ class AttendanceView {
 
 	_renderShiftWise(logs, emps, empMap, model) {
 		const shiftStats = model.state.data.shiftStats || [];
+		const { dateFrom, dateTo } = model.state.filters;  // ← ADD THIS LINE
+
 		const rows = shiftStats.map((s) => [
 			s.shiftName,
 			s.total,
@@ -1815,7 +1808,7 @@ class AttendanceView {
 			s.absent,
 			s.rate + "%",
 		]);
-	
+
 		this._lastData["shift-wise"] = rows.map((r) => ({
 			Shift: r[0],
 			Total: r[1],
@@ -1826,38 +1819,30 @@ class AttendanceView {
 			Rate: r[6],
 		}));
 
+		const fullLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
+
 		return {
 			html: `
-					<h2 class="section-title">
-						<i class="ph-fill ph-clock-clockwise"></i>
-						Shift Statistics
-					</h2>
-
-					<div class="charts-grid">
-						${this._chartCard(
-							"ch-shift-bar",
-							'<i class="ph-fill ph-chart-bar"></i>',
-							"amber",
-							"Present by Shift",
-						)}
-					</div>
-
-					${this._tableHTML(
-						"tbl-shift",
-						[
-							"Shift",
-							"Total",
-							"Present",
-							"Half Present",
-							"Weekly Off",
-							"Absent",
-							"Rate",
-						],
-						rows,
-						"shift-wise",
+				<h2 class="section-title">
+					<i class="ph-fill ph-clock-clockwise"></i>
+					Shift Statistics
+				</h2>
+				<div class="charts-grid">
+					${this._chartCard(
+						"ch-shift-bar",
+						'<i class="ph-fill ph-chart-bar"></i>',
+						"amber",
+						"Present by Shift",
+						"Click to view records"
 					)}
-
-					<div id="drilldown-table" style="margin-top:16px"></div>
+				</div>
+				${this._tableHTML(
+					"tbl-shift",
+					["Shift", "Total", "Present", "Half Present", "Weekly Off", "Absent", "Rate"],
+					rows,
+					"shift-wise",
+				)}
+				<div id="drilldown-table" style="margin-top:16px"></div>
 			`,
 
 			renderCharts: () => {
@@ -1866,13 +1851,13 @@ class AttendanceView {
 					shiftStats.map((s) => s.shiftName),
 					[
 						{ name: "Present", data: shiftStats.map((s) => s.present) },
-						{ name: "Half Present", data: shiftStats.map((s) => s.halfPresent), },
+						{ name: "Half Present", data: shiftStats.map((s) => s.halfPresent) },
 						{ name: "Weekly Off", data: shiftStats.map((s) => s.weeklyOff) },
 						{ name: "Absent", data: shiftStats.map((s) => s.absent) },
 					],
 					"Shift Attendance",
 					(shiftName, index, seriesIndex, seriesName) => {
-						const filteredLogs = logs.filter((l) => {
+						const filteredLogs = fullLogs.filter((l) => {
 							const e = empMap[l.empId];
 							if (!e) {
 								return false;
@@ -1880,31 +1865,16 @@ class AttendanceView {
 							if (e.shift !== shiftName) {
 								return false;
 							}
-			
-							switch (seriesName) {
-								case "Present":
-									return (l.status === "Present" || l.status === "Present On WeeklyOff");
-			
-								case "Half Present":
-									return (l.status === "1/2Present" || l.status === "1/2Present On WeeklyOff");
-			
-								case "Weekly Off":
-									return l.status === "On WeeklyOff";
-			
-								case "Absent":
-									return l.status === "Absent";
-			
-								default:
-									return false;
-							}
+
+							return this._matchesStatus(l, seriesName);
 						});
-		
+
 						this._renderDrillDown(
 							filteredLogs,
 							`Shift: ${shiftName} - ${seriesName}`,
 							empMap,
 						);
-					},
+					}
 				);
 			},
 		};

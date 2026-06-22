@@ -343,12 +343,13 @@ function setupPassword($data) {
 }
 
 
-function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesInAttendanceLogs, $todayDate, $conn) {
+function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesInAttendanceLogs, $dayFrom, $dayTo, $conn) {
     $shiftStats = [];
+    $empShiftLookup = [];
+    foreach ($employees as $employee) {
+        $shiftName = $employee['shift'] ?: 'No Shift';
+        $empShiftLookup[$employee['id']] = $shiftName;
 
-    // Step 1: seed every employee's shift bucket so totals always match Total Staff
-    foreach ($employees as $e) {
-        $shiftName = $e['shift'] ?: 'No Shift';   // already 'No Shift' if unmapped
         if (!isset($shiftStats[$shiftName])) {
             $shiftStats[$shiftName] = [
                 'shiftCode' => $shiftName,
@@ -365,46 +366,57 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
         $shiftStats[$shiftName]['total']++;
     }
 
-    // Step 2: build empId => shiftName lookup (same as before)
-    $empShiftLookup = [];
-    foreach ($employees as $e) {
-        $empShiftLookup[$e['id']] = $e['shift'] ?: 'No Shift';
-    }
-
-    // Step 3: apply AttendanceLogs-based status
-    $coveredEmpIds = [];
+    $logKeyMap = [];
     foreach ($logs as $log) {
-        $shiftName = $empShiftLookup[$log['empId']] ?? 'No Shift';
-        $coveredEmpIds[$log['empId']] = true;
-
-        if (intval($log['weeklyOff']) == 1 && floatval($log['present']) == 0) {
-            $shiftStats[$shiftName]['weeklyOff']++;
-        } elseif (intval($log['holiday']) == 1) {
-            $shiftStats[$shiftName]['holiday']++;
-        } elseif (intval($log['isOnLeave']) == 1) {
-            $shiftStats[$shiftName]['leave']++;
-        } elseif (floatval($log['present']) == 1) {
-            $shiftStats[$shiftName]['present']++;
-        } elseif (floatval($log['present']) == 0.5) {
-            $shiftStats[$shiftName]['halfPresent']++;
+        $key = $log['empId'] . '_' . $log['date'];
+        if (!isset($logKeyMap[$key])) {
+            $logKeyMap[$key] = $log;
         } else {
-            $shiftStats[$shiftName]['absent']++;
+            if (floatval($log['present']) > floatval($logKeyMap[$key]['present'])) {
+                $logKeyMap[$key] = $log;
+            }
         }
     }
 
-    // Step 4: apply DeviceLogs-only presence (employees with punches but no AttendanceLogs row)
-    foreach ($employees as $e) {
-        $key = $e['id'] . '_' . $todayDate;
-        if (isset($coveredEmpIds[$e['id']])) {
-            continue; // already counted via AttendanceLogs above
-        }
-        if (isset($deviceEmployeeStats[$key])) {
-            $shiftName = $empShiftLookup[$e['id']] ?? 'No Shift';
-            $shiftStats[$shiftName]['present']++;
-        } else {
-            // no attendance row AND no device punch -> absent
-            $shiftName = $empShiftLookup[$e['id']] ?? 'No Shift';
-            $shiftStats[$shiftName]['absent']++;
+    $rangeStart = new DateTime($dayFrom);
+    $rangeEnd = new DateTime($dayTo);
+
+    for ($d = clone $rangeStart; $d <= $rangeEnd; $d->modify('+1 day')) {
+        $dateStr = $d->format('Y-m-d');
+        foreach ($employees as $e) {
+            $empId = $e['id'];
+            $shiftName = $empShiftLookup[$empId] ?? 'No Shift';
+            $key = $empId . '_' . $dateStr;
+
+            if (isset($logKeyMap[$key])) {
+                $log = $logKeyMap[$key];
+
+                $hasInPunch  = !empty($log['inTime'])  && $log['inTime']  !== '00:00' && $log['inTime']  !== '00:00:00';
+                $hasOutPunch = !empty($log['outTime']) && $log['outTime'] !== '00:00' && $log['outTime'] !== '00:00:00';
+
+                if (intval($log['weeklyOff']) == 1 && floatval($log['present']) == 0) {
+					$shiftStats[$shiftName]['weeklyOff']++;
+				} elseif (intval($log['holiday']) == 1 && floatval($log['present']) == 0) {
+					$shiftStats[$shiftName]['holiday']++;
+				} elseif (intval($log['isOnLeave']) == 1 && floatval($log['present']) == 0) {
+					$shiftStats[$shiftName]['leave']++;
+				} elseif (floatval($log['present']) == 0.5) {
+					$shiftStats[$shiftName]['halfPresent']++;
+				} elseif (floatval($log['present']) >= 1 || $hasInPunch || $hasOutPunch) {
+					$shiftStats[$shiftName]['present']++;
+				} else {
+					$shiftStats[$shiftName]['absent']++;
+				}
+            } elseif (isset($deviceEmployeeStats[$key])) {
+                $stat = $deviceEmployeeStats[$key];
+                if (($stat['inCount'] ?? 0) >= 1) {
+                    $shiftStats[$shiftName]['present']++;
+                } else {
+                    $shiftStats[$shiftName]['absent']++;
+                }
+            } else {
+                $shiftStats[$shiftName]['absent']++;
+            }
         }
     }
 
@@ -924,7 +936,7 @@ function handleDashboardData($input, $returnData = false) {
         $absentEmployees = $absentEmployeeDays;     
     }
 
-    $shiftStats = computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesInAttendanceLogs, $dayFrom, $conn);
+	$shiftStats = computeShiftStats($employees,  $logs,  $deviceEmployeeStats,  $employeesInAttendanceLogs,  $dayFrom, $dayTo, $conn);
 
     if ($returnData) {
         return [
