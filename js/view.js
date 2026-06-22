@@ -20,6 +20,8 @@ class AttendanceView {
 			{ id: "night", label: "Night Shift", icon: "ph-moon" },
 			{ id: "designation", label: "Designation Stats", icon: "ph-identification-badge", },
 			{ id: "shift", label: "Shift Stats", icon: "ph-clock-clockwise" },
+			{ id: "staff", label: "Staff", icon: "ph-identification-badge" },
+			{ id: "worker", label: "Workmen", icon: "ph-hard-hat" },
 			{ id: "special", label: "Critical Alerts", icon: "ph-warning-circle" },
 			{ id: "designation_order", label: "Designations Order", icon: "ph-sliders" },
 		];
@@ -382,6 +384,12 @@ class AttendanceView {
 				break;
 			case "shift":
 				content = this._renderShiftWise(logs, emps, empMap, model);
+				break;
+			case "staff":
+				content = this._renderStaff(logs, emps, empMap, model);
+				break;
+			case "worker":
+				content = this._renderWorker(logs, emps, empMap, model);
 				break;
 			case "special":
 				content = this._renderSpecial(logs, emps, empMap, filters, model);
@@ -2728,6 +2736,129 @@ class AttendanceView {
 				alert("Failed to save designation orders: " + (saveRes ? saveRes.message : "Unknown error"));
 			}
 		});
+	}
+
+
+	_renderStaff(logs, emps, empMap, model) {
+		const staffCategoryIds = [58];
+		const { dateFrom, dateTo } = model.state.filters;
+
+		const staffEmps = emps.filter(e => staffCategoryIds.includes(e.categoryId));
+		const staffGroups = this._computeGroupedDayStats(staffEmps, logs, dateFrom, dateTo, (e) => e.dept);
+		const staffDepts = [...new Set(staffEmps.map(e => e.dept))].sort();
+
+		const staffRows = staffDepts.map(d => {
+			const g = staffGroups[d] || {};
+			return [
+				d,
+				g.total || 0,
+				g.present || 0,
+				g.halfPresent || 0,
+				g.weeklyOff || 0,
+				g.absent || 0,
+				g.total ? Math.round((g.present / g.total) * 100) + '%' : '0%'
+			];
+		});
+
+		this._lastData['staff-wise'] = staffRows.map(r => ({
+			Dept: r[0], Total: r[1], Present: r[2], Half: r[3], WeeklyOff: r[4], Absent: r[5], Rate: r[6]
+		}));
+
+		return {
+			html: `
+				<h2 class="section-title">
+					<i class="ph-fill ph-identification-badge"></i> Staff Statistics
+				</h2>
+				<div class="charts-grid">
+					${this._chartCard('ch-staff-dept', '<i class="ph-fill ph-chart-bar"></i>', 'violet', 'Staff Attendance by Department', 'Click bar for detail')}
+				</div>
+				${this._tableHTML('tbl-staff', ["Dept", "Total", "Present", "Half Present", "Weekly Off", "Absent", "Rate"], staffRows, 'staff-wise')}
+				<div id="drilldown-table" style="margin-top:16px"></div>
+			`,
+			renderCharts: () => {
+				Charts.stacked(
+					'ch-staff-dept',
+					staffDepts,
+					[
+						{ name: 'Present',      data: staffRows.map(r => r[2]) },
+						{ name: 'Half Present', data: staffRows.map(r => r[3]) },
+						{ name: 'Weekly Off',   data: staffRows.map(r => r[4]) },
+						{ name: 'Absent',       data: staffRows.map(r => r[5]) },
+					],
+					'Staff by Department',
+					(dept, index, seriesIndex, seriesName) => {
+						const filtered = logs.filter(l => {
+							const e = empMap[l.empId];
+							if (!e || e.dept !== dept) return false;
+							if (!staffCategoryIds.includes(e.categoryId)) return false;
+							return this._matchesStatus(l, seriesName);
+						});
+						this._renderDrillDown(filtered, `Staff – ${dept} – ${seriesName}`, empMap);
+					}
+				);
+			}
+		};
+	}
+
+	_renderWorker(logs, emps, empMap, model) {
+		const workerCategoryIds = [51, 59, 60];
+		const { dateFrom, dateTo } = model.state.filters;
+
+		const workerEmps = emps.filter(e => workerCategoryIds.includes(e.categoryId));
+		const workerGroups = this._computeGroupedDayStats(workerEmps, logs, dateFrom, dateTo, (e) => e.dept);
+		const workerDepts = [...new Set(workerEmps.map(e => e.dept))].sort();
+
+		const workerRows = workerDepts.map(d => {
+			const g = workerGroups[d] || {};
+			return [
+				d,
+				g.total || 0,
+				g.present || 0,
+				g.halfPresent || 0,
+				g.weeklyOff || 0,
+				g.absent || 0,
+				g.total ? Math.round((g.present / g.total) * 100) + '%' : '0%'
+			];
+		});
+
+		this._lastData['worker-wise'] = workerRows.map(r => ({
+			Dept: r[0], Total: r[1], Present: r[2], Half: r[3], WeeklyOff: r[4], Absent: r[5], Rate: r[6]
+		}));
+
+		return {
+			html: `
+				<h2 class="section-title">
+					<i class="ph-fill ph-hard-hat"></i> Workmen Statistics
+				</h2>
+				<div class="charts-grid">
+					${this._chartCard('ch-worker-dept', '<i class="ph-fill ph-chart-bar"></i>', 'amber', 'Workmen Attendance by Department', 'Click bar for detail')}
+				</div>
+				${this._tableHTML('tbl-worker', ["Dept", "Total", "Present", "Half Present", "Weekly Off", "Absent", "Rate"], workerRows, 'worker-wise')}
+				<div id="drilldown-table" style="margin-top:16px"></div>
+			`,
+			renderCharts: () => {
+				Charts.stacked(
+					'ch-worker-dept',
+					workerDepts,
+					[
+						{ name: 'Present',      data: workerRows.map(r => r[2]) },
+						{ name: 'Half Present', data: workerRows.map(r => r[3]) },
+						{ name: 'Weekly Off',   data: workerRows.map(r => r[4]) },
+						{ name: 'Absent',       data: workerRows.map(r => r[5]) },
+					],
+					'Workmen by Department',
+					(dept, index, seriesIndex, seriesName) => {
+						const filtered = logs.filter(l => {
+							const e = empMap[l.empId];
+							if (!e || e.dept !== dept) return false;
+							if (!workerCategoryIds.includes(e.categoryId)) return false;
+							return this._matchesStatus(l, seriesName);
+						});
+						this._renderDrillDown(filtered, `Workmen – ${dept} – ${seriesName}`, empMap);
+					}
+				);
+			}
+		};
 	}
 }
 

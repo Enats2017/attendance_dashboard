@@ -64,6 +64,7 @@ body {
     height: 100vh;
     z-index: 1000;
     box-shadow: 4px 0 24px rgba(0,0,0,0.06);
+    overflow: hidden;        
 }
 
 .sidebar-header {
@@ -105,6 +106,22 @@ body {
     display: flex;
     flex-direction: column;
     gap: 4px;
+    overflow-y: auto;
+    min-height: 0;  
+}
+
+.sidebar-nav::-webkit-scrollbar {
+    width: 4px;
+}
+.sidebar-nav::-webkit-scrollbar-track {
+    background: transparent;
+}
+.sidebar-nav::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.35);
 }
 
 .nav-item {
