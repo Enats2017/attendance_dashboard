@@ -112,6 +112,10 @@ class AttendanceModel {
                     resigned: 0,
                     newJoined: 0
                 };
+                this.state.staffWorkerStats = data.staffWorkerStats || {
+                    staffTotal: 0, staffPresent: 0, staffAbsent: 0,
+                    workerTotal: 0, workerPresent: 0, workerAbsent: 0
+                };
                 this.state.nightShiftStats = data.nightShiftStats || {
                     present: 0,
                     absent: 0,
@@ -139,8 +143,10 @@ class AttendanceModel {
     }
 
     updateFilters(newFilters) {
-        this.state.filters = { ...this.state.filters, ...newFilters };
-        this._commit();
+        this.state.filters = { 
+            ...this.state.filters, 
+            ...newFilters 
+        };
     }
 
     resetFilters() {
@@ -153,10 +159,12 @@ class AttendanceModel {
             shift: 'All',
             location: 'All'
         };
-        this._commit();
     }
 
     switchTab(tabId) {
+        if (this.state.activeTab === tabId) {
+            return;
+        }
         this.state.activeTab = tabId;
         this._commit();
     }
@@ -580,6 +588,18 @@ class AttendanceModel {
             console.error('Save Designations Order Error:', error);
             return { success: false, error: error.message };
         }
+    }
+
+    getStaffEmployees() {
+        const staffCategoryIds = [58];
+        const { emps } = this.getFilteredData();
+        return emps.filter(emp => staffCategoryIds.includes(emp.categoryId)).map(emp => ({ log: null, emp }));
+    }
+
+    getWorkerEmployees() {
+        const workerCategoryIds = [51, 59, 60];
+        const { emps } = this.getFilteredData();
+        return emps.filter(emp => workerCategoryIds.includes(emp.categoryId)).map(emp => ({ log: null, emp }));
     }
 }
 

@@ -499,7 +499,7 @@ function handleDashboardData($input, $returnData = false) {
         $shiftFilteredIds = array_keys($shiftFilteredIds);
     }
 
-    $sqlEmp = "SELECT E.EmployeeId, E.EmployeeName, E.EmployeeCode, E.Gender, E.DOB, E.Designation, DG.DesignationsName as DesignationName, ISNULL(DSO.SortOrder, 0) as designationSortOrder, C.CompanyFName as company, L.LocationName as location, D.DepartmentFName as dept, D.std_hc FROM Employees E WITH (NOLOCK) LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId LEFT JOIN departmentDeginationSortOrder DSO WITH (NOLOCK) ON E.DepartmentId = DSO.DepartmentId AND E.Designation = DSO.DesignationId WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working'";
+    $sqlEmp = "SELECT E.EmployeeId, E.EmployeeName, E.EmployeeCode, E.Gender, E.DOB, E.CategoryId, E.Designation, DG.DesignationsName as DesignationName, ISNULL(DSO.SortOrder, 0) as designationSortOrder, C.CompanyFName as company, L.LocationName as location, D.DepartmentFName as dept, D.std_hc FROM Employees E WITH (NOLOCK) LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId LEFT JOIN departmentDeginationSortOrder DSO WITH (NOLOCK) ON E.DepartmentId = DSO.DepartmentId AND E.Designation = DSO.DesignationId WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working'";
 
     $paramsEmp = [];
     
@@ -534,12 +534,26 @@ function handleDashboardData($input, $returnData = false) {
                 'dept' => $row['dept'] ?: 'Dept ' . $row['DepartmentId'],
                 'std_hc' => intval($row['std_hc']),
                 'company' => $row['company'] ?: 'Unknown',
-                'designation' => $row['DesignationName'] ?: 'Staff',
+                'categoryId' => intval($row['CategoryId']),
+				'designation' => $row['DesignationName'] ?: 'Staff',
                 'designationSortOrder' => isset($row['designationSortOrder']) ? intval($row['designationSortOrder']) : 0,
                 'shift' => isset($empShiftMap[(string)$row['EmployeeId']]) ? $empShiftMap[(string)$row['EmployeeId']] : 'No Shift',
                 'location' => $row['location'] ?: 'Head Office'
             ];
         }
+
+		$staffCategoryIds  = [58];
+		$workerCategoryIds = [51, 59, 60];
+
+		$staffEmpIds  = [];
+		$workerEmpIds = [];
+		foreach ($employees as $emp) {
+			if (in_array($emp['categoryId'], $staffCategoryIds)) {
+				$staffEmpIds[$emp['id']] = true;
+			} elseif (in_array($emp['categoryId'], $workerCategoryIds)) {
+				$workerEmpIds[$emp['id']] = true;
+			}
+		}
     }
 
     $resignedEmployees = [];
@@ -636,7 +650,7 @@ function handleDashboardData($input, $returnData = false) {
         $tableExists = isset($allTableNames[$logTable]);
 
         if ($tableExists) {
-            $sqlLogs = "SELECT A.EmployeeId, A.AttendanceDate, A.InTime, A.OutTime, A.Status, A.Duration, A.LateBy, A.EarlyBy, A.Present, A.Absent, A.WeeklyOff, A.Holiday, A.IsOnLeave, A.IsPartialDay, A.MissedInPunch, A.MissedOutPunch, A.ShiftId, S.ShiftCode, S.ShiftName FROM $logTable A WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON A.EmployeeId = E.EmployeeId LEFT JOIN Shifts S WITH (NOLOCK) ON A.ShiftId = S.ShiftId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND A.AttendanceDate >= '$dayFrom' AND A.AttendanceDate <= '$dayTo 23:59:59' AND E.Status = 'Working'";
+            $sqlLogs = "SELECT A.EmployeeId, A.AttendanceDate, A.InTime, A.OutTime, A.Status, A.Duration, A.LateBy, A.EarlyBy, A.ComplinFreeLateBy, A.ComplinFreeEarlyBy, A.Present, A.Absent, A.WeeklyOff, A.Holiday, A.IsOnLeave, A.IsPartialDay, A.MissedInPunch, A.MissedOutPunch, A.ShiftId, S.ShiftCode, S.ShiftName, S.BeginTime, S.EndTime FROM $logTable A WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON A.EmployeeId = E.EmployeeId LEFT JOIN Shifts S WITH (NOLOCK) ON A.ShiftId = S.ShiftId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND A.AttendanceDate >= '$dayFrom' AND A.AttendanceDate <= '$dayTo 23:59:59' AND E.Status = 'Working'";
 
             $paramsLogs = [];
             
@@ -685,7 +699,9 @@ function handleDashboardData($input, $returnData = false) {
                         'missedOutPunch' => intval($row['MissedOutPunch']),
                         'shiftId' => intval($row['ShiftId']),
                         'shiftName' => $row['ShiftName'],
-                        'shiftCode' => $row['ShiftCode']
+                        'shiftCode' => $row['ShiftCode'],
+						'shiftStart' => $row['BeginTime'] ? (is_object($row['BeginTime']) ? $row['BeginTime']->format('H:i') : $row['BeginTime']) : null,
+						'shiftEnd' => $row['EndTime'] ? (is_object($row['EndTime']) ? $row['EndTime']->format('H:i') : $row['EndTime']) : null
                     ];
                 }
             }
@@ -907,7 +923,26 @@ function handleDashboardData($input, $returnData = false) {
 
     $rangeStart = new DateTime($dayFrom);
     $rangeEnd = new DateTime($dayTo);
-    $totalEmployeeDays = 0;
+    
+	$staffPresent = 0;
+	$staffAbsent = 0;
+	$workerPresent = 0;
+	$workerAbsent = 0;
+	for ($d = clone $rangeStart; $d <= $rangeEnd; $d->modify('+1 day')) {
+		$dateStr = $d->format('Y-m-d');
+		foreach ($employees as $e) {
+			$k = $e['id'] . '_' . $dateStr;
+			if (isset($staffEmpIds[$e['id']])) {
+				if (isset($presentKeySet[$k])) $staffPresent++;
+				else $staffAbsent++;
+			} elseif (isset($workerEmpIds[$e['id']])) {
+				if (isset($presentKeySet[$k])) $workerPresent++;
+				else $workerAbsent++;
+			}
+		}
+	}
+
+	$totalEmployeeDays = 0;
     $presentEmployeeDays = 0;
     $absentEmployeeDays = 0;
 
@@ -961,6 +996,14 @@ function handleDashboardData($input, $returnData = false) {
             'resigned' => count($resignedEmployees),
             'newJoined' => count($newJoinedEmployees)
         ],
+		'staffWorkerStats' => [
+			'staffTotal'   => count($staffEmpIds),
+			'staffPresent' => $staffPresent,
+			'staffAbsent'  => $staffAbsent,
+			'workerTotal'   => count($workerEmpIds),
+			'workerPresent' => $workerPresent,
+			'workerAbsent'  => $workerAbsent,
+		],
         'employees' => $employees,
         'attendanceLogs' => $logs,
         'counts' => $counts,

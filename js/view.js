@@ -15,6 +15,8 @@ class AttendanceView {
 			{ id: "dept", label: "Department Stats", icon: "ph-briefcase" },
 			{ id: "gender", label: "Gender Split", icon: "ph-gender-intersex" },
 			{ id: "late", label: "Late/Early", icon: "ph-clock" },
+			{ id: "latein", label: "Late In", icon: "ph-clock-afternoon" },
+			{ id: "earlyout", label: "Early Out", icon: "ph-sign-out" },
 			{ id: "night", label: "Night Shift", icon: "ph-moon" },
 			{ id: "designation", label: "Designation Stats", icon: "ph-identification-badge", },
 			{ id: "shift", label: "Shift Stats", icon: "ph-clock-clockwise" },
@@ -22,9 +24,17 @@ class AttendanceView {
 			{ id: "designation_order", label: "Designations Order", icon: "ph-sliders" },
 		];
 		this._lastData = {};
+		this._renderToken = 0;
 	}
 
 	render(state, model) {
+		this._renderToken++;
+		const myToken = this._renderToken;
+
+		if (window.Charts && typeof Charts.destroyAll === "function") {
+			Charts.destroyAll();
+		}
+
 		let stats = model.getSummaryStats();
 
 		if (state.activeTab === "night") {
@@ -33,6 +43,8 @@ class AttendanceView {
 
 		const { logs, emps, empMap } = model.getFilteredData();
 		const filterOpts = model.getFilterOptions();
+
+		this._staffWorkerStats = state.staffWorkerStats || {};
 
 		this.app.innerHTML = `
 			<div class="dashboard-layout">
@@ -53,7 +65,7 @@ class AttendanceView {
 		`;
 
 		this._restoreFilterValues(state.filters);
-		this._initChartRendering(state.activeTab, logs, emps, empMap, state.filters, state.data.counts, model,);
+		this._initChartRendering(state.activeTab, logs, emps, empMap, state.filters, state.data.counts, model, myToken);
 	}
 
 	_handleDeptAccordionClick(e) {
@@ -296,6 +308,8 @@ class AttendanceView {
 
 
 	_renderSummaryCards(stats) {
+		const staffWorkerStats = this._staffWorkerStats || {};
+
 		const cards = [
 			{ key: "present", label: "Present", val: stats.present, icon: "ph-check-circle", cls: "success" },
 			{ key: "absent", label: "Absent", val: stats.absent, icon: "ph-x-circle", cls: "danger" },
@@ -306,6 +320,8 @@ class AttendanceView {
 			{ key: "earlyOut", label: "Early Out", val: stats.earlyOut, icon: "ph-sign-out", cls: "accent" },
 			{ key: null, label: "Avg Hours", val: stats.avgHours+"h", icon: "ph-timer", cls: "" },
 			{ key: null, label: "Total Staff", val: stats.total, icon: "ph-users", cls: "" },
+			{ key: "staffList", label: "Staff", val: staffWorkerStats.staffTotal || 0, icon: "ph-identification-badge", cls: "info" },
+			{ key: "workerList", label: "Workmen", val: staffWorkerStats.workerTotal || 0, icon: "ph-hard-hat", cls: "warning" },
 		];
 
 		return `
@@ -351,6 +367,12 @@ class AttendanceView {
 			case "late":
 				content = this._renderLateEarly(logs, emps, empMap);
 				break;
+			case "latein":                                            
+				content = this._renderLateIn(logs, emps, empMap, model);
+				break;
+			case "earlyout":                                          
+				content = this._renderEarlyOut(logs, emps, empMap, model);
+				break;
 			case "night":
 				const nightData = model.getNightShiftData();
 				content = this._renderNightShift(nightData.logs, nightData.emps, nightData.empMap,);
@@ -382,63 +404,53 @@ class AttendanceView {
 			default:
 				content = { html: "<p>Tab not found</p>" };
 		}
+
+		this._lastTabContent = content;
 		return typeof content === "object" ? content.html : content;
 	}
 
-	_initChartRendering(tabId, logs, emps, empMap, filters, counts, model) {
-		let content;
-		const stats = model.getSummaryStats();
-		switch (tabId) {
-			case "feature":
-				const featureCounts = { in: stats.filteredIn, out: stats.filteredOut };
-				content = this._renderFeature(featureCounts);
-				break;
-			case "all":
-				content = this._renderAll(logs, emps, empMap, filters);
-				break;
-			case "age":
-				content = this._renderAgeWise(logs, emps, empMap, model);
-				break;
-			case "company":
-				content = this._renderCompanyWise(logs, emps, empMap, model);
-				break;
-			case "dept":
-				content = this._renderDeptWise(logs, emps, empMap, model);
-				break;
-			case "gender":
-				content = this._renderGenderWise(logs, emps, empMap, model);
-				break;
-			case "late":
-				content = this._renderLateEarly(logs, emps, empMap);
-				break;
-			case "night":
-				const nightData = model.getNightShiftData();
-				content = this._renderNightShift(nightData.logs, nightData.emps, nightData.empMap,);
-				break;
-			case "designation":
-				content = this._renderDesignationWise(logs, emps, empMap, model);
-				break;
-			case "shift":
-				content = this._renderShiftWise(logs, emps, empMap, model);
-				break;
-			case "special":
-				content = this._renderSpecial(logs, emps, empMap, filters, model);
-				break;
-			case "designation_order":
-				this._initDesignationOrderTab(model);
-				break;
+	_initChartRendering(tabId, logs, emps, empMap, filters, counts, model, renderToken) {
+		if (tabId === "designation_order") {
+			this._initDesignationOrderTab(model);
+			return;
 		}
 
+		const content = this._lastTabContent;
+
 		if (content && typeof content.renderCharts === "function") {
-			try {
-				setTimeout(() => {
-					console.log("Rendering Tab:", tabId);
+			this._waitForLayout(renderToken, () => {
+				console.log("Rendering Tab:", tabId);
+				try {
 					content.renderCharts();
-				}, 50);
-			} catch (e) {
-				console.error("Chart Error:", e);
-			}
+				} catch (e) {
+					console.error("Chart Error:", e);
+				}
+			});
 		}
+	}
+
+	_waitForLayout(renderToken, callback, attempts = 0) {
+		if (renderToken !== this._renderToken) {
+			return;
+		}
+
+		const card = this.app.querySelector(".tab-pane-container .chart-card");
+
+		if (!card) {
+			requestAnimationFrame(callback);
+			return;
+		}
+
+		const ready = card.offsetWidth > 0 && card.offsetHeight > 0;
+
+		if (ready || attempts > 30) {
+			requestAnimationFrame(() => requestAnimationFrame(callback));
+			return;
+		}
+
+		setTimeout(() => {
+			this._waitForLayout(renderToken, callback, attempts + 1);
+		}, 30);
 	}
 
 	_restoreFilterValues(filters) {
@@ -452,44 +464,58 @@ class AttendanceView {
 	}
 
 	bindSwitchTab(handler) {
-		this.app.addEventListener("click", (event) => {
+		if (this._tabClickHandler) {
+			this.app.removeEventListener("click", this._tabClickHandler);
+		}
+		this._tabClickHandler = (event) => {
 			const navItem = event.target.closest(".nav-item");
-			if (navItem) {
-				const tabId = navItem.dataset.tab;
-				handler(tabId);
+			if (navItem && navItem.dataset.tab) {
+				handler(navItem.dataset.tab);
 			}
-		});
+		};
+		this.app.addEventListener("click", this._tabClickHandler);
 	}
 
 	bindApplyFilters(handler) {
-		this.app.addEventListener("click", (event) => {
+		if (this._applyFilterHandler) {
+			this.app.removeEventListener("click", this._applyFilterHandler);
+		}
+		this._applyFilterHandler = (event) => {
 			if (event.target.closest("#btn-apply-filters")) {
-				const filters = {
+				handler({
 					dateFrom: document.getElementById("f-from").value,
 					dateTo: document.getElementById("f-to").value,
 					company: document.getElementById("f-company").value,
 					dept: document.getElementById("f-dept").value,
 					shift: document.getElementById("f-shift").value,
-				};
-				handler(filters);
+				});
 			}
-		});
+		};
+		this.app.addEventListener("click", this._applyFilterHandler);
 	}
 
 	bindRefreshData(handler) {
-		this.app.addEventListener("click", (event) => {
+		if (this._refreshHandler) {
+			this.app.removeEventListener("click", this._refreshHandler);
+		}
+		this._refreshHandler = (event) => {
 			if (event.target.closest("#btn-refresh-data")) {
 				handler();
 			}
-		});
+		};
+		this.app.addEventListener("click", this._refreshHandler);
 	}
 
 	bindResetFilters(handler) {
-		this.app.addEventListener("click", (event) => {
+		if (this._resetHandler) {
+			this.app.removeEventListener("click", this._resetHandler);
+		}
+		this._resetHandler = (event) => {
 			if (event.target.closest("#btn-reset-filters")) {
 				handler();
 			}
-		});
+		};
+		this.app.addEventListener("click", this._resetHandler);
 	}
 
 	showOverlay(message) {
@@ -903,12 +929,16 @@ class AttendanceView {
 						<td>${e.dept || "–"}</td>
 						<td>${e.company || "–"}</td>
 						<td>${e.shift || "–"}</td>
+						<td>${l.shiftStart || "–"}</td>
+						<td>${l.shiftEnd || "–"}</td>
 						<td>${l.date}</td>
 						<td>${l.inTime || "–"}</td>
 						<td>${l.outTime || "–"}</td>
 						<td><b>${l.hoursWorked || 0}h</b></td>
-						<td>${l.lateIn ? "Yes" : "No"}</td>
-						<td>${l.earlyOut ? "Yes" : "No"}</td>
+						<td>${(l.lateBy || 0) > 0 ? "Yes" : "No"}</td>
+						<td>${(l.lateBy || 0) > 0 ? this._fmtMins(l.lateBy) : '-'}</td>
+						<td>${(l.earlyBy || 0) > 0 ? "Yes" : "No"}</td>
+						<td>${(l.earlyBy || 0) > 0 ? this._fmtMins(l.earlyBy) : '-'}</td>
 						<td>${l.status}</td>
 					</tr>`;
 		}).join("");
@@ -921,12 +951,14 @@ class AttendanceView {
 				Dept: e.dept,
 				Company: e.company,
 				Shift: e.shift,
+				ShiftStart: l.shiftStart || '',
+				ShiftEnd: l.shiftEnd || '',
 				Date: l.date,
 				In: l.inTime,
 				Out: l.outTime,
 				Hours: l.hoursWorked,
-				Late: l.lateIn,
-				Early: l.earlyOut,
+				Late: (l.lateBy || 0) > 0 ? "Yes" : "No",
+				Early: (l.earlyBy || 0) > 0 ? "Yes" : "No",
 				Status: l.status,
 			};
 		});
@@ -971,9 +1003,23 @@ class AttendanceView {
 	                <table class="data-table">
 	                    <thead>
 	                        <tr>
-	                            <th>Sr.No</th><th>Code</th><th>Name</th><th>Dept</th>
-	                            <th>Company</th><th>Shift</th><th>Date</th><th>In</th>
-	                            <th>Out</th><th>Hours</th><th>Late</th><th>Early</th><th>Status</th>
+	                            <th>Sr.No</th>
+								<th>Code</th>
+								<th>Name</th>
+								<th>Dept</th>
+	                            <th>Company</th>
+								<th>Shift</th>
+								<th>Shift Start</th>
+								<th>Shift End</th>
+								<th>Date</th>
+								<th>In</th>
+	                            <th>Out</th>
+								<th>Hours</th>
+								<th>Late</th>
+								<th>Late By</th>
+								<th>Early</th>
+								<th>Early By</th>
+								<th>Status</th>
 	                        </tr>
 	                    </thead>
 	                    <tbody>${rows}</tbody>
@@ -1649,8 +1695,216 @@ class AttendanceView {
 		};
 	}
 
+
+	_fmtMins(mins) {
+		const m = parseInt(mins) || 0;
+		if (m <= 0) {
+			return '-';
+		}
+		if (m < 60) {
+			return `${m}m`;
+		}
+		return `${Math.floor(m/60)}h ${m%60}m`;
+	}
+
+	_renderLateIn(logs, emps, empMap, model, page = 1) {
+		const items = model ? model.getLateInEmployees() : this._currentLateInItems;
+		this._currentLateInItems = items;
+		this._currentLateInEmpMap = empMap || this._currentLateInEmpMap;
+
+		const pageSize = 25;
+		const currentPage = page;
+		const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+		const pageItems = items.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+		const rows = pageItems.map(({ log, emp, date }) => [
+			emp.code || "-",
+			emp.name || "-",
+			emp.dept || "-",
+			emp.company || "-",
+			emp.shift || "-",
+			log?.shiftStart || "-",
+			log?.shiftEnd || "-",
+			date,
+			log?.inTime || "-",
+			log?.outTime || "-",
+			log?.hoursWorked || 0,
+			this._fmtMins(log?.lateBy),
+		]);
+
+		this._lastData["late-in"] = items.map(({ log, emp, date }) => ({
+			Code: emp.code, 
+			Name: emp.name, 
+			Dept: emp.dept, 
+			Company: emp.company,
+			Shift: emp.shift, 
+			Date: date, 
+			In: log?.inTime, 
+			Out: log?.outTime,
+			Hours: log?.hoursWorked, 
+			LateByMins: log?.lateBy,
+		}));
+
+		const byShift = this._countBy(items, (it) => it.emp.shift || "No Shift");
+		const shifts = Object.keys(byShift);
+
+		let pageButtons = "";
+		const startPage = Math.max(1, currentPage - 2);
+		const endPage = Math.min(totalPages, currentPage + 2);
+		for (let i = startPage; i <= endPage; i++) {
+			pageButtons += `
+				<button class="btn-page ${i === currentPage ? "btn-page-active" : ""}"
+					onclick="AppController.view._reRenderLateInPage(${i})">
+					${i}
+				</button>
+			`;
+		}
+
+		return {
+			html: `
+				<h2 class="section-title"><i class="ph-fill ph-clock-afternoon"></i> Late In Records</h2>
+				<div class="charts-grid">
+					${this._chartCard("ch-latein-shift", '<i class="ph ph-clock-clockwise"></i>', "amber", "Late-In Count by Shift", "Click for detail")}
+				</div>
+				${this._tableHTML("tbl-latein", ["Code", "Name", "Dept", "Company", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Late By"], rows, "late-in")}
+				<div class="pagination-bar">
+					<div class="pagination-text">
+						Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, items.length)} of ${items.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
+					</div>
+					<div class="pagination-buttons">
+						<button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderLateInPage(1)">«</button>
+						<button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderLateInPage(${currentPage - 1})">‹</button>
+						${pageButtons}
+						<button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderLateInPage(${currentPage + 1})">›</button>
+						<button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderLateInPage(${totalPages})">»</button>
+					</div>
+				</div>
+				<div id="drilldown-table" style="margin-top:16px"></div>
+			`,
+			renderCharts: () => {
+				Charts.stacked(
+					"ch-latein-shift",
+					shifts,
+					[{ name: "Late In Count", data: shifts.map((s) => byShift[s]) }],
+					"Late-In by Shift",
+					(shiftName) => {
+						const shiftLogs = items
+							.filter((it) => (it.emp.shift || "No Shift") === shiftName)
+							.map((it) => it.log);
+						this._renderDrillDown(shiftLogs, `Late In - Shift: ${shiftName}`, empMap || this._currentLateInEmpMap);
+					},
+				);
+			},
+		};
+	}
+
+	_reRenderLateInPage(page) {
+		const content = this._renderLateIn(null, null, this._currentLateInEmpMap, null, page);
+		document.querySelector(".tab-pane-container").innerHTML = content.html;
+		content.renderCharts();
+	}
+
+	_renderEarlyOut(logs, emps, empMap, model, page = 1) {
+		const items = model ? model.getEarlyOutEmployees() : this._currentEarlyOutItems;
+		this._currentEarlyOutItems = items;
+		this._currentEarlyOutEmpMap = empMap || this._currentEarlyOutEmpMap;
+
+		const pageSize = 25;
+		const currentPage = page;
+		const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+		const pageItems = items.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+		const rows = pageItems.map(({ log, emp, date }) => [
+			emp.code || "-",
+			emp.name || "-",
+			emp.dept || "-",
+			emp.company || "-",
+			emp.shift || "-",
+			log?.shiftStart || "-",
+			log?.shiftEnd || "-",
+			date,
+			log?.inTime || "-",
+			log?.outTime || "-",
+			log?.hoursWorked || 0,
+			this._fmtMins(log?.earlyBy),
+		]);
+
+		this._lastData["early-out"] = items.map(({ log, emp, date }) => ({
+			Code: emp.code, 
+			Name: emp.name, 
+			Dept: emp.dept, 
+			Company: emp.company,
+			Shift: emp.shift, 
+			ShiftStart: log?.shiftStart, 
+			ShiftEnd: log?.shiftEnd,
+			Date: date, 
+			In: log?.inTime, 
+			Out: log?.outTime,
+			Hours: log?.hoursWorked, 
+			EarlyByMins: log?.earlyBy,
+		}));
+
+		const byShift = this._countBy(items, (it) => it.emp.shift || "No Shift");
+		const shifts = Object.keys(byShift);
+
+		let pageButtons = "";
+		const startPage = Math.max(1, currentPage - 2);
+		const endPage = Math.min(totalPages, currentPage + 2);
+		for (let i = startPage; i <= endPage; i++) {
+			pageButtons += `
+				<button class="btn-page ${i === currentPage ? "btn-page-active" : ""}"
+					onclick="AppController.view._reRenderEarlyOutPage(${i})">
+					${i}
+				</button>
+			`;
+		}
+
+		return {
+			html: `
+				<h2 class="section-title"><i class="ph-fill ph-sign-out"></i> Early Out Records</h2>
+				<div class="charts-grid">
+					${this._chartCard("ch-earlyout-shift", '<i class="ph ph-clock-clockwise"></i>', "sky", "Early-Out Count by Shift", "Click for detail")}
+				</div>
+				${this._tableHTML("tbl-earlyout", ["Code", "Name", "Dept", "Company", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Early By"], rows, "early-out")}
+				<div class="pagination-bar">
+					<div class="pagination-text">
+						Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, items.length)} of ${items.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
+					</div>
+					<div class="pagination-buttons">
+						<button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderEarlyOutPage(1)">«</button>
+						<button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderEarlyOutPage(${currentPage - 1})">‹</button>
+						${pageButtons}
+						<button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderEarlyOutPage(${currentPage + 1})">›</button>
+						<button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderEarlyOutPage(${totalPages})">»</button>
+					</div>
+				</div>
+				<div id="drilldown-table" style="margin-top:16px"></div>
+			`,
+			renderCharts: () => {
+				Charts.stacked(
+					"ch-earlyout-shift",
+					shifts,
+					[{ name: "Early Out Count", data: shifts.map((s) => byShift[s]) }],
+					"Early-Out by Shift",
+					(shiftName) => {
+						const shiftLogs = items
+							.filter((it) => (it.emp.shift || "No Shift") === shiftName)
+							.map((it) => it.log);
+						this._renderDrillDown(shiftLogs, `Early Out - Shift: ${shiftName}`, empMap || this._currentEarlyOutEmpMap);
+					},
+				);
+			},
+		};
+	}
+
+	_reRenderEarlyOutPage(page) {
+		const content = this._renderEarlyOut(null, null, this._currentEarlyOutEmpMap, null, page);
+		document.querySelector(".tab-pane-container").innerHTML = content.html;
+		content.renderCharts();
+	}
+
+
 	_renderNightShift(logs, emps, empMap) {
-		// const filtered = logs.filter(l => (empMap[l.empId] || {}).shift === 'Night');
 		const filtered = logs;
 		const rows = filtered.slice(0, 100).map((l) => {
 			const e = empMap[l.empId] || {};
@@ -1894,10 +2148,14 @@ class AttendanceView {
 			singlePunch: '⚡ Single Punch Employees',
 			lateIn: '🕐 Late In Employees',
 			earlyOut: '🚪 Early Out Employees',
+			staffList: '👔 Staff Employees',      
+			workerList: '🔧 Workmen Employees',   
 		};
 
 		const isResignedOnly = (key === 'resigned');
 		const isNewJoinedOnly = (key === 'newJoined');
+		const isStaffList     = (key === 'staffList');   
+		const isWorkerList    = (key === 'workerList');  
 		const pageSize = 10;
 		const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
 		const currentPage = Math.min(page, totalPages);
@@ -1908,10 +2166,12 @@ class AttendanceView {
 			headers = ['Sr.No', 'Code', 'Name', 'Dept', 'Company', 'DOJ', 'DOR', 'Status'];
 		} else if (isNewJoinedOnly) {
 			headers = ['Sr.No', 'Code', 'Name', 'Dept', 'Company', 'DOJ', 'Status'];
+		} else if (isStaffList || isWorkerList) {
+			headers = ['Sr.No', 'Code', 'Name', 'Dept', 'Company', 'Designation', 'Shift', 'Location'];
 		} else if (key === 'lateIn') {
-			headers = ['Sr.No', 'Code', 'Name', 'Dept', 'Company', 'Shift', 'Date', 'In', 'Out', 'Hours', 'Late By'];
+			headers = ['Sr.No', 'Code', 'Name', 'Dept', 'Company', 'Shift', 'Shift Start', 'Shift End', 'Date', 'In', 'Out', 'Hours', 'Late By'];
 		} else if (key === 'earlyOut') {
-			headers = ['Sr.No', 'Code', 'Name', 'Dept', 'Company', 'Shift', 'Date', 'In', 'Out', 'Hours', 'Early By'];
+			headers = ['Sr.No', 'Code', 'Name', 'Dept', 'Company', 'Shift', 'Shift Start', 'Shift End', 'Date', 'In', 'Out', 'Hours', 'Early By'];
 		} else {
 			headers = ['Sr.No', 'Code', 'Name', 'Dept', 'Company', 'Shift', 'Date', 'In', 'Out', 'Hours', 'Status'];
 		}
@@ -1922,6 +2182,20 @@ class AttendanceView {
 				return '';
 			}
 			const sr = (currentPage - 1) * pageSize + i + 1;
+
+			if (isStaffList || isWorkerList) {
+				return `
+				<tr>
+					<td>${sr}</td>
+					<td><b>${emp.code || '–'}</b></td>
+					<td>${emp.name || '–'}</td>
+					<td>${emp.dept || '–'}</td>
+					<td>${emp.company || '–'}</td>
+					<td>${emp.designation || '–'}</td>
+					<td>${emp.shift || '–'}</td>
+					<td>${emp.location || '–'}</td>
+				</tr>`;
+			}
 
 			if (isResignedOnly) {
 				return `
@@ -1950,12 +2224,10 @@ class AttendanceView {
 				</tr>`;
 			}
 
-			// Generic template — used by Present, Absent, Late In, Early Out
-			// Show raw data only. No fallback text like "Absent" or "0h" — blank if missing.
 			const lastCol = key === 'lateIn'
-				? `<td>${log?.lateBy ?? ''}</td>`
+				? `<td>${this._fmtMins(log?.lateBy)}</td>`
 				: key === 'earlyOut'
-					? `<td>${log?.earlyBy ?? ''}</td>`
+					? `<td>${this._fmtMins(log?.earlyBy)}</td>`
 					: `<td>${log?.status ?? ''}</td>`;
 
 			return `
@@ -1966,12 +2238,15 @@ class AttendanceView {
 					<td>${emp.dept || '–'}</td>
 					<td>${emp.company || '–'}</td>
 					<td>${emp.shift || '–'}</td>
+					<td>${log?.shiftStart || '–'}</td>
+					<td>${log?.shiftEnd || '–'}</td>
 					<td>${date || log?.date || ''}</td>
 					<td>${log?.inTime ?? ''}</td>
 					<td>${log?.outTime ?? ''}</td>
 					<td>${log?.hoursWorked ?? ''}</td>
 					${lastCol}
-				</tr>`;
+				</tr>
+			`;
 		}).join('');
 
 		let pageButtons = '';
@@ -2007,6 +2282,19 @@ class AttendanceView {
 					Status: emp?.status,
 				};
 			}
+
+			if (key === 'staffList' || key === 'workerList') {
+				return {
+					Code: emp?.code,
+					Name: emp?.name,
+					Dept: emp?.dept,
+					Company: emp?.company,
+					Designation: emp?.designation,
+					Shift: emp?.shift,
+					Location: emp?.location,
+				};
+			}
+
 			return {
 				Code: emp?.code,
 				Name: emp?.name,

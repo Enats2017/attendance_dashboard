@@ -36,8 +36,11 @@ class AttendanceController {
             this.view.hideOverlay();
         });
 
-        this.view.bindResetFilters(() => {
+        this.view.bindResetFilters(async () => {
             this.model.resetFilters();
+            this.view.showOverlay('Resetting dashboard...');
+            await this.model.fetchData(); // ← fetch after reset
+            this.view.hideOverlay();
         });
 
         this.view.bindStatCardClick((key) => {
@@ -63,6 +66,12 @@ class AttendanceController {
                     break;
                 case 'earlyOut':    
                     items = this.model.getEarlyOutEmployees();    
+                    break;
+                case 'staffList':
+                    items = this.model.getStaffEmployees();
+                    break;
+                case 'workerList':
+                    items = this.model.getWorkerEmployees();
                     break;
             }
             this.view._renderStatCardDrilldown(key, items);

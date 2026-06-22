@@ -87,11 +87,22 @@ var Charts = (function () {
 		}
 	}
 
+	function destroyAll() {
+		Object.keys(instances).forEach(function (id) {
+			destroy(id);
+		});
+	}
+
 	// ── BAR CHART ────────────────────────────────────────────────────────
 	function bar(id, categories, series, title, horizontal, onDataClick, tooltipData,) {
 		destroy(id);
 		var el = document.getElementById(id);
 		if (!el) {
+			return;
+		}	
+
+		if (!categories || categories.length === 0) {
+			el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:300px;color:#94a3b8;font-size:13px;">No data available for this period</div>';
 			return;
 		}
 	
@@ -363,12 +374,15 @@ var Charts = (function () {
 		instances[id].render();
 	}
 
-	// ── LINE / AREA CHART ─────────────────────────────────────────────────
-	// Auto-switches to a richer bar/column when only 1 data point exists
 	function line(id, categories, seriesArr, title, onDataClick) {
 		destroy(id);
 		var el = document.getElementById(id);
 		if (!el) {
+			return;
+		}
+
+		if (!categories || categories.length === 0) {
+			el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:300px;color:#94a3b8;font-size:13px;">No data available for this period</div>';
 			return;
 		}
 
@@ -514,6 +528,11 @@ var Charts = (function () {
 		destroy(id);
 		var el = document.getElementById(id);
 		if (!el) {
+			return;
+		}
+
+		if (!categories || categories.length === 0) {
+			el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:300px;color:#94a3b8;font-size:13px;">No data available for this period</div>';
 			return;
 		}
 
@@ -747,5 +766,5 @@ var Charts = (function () {
 		instances[id].render();
 	}
 
-	return { bar, donut, line, stacked, heatmap, radialBar, destroy };
+	return { bar, donut, line, stacked, heatmap, radialBar, destroy, destroyAll };
 })();
