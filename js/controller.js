@@ -49,6 +49,12 @@ class AttendanceController {
                 case 'present': 
                     items = this.model.getPresentEmployees(); 
                     break;
+                case 'halfPresent':
+                    items = this.model.getHalfPresentEmployees();
+                    break;
+                case 'weeklyOff':
+                    items = this.model.getWeeklyOffEmployees();
+                    break;
                 case 'absent':      
                     items = this.model.getAbsentEmployees(); 
                     break;

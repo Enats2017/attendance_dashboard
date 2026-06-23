@@ -283,6 +283,7 @@ body {
     align-items: flex-end;
     gap: 20px;
     box-shadow: var(--shadow-sm);
+    flex-wrap: wrap;
 }
 
 .filter-grid {
@@ -290,6 +291,7 @@ body {
     grid-template-columns: repeat(5, 1fr);
     gap: 16px;
     flex: 1;
+    min-width: 0;
 }
 
 .filter-field {
@@ -316,6 +318,7 @@ body {
 .filter-actions {
     display: flex;
     gap: 8px;
+    flex-shrink: 0;
 }
 
 /* ── Summary Cards ───────────────────────────────────────────────────── */

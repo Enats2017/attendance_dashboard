@@ -1,6 +1,3 @@
-/**
- * AttendanceModel - Handles data state and API interactions
- */
 class AttendanceModel {
     constructor() {
         this.state = {
@@ -102,19 +99,29 @@ class AttendanceModel {
                     counts: data.counts
                 };
                 this.state.todayStats = data.todayStats || {
-                    present: 0,
-                    absent: 0,
+                    present: 0, 
+                    halfPresent: 0, 
+                    weeklyOff: 0, 
+                    absent: 0, 
                     total: 0,
-                    singlePunch: 0,
-                    lateIn: 0,
-                    earlyOut: 0,
+                    singlePunch: 0, 
+                    lateIn: 0, 
+                    earlyOut: 0, 
                     avgHours: 0,
-                    resigned: 0,
+                    resigned: 0, 
                     newJoined: 0
                 };
                 this.state.staffWorkerStats = data.staffWorkerStats || {
-                    staffTotal: 0, staffPresent: 0, staffAbsent: 0,
-                    workerTotal: 0, workerPresent: 0, workerAbsent: 0
+                    staffTotal: 0, 
+                    staffPresent: 0, 
+                    staffHalfPresent: 0, 
+                    staffWeeklyOff: 0, 
+                    staffAbsent: 0,
+                    workerTotal: 0, 
+                    workerPresent: 0, 
+                    workerHalfPresent: 0, 
+                    workerWeeklyOff: 0, 
+                    workerAbsent: 0
                 };
                 this.state.nightShiftStats = data.nightShiftStats || {
                     present: 0,
@@ -127,7 +134,6 @@ class AttendanceModel {
                 };
                 this.state.lastUpdated = new Date().toLocaleTimeString();
                 
-                // Keep compatibility with legacy Utils if needed, but we'll migrate them
                 window.EMPLOYEES = data.employees;
                 window.ATTENDANCE_LOGS = data.attendanceLogs;
 
@@ -229,10 +235,15 @@ class AttendanceModel {
 
     getAgeGroup(dob) {
         const age = this.getAge(dob);
-        if (age < 25) return 'Under 25';
-        if (age < 35) return '25–34';
-        if (age < 45) return '35–44';
-        if (age < 55) return '45–54';
+        if (age < 25) {
+            return 'Under 25';
+        } if (age < 35) {
+            return '25–34';
+        } if (age < 45) {
+            return '35–44';
+        } if (age < 55) {
+            return '45–54';
+        }
         return '55+';
     }
 
@@ -280,39 +291,26 @@ class AttendanceModel {
     getSummaryStats() {
         const { logs, emps } = this.getFilteredData();
         const empIds = emps.map(e => e.id);
-        
-        // Only count as present if the record explicitly indicates presence
         const presentIds = new Set(logs.filter(l => l.present === 1).map(l => l.empId));
-        
-        // Helper to check if a log record represents a valid presence
         const isPresent = (l) => l.present === 1 || l.status === 'Present';
-
-        // Calculate total presence records for the entire range
-        // const totalPresentRecords = logs.filter(isPresent).length;
-        
-        // Calculate total possible records in this range (Staff * Days)
         const todayStats = this.state.todayStats;
         const totalPresentRecords = todayStats ? todayStats.present : logs.filter(isPresent).length;
         const totalAbsentRecords = todayStats ? todayStats.absent : Math.max(0, emps.length - totalPresentRecords);
-
-        // Calculate total punches for the entire range (ignoring '00:00')
-        const totalIn = logs.filter(l => l.inTime && l.inTime !== '00:00' && l.inTime !== '00:00:00').length;
-        const totalOut = logs.filter(l => l.outTime && l.outTime !== '00:00' && l.outTime !== '00:00:00').length;
-
-        // const lateIn = logs.filter(l => l.lateIn).length;
-        // const earlyOut = logs.filter(l => l.earlyOut).length;
-        // const avgHours = logs.length ? (logs.reduce((s, l) => s + (l.hoursWorked || 0), 0) / logs.length).toFixed(1) : 0;
+        const totalIn = logs.filter(l => parseFloat(l.present) > 0 || l.missedOutPunch == 1  ).length;
+        const totalOut = logs.filter(l => parseFloat(l.present) > 0 && l.missedInPunch != 1   ).length;
 
         return {
-            present: totalPresentRecords,
-            absent: totalAbsentRecords,
-            singlePunch: todayStats ? todayStats.singlePunch : 0,
-            lateIn: todayStats ? todayStats.lateIn : 0,
-            earlyOut: todayStats ? todayStats.earlyOut : 0,
-            avgHours: todayStats ? todayStats.avgHours : 0,
-            total: todayStats ? todayStats.total : emps.length,
-            resigned: todayStats ? todayStats.resigned : (this.state.data.resignedEmployees || []).length,
-            newJoined: todayStats ? todayStats.newJoined : (this.state.data.newJoinedEmployees || []).length,
+            present: todayStats?.present ?? 0,
+            halfPresent: todayStats?.halfPresent ?? 0,
+            weeklyOff: todayStats?.weeklyOff ?? 0,
+            absent: todayStats?.absent ?? 0,
+            singlePunch: todayStats?.singlePunch ?? 0,
+            lateIn: todayStats?.lateIn ?? 0,
+            earlyOut: todayStats?.earlyOut ?? 0,
+            avgHours: todayStats?.avgHours ?? 0,
+            total: todayStats?.total ?? 0,
+            resigned: todayStats?.resigned ?? (this.state.data.resignedEmployees || []).length,
+            newJoined: todayStats?.newJoined ?? (this.state.data.newJoinedEmployees || []).length,
             filteredIn: totalIn,
             filteredOut: totalOut
         };
@@ -338,10 +336,7 @@ class AttendanceModel {
         const presentKeySet = {};
 
         logs.forEach(l => {
-            const hasInPunch = l.inTime && l.inTime !== '00:00' && l.inTime !== '00:00:00';
-            const hasOutPunch = l.outTime && l.outTime !== '00:00' && l.outTime !== '00:00:00';
-
-            if (parseFloat(l.present) > 0 || hasInPunch || hasOutPunch) {
+            if (parseFloat(l.present) == 1 && l.absent == 0) {
                 presentKeySet[l.empId + '_' + l.date] = true;
             }
         });
@@ -385,44 +380,19 @@ class AttendanceModel {
         const { filters } = this.state;
         const { logs, emps } = this.getFilteredData();
 
-        const presentKeySet = {};
-
-        logs.forEach(l => {
-            const hasInPunch = l.inTime && l.inTime !== '00:00' && l.inTime !== '00:00:00';
-            const hasOutPunch = l.outTime && l.outTime !== '00:00' && l.outTime !== '00:00:00';
-
-            if (parseFloat(l.present) > 0 || hasInPunch || hasOutPunch) {
-                presentKeySet[l.empId + '_' + l.date] = true;
-            }
-        });
-
-        const logMap = {};
-
-        logs.forEach(l => {
-            const key = l.empId + '_' + l.date;
-            const existing = logMap[key];
-
-            if (!existing || parseFloat(l.present) > parseFloat(existing.present)) {
-                logMap[key] = l;
-            }
-        });
+        const statusKeyMap = this._buildStatusKeyMap(logs);
+        const logMap = this._buildLogMap(logs);
 
         const from = new Date(filters.dateFrom);
-        const to = new Date(filters.dateTo);
+        const to   = new Date(filters.dateTo);
         const result = [];
 
         emps.forEach(emp => {
             for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
-
                 const dateStr = d.toISOString().slice(0, 10);
                 const key = emp.id + '_' + dateStr;
-
-                if (!presentKeySet[key]) {
-                    result.push({
-                        log: logMap[key] || null,
-                        emp,
-                        date: dateStr
-                    });
+                if ((statusKeyMap[key] ?? 'absent') === 'absent') {
+                    result.push({ log: logMap[key] || null, emp, date: dateStr });
                 }
             }
         });
@@ -430,6 +400,57 @@ class AttendanceModel {
         result.sort((a, b) => b.date.localeCompare(a.date));
         return result;
     }
+
+    getHalfPresentEmployees() {
+        const { filters } = this.state;
+        const { logs, emps } = this.getFilteredData();
+
+        const statusKeyMap = this._buildStatusKeyMap(logs);
+        const logMap = this._buildLogMap(logs);
+
+        const from = new Date(filters.dateFrom);
+        const to   = new Date(filters.dateTo);
+        const result = [];
+
+        emps.forEach(emp => {
+            for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+                const dateStr = d.toISOString().slice(0, 10);
+                const key = emp.id + '_' + dateStr;
+                if (statusKeyMap[key] === 'halfPresent') {
+                    result.push({ log: logMap[key] || null, emp, date: dateStr });
+                }
+            }
+        });
+
+        result.sort((a, b) => b.date.localeCompare(a.date));
+        return result;
+    }
+
+    getWeeklyOffEmployees() {
+        const { filters } = this.state;
+        const { logs, emps } = this.getFilteredData();
+
+        const statusKeyMap = this._buildStatusKeyMap(logs);
+        const logMap = this._buildLogMap(logs);
+
+        const from = new Date(filters.dateFrom);
+        const to   = new Date(filters.dateTo);
+        const result = [];
+
+        emps.forEach(emp => {
+            for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+                const dateStr = d.toISOString().slice(0, 10);
+                const key = emp.id + '_' + dateStr;
+                if (statusKeyMap[key] === 'weeklyOff') {
+                    result.push({ log: logMap[key] || null, emp, date: dateStr });
+                }
+            }
+        });
+
+        result.sort((a, b) => b.date.localeCompare(a.date));
+        return result;
+    }
+
 
     getSinglePunchEmployees() {
         const { filters } = this.state;
@@ -454,10 +475,8 @@ class AttendanceModel {
                 const log = logMap[emp.id + '_' + dateStr];
 
                 if (log) {
-                    const hasInPunch = log.inTime && log.inTime !== '00:00' && log.inTime !== '00:00:00';
-                    const hasOutPunch = log.outTime && log.outTime !== '00:00' && log.outTime !== '00:00:00';
-
-                    if ((hasInPunch && !hasOutPunch) || (!hasInPunch && hasOutPunch)) {
+                    if ((log.missedInPunch == 1 && log.missedOutPunch == 0) ||
+                        (log.missedInPunch == 0 && log.missedOutPunch == 1)) {
                         result.push({ log, emp, date: dateStr });
                     }
                 }
@@ -600,6 +619,38 @@ class AttendanceModel {
         const workerCategoryIds = [51, 59, 60];
         const { emps } = this.getFilteredData();
         return emps.filter(emp => workerCategoryIds.includes(emp.categoryId)).map(emp => ({ log: null, emp }));
+    }
+
+    _buildStatusKeyMap(logs) {
+        const map = {};
+        logs.forEach(l => {
+            const key = l.empId + '_' + l.date;
+            const present = parseFloat(l.present);
+            const absent  = parseFloat(l.absent);   
+
+            if (present == 1 && absent == 0) {
+                map[key] = 'present';
+            } else if (present == 0.5 && absent == 0.5) {
+                map[key] = 'halfPresent';
+            } else if (present == 0 && absent == 0) {
+                      map[key] = 'weeklyOff';
+            } else {
+                map[key] = 'absent';
+            }
+        });
+        return map;
+    }
+
+    _buildLogMap(logs) {
+        const map = {};
+        logs.forEach(l => {
+            const key = l.empId + '_' + l.date;
+            const existing = map[key];
+            if (!existing || parseFloat(l.present) > parseFloat(existing.present)) {
+                map[key] = l;
+            }
+        });
+        return map;
     }
 }
 
