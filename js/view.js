@@ -313,17 +313,19 @@ class AttendanceView {
 		const staffWorkerStats = this._staffWorkerStats || {};
 
 		const cards = [
+			{ key: null, label: "Total Headcount", val: stats.total, icon: "ph-users", cls: "" },
 			{ key: "present", label: "Present", val: stats.present, icon: "ph-check-circle", cls: "success" },
+			{ key: "halfPresent", label: "Half Day", val: stats.halfPresent ?? 0, icon: "ph-circle-half", cls: "warning" },
 			{ key: "absent", label: "Absent", val: stats.absent, icon: "ph-x-circle", cls: "danger" },
-			{ key: "resigned", label: "Resigned", val: stats.resigned || 0, icon: "ph-user-minus", cls: "danger" },
-			{ key: "newJoined", label: "New Join", val: stats.newJoined || 0, icon: "ph-user-plus", cls: "success" },
+			{ key: "weeklyOff", label: "Weekly Off", val: stats.weeklyOff ?? 0, icon: "ph-calendar-x", cls: "info" },
 			{ key: "singlePunch", label: "Single Punch", val: stats.singlePunch, icon: "ph-lightning", cls: "warning" },
 			{ key: "lateIn", label: "Late In", val: stats.lateIn, icon: "ph-clock-afternoon", cls: "info" },
 			{ key: "earlyOut", label: "Early Out", val: stats.earlyOut, icon: "ph-sign-out", cls: "accent" },
-			{ key: null, label: "Avg Hours", val: stats.avgHours+"h", icon: "ph-timer", cls: "" },
-			{ key: null, label: "Total Staff", val: stats.total, icon: "ph-users", cls: "" },
+			{ key: null, label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "" },
 			{ key: "staffList", label: "Staff", val: staffWorkerStats.staffTotal || 0, icon: "ph-identification-badge", cls: "info" },
 			{ key: "workerList", label: "Workmen", val: staffWorkerStats.workerTotal || 0, icon: "ph-hard-hat", cls: "warning" },
+			{ key: "newJoined", label: "New Join", val: stats.newJoined || 0, icon: "ph-user-plus", cls: "success" },
+			{ key: "resigned", label: "Resigned", val: stats.resigned || 0, icon: "ph-user-minus", cls: "danger" },
 		];
 
 		return `
@@ -616,14 +618,17 @@ class AttendanceView {
 						date: date,
 						inTime: null,
 						outTime: null,
-						status: "Absent",
+						status: 'Absent',
 						present: 0,
+						absent: 1,      // ← add this
 						weeklyOff: 0,
 						holiday: 0,
 						isOnLeave: 0,
 						hoursWorked: 0,
-						lateIn: false,
-						earlyOut: false,
+						lateBy: 0,
+						earlyBy: 0,
+						missedInPunch: 0,
+						missedOutPunch: 0,
 					});
 				}
 			});
@@ -663,15 +668,14 @@ class AttendanceView {
 			groups[g].total++;
 
 			const present = parseFloat(log.present);
-			const hasIn  = log.inTime  && log.inTime  !== '00:00' && log.inTime  !== '00:00:00';
-			const hasOut = log.outTime && log.outTime !== '00:00' && log.outTime !== '00:00:00';
+			const absent  = parseFloat(log.absent ?? 0);
 
-			if (log.weeklyOff == 1 && present === 0 && !hasIn && !hasOut) {
-				groups[g].weeklyOff++;
-			} else if (present === 0.5) {
-				groups[g].halfPresent++;
-			} else if (present >= 1 || hasIn || hasOut) {
+			if (present == 1 && absent == 0) {
 				groups[g].present++;
+			} else if (present == 0.5 && absent == 0.5) {
+				groups[g].halfPresent++;
+			} else if (present == 0 && absent == 0) {
+				groups[g].weeklyOff++;
 			} else {
 				groups[g].absent++;
 			}
@@ -1286,16 +1290,16 @@ class AttendanceView {
 			if (!e) return;
 			const g = model.getAgeGroup(e.dob);
 
+			// REPLACE WITH:
 			const lPresent = parseFloat(l.present);
-			const lHasIn  = l.inTime  && l.inTime  !== '00:00' && l.inTime  !== '00:00:00';
-			const lHasOut = l.outTime && l.outTime !== '00:00' && l.outTime !== '00:00:00';
+			const lAbsent  = parseFloat(l.absent ?? 0);
 
-			if (l.weeklyOff == 1 && lPresent === 0 && !lHasIn && !lHasOut) {
-				gWeeklyOff[g]++;
-			} else if (lPresent === 0.5) {
-				gHalfPresent[g]++;
-			} else if (lPresent >= 1 || lHasIn || lHasOut) {
+			if (lPresent == 1 && lAbsent == 0) {
 				gPresent[g]++;
+			} else if (lPresent == 0.5 && lAbsent == 0.5) {
+				gHalfPresent[g]++;
+			} else if (lPresent == 0 && lAbsent == 0) {
+				gWeeklyOff[g]++;
 			} else {
 				gAbsent[g]++;
 			}
@@ -1389,19 +1393,19 @@ class AttendanceView {
 	}
 
 
+	// REPLACE WITH:
 	_matchesStatus(log, seriesName) {
 		const present = parseFloat(log.present);
-		const hasIn  = log.inTime  && log.inTime  !== '00:00' && log.inTime  !== '00:00:00';
-		const hasOut = log.outTime && log.outTime !== '00:00' && log.outTime !== '00:00:00';
+		const absent  = parseFloat(log.absent ?? 0);
 
-		if (present === 0.5) {
-			return seriesName === "Half Present";
-		} else if (present >= 1 || hasIn || hasOut) {
-			return seriesName === "Present";
-		} else if (log.weeklyOff == 1 && present === 0 && !hasIn && !hasOut) {
-			return seriesName === "Weekly Off";
+		if (present == 1 && absent == 0) {
+			return seriesName === 'Present';
+		} else if (present == 0.5 && absent == 0.5) {
+			return seriesName === 'Half Present';
+		} else if (present == 0 && absent == 0) {
+			return seriesName === 'Weekly Off';
 		} else {
-			return seriesName === "Absent";
+			return seriesName === 'Absent';
 		}
 	}
 
@@ -2245,6 +2249,8 @@ class AttendanceView {
 
 		const titleMap = {
 			present: '✅ Present Employees',
+			halfPresent: '½ Half Day Employees',  
+			weeklyOff: '📅 Weekly Off Employees',   
 			absent: '❌ Absent Employees',
 			resigned: '👤 Resigned Employees',
 			newJoined: '🆕 New Joined Employees',
@@ -2258,7 +2264,9 @@ class AttendanceView {
 		const isResignedOnly = (key === 'resigned');
 		const isNewJoinedOnly = (key === 'newJoined');
 		const isStaffList = (key === 'staffList');   
-		const isWorkerList = (key === 'workerList');  
+		const isWorkerList = (key === 'workerList'); 
+		const isHalfPresent = (key === 'halfPresent');
+		const isWeeklyOff = (key === 'weeklyOff');   
 		const pageSize = 10;
 		const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
 		const currentPage = Math.min(page, totalPages);
