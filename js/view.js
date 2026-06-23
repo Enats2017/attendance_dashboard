@@ -1946,12 +1946,12 @@ class AttendanceView {
 				desigMap[name] = { name, order };
 			}
 		});
-		const desigs = Object.values(desigMap)
-			.sort((a, b) => {
-				if (a.order !== b.order) return a.order - b.order;
-				return a.name.localeCompare(b.name);
-			})
-			.map(d => d.name);
+		const desigs = Object.values(desigMap).sort((a, b) => {
+			if (a.order !== b.order) {
+				return a.order - b.order;
+			}
+			return a.name.localeCompare(b.name);
+		}).map(d => d.name);
 		const eBD = model.groupBy(emps, (e) => e.designation || "Staff");
 		const lBD = model.groupBy(logs, (l) => (empMap[l.empId] || {}).designation || "Staff",);
 		const rows = desigs.map((d) => {
@@ -2000,7 +2000,7 @@ class AttendanceView {
 
 	_renderShiftWise(logs, emps, empMap, model) {
 		const shiftStats = model.state.data.shiftStats || [];
-		const { dateFrom, dateTo } = model.state.filters;  // ← ADD THIS LINE
+		const { dateFrom, dateTo } = model.state.filters;  
 
 		const rows = shiftStats.map((s) => [
 			s.shiftName,
@@ -2083,27 +2083,120 @@ class AttendanceView {
 		};
 	}
 
-	_renderSpecial(logs, emps, empMap, filters, model) {
+
+	_buildPaginatedTable(rows, headers, page, pageSize, tableId, reRenderFnName) {
+		const currentPage = page;
+		const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+		const pageRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+		const colCount = headers.length;
+
+		const trs = pageRows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("") || `<tr><td colspan="${colCount}">None</td></tr>`;
+
+		let pageButtons = "";
+		const startPage = Math.max(1, currentPage - 2);
+		const endPage = Math.min(totalPages, currentPage + 2);
+		for (let i = startPage; i <= endPage; i++) {
+			pageButtons += `
+				<button class="btn-page ${i === currentPage ? "btn-page-active" : ""}"
+					onclick="AppController.view.${reRenderFnName}(${i})">
+					${i}
+				</button>
+			`;
+		}
+
+		return `
+			<table class="data-table" id="${tableId}">
+				<thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
+				<tbody>${trs}</tbody>
+			</table>
+			<div class="pagination-bar">
+				<div class="pagination-text">
+					Showing ${rows.length ? (currentPage - 1) * pageSize + 1 : 0}–${Math.min(currentPage * pageSize, rows.length)} of ${rows.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
+				</div>
+				<div class="pagination-buttons">
+					<button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view.${reRenderFnName}(1)">«</button>
+					<button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view.${reRenderFnName}(${currentPage - 1})">‹</button>
+					${pageButtons}
+					<button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view.${reRenderFnName}(${currentPage + 1})">›</button>
+					<button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view.${reRenderFnName}(${totalPages})">»</button>
+				</div>
+			</div>
+		`;
+	}
+
+
+	_renderSpecial(logs, emps, empMap, filters, model, npPage = 1, spPage = 1) {
 		const noPunch = model.findNoPunchEmployees();
-		const singlePunch = logs.filter((l) => l.status === "Single Punch");
+		const singlePunchItems = model.getSinglePunchEmployees(); 
+
 		const npRows = noPunch.map((x) => [
-			x.emp.name,
-			x.emp.dept,
+			x.emp.code || "-",
+			x.emp.name || "-",
+			x.emp.dept || "-",
+			x.emp.designation || "-",
+			x.emp.shift || "-",
+			x.emp.company || "-",
 			x.maxGap,
 			x.gapStart,
 		]);
-		const spRows = singlePunch.slice(0, 100).map((l) => {
-			const e = empMap[l.empId] || {};
-			return [e.name, e.dept, l.date, l.inTime];
-		});
+
+		const spRows = singlePunchItems.map(({ log, emp, date }) => [   
+			emp.code || "-",
+			emp.name || "-",
+			emp.dept || "-",
+			emp.designation || "-",
+			emp.shift || "-",
+			emp.company || "-",
+			date,                          
+			log?.inTime || log?.outTime || "-",
+		]);
+
+		this._currentNoPunchRows = npRows;
+		this._currentSinglePunchRows = spRows;
+
+		const npHeaders = ["Code", "Name", "Dept", "Designation", "Shift", "Company", "Gap", "Start"];
+		const spHeaders = ["Code", "Name", "Dept", "Designation", "Shift", "Company", "Date", "Time"];
+		const pageSize = 10;
+
 		return {
 			html: `
-				<h2 class="section-title"><i class="ph-fill ph-warning-circle"></i> Critical Alerts</h2><div class="table-wrap" style="margin-bottom:20px"><div class="table-header"><h3>🚩 No Punch ≥ 5 Days</h3></div><table class="data-table"><thead><tr><th>Name</th><th>Dept</th><th>Gap</th><th>Start</th></tr></thead><tbody>${npRows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("") || '<tr><td colspan="4">None</td></tr>'}</tbody></table></div><div class="table-wrap"><div class="table-header"><h3>⚡ Single Punch</h3></div><table class="data-table"><thead><tr><th>Name</th><th>Dept</th><th>Date</th><th>Time</th></tr></thead><tbody>${spRows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("") || '<tr><td colspan="4">None</td></tr>'}</tbody></table></div>
+				<h2 class="section-title"><i class="ph-fill ph-warning-circle"></i> Critical Alerts</h2>
+				<div class="table-wrap" style="margin-bottom:20px">
+					<div class="table-header"><h3>🚩 No Punch ≥ 5 Days</h3></div>
+					<div id="special-np-table-wrap" style="overflow-x:auto">
+						${this._buildPaginatedTable(npRows, npHeaders, npPage, pageSize, "tbl-np", "_reRenderNoPunchPage")}
+					</div>
+				</div>
+				<div class="table-wrap">
+					<div class="table-header"><h3>⚡ Single Punch</h3></div>
+					<div id="special-sp-table-wrap" style="overflow-x:auto">
+						${this._buildPaginatedTable(spRows, spHeaders, spPage, pageSize, "tbl-sp", "_reRenderSinglePunchPage")}
+					</div>
+				</div>
 			`,
 			renderCharts: () => {},
 		};
 	}
 
+	_reRenderNoPunchPage(page) {
+		const rows = this._currentNoPunchRows || [];
+		const headers = ["Code", "Name", "Dept", "Designation", "Shift", "Company", "Gap", "Start"];
+		const wrap = document.getElementById("special-np-table-wrap");
+		if (wrap) {
+			wrap.innerHTML = this._buildPaginatedTable(rows, headers, page, 10, "tbl-np", "_reRenderNoPunchPage");
+		}
+	}
+
+	_reRenderSinglePunchPage(page) {
+		const rows = this._currentSinglePunchRows || [];
+		const headers = ["Code", "Name", "Dept", "Designation", "Shift", "Company", "Date", "Time"];
+		const wrap = document.getElementById("special-sp-table-wrap");
+		if (wrap) {
+			wrap.innerHTML = this._buildPaginatedTable(rows, headers, page, 10, "tbl-sp", "_reRenderSinglePunchPage");
+		}
+	}
+
+	
 	exportPDF(tableId, filename) {
 		const el = document.getElementById(tableId);
 		if (!el || !window.html2canvas) return;
@@ -2146,7 +2239,9 @@ class AttendanceView {
 		this._statCardItems = items;
 
 		const panel = document.getElementById('stat-card-drilldown');
-		if (!panel) return;
+		if (!panel) {
+			return;
+		}
 
 		const titleMap = {
 			present: '✅ Present Employees',
@@ -2162,8 +2257,8 @@ class AttendanceView {
 
 		const isResignedOnly = (key === 'resigned');
 		const isNewJoinedOnly = (key === 'newJoined');
-		const isStaffList     = (key === 'staffList');   
-		const isWorkerList    = (key === 'workerList');  
+		const isStaffList = (key === 'staffList');   
+		const isWorkerList = (key === 'workerList');  
 		const pageSize = 10;
 		const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
 		const currentPage = Math.min(page, totalPages);
@@ -2181,7 +2276,7 @@ class AttendanceView {
 		} else if (key === 'earlyOut') {
 			headers = ['Sr.No', 'Code', 'Name', 'Dept', 'Company', 'Shift', 'Shift Start', 'Shift End', 'Date', 'In', 'Out', 'Hours', 'Early By'];
 		} else {
-			headers = ['Sr.No', 'Code', 'Name', 'Dept', 'Company', 'Shift', 'Date', 'In', 'Out', 'Hours', 'Status'];
+			headers = ['Sr.No', 'Code', 'Name', 'Dept', 'Company', 'Shift', 'Shift Start', 'Shift End', 'Date', 'In', 'Out', 'Hours', 'Status'];
 		}
 		ths = headers.map(h => `<th>${h}</th>`).join('');
 
@@ -2780,17 +2875,21 @@ class AttendanceView {
 					'ch-staff-dept',
 					staffDepts,
 					[
-						{ name: 'Present',      data: staffRows.map(r => r[2]) },
+						{ name: 'Present', data: staffRows.map(r => r[2]) },
 						{ name: 'Half Present', data: staffRows.map(r => r[3]) },
-						{ name: 'Weekly Off',   data: staffRows.map(r => r[4]) },
-						{ name: 'Absent',       data: staffRows.map(r => r[5]) },
+						{ name: 'Weekly Off', data: staffRows.map(r => r[4]) },
+						{ name: 'Absent', data: staffRows.map(r => r[5]) },
 					],
 					'Staff by Department',
 					(dept, index, seriesIndex, seriesName) => {
 						const filtered = logs.filter(l => {
 							const e = empMap[l.empId];
-							if (!e || e.dept !== dept) return false;
-							if (!staffCategoryIds.includes(e.categoryId)) return false;
+							if (!e || e.dept !== dept) {
+								return false;
+							}
+							if (!staffCategoryIds.includes(e.categoryId)) {
+								return false;
+							}
 							return this._matchesStatus(l, seriesName);
 						});
 						this._renderDrillDown(filtered, `Staff – ${dept} – ${seriesName}`, empMap);
@@ -2841,17 +2940,21 @@ class AttendanceView {
 					'ch-worker-dept',
 					workerDepts,
 					[
-						{ name: 'Present',      data: workerRows.map(r => r[2]) },
+						{ name: 'Present', data: workerRows.map(r => r[2]) },
 						{ name: 'Half Present', data: workerRows.map(r => r[3]) },
-						{ name: 'Weekly Off',   data: workerRows.map(r => r[4]) },
-						{ name: 'Absent',       data: workerRows.map(r => r[5]) },
+						{ name: 'Weekly Off', data: workerRows.map(r => r[4]) },
+						{ name: 'Absent', data: workerRows.map(r => r[5]) },
 					],
 					'Workmen by Department',
 					(dept, index, seriesIndex, seriesName) => {
 						const filtered = logs.filter(l => {
 							const e = empMap[l.empId];
-							if (!e || e.dept !== dept) return false;
-							if (!workerCategoryIds.includes(e.categoryId)) return false;
+							if (!e || e.dept !== dept) {
+								return false;
+							}
+							if (!workerCategoryIds.includes(e.categoryId)) {
+								return false;
+							}
 							return this._matchesStatus(l, seriesName);
 						});
 						this._renderDrillDown(filtered, `Workmen – ${dept} – ${seriesName}`, empMap);
