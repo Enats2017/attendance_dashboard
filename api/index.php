@@ -469,7 +469,7 @@ function handleDashboardData($input, $returnData = false) {
     $shiftFilteredIds = [];
     $shiftParams = [];
 
-    $sqlShifts = "SELECT ES.EmployeeId, ES.ShiftId, ES.Shiftdate, ES.ToDate, S.ShiftName, S.ShiftCode FROM (SELECT EmployeeId, ShiftId, Shiftdate, ToDate, ROW_NUMBER() OVER(PARTITION BY EmployeeId ORDER BY Shiftdate DESC) as rn FROM EmployeeShift WITH (NOLOCK)  WHERE Shiftdate <= '$dayTo 23:59:59' AND (ToDate IS NULL OR ToDate >= '$dayFrom')) ES JOIN Shifts S WITH (NOLOCK) ON ES.ShiftId = S.ShiftId INNER JOIN Employees E WITH (NOLOCK) ON ES.EmployeeId = E.EmployeeId WHERE ES.rn = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working' AND E.RecordStatus = 1 AND S.RecordStatus = '1'";
+    $sqlShifts = "SELECT ES.EmployeeId, ES.ShiftId, ES.Shiftdate, ES.ToDate, S.ShiftName, S.ShiftCode, S.BeginTime, S.EndTime FROM (SELECT EmployeeId, ShiftId, Shiftdate, ToDate, ROW_NUMBER() OVER(PARTITION BY EmployeeId ORDER BY Shiftdate DESC) as rn FROM EmployeeShift WITH (NOLOCK)  WHERE Shiftdate <= '$dayTo 23:59:59' AND (ToDate IS NULL OR ToDate >= '$dayFrom')) ES JOIN Shifts S WITH (NOLOCK) ON ES.ShiftId = S.ShiftId INNER JOIN Employees E WITH (NOLOCK) ON ES.EmployeeId = E.EmployeeId WHERE ES.rn = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working' AND E.RecordStatus = 1 AND S.RecordStatus = '1'";
 
     $shiftParams = [];
     if ($shiftName) {
@@ -479,18 +479,23 @@ function handleDashboardData($input, $returnData = false) {
 
     $stmtShifts = sqlsrv_query($conn, $sqlShifts, $shiftParams);
 
-    $empShiftMap = [];
-    $shiftFilteredIds = [];
+	$empShiftMap = [];
+	$empShiftTimeMap = [];
+	$shiftFilteredIds = [];
 
-    if ($stmtShifts) {
-        while ($r = sqlsrv_fetch_array($stmtShifts, SQLSRV_FETCH_ASSOC)) {
-            $empId = (string)$r['EmployeeId'];
-            $empShiftMap[$empId] = $r['ShiftName'];
-            if ($shiftName) {
-                $shiftFilteredIds[$r['EmployeeId']] = true;
-            }
-        }
-    }
+	if ($stmtShifts) {
+		while ($r = sqlsrv_fetch_array($stmtShifts, SQLSRV_FETCH_ASSOC)) {
+			$empId = (string)$r['EmployeeId'];
+			$empShiftMap[$empId] = $r['ShiftName'];
+			$empShiftTimeMap[$empId] = [
+				'start' => $r['BeginTime'] ? (is_object($r['BeginTime']) ? $r['BeginTime']->format('H:i') : $r['BeginTime']) : null,
+				'end' => $r['EndTime'] ? (is_object($r['EndTime']) ? $r['EndTime']->format('H:i') : $r['EndTime']) : null
+			];
+			if ($shiftName) {
+				$shiftFilteredIds[$r['EmployeeId']] = true;
+			}
+		}
+	}
 
     if ($shiftName && empty($shiftFilteredIds)) {
         $shiftFilteredIds = [-1];
@@ -740,24 +745,14 @@ function handleDashboardData($input, $returnData = false) {
                 $paramsDevRaw[] = $compName;
             }
 
-            if ($shiftName) {
-                $sqlDevRaw .= " AND D.UserId IN (" . implode(',', $shiftFilteredIds) . ")";
-            }
-
             $stmtDevRaw = sqlsrv_query($conn, $sqlDevRaw, $paramsDevRaw);
 
             $devEmpDayBuckets = [];
             if ($stmtDevRaw) {
-                while ($row = sqlsrv_fetch_array($stmtDevRaw, SQLSRV_FETCH_ASSOC)) {
+				while ($row = sqlsrv_fetch_array($stmtDevRaw, SQLSRV_FETCH_ASSOC)) {
                     $dir = trim($row['AttDirection'] ?? '');
                     $isIn = (strcasecmp($dir, 'in') == 0 || $dir === '0');
                     $isOut = (strcasecmp($dir, 'out') == 0 || $dir === '1');
-
-                    if ($isIn) {
-                        $counts['in']++;
-                    } else if ($isOut) {
-                        $counts['out']++;
-                    }
 
                     $punchDate = $row['PunchDate']->format('Y-m-d');
                     $key = (string)$row['EmployeeId'] . '_' . $punchDate;
@@ -872,28 +867,87 @@ function handleDashboardData($input, $returnData = false) {
     $presentEmployees = $presentRecordCount + $devicePresentDayCount;
     $dataSource = 'attendance+device';
 
-    $singlePunch = 0;
-    $lateIn = 0;
-    $earlyOut = 0;
-    $totalHours = 0;
-    $hoursCount = 0;
-    foreach ($logs as $log) {
-        if (($log['missedInPunch'] == 1 && $log['missedOutPunch'] == 0) || ($log['missedInPunch'] == 0 && $log['missedOutPunch'] == 1)) {
-            $singlePunch++;
-        }
-        if (($log['lateBy'] ?? 0) > 0) {
-            $lateIn++;
-        }
-        if (($log['earlyBy'] ?? 0) > 0) {
-            $earlyOut++;
-        }
+	$validEmpIdSet = [];
+	foreach ($employees as $emp) {
+		$validEmpIdSet[$emp['id']] = true;
+	}
 
-        $totalHours += floatval($log['hoursWorked']);
+	$counts = ['in' => 0, 'out' => 0];
+	foreach ($deviceEmployeeStats as $key => $stat) {
+		[$empId] = explode('_', $key, 2);
+		if (!isset($validEmpIdSet[$empId])) {
+			continue;
+		}
+		$counts['in']  += $stat['inCount']  ?? 0;
+		$counts['out'] += $stat['outCount'] ?? 0;
+	}
 
-        if ($log['hoursWorked'] > 0) {
-            $hoursCount++;
-        }
-    }
+	$singlePunch = 0;
+	$singlePunchKeys = [];
+	$weeklyOffKeySet = [];
+	foreach ($logs as $log) {
+		$present = floatval($log['present']);
+		$absent  = floatval($log['absent']);
+		if ($present == 0 && $absent == 0 && intval($log['weeklyOff']) == 1) {
+			$weeklyOffKeySet[$log['empId'] . '_' . $log['date']] = true;
+		}
+	}
+
+	$singlePunchData = []; 
+	foreach ($deviceEmployeeStats as $key => $stat) {
+		[$empId] = explode('_', $key, 2);
+		if (!isset($validEmpIdSet[$empId])) {
+			continue;
+		}
+		if (isset($weeklyOffKeySet[$key])) {
+			continue;
+		}
+
+		$hasIn = ($stat['inCount']  ?? 0) >= 1;
+		$hasOut = ($stat['outCount'] ?? 0) >= 1;
+
+		$shiftTimes = $empShiftTimeMap[$empId] ?? ['start' => null, 'end' => null];
+
+		if ($hasIn !== $hasOut) {
+			$singlePunch++;
+			$singlePunchKeys[] = $key;
+
+			if ($hasIn && $stat['firstIn']) {
+				$singlePunchData[$key] = [
+					'time' => $stat['firstIn']->format('H:i'),
+					'direction' => 'in',
+					'shiftStart' => $shiftTimes['start'],
+					'shiftEnd' => $shiftTimes['end']
+				];
+			} elseif ($hasOut && $stat['lastOut']) {
+				$singlePunchData[$key] = [
+					'time' => $stat['lastOut']->format('H:i'),
+					'direction' => 'out',
+					'shiftStart' => $shiftTimes['start'],
+					'shiftEnd' => $shiftTimes['end']
+				];
+			}
+		}
+	}
+
+	$lateIn = 0;
+	$earlyOut = 0;
+	$totalHours = 0;
+	$hoursCount = 0;
+	foreach ($logs as $log) {
+		if (($log['lateBy'] ?? 0) > 0) {
+			$lateIn++;
+		}
+		if (($log['earlyBy'] ?? 0) > 0) {
+			$earlyOut++;
+		}
+
+		$totalHours += floatval($log['hoursWorked']);
+
+		if ($log['hoursWorked'] > 0) {
+			$hoursCount++;
+		}
+	}
 
     $avgHours = $hoursCount > 0 ? round($totalHours / $hoursCount, 2) : 0;
 
@@ -1019,6 +1073,8 @@ function handleDashboardData($input, $returnData = false) {
             'resigned'    => count($resignedEmployees),
             'newJoined'   => count($newJoinedEmployees)
         ],
+		'singlePunchKeys' => $singlePunchKeys,
+		'singlePunchData' => $singlePunchData,
         'staffWorkerStats' => [
             'staffTotal'        => count($staffEmpIds),
             'staffPresent'      => $staffPresent,
