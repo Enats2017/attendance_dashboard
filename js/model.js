@@ -96,7 +96,9 @@ class AttendanceModel {
                     shiftStats: data.shiftStats || [],
                     nightShiftEmployees: data.nightShiftEmployees || [],
                     nightShiftLogs: data.nightShiftLogs || [],
-                    counts: data.counts
+                    counts: data.counts,
+                    singlePunchKeys: new Set(data.singlePunchKeys || []),
+                    singlePunchData: data.singlePunchData || {}
                 };
                 this.state.todayStats = data.todayStats || {
                     present: 0, 
@@ -352,13 +354,14 @@ class AttendanceModel {
             }
         });
 
-        const from = new Date(filters.dateFrom);
-        const to = new Date(filters.dateTo);
+        const fromStr = filters.dateFrom;
+        const toStr = filters.dateTo;
         const result = [];
 
         emps.forEach(emp => {
+            const from = new Date(fromStr);
+            const to = new Date(toStr);
             for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
-
                 const dateStr = d.toISOString().slice(0, 10);
                 const key = emp.id + '_' + dateStr;
 
@@ -383,11 +386,13 @@ class AttendanceModel {
         const statusKeyMap = this._buildStatusKeyMap(logs);
         const logMap = this._buildLogMap(logs);
 
-        const from = new Date(filters.dateFrom);
-        const to   = new Date(filters.dateTo);
+        const fromStr = filters.dateFrom;
+        const toStr = filters.dateTo;
         const result = [];
 
         emps.forEach(emp => {
+            const from = new Date(fromStr);
+            const to = new Date(toStr);
             for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
                 const dateStr = d.toISOString().slice(0, 10);
                 const key = emp.id + '_' + dateStr;
@@ -408,11 +413,13 @@ class AttendanceModel {
         const statusKeyMap = this._buildStatusKeyMap(logs);
         const logMap = this._buildLogMap(logs);
 
-        const from = new Date(filters.dateFrom);
-        const to   = new Date(filters.dateTo);
+        const fromStr = filters.dateFrom;
+        const toStr = filters.dateTo;
         const result = [];
 
         emps.forEach(emp => {
+            const from = new Date(fromStr);
+            const to = new Date(toStr);
             for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
                 const dateStr = d.toISOString().slice(0, 10);
                 const key = emp.id + '_' + dateStr;
@@ -433,11 +440,13 @@ class AttendanceModel {
         const statusKeyMap = this._buildStatusKeyMap(logs);
         const logMap = this._buildLogMap(logs);
 
-        const from = new Date(filters.dateFrom);
-        const to   = new Date(filters.dateTo);
+        const fromStr = filters.dateFrom;
+        const toStr = filters.dateTo;
         const result = [];
 
         emps.forEach(emp => {
+            const from = new Date(fromStr);
+            const to = new Date(toStr);
             for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
                 const dateStr = d.toISOString().slice(0, 10);
                 const key = emp.id + '_' + dateStr;
@@ -454,32 +463,40 @@ class AttendanceModel {
 
     getSinglePunchEmployees() {
         const { filters } = this.state;
-        const { logs, emps } = this.getFilteredData();
+        const { emps } = this.getFilteredData();
+        const singlePunchKeys = this.state.data.singlePunchKeys || new Set();
+        const singlePunchData = this.state.data.singlePunchData || {};
 
-        const logMap = {};
-        logs.forEach(l => {
-            const key = l.empId + '_' + l.date;
-            const existing = logMap[key];
-            if (!existing || parseFloat(l.present) > parseFloat(existing.present)) {
-                logMap[key] = l;
-            }
-        });
-
-        const from = new Date(filters.dateFrom);
-        const to = new Date(filters.dateTo);
+        const fromStr = filters.dateFrom;
+        const toStr = filters.dateTo;
         const result = [];
 
         emps.forEach(emp => {
+            const from = new Date(fromStr);
+            const to = new Date(toStr);
             for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
                 const dateStr = d.toISOString().slice(0, 10);
-                const log = logMap[emp.id + '_' + dateStr];
+                const key = emp.id + '_' + dateStr;
 
-                if (log) {
-                    const missedIn  = log.missedInPunch == 1;
-                    const missedOut = log.missedOutPunch == 1;
-                    if ((missedIn && !missedOut) || (!missedIn && missedOut)) {
-                        result.push({ log, emp, date: dateStr });
-                    }
+                if (singlePunchKeys.has(key)) {
+                    const punchInfo = singlePunchData[key] || {};
+                    result.push({
+                        log: {
+                            empId: emp.id,
+                            date: dateStr,
+                            inTime: punchInfo.direction === 'in'  ? punchInfo.time : null,
+                            outTime: punchInfo.direction === 'out' ? punchInfo.time : null,
+                            status: 'Single Punch',
+                            present: 0,
+                            absent: 1,
+                            hoursWorked: 0,
+                            lateBy: 0,
+                            earlyBy: 0,
+                            shiftStart: punchInfo.shiftStart || null,
+                            shiftEnd: punchInfo.shiftEnd || null
+                        },
+                        emp, date: dateStr
+                    });
                 }
             }
         });
@@ -501,11 +518,13 @@ class AttendanceModel {
             }
         });
 
-        const from = new Date(filters.dateFrom);
-        const to = new Date(filters.dateTo);
+        const fromStr = filters.dateFrom;
+        const toStr = filters.dateTo;
         const result = [];
 
         emps.forEach(emp => {
+            const from = new Date(fromStr);
+            const to = new Date(toStr);
             for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
                 const dateStr = d.toISOString().slice(0, 10);
                 const log = logMap[emp.id + '_' + dateStr];
@@ -533,11 +552,13 @@ class AttendanceModel {
             }
         });
 
-        const from = new Date(filters.dateFrom);
-        const to = new Date(filters.dateTo);
+        const fromStr = filters.dateFrom;
+        const toStr = filters.dateTo;
         const result = [];
 
         emps.forEach(emp => {
+            const from = new Date(fromStr);
+            const to = new Date(toStr);
             for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
                 const dateStr = d.toISOString().slice(0, 10);
                 const log = logMap[emp.id + '_' + dateStr];
