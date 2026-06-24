@@ -938,7 +938,7 @@ class AttendanceView {
         e.name || "",
         e.dept || "",
         e.company || "",
-        l.date,
+        this._formatDate(l.date),
         l.inTime || "-",
         l.outTime || "-",
         l.hoursWorked || 0,
@@ -955,7 +955,7 @@ class AttendanceView {
         Name: e.name,
         Dept: e.dept,
         Company: e.company,
-        Date: l.date,
+        Date: this._formatDate(l.date),
         In: l.inTime,
         Out: l.outTime,
         Hours: l.hoursWorked,
@@ -967,6 +967,7 @@ class AttendanceView {
 
     const byDate = this._countBy(logs, (l) => l.date);
     const dates = Object.keys(byDate).sort();
+    const formattedDates = dates.map((d) => this._formatDate(d));
     const counts = dates.map((d) => byDate[d]);
     const byDept = this._countBy(
       logs,
@@ -1012,13 +1013,13 @@ class AttendanceView {
       renderCharts: () => {
         Charts.line(
           "ch-all-trend",
-          dates,
+          formattedDates,
           [{ name: "Total Punches", data: counts }],
           "Daily Attendance",
-          (date) =>
+          (idx) =>
             this._renderDrillDown(
-              logs.filter((l) => l.date === date),
-              `Date: ${date}`,
+              logs.filter((l) => l.date === dates[idx]),
+              `Date: ${formattedDates[idx]}`,
               empMap,
             ),
         );
@@ -1103,7 +1104,7 @@ class AttendanceView {
 						<td>${e.shift || "–"}</td>
 						<td>${l.shiftStart || "–"}</td>
 						<td>${l.shiftEnd || "–"}</td>
-						<td>${l.date}</td>
+						<td>${this._formatDate(l.date)}</td>
 						<td>${l.inTime || "–"}</td>
 						<td>${l.outTime || "–"}</td>
 						<td><b>${l.hoursWorked || 0}h</b></td>
@@ -1126,7 +1127,7 @@ class AttendanceView {
         Shift: e.shift,
         ShiftStart: l.shiftStart || "",
         ShiftEnd: l.shiftEnd || "",
-        Date: l.date,
+        Date: this._formatDate(l.date),
         In: l.inTime,
         Out: l.outTime,
         Hours: l.hoursWorked,
@@ -1989,7 +1990,7 @@ class AttendanceView {
       return [
         e.name,
         e.dept,
-        l.date,
+        this._formatDate(l.date),
         l.inTime,
         l.outTime,
         l.lateIn ? "Yes" : "-",
@@ -2018,6 +2019,22 @@ class AttendanceView {
     return `${Math.floor(m / 60)}h ${m % 60}m`;
   }
 
+  _formatDate(dateStr) {
+    if (!dateStr) return "-";
+    try {
+      const [year, month, day] = dateStr.split("-");
+      const monthNames = [
+        "january", "february", "march", "april", "may", "june",
+        "july", "august", "september", "october", "november", "december"
+      ];
+      const monthIndex = parseInt(month) - 1;
+      if (monthIndex < 0 || monthIndex > 11) return dateStr;
+      return `${day}-${monthNames[monthIndex]}-${year}`;
+    } catch (e) {
+      return dateStr;
+    }
+  }
+
   _renderLateIn(logs, emps, empMap, model, page = 1) {
     const items = model ? model.getLateInEmployees() : this._currentLateInItems;
     this._currentLateInItems = items;
@@ -2039,7 +2056,7 @@ class AttendanceView {
       emp.shift || "-",
       log?.shiftStart || "-",
       log?.shiftEnd || "-",
-      date,
+      this._formatDate(date),
       log?.inTime || "-",
       log?.outTime || "-",
       log?.hoursWorked || 0,
@@ -2052,7 +2069,7 @@ class AttendanceView {
       Dept: emp.dept,
       Company: emp.company,
       Shift: emp.shift,
-      Date: date,
+      Date: this._formatDate(date),
       In: log?.inTime,
       Out: log?.outTime,
       Hours: log?.hoursWorked,
@@ -2151,7 +2168,7 @@ class AttendanceView {
       emp.shift || "-",
       log?.shiftStart || "-",
       log?.shiftEnd || "-",
-      date,
+      this._formatDate(date),
       log?.inTime || "-",
       log?.outTime || "-",
       log?.hoursWorked || 0,
@@ -2166,7 +2183,7 @@ class AttendanceView {
       Shift: emp.shift,
       ShiftStart: log?.shiftStart,
       ShiftEnd: log?.shiftEnd,
-      Date: date,
+      Date: this._formatDate(date),
       In: log?.inTime,
       Out: log?.outTime,
       Hours: log?.hoursWorked,
@@ -2249,7 +2266,7 @@ class AttendanceView {
       return [
         e.name,
         e.dept,
-        l.date,
+        this._formatDate(l.date),
         l.inTime,
         l.outTime,
         l.hoursWorked,
@@ -2488,7 +2505,7 @@ class AttendanceView {
       x.emp.shift || "-",
       x.emp.company || "-",
       x.maxGap,
-      x.gapStart,
+      this._formatDate(x.gapStart),
     ]);
 
     const spRows = singlePunchItems.map(({ log, emp, date }) => [
@@ -2498,7 +2515,7 @@ class AttendanceView {
       emp.designation || "-",
       emp.shift || "-",
       emp.company || "-",
-      date,
+      this._formatDate(date),
       log?.inTime || log?.outTime || "-",
     ]);
 
@@ -2778,8 +2795,8 @@ class AttendanceView {
 					<td>${emp.name || "–"}</td>
 					<td>${emp.dept || "–"}</td>
 					<td>${emp.company || "–"}</td>
-					<td>${emp.doj || "–"}</td>
-					<td>${emp.dor || "–"}</td>
+					<td>${this._formatDate(emp.doj) || "–"}</td>
+					<td>${this._formatDate(emp.dor) || "–"}</td>
 					<td><span class="badge badge-danger">${emp.status || "Resigned"}</span></td>
 				</tr>`;
         }
@@ -2793,7 +2810,7 @@ class AttendanceView {
 					<td>${emp.name || "–"}</td>
 					<td>${emp.dept || "–"}</td>
 					<td>${emp.company || "–"}</td>
-					<td>${emp.doj || "–"}</td>
+					<td>${this._formatDate(emp.doj) || "–"}</td>
 					<td><span class="badge ${badgeClass}">${emp.status || "Working"}</span></td>
 				</tr>`;
         }
@@ -2815,7 +2832,7 @@ class AttendanceView {
 					<td>${emp.shift || "–"}</td>
 					<td>${log?.shiftStart || "–"}</td>
 					<td>${log?.shiftEnd || "–"}</td>
-					<td>${date || log?.date || ""}</td>
+					<td>${this._formatDate(date || log?.date || "")}</td>
 					<td>${log?.inTime ?? ""}</td>
 					<td>${log?.outTime ?? ""}</td>
 					<td>${log?.hoursWorked ?? ""}</td>
@@ -2877,7 +2894,7 @@ class AttendanceView {
         Dept: emp?.dept,
         Company: emp?.company,
         Shift: emp?.shift,
-        Date: date || log?.date,
+        Date: this._formatDate(date || log?.date),
         In: log?.inTime,
         Out: log?.outTime,
         Hours: log?.hoursWorked,
