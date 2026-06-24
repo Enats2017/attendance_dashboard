@@ -336,7 +336,7 @@ class AttendanceModel {
         const presentKeySet = {};
 
         logs.forEach(l => {
-            if (parseFloat(l.present) == 1 && l.absent == 0) {
+            if (parseFloat(l.present) == 1 && l.absent == 0 && l.missedInPunch == 0 && l.missedOutPunch == 0) {
                 presentKeySet[l.empId + '_' + l.date] = true;
             }
         });
@@ -475,8 +475,9 @@ class AttendanceModel {
                 const log = logMap[emp.id + '_' + dateStr];
 
                 if (log) {
-                    if ((log.missedInPunch == 1 && log.missedOutPunch == 0) ||
-                        (log.missedInPunch == 0 && log.missedOutPunch == 1)) {
+                    const missedIn  = log.missedInPunch == 1;
+                    const missedOut = log.missedOutPunch == 1;
+                    if ((missedIn && !missedOut) || (!missedIn && missedOut)) {
                         result.push({ log, emp, date: dateStr });
                     }
                 }
@@ -621,25 +622,29 @@ class AttendanceModel {
         return emps.filter(emp => workerCategoryIds.includes(emp.categoryId)).map(emp => ({ log: null, emp }));
     }
 
+
     _buildStatusKeyMap(logs) {
         const map = {};
         logs.forEach(l => {
             const key = l.empId + '_' + l.date;
             const present = parseFloat(l.present);
-            const absent  = parseFloat(l.absent);   
+            const absent  = parseFloat(l.absent);
 
             if (present == 1 && absent == 0) {
-                map[key] = 'present';
+                const hasBothPunches = (l.missedInPunch == 0 && l.missedOutPunch == 0);
+                // Single punch treated as absent — getSinglePunchEmployees handles them separately
+                map[key] = hasBothPunches ? 'present' : 'absent';
             } else if (present == 0.5 && absent == 0.5) {
                 map[key] = 'halfPresent';
             } else if (present == 0 && absent == 0) {
-                      map[key] = 'weeklyOff';
+                map[key] = 'weeklyOff';
             } else {
                 map[key] = 'absent';
             }
         });
         return map;
     }
+
 
     _buildLogMap(logs) {
         const map = {};

@@ -391,17 +391,17 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
             if (isset($logKeyMap[$key])) {
                 $log = $logKeyMap[$key];
                 $present = floatval($log['present']);
-				$absent = floatval($log['absent']);
+                $absent = floatval($log['absent']);
 
-				if ($present == 1 && $absent == 0) {
-					$shiftStats[$shiftName]['present']++;
-				} elseif ($present == 0.5 && $absent == 0.5) {
-					$shiftStats[$shiftName]['halfPresent']++;
-				} elseif ($present == 0 && $absent == 0) {
-					$shiftStats[$shiftName]['weeklyOff']++;
-				} else {
-					$shiftStats[$shiftName]['absent']++;
-				}
+                if ($present == 1 && $absent == 0) {
+                    $shiftStats[$shiftName]['present']++;
+                } elseif ($present == 0.5 && $absent == 0.5) {
+                    $shiftStats[$shiftName]['halfPresent']++;
+                } elseif ($present == 0 && $absent == 0) {
+                    $shiftStats[$shiftName]['weeklyOff']++;
+                } else {
+                    $shiftStats[$shiftName]['absent']++;
+                }
             } elseif (isset($deviceEmployeeStats[$key])) {
                 $stat = $deviceEmployeeStats[$key];
                 if (($stat['inCount'] ?? 0) >= 1) {
@@ -439,7 +439,7 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
  */
 function handleDashboardData($input, $returnData = false) {
     $userId = isset($input['userId']) ? intval($input['userId']) : 0;
-	if (isset($input['date_from']) && isset($input['date_to'])) {
+    if (isset($input['date_from']) && isset($input['date_to'])) {
         $dayFrom = $input['date_from'];
         $dayTo = $input['date_to'];
     } else {
@@ -534,25 +534,25 @@ function handleDashboardData($input, $returnData = false) {
                 'std_hc' => intval($row['std_hc']),
                 'company' => $row['company'] ?: 'Unknown',
                 'categoryId' => intval($row['CategoryId']),
-				'designation' => $row['DesignationName'] ?: 'Staff',
+                'designation' => $row['DesignationName'] ?: 'Staff',
                 'designationSortOrder' => isset($row['designationSortOrder']) ? intval($row['designationSortOrder']) : 0,
                 'shift' => isset($empShiftMap[(string)$row['EmployeeId']]) ? $empShiftMap[(string)$row['EmployeeId']] : 'No Shift',
                 'location' => $row['location'] ?: 'Head Office'
             ];
         }
 
-		$staffCategoryIds  = [58];
-		$workerCategoryIds = [51, 59, 60];
+        $staffCategoryIds  = [58];
+        $workerCategoryIds = [51, 59, 60];
 
-		$staffEmpIds  = [];
-		$workerEmpIds = [];
-		foreach ($employees as $emp) {
-			if (in_array($emp['categoryId'], $staffCategoryIds)) {
-				$staffEmpIds[$emp['id']] = true;
-			} elseif (in_array($emp['categoryId'], $workerCategoryIds)) {
-				$workerEmpIds[$emp['id']] = true;
-			}
-		}
+        $staffEmpIds  = [];
+        $workerEmpIds = [];
+        foreach ($employees as $emp) {
+            if (in_array($emp['categoryId'], $staffCategoryIds)) {
+                $staffEmpIds[$emp['id']] = true;
+            } elseif (in_array($emp['categoryId'], $workerCategoryIds)) {
+                $workerEmpIds[$emp['id']] = true;
+            }
+        }
     }
 
     $resignedEmployees = [];
@@ -671,7 +671,7 @@ function handleDashboardData($input, $returnData = false) {
             
             if ($stmtLogs) {
                 while ($row = sqlsrv_fetch_array($stmtLogs, SQLSRV_FETCH_ASSOC)) {
-					$status = $row['Status'] ?: 'Absent';
+                    $status = $row['Status'] ?: 'Absent';
 
                     $logs[] = [
                         'empId' => (string)$row['EmployeeId'],
@@ -680,7 +680,7 @@ function handleDashboardData($input, $returnData = false) {
                         'outTime' => $row['OutTime'],
                         'status' => $status,
                         'present' => floatval($row['Present']),
-						'absent' => floatval($row['Absent']),
+                        'absent' => floatval($row['Absent']),
                         'weeklyOff' => intval($row['WeeklyOff']),
                         'holiday' => intval($row['Holiday']),
                         'isOnLeave' => intval($row['IsOnLeave']),
@@ -693,8 +693,8 @@ function handleDashboardData($input, $returnData = false) {
                         'shiftId' => intval($row['ShiftId']),
                         'shiftName' => $row['ShiftName'],
                         'shiftCode' => $row['ShiftCode'],
-						'shiftStart' => $row['BeginTime'] ? (is_object($row['BeginTime']) ? $row['BeginTime']->format('H:i') : $row['BeginTime']) : null,
-						'shiftEnd' => $row['EndTime'] ? (is_object($row['EndTime']) ? $row['EndTime']->format('H:i') : $row['EndTime']) : null
+                        'shiftStart' => $row['BeginTime'] ? (is_object($row['BeginTime']) ? $row['BeginTime']->format('H:i') : $row['BeginTime']) : null,
+                        'shiftEnd' => $row['EndTime'] ? (is_object($row['EndTime']) ? $row['EndTime']->format('H:i') : $row['EndTime']) : null
                     ];
                 }
             }
@@ -819,25 +819,24 @@ function handleDashboardData($input, $returnData = false) {
 
     // Step 1: mark which empId_date keys already exist in AttendanceLogs
     $employeesInAttendanceLogs = [];
-	$presentRecordCount = 0;
-	foreach ($logs as $log) {
-		$key = $log['empId'] . '_' . $log['date'];
-		$employeesInAttendanceLogs[$key] = true;
-	
-		if (floatval($log['present']) == 1 && $log['absent'] == 0) {
-			$presentRecordCount++;
-		}
-	}
+    $presentRecordCount = 0;
+    foreach ($logs as $log) {
+        $key = $log['empId'] . '_' . $log['date'];
+        $employeesInAttendanceLogs[$key] = true;
+    
+        if (floatval($log['present']) == 1 && $log['absent'] == 0) {
+            $presentRecordCount++;
+        }
+    }
 
-    // Step 2: merge DeviceLogs-only empId_date into $logs as synthesized rows
     $devicePresentDayCount = 0;
     foreach ($deviceEmployeeStats as $key => $stat) {
         if (isset($employeesInAttendanceLogs[$key])) {
             continue; 
         }
 
-        if (($stat['inCount'] ?? 0) < 1) {
-            continue;
+        if (($stat['inCount'] ?? 0) < 1 || ($stat['outCount'] ?? 0) < 1) {
+            continue; 
         }
 
         list($empId, $date) = explode('_', $key, 2);
@@ -860,7 +859,7 @@ function handleDashboardData($input, $returnData = false) {
             'lateBy' => 0,
             'earlyBy' => 0,
             'missedInPunch' => 0,                  
-            'missedOutPunch' => $hasOut ? 0 : 1,   
+            'missedOutPunch' => 0,   
             'shiftId' => 0,
             'shiftName' => null,
             'shiftCode' => null
@@ -880,8 +879,8 @@ function handleDashboardData($input, $returnData = false) {
     $hoursCount = 0;
     foreach ($logs as $log) {
         if (($log['missedInPunch'] == 1 && $log['missedOutPunch'] == 0) || ($log['missedInPunch'] == 0 && $log['missedOutPunch'] == 1)) {
-			$singlePunch++;
-		}
+            $singlePunch++;
+        }
         if (($log['lateBy'] ?? 0) > 0) {
             $lateIn++;
         }
@@ -899,96 +898,97 @@ function handleDashboardData($input, $returnData = false) {
     $avgHours = $hoursCount > 0 ? round($totalHours / $hoursCount, 2) : 0;
 
     $statusKeyMap = [];
-	foreach ($logs as $log) {
-		$key = $log['empId'] . '_' . $log['date'];
-		$present = floatval($log['present']);
-		$absent  = floatval($log['absent']);
+    foreach ($logs as $log) {
+        $key = $log['empId'] . '_' . $log['date'];
+        $present = floatval($log['present']);
+        $absent  = floatval($log['absent']);
 
-		if ($present == 1 && $absent == 0) {
-			$statusKeyMap[$key] = 'present';
-		} elseif ($present == 0.5 && $absent == 0.5) {
-			$statusKeyMap[$key] = 'halfPresent';
-		} elseif ($present == 0 && $absent == 0) {
-			$statusKeyMap[$key] = 'weeklyOff';
-		} else {
-			$statusKeyMap[$key] = 'absent';
-		}
-	}
+        if ($present == 1 && $absent == 0) {
+            $hasBothPunches = ($log['missedInPunch'] == 0 && $log['missedOutPunch'] == 0);
+            $statusKeyMap[$key] = $hasBothPunches ? 'present' : 'absent';
+        } elseif ($present == 0.5 && $absent == 0.5) {
+            $statusKeyMap[$key] = 'halfPresent';
+        } elseif ($present == 0 && $absent == 0) {
+            $statusKeyMap[$key] = 'weeklyOff';
+        } else {
+            $statusKeyMap[$key] = 'absent';
+        }
+    }
 
     $rangeStart = new DateTime($dayFrom);
     $rangeEnd = new DateTime($dayTo);
     
-	$staffPresent = 0; 
-	$staffHalfPresent = 0; 
-	$staffAbsent = 0; 
-	$staffWeeklyOff = 0;
-	$workerPresent = 0; 
-	$workerHalfPresent = 0; 
-	$workerAbsent = 0; 
-	$workerWeeklyOff = 0;
+    $staffPresent = 0; 
+    $staffHalfPresent = 0; 
+    $staffAbsent = 0; 
+    $staffWeeklyOff = 0;
+    $workerPresent = 0; 
+    $workerHalfPresent = 0; 
+    $workerAbsent = 0; 
+    $workerWeeklyOff = 0;
 
-	for ($d = clone $rangeStart; $d <= $rangeEnd; $d->modify('+1 day')) {
-		$dateStr = $d->format('Y-m-d');
-		foreach ($employees as $e) {
-			$k = $e['id'] . '_' . $dateStr;
-			$empStatus = $statusKeyMap[$k] ?? 'absent';
+    for ($d = clone $rangeStart; $d <= $rangeEnd; $d->modify('+1 day')) {
+        $dateStr = $d->format('Y-m-d');
+        foreach ($employees as $e) {
+            $k = $e['id'] . '_' . $dateStr;
+            $empStatus = $statusKeyMap[$k] ?? 'absent';
 
-			if (isset($staffEmpIds[$e['id']])) {
-				if ($empStatus === 'present') {
-					$staffPresent++;
-				} elseif ($empStatus === 'halfPresent') {
-					$staffHalfPresent++;
-				}
-				elseif ($empStatus === 'weeklyOff') {
-					$staffWeeklyOff++;
-				} else {
-					$staffAbsent++;
-				}
-			} elseif (isset($workerEmpIds[$e['id']])) {
-				if ($empStatus === 'present') {
-					$workerPresent++;
-				} elseif ($empStatus === 'halfPresent') {
-					$workerHalfPresent++;
-				} elseif ($empStatus === 'weeklyOff') {
-					$workerWeeklyOff++;
-				} else {
-					$workerAbsent++;
-				}
-			}
-		}
-	}
+            if (isset($staffEmpIds[$e['id']])) {
+                if ($empStatus === 'present') {
+                    $staffPresent++;
+                } elseif ($empStatus === 'halfPresent') {
+                    $staffHalfPresent++;
+                }
+                elseif ($empStatus === 'weeklyOff') {
+                    $staffWeeklyOff++;
+                } else {
+                    $staffAbsent++;
+                }
+            } elseif (isset($workerEmpIds[$e['id']])) {
+                if ($empStatus === 'present') {
+                    $workerPresent++;
+                } elseif ($empStatus === 'halfPresent') {
+                    $workerHalfPresent++;
+                } elseif ($empStatus === 'weeklyOff') {
+                    $workerWeeklyOff++;
+                } else {
+                    $workerAbsent++;
+                }
+            }
+        }
+    }
 
-	$totalEmployeeDays = 0;
-	$presentEmployeeDays = 0;
-	$halfPresentEmployeeDays = 0;
-	$weeklyOffEmployeeDays = 0;
-	$absentEmployeeDays = 0;
+    $totalEmployeeDays = 0;
+    $presentEmployeeDays = 0;
+    $halfPresentEmployeeDays = 0;
+    $weeklyOffEmployeeDays = 0;
+    $absentEmployeeDays = 0;
 
-	for ($d = clone $rangeStart; $d <= $rangeEnd; $d->modify('+1 day')) {
-		$dateStr = $d->format('Y-m-d');
-		foreach ($employees as $e) {
-			$totalEmployeeDays++;
-			$k = $e['id'] . '_' . $dateStr;
-			$empStatus = $statusKeyMap[$k] ?? 'absent';
+    for ($d = clone $rangeStart; $d <= $rangeEnd; $d->modify('+1 day')) {
+        $dateStr = $d->format('Y-m-d');
+        foreach ($employees as $e) {
+            $totalEmployeeDays++;
+            $k = $e['id'] . '_' . $dateStr;
+            $empStatus = $statusKeyMap[$k] ?? 'absent';
 
-			if ($empStatus === 'present') {
-				$presentEmployeeDays++;
-			} elseif ($empStatus === 'halfPresent') {
-				$halfPresentEmployeeDays++;
-			} elseif ($empStatus === 'weeklyOff') {
-				$weeklyOffEmployeeDays++;
-			} else {
-				$absentEmployeeDays++;
-			}
-		}
-	}
+            if ($empStatus === 'present') {
+                $presentEmployeeDays++;
+            } elseif ($empStatus === 'halfPresent') {
+                $halfPresentEmployeeDays++;
+            } elseif ($empStatus === 'weeklyOff') {
+                $weeklyOffEmployeeDays++;
+            } else {
+                $absentEmployeeDays++;
+            }
+        }
+    }
 
-	$presentEmployees = $presentEmployeeDays;
-	$absentEmployees = $absentEmployeeDays;
-	$halfPresentTotal = $halfPresentEmployeeDays;
-	$weeklyOffTotal = $weeklyOffEmployeeDays;
+    $presentEmployees = $presentEmployeeDays;
+    $absentEmployees = $absentEmployeeDays;
+    $halfPresentTotal = $halfPresentEmployeeDays;
+    $weeklyOffTotal = $weeklyOffEmployeeDays;
 
-	$shiftStats = computeShiftStats($employees,  $logs,  $deviceEmployeeStats,  $employeesInAttendanceLogs,  $dayFrom, $dayTo, $conn);
+    $shiftStats = computeShiftStats($employees,  $logs,  $deviceEmployeeStats,  $employeesInAttendanceLogs,  $dayFrom, $dayTo, $conn);
 
     if ($returnData) {
         return [
@@ -1007,30 +1007,30 @@ function handleDashboardData($input, $returnData = false) {
     echo json_encode([
         'success' => true,
         'todayStats' => [
-			'present'     => $presentEmployees,
-			'halfPresent' => $halfPresentTotal,
-			'weeklyOff'   => $weeklyOffTotal,
-			'absent'      => $absentEmployees,
-			'total'       => $totalEmployees,
-			'singlePunch' => $singlePunch,
-			'lateIn'      => $lateIn,
-			'earlyOut'    => $earlyOut,
-			'avgHours'    => $avgHours,
-			'resigned'    => count($resignedEmployees),
-			'newJoined'   => count($newJoinedEmployees)
-		],
-		'staffWorkerStats' => [
-			'staffTotal'        => count($staffEmpIds),
-			'staffPresent'      => $staffPresent,
-			'staffHalfPresent'  => $staffHalfPresent,
-			'staffWeeklyOff'    => $staffWeeklyOff,
-			'staffAbsent'       => $staffAbsent,
-			'workerTotal'       => count($workerEmpIds),
-			'workerPresent'     => $workerPresent,
-			'workerHalfPresent' => $workerHalfPresent,
-			'workerWeeklyOff'   => $workerWeeklyOff,
-			'workerAbsent'      => $workerAbsent,
-		],
+            'present'     => $presentEmployees,
+            'halfPresent' => $halfPresentTotal,
+            'weeklyOff'   => $weeklyOffTotal,
+            'absent'      => $absentEmployees,
+            'total'       => $totalEmployees,
+            'singlePunch' => $singlePunch,
+            'lateIn'      => $lateIn,
+            'earlyOut'    => $earlyOut,
+            'avgHours'    => $avgHours,
+            'resigned'    => count($resignedEmployees),
+            'newJoined'   => count($newJoinedEmployees)
+        ],
+        'staffWorkerStats' => [
+            'staffTotal'        => count($staffEmpIds),
+            'staffPresent'      => $staffPresent,
+            'staffHalfPresent'  => $staffHalfPresent,
+            'staffWeeklyOff'    => $staffWeeklyOff,
+            'staffAbsent'       => $staffAbsent,
+            'workerTotal'       => count($workerEmpIds),
+            'workerPresent'     => $workerPresent,
+            'workerHalfPresent' => $workerHalfPresent,
+            'workerWeeklyOff'   => $workerWeeklyOff,
+            'workerAbsent'      => $workerAbsent,
+        ],
         'employees' => $employees,
         'attendanceLogs' => $logs,
         'counts' => $counts,
