@@ -360,7 +360,7 @@ class AttendanceView {
 
     const cards = [
       {
-        key: null,
+        key: "totalHeadcount",
         label: "Total Headcount",
         val: stats.total,
         icon: "ph-users",
@@ -2024,8 +2024,18 @@ class AttendanceView {
     try {
       const [year, month, day] = dateStr.split("-");
       const monthNames = [
-        "january", "february", "march", "april", "may", "june",
-        "july", "august", "september", "october", "november", "december"
+        "january",
+        "february",
+        "march",
+        "april",
+        "may",
+        "june",
+        "july",
+        "august",
+        "september",
+        "october",
+        "november",
+        "december",
       ];
       const monthIndex = parseInt(month) - 1;
       if (monthIndex < 0 || monthIndex > 11) return dateStr;
@@ -2663,6 +2673,7 @@ class AttendanceView {
     }
 
     const titleMap = {
+      totalHeadcount: "👥 All Employees",
       present: "✅ Present Employees",
       halfPresent: "½ Half Day Employees",
       weeklyOff: "📅 Weekly Off Employees",
@@ -2679,7 +2690,8 @@ class AttendanceView {
     const isResignedOnly = key === "resigned";
     const isNewJoinedOnly = key === "newJoined";
     const isStaffList = key === "staffList";
-    const isWorkerList = key === "workerList";
+	const isWorkerList = key === "workerList";
+	const isTotalHeadcount = key === "totalHeadcount";
     const isHalfPresent = key === "halfPresent";
     const isWeeklyOff = key === "weeklyOff";
     const pageSize = 10;
@@ -2704,17 +2716,17 @@ class AttendanceView {
       ];
     } else if (isNewJoinedOnly) {
       headers = ["Sr.No", "Code", "Name", "Dept", "Company", "DOJ", "Status"];
-    } else if (isStaffList || isWorkerList) {
-      headers = [
-        "Sr.No",
-        "Code",
-        "Name",
-        "Dept",
-        "Company",
-        "Designation",
-        "Shift",
-        "Location",
-      ];
+    } else if (isStaffList || isWorkerList || isTotalHeadcount) {
+		headers = [
+			"Sr.No",
+			"Code",
+			"Name",
+			"Dept",
+			"Company",
+			"Designation",
+			"Shift",
+			"Location",
+		];
     } else if (key === "lateIn") {
       headers = [
         "Sr.No",
@@ -2773,7 +2785,7 @@ class AttendanceView {
         }
         const sr = (currentPage - 1) * pageSize + i + 1;
 
-        if (isStaffList || isWorkerList) {
+        if (isStaffList || isWorkerList || isTotalHeadcount) {
           return `
 				<tr>
 					<td>${sr}</td>
@@ -2876,7 +2888,7 @@ class AttendanceView {
         };
       }
 
-      if (key === "staffList" || key === "workerList") {
+      if (key === "staffList" || key === "workerList" || key === "totalHeadcount") {
         return {
           Code: emp?.code,
           Name: emp?.name,

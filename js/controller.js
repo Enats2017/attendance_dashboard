@@ -46,6 +46,9 @@ class AttendanceController {
         this.view.bindStatCardClick((key) => {
             let items = [];
             switch (key) {
+                case 'totalHeadcount':
+                    items = model.getAllEmployees();
+                    break;
                 case 'present': 
                     items = this.model.getPresentEmployees(); 
                     break;

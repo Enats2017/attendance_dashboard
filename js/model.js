@@ -331,6 +331,13 @@ class AttendanceModel {
         return { companies, depts, shifts, locations };
     }
 
+
+    getAllEmployees() {
+        const { emps } = this.getFilteredData();
+        return emps.map(emp => ({ log: null, emp, date: null }));
+    }
+
+
     getPresentEmployees() {
         const { filters } = this.state;
         const { logs, emps } = this.getFilteredData();
