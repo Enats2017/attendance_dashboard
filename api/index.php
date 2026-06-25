@@ -896,7 +896,6 @@ function handleDashboardData($input, $returnData = false) {
         $curDate->modify('+1 month');
     }
 
-    // ---- Resolve shift for each AttendanceLog using InTime + ShiftGroup ----
     foreach ($logs as &$log) {
         $empId = $log['empId'];
         $groupId = $empShiftGroupMap[$empId] ?? null;
@@ -1039,7 +1038,7 @@ function handleDashboardData($input, $returnData = false) {
 		if (!isset($validEmpIdSet[$empId])) {
 			continue;
 		}
-		$counts['in']  += $stat['inCount']  ?? 0;
+		$counts['in']  += $stat['inCount'] ?? 0;
 		$counts['out'] += $stat['outCount'] ?? 0;
 	}
 
@@ -1064,7 +1063,7 @@ function handleDashboardData($input, $returnData = false) {
 			continue;
 		}
 
-		$hasIn = ($stat['inCount']  ?? 0) >= 1;
+		$hasIn = ($stat['inCount'] ?? 0) >= 1;
 		$hasOut = ($stat['outCount'] ?? 0) >= 1;
 
 		$shiftTimes = $empShiftTimeMap[$empId] ?? ['start' => null, 'end' => null];
@@ -1116,7 +1115,7 @@ function handleDashboardData($input, $returnData = false) {
     foreach ($logs as $log) {
         $key = $log['empId'] . '_' . $log['date'];
         $present = floatval($log['present']);
-        $absent  = floatval($log['absent']);
+        $absent = floatval($log['absent']);
 
         if ($present == 1 && $absent == 0) {
             $hasBothPunches = ($log['missedInPunch'] == 0 && $log['missedOutPunch'] == 0);
@@ -1222,31 +1221,31 @@ function handleDashboardData($input, $returnData = false) {
     echo json_encode([
         'success' => true,
         'todayStats' => [
-            'present'     => $presentEmployees,
+            'present' => $presentEmployees,
             'halfPresent' => $halfPresentTotal,
-            'weeklyOff'   => $weeklyOffTotal,
-            'absent'      => $absentEmployees,
-            'total'       => $totalEmployees,
+            'weeklyOff' => $weeklyOffTotal,
+            'absent' => $absentEmployees,
+            'total' => $totalEmployees,
             'singlePunch' => $singlePunch,
-            'lateIn'      => $lateIn,
-            'earlyOut'    => $earlyOut,
-            'avgHours'    => $avgHours,
-            'resigned'    => count($resignedEmployees),
-            'newJoined'   => count($newJoinedEmployees)
+            'lateIn' => $lateIn,
+            'earlyOut' => $earlyOut,
+            'avgHours' => $avgHours,
+            'resigned' => count($resignedEmployees),
+            'newJoined' => count($newJoinedEmployees)
         ],
 		'singlePunchKeys' => $singlePunchKeys,
 		'singlePunchData' => $singlePunchData,
         'staffWorkerStats' => [
-            'staffTotal'        => count($staffEmpIds),
-            'staffPresent'      => $staffPresent,
-            'staffHalfPresent'  => $staffHalfPresent,
-            'staffWeeklyOff'    => $staffWeeklyOff,
-            'staffAbsent'       => $staffAbsent,
-            'workerTotal'       => count($workerEmpIds),
-            'workerPresent'     => $workerPresent,
+            'staffTotal' => count($staffEmpIds),
+            'staffPresent' => $staffPresent,
+            'staffHalfPresent' => $staffHalfPresent,
+            'staffWeeklyOff' => $staffWeeklyOff,
+            'staffAbsent' => $staffAbsent,
+            'workerTotal' => count($workerEmpIds),
+            'workerPresent' => $workerPresent,
             'workerHalfPresent' => $workerHalfPresent,
-            'workerWeeklyOff'   => $workerWeeklyOff,
-            'workerAbsent'      => $workerAbsent,
+            'workerWeeklyOff' => $workerWeeklyOff,
+            'workerAbsent' => $workerAbsent,
         ],
         'employees' => $employees,
         'attendanceLogs' => $logs,
