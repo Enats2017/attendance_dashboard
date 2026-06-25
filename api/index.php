@@ -430,7 +430,6 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
             'rate' => $row['total'] > 0 ? round(($row['present'] / $row['total']) * 100) : 0
         ];
     }
-
     return $result;
 }
 
@@ -455,6 +454,7 @@ function handleDashboardData($input, $returnData = false) {
     $deptName = isset($input['dept']) && $input['dept'] !== 'All' ? $input['dept'] : null;
     $compName = isset($input['company']) && $input['company'] !== 'All' ? $input['company'] : null;
     $shiftName = isset($input['shift']) && $input['shift'] !== 'All' ? $input['shift'] : null;
+    $locationFilter = isset($input['location']) && $input['location'] !== 'All' ? $input['location'] : null;
     $conn = getSQLServer();
 
     $userLocations = $_SESSION['locations'] ?? [];
@@ -520,6 +520,11 @@ function handleDashboardData($input, $returnData = false) {
     if ($shiftName) { 
         $sqlEmp .= " AND E.EmployeeId IN (" . implode(',', $shiftFilteredIds) . ")"; 
     }
+
+    if ($locationFilter) {
+        $sqlEmp .= " AND L.LocationName = ?";
+        $paramsEmp[] = $locationFilter;
+    }
     
     $sqlEmp .= " ORDER BY D.DepartmentFName ASC, E.EmployeeName ASC";
 
@@ -542,6 +547,8 @@ function handleDashboardData($input, $returnData = false) {
                 'designation' => $row['DesignationName'] ?: 'Staff',
                 'designationSortOrder' => isset($row['designationSortOrder']) ? intval($row['designationSortOrder']) : 0,
                 'shift' => isset($empShiftMap[(string)$row['EmployeeId']]) ? $empShiftMap[(string)$row['EmployeeId']] : 'No Shift',
+                'shiftStart' => isset($empShiftTimeMap[(string)$row['EmployeeId']]) ? $empShiftTimeMap[(string)$row['EmployeeId']]['start'] : null,
+                'shiftEnd' => isset($empShiftTimeMap[(string)$row['EmployeeId']]) ? $empShiftTimeMap[(string)$row['EmployeeId']]['end']   : null,
                 'location' => $row['location'] ?: 'Head Office'
             ];
         }
@@ -573,6 +580,10 @@ function handleDashboardData($input, $returnData = false) {
     if ($compName) { 
         $sqlResigned .= " AND C.CompanyFName = ?"; 
         $paramsResigned[] = $compName; 
+    }
+    if ($locationFilter) {
+        $sqlResigned .= " AND L.LocationName = ?";
+        $paramsResigned[] = $locationFilter;
     }
     $sqlResigned .= " ORDER BY D.DepartmentFName ASC, E.EmployeeName ASC";
 
@@ -606,6 +617,10 @@ function handleDashboardData($input, $returnData = false) {
     if ($compName) { 
         $sqlNewJoined .= " AND C.CompanyFName = ?"; 
         $paramsNewJoined[] = $compName; 
+    }
+    if ($locationFilter) {
+        $sqlNewJoined .= " AND L.LocationName = ?";
+        $paramsNewJoined[] = $locationFilter;
     }
     $sqlNewJoined .= " ORDER BY D.DepartmentFName ASC, E.EmployeeName ASC";
 
@@ -654,7 +669,7 @@ function handleDashboardData($input, $returnData = false) {
         $tableExists = isset($allTableNames[$logTable]);
 
         if ($tableExists) {
-            $sqlLogs = "SELECT A.EmployeeId, A.AttendanceDate, A.InTime, A.OutTime, A.Status, A.Duration, A.LateBy, A.EarlyBy, A.ComplinFreeLateBy, A.ComplinFreeEarlyBy, A.Present, A.Absent, A.WeeklyOff, A.Holiday, A.IsOnLeave, A.IsPartialDay, A.MissedInPunch, A.MissedOutPunch, A.ShiftId, S.ShiftCode, S.ShiftName, S.BeginTime, S.EndTime FROM $logTable A WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON A.EmployeeId = E.EmployeeId LEFT JOIN Shifts S WITH (NOLOCK) ON A.ShiftId = S.ShiftId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND A.AttendanceDate >= '$dayFrom' AND A.AttendanceDate <= '$dayTo 23:59:59' AND E.Status = 'Working'";
+            $sqlLogs = "SELECT A.EmployeeId, A.AttendanceDate, A.InTime, A.OutTime, A.Status, A.Duration, A.LateBy, A.EarlyBy, A.ComplinFreeLateBy, A.ComplinFreeEarlyBy, A.Present, A.Absent, A.WeeklyOff, A.Holiday, A.IsOnLeave, A.IsPartialDay, A.MissedInPunch, A.MissedOutPunch, A.ShiftId, S.ShiftCode, S.ShiftName, S.BeginTime, S.EndTime FROM $logTable A WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON A.EmployeeId = E.EmployeeId LEFT JOIN Shifts S WITH (NOLOCK) ON A.ShiftId = S.ShiftId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND A.AttendanceDate >= '$dayFrom' AND A.AttendanceDate <= '$dayTo 23:59:59' AND E.Status = 'Working'";
 
             $paramsLogs = [];
             
@@ -670,6 +685,11 @@ function handleDashboardData($input, $returnData = false) {
             
             if ($shiftName) { 
                 $sqlLogs .= " AND A.EmployeeId IN (" . implode(',', $shiftFilteredIds) . ")"; 
+            }
+
+            if ($locationFilter) {
+                $sqlLogs .= " AND L.LocationName = ?";
+                $paramsLogs[] = $locationFilter;
             }
 
             $stmtLogs = sqlsrv_query($conn, $sqlLogs, $paramsLogs);
@@ -731,7 +751,7 @@ function handleDashboardData($input, $returnData = false) {
             
             $devTables[] = $devTable;
 
-            $sqlDevRaw = "SELECT D.AttDirection, D.LogDate, CAST(D.LogDate AS DATE) AS PunchDate, E.EmployeeId FROM $devTable D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON CAST(D.UserId AS VARCHAR(50)) = CAST(E.EmployeeCodeInDevice AS VARCHAR(50)) LEFT JOIN Departments De WITH (NOLOCK) ON E.DepartmentId = De.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND D.LogDate >= '$dayFrom' AND D.LogDate <= '$dayTo 23:59:59' AND E.Status = 'Working' AND E.RecordStatus = 1";
+            $sqlDevRaw = "SELECT D.AttDirection, D.LogDate, CAST(D.LogDate AS DATE) AS PunchDate, E.EmployeeId FROM $devTable D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON CAST(D.UserId AS VARCHAR(50)) = CAST(E.EmployeeCodeInDevice AS VARCHAR(50)) LEFT JOIN Departments De WITH (NOLOCK) ON E.DepartmentId = De.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND D.LogDate >= '$dayFrom' AND D.LogDate <= '$dayTo 23:59:59' AND E.Status = 'Working' AND E.RecordStatus = 1";
 
             $paramsDevRaw = [];
 
@@ -743,6 +763,11 @@ function handleDashboardData($input, $returnData = false) {
             if ($compName) {
                 $sqlDevRaw .= " AND C.CompanyFName = ?";
                 $paramsDevRaw[] = $compName;
+            }
+
+            if ($locationFilter) {
+                $sqlDevRaw .= " AND L.LocationName = ?";
+                $paramsDevRaw[] = $locationFilter;
             }
 
             $stmtDevRaw = sqlsrv_query($conn, $sqlDevRaw, $paramsDevRaw);

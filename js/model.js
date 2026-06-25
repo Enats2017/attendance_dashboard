@@ -83,6 +83,7 @@ class AttendanceModel {
             url.searchParams.set('dept', this.state.filters.dept);
             url.searchParams.set('company', this.state.filters.company);
             url.searchParams.set('shift', this.state.filters.shift);
+            url.searchParams.set('location', this.state.filters.location);
             console.log('Dashboard URL:', url.toString());
             const response = await fetch(url.toString());
             const data = await response.json();
@@ -184,22 +185,46 @@ class AttendanceModel {
         const logs = data.attendanceLogs.filter(log => {
             const emp = empMap[log.empId];
             if (!emp) return false;
-            if (filters.dateFrom && log.date < filters.dateFrom) return false;
-            if (filters.dateTo && log.date > filters.dateTo) return false;
-            if (filters.company !== 'All' && emp.company !== filters.company) return false;
-            if (filters.dept !== 'All' && emp.dept !== filters.dept) return false;
-            if (filters.gender !== 'All' && emp.gender !== filters.gender) return false;
-            if (filters.shift !== 'All' && emp.shift !== filters.shift) return false;
-            if (filters.location !== 'All' && emp.location !== filters.location) return false;
+            if (filters.dateFrom && log.date < filters.dateFrom) {
+                return false;
+            }
+            if (filters.dateTo && log.date > filters.dateTo) {
+                return false;
+            }
+            if (filters.company !== 'All' && emp.company !== filters.company) {
+                return false;
+            }
+            if (filters.dept !== 'All' && emp.dept !== filters.dept) {
+                return false;
+            }
+            if (filters.gender !== 'All' && emp.gender !== filters.gender) {
+                return false;
+            }
+            if (filters.shift !== 'All' && emp.shift !== filters.shift) {
+                return false;
+            }
+            if (filters.location !== 'All' && emp.location !== filters.location) {
+                return false;
+            }
             return true;
         });
 
         const emps = data.employees.filter(emp => {
-            if (filters.company !== 'All' && emp.company !== filters.company) return false;
-            if (filters.dept !== 'All' && emp.dept !== filters.dept) return false;
-            if (filters.gender !== 'All' && emp.gender !== filters.gender) return false;
-            if (filters.shift !== 'All' && emp.shift !== filters.shift) return false;
-            if (filters.location !== 'All' && emp.location !== filters.location) return false;
+            if (filters.company !== 'All' && emp.company !== filters.company) {
+                return false;
+            }
+            if (filters.dept !== 'All' && emp.dept !== filters.dept) {
+                return false;
+            }
+            if (filters.gender !== 'All' && emp.gender !== filters.gender) {
+                return false;
+            }
+            if (filters.shift !== 'All' && emp.shift !== filters.shift) {
+                return false;
+            }
+            if (filters.location !== 'All' && emp.location !== filters.location) {
+                return false;
+            }
             return true;
         });
 
@@ -231,7 +256,9 @@ class AttendanceModel {
         const now = new Date();
         let age = now.getFullYear() - birth.getFullYear();
         const m = now.getMonth() - birth.getMonth();
-        if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
+        if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) {
+            age--;
+        }
         return age;
     }
 
@@ -270,12 +297,21 @@ class AttendanceModel {
             let maxGap = 0, gap = 0, gapStart = null, maxGapStart = null;
             allDates.forEach(dt => {
                 if (dates.indexOf(dt) === -1) {
-                    if (gap === 0) gapStart = dt;
+                    if (gap === 0) {
+                        gapStart = dt;
+                    }
                     gap++;
-                    if (gap > maxGap) { maxGap = gap; maxGapStart = gapStart; }
-                } else { gap = 0; }
+                    if (gap > maxGap) { 
+                        maxGap = gap; 
+                        maxGapStart = gapStart; 
+                    }
+                } else {
+                    gap = 0; 
+                }
             });
-            if (maxGap >= 5) result.push({ emp: emp, maxGap: maxGap, gapStart: maxGapStart });
+            if (maxGap >= 5) {
+                result.push({ emp: emp, maxGap: maxGap, gapStart: maxGapStart });
+            }
         });
         return result;
     }
@@ -284,7 +320,9 @@ class AttendanceModel {
         const out = {};
         arr.forEach(item => {
             const k = keyFn(item);
-            if (!out[k]) out[k] = [];
+            if (!out[k]) {
+                out[k] = [];
+            }
             out[k].push(item);
         });
         return out;
@@ -321,8 +359,6 @@ class AttendanceModel {
     getFilterOptions() {
         const emps = this.state.data.employees || [];
         const uniq = (arr) => [...new Set(arr)].sort();
-        
-        // Use API-fetched lists for companies and depts, otherwise fallback to extracting from punches JSON
         const companies = this.state.filterLists ? this.state.filterLists.companies : uniq(emps.map(e => e.company));
         const depts = this.state.filterLists ? this.state.filterLists.depts : uniq(emps.map(e => e.dept));
         const shifts = this.state.filterLists ? this.state.filterLists.shifts : uniq(emps.map(e => e.shift));
@@ -501,8 +537,7 @@ class AttendanceModel {
                             earlyBy: 0,
                             shiftStart: punchInfo.shiftStart || null,
                             shiftEnd: punchInfo.shiftEnd || null
-                        },
-                        emp, date: dateStr
+                        }, emp, date: dateStr
                     });
                 }
             }
@@ -584,26 +619,40 @@ class AttendanceModel {
         const resigned = this.state.data.resignedEmployees || [];
         const { filters } = this.state;
         return resigned.filter(emp => {
-            if (filters.company !== 'All' && emp.company !== filters.company) return false;
-            if (filters.dept !== 'All' && emp.dept !== filters.dept) return false;
-            if (filters.gender !== 'All' && emp.gender !== filters.gender) return false;
-            if (filters.location !== 'All' && emp.location !== filters.location) return false;
+            if (filters.company !== 'All' && emp.company !== filters.company) {
+                return false;
+            }
+            if (filters.dept !== 'All' && emp.dept !== filters.dept) {
+                return false;
+            }
+            if (filters.gender !== 'All' && emp.gender !== filters.gender) {
+                return false;
+            }
+            if (filters.location !== 'All' && emp.location !== filters.location) {
+                return false;
+            }
             return true;
-        }).sort((a, b) => (b.dor || '').localeCompare(a.dor || ''))
-          .map(emp => ({ log: null, emp }));
+        }).sort((a, b) => (b.dor || '').localeCompare(a.dor || '')).map(emp => ({ log: null, emp }));
     }
 
     getNewJoinedEmployees() {
         const newJoined = this.state.data.newJoinedEmployees || [];
         const { filters } = this.state;
         return newJoined.filter(emp => {
-            if (filters.company !== 'All' && emp.company !== filters.company) return false;
-            if (filters.dept !== 'All' && emp.dept !== filters.dept) return false;
-            if (filters.gender !== 'All' && emp.gender !== filters.gender) return false;
-            if (filters.location !== 'All' && emp.location !== filters.location) return false;
+            if (filters.company !== 'All' && emp.company !== filters.company) {
+                return false;
+            }
+            if (filters.dept !== 'All' && emp.dept !== filters.dept) {
+                return false;
+            }
+            if (filters.gender !== 'All' && emp.gender !== filters.gender) {
+                return false;
+            }
+            if (filters.location !== 'All' && emp.location !== filters.location) {
+                return false;
+            }
             return true;
-        }).sort((a, b) => (b.doj || '').localeCompare(a.doj || ''))
-          .map(emp => ({ log: null, emp }));
+        }).sort((a, b) => (b.doj || '').localeCompare(a.doj || '')).map(emp => ({ log: null, emp }));
     }
 
     async fetchDesignationsOrder() {
@@ -655,12 +704,11 @@ class AttendanceModel {
         const map = {};
         logs.forEach(l => {
             const key = l.empId + '_' + l.date;
-            const present = parseFloat(l.present);
-            const absent  = parseFloat(l.absent);
+            const present = parseFloat(l.present ?? 0);
+            const absent = parseFloat(l.absent  ?? 0);
 
             if (present == 1 && absent == 0) {
                 const hasBothPunches = (l.missedInPunch == 0 && l.missedOutPunch == 0);
-                // Single punch treated as absent — getSinglePunchEmployees handles them separately
                 map[key] = hasBothPunches ? 'present' : 'absent';
             } else if (present == 0.5 && absent == 0.5) {
                 map[key] = 'halfPresent';
