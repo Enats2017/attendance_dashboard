@@ -477,6 +477,18 @@ function resolveShiftFromPunchTime($punchTimeStr, $shiftGroupId, $shiftGroupMap,
 }
 
 
+function getAllTeams($conn) {
+    $teamMap = [];
+    $stmt = sqlsrv_query($conn, "SELECT TeamId, TeamName FROM Team WHERE RecordStatus = 1");
+    if ($stmt) {
+        while ($r = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+            $teamMap[intval($r['TeamId'])] = $r['TeamName'];
+        }
+    }
+    return $teamMap;
+}
+
+
 /**
  * Handle Dashboard Data Fetch (Employees, Logs, Counts)
  */
@@ -500,6 +512,7 @@ function handleDashboardData($input, $returnData = false) {
     $shiftName = isset($input['shift']) && $input['shift'] !== 'All' ? $input['shift'] : null;
     $locationFilter = isset($input['location']) && $input['location'] !== 'All' ? $input['location'] : null;
     $conn = getSQLServer();
+    $allTeams = getAllTeams($conn);
 
     $userLocations = $_SESSION['locations'] ?? [];
     $userCompanies = $_SESSION['companies'] ?? [];
@@ -588,22 +601,34 @@ function handleDashboardData($input, $returnData = false) {
             ];
         }
 
-        $staffCategoryIds  = [58];
-        $workerCategoryIds = [51, 59, 60];
-
-        $staffEmpIds  = [];
-        $workerEmpIds = [];
-        foreach ($employees as $emp) {
-            if (in_array($emp['categoryId'], $staffCategoryIds)) {
-                $staffEmpIds[$emp['id']] = true;
-            } elseif (in_array($emp['categoryId'], $workerCategoryIds)) {
-                $workerEmpIds[$emp['id']] = true;
-            }
-        }
-
         $empShiftGroupMap = [];
         foreach ($employees as $emp) {
             $empShiftGroupMap[$emp['id']] = $emp['shiftGroupId'];
+        }
+
+        $empTeamMap = [];
+        $empIdList = implode(',', array_map('intval', array_column($employees, 'id')));
+        if (!empty($empIdList)) {
+            $stmtEmpTeam = sqlsrv_query($conn, "SELECT EmployeeId, Team FROM Employees WHERE EmployeeId IN ($empIdList)");
+            if ($stmtEmpTeam) {
+                while ($r = sqlsrv_fetch_array($stmtEmpTeam, SQLSRV_FETCH_ASSOC)) {
+                    $empTeamMap[(string)$r['EmployeeId']] = intval($r['Team']);
+                }
+            }
+        }
+
+        $staffTeamId  = 7;
+        $workerTeamId = 6;
+
+        $staffEmpIds = [];
+        $workerEmpIds = [];
+        foreach ($employees as $emp) {
+            $teamId = $empTeamMap[$emp['id']] ?? null;
+            if ($teamId === $staffTeamId) {
+                $staffEmpIds[$emp['id']] = true;
+            } elseif ($teamId === $workerTeamId) {
+                $workerEmpIds[$emp['id']] = true;
+            }
         }
     }
 
@@ -932,9 +957,10 @@ function handleDashboardData($input, $returnData = false) {
         $staffEmpIds  = [];
         $workerEmpIds = [];
         foreach ($employees as $emp) {
-            if (in_array($emp['categoryId'], [58])) {
+            $teamId = $empTeamMap[$emp['id']] ?? null;
+            if ($teamId === 7) {
                 $staffEmpIds[$emp['id']] = true;
-            } elseif (in_array($emp['categoryId'], [51, 59, 60])) {
+            } elseif ($teamId === 6) {
                 $workerEmpIds[$emp['id']] = true;
             }
         }
@@ -992,7 +1018,7 @@ function handleDashboardData($input, $returnData = false) {
             'shiftName' => $devResolved ? $devResolved['name'] : null,
             'shiftCode' => $devResolved ? $devResolved['code'] : null,
             'shiftStart' => $devResolved ? $devResolved['start'] : null,
-            'shiftEnd'   => $devResolved ? $devResolved['end']   : null,
+            'shiftEnd'   => $devResolved ? $devResolved['end'] : null,
         ];
 
         $employeesInAttendanceLogs[$key] = true;
@@ -1022,7 +1048,7 @@ function handleDashboardData($input, $returnData = false) {
 	$weeklyOffKeySet = [];
 	foreach ($logs as $log) {
 		$present = floatval($log['present']);
-		$absent  = floatval($log['absent']);
+		$absent = floatval($log['absent']);
 		if ($present == 0 && $absent == 0 && intval($log['weeklyOff']) == 1) {
 			$weeklyOffKeySet[$log['empId'] . '_' . $log['date']] = true;
 		}
