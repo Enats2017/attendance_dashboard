@@ -660,17 +660,14 @@ ${
           }
           if (c.type === "avgHours") {
             return `
-					<div class="stat-card stat-card-clickable"
-						data-card-key="avgHours"
-						onclick="AppController.view._showAvgHoursDrilldown()">
-						<div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-						<div class="stat-content">
-							<span class="stat-label">${c.label}</span>
-							<span class="stat-value">${c.val}</span>
-							<span class="stat-card-hint">↓ click to view</span>
-						</div>
-					</div>
-				`;
+        <div class="stat-card">
+            <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+            <div class="stat-content">
+                <span class="stat-label">${c.label}</span>
+                <span class="stat-value">${c.val}</span>
+            </div>
+        </div>
+    `;
           }
           // headcount
           return `
@@ -750,17 +747,14 @@ ${
           }
           if (c.type === "avgHours") {
             return `
-					<div class="stat-card stat-card-clickable"
-						data-card-key="avgHoursDept"
-						onclick="AppController.view._showAvgHoursDeptDrilldown()">
-						<div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-						<div class="stat-content">
-							<span class="stat-label">${c.label}</span>
-							<span class="stat-value">${c.val}</span>
-							<span class="stat-card-hint">↓ click to view</span>
-						</div>
-					</div>
-				`;
+        <div class="stat-card">
+            <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+            <div class="stat-content">
+                <span class="stat-label">${c.label}</span>
+                <span class="stat-value">${c.val}</span>
+            </div>
+        </div>
+    `;
           }
           // headcount
           return `
@@ -841,17 +835,14 @@ ${
           }
           if (c.type === "avgHours") {
             return `
-					<div class="stat-card stat-card-clickable"
-						data-card-key="avgHoursGender"
-						onclick="AppController.view._showAvgHoursGenderDrilldown()">
-						<div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-						<div class="stat-content">
-							<span class="stat-label">${c.label}</span>
-							<span class="stat-value">${c.val}</span>
-							<span class="stat-card-hint">↓ click to view</span>
-						</div>
-					</div>
-				`;
+        <div class="stat-card">
+            <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+            <div class="stat-content">
+                <span class="stat-label">${c.label}</span>
+                <span class="stat-value">${c.val}</span>
+            </div>
+        </div>
+    `;
           }
           // headcount
           return `
@@ -1015,17 +1006,14 @@ ${
           }
           if (c.type === "avgHours") {
             return `
-					<div class="stat-card stat-card-clickable"
-						data-card-key="avgHoursShift"
-						onclick="AppController.view._showAvgHoursShiftDrilldown()">
-						<div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-						<div class="stat-content">
-							<span class="stat-label">${c.label}</span>
-							<span class="stat-value">${c.val}</span>
-							<span class="stat-card-hint">↓ click to view</span>
-						</div>
-					</div>
-				`;
+        <div class="stat-card">
+            <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+            <div class="stat-content">
+                <span class="stat-label">${c.label}</span>
+                <span class="stat-value">${c.val}</span>
+            </div>
+        </div>
+    `;
           }
           // headcount
           return `
@@ -1115,17 +1103,14 @@ ${
           }
           if (c.type === "avgHours") {
             return `
-					<div class="stat-card stat-card-clickable"
-						data-card-key="avgHoursStaff"
-						onclick="AppController.view._showAvgHoursStaffDrilldown()">
-						<div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-						<div class="stat-content">
-							<span class="stat-label">${c.label}</span>
-							<span class="stat-value">${c.val}</span>
-							<span class="stat-card-hint">↓ click to view</span>
-						</div>
-					</div>
-				`;
+        <div class="stat-card">
+            <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+            <div class="stat-content">
+                <span class="stat-label">${c.label}</span>
+                <span class="stat-value">${c.val}</span>
+            </div>
+        </div>
+    `;
           }
           // headcount
           return `
@@ -1220,17 +1205,14 @@ ${
           }
           if (c.type === "avgHours") {
             return `
-					<div class="stat-card stat-card-clickable"
-						data-card-key="avgHoursWorker"
-						onclick="AppController.view._showAvgHoursWorkerDrilldown()">
-						<div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-						<div class="stat-content">
-							<span class="stat-label">${c.label}</span>
-							<span class="stat-value">${c.val}</span>
-							<span class="stat-card-hint">↓ click to view</span>
-						</div>
-					</div>
-				`;
+        <div class="stat-card">
+            <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+            <div class="stat-content">
+                <span class="stat-label">${c.label}</span>
+                <span class="stat-value">${c.val}</span>
+            </div>
+        </div>
+    `;
           }
           // headcount
           return `
