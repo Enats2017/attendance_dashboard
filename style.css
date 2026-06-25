@@ -315,7 +315,6 @@ body {
 
 .filter-actions {
     display: flex;
-    justify-content: flex-start;
     gap: 8px;
     padding: 8px;
 }
