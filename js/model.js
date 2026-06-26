@@ -283,7 +283,8 @@ class AttendanceModel {
         if (age < 35) return '25–34';
         if (age < 45) return '35–44';
         if (age < 55) return '45–54';
-        return '55+';
+        if (age < 60) return '55–59';
+        return '60+';
     }
 
 

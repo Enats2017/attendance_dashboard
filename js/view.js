@@ -455,14 +455,15 @@ class AttendanceView {
 
         // --- Age cards ---
         this._currentAgeData = { emps, model, dayLogs, empMap };
-        const ageGroups = ["Under 18", "Under 25", "25–34", "35–44", "45–54", "55+"];
+        const ageGroups = ["Under 18", "Under 25", "25–34", "35–44", "45–54", "55–59", "60+"];
         const ageGroupIcons = {
-            "Under 18": "ph-baby",
-            "Under 25": "ph-person-simple-run",
-            "25–34": "ph-user",
-            "35–44": "ph-user-circle",
-            "45–54": "ph-user-circle-gear",
-            "55+": "ph-user-focus",
+            "Under 18": "ph-baby",                  // Child
+            "Under 25": "ph-student",               // Student / Young Adult
+            "25–34": "ph-person-simple",            // Young Adult
+            "35–44": "ph-user-circle",              // Adult
+            "45–54": "ph-user-circle-gear",         // Experienced Professional
+            "55-59": "ph-user-focus",               // Senior Adult
+            "60+": "ph-person-simple-tai-chi"       // Elderly
         };
         const ageGroupCls = {
             "Under 18": "",
@@ -470,7 +471,8 @@ class AttendanceView {
             "25–34": "success",
             "35–44": "warning",
             "45–54": "accent",
-            "55+": "danger",
+            "55-59": "danger",
+            "60+": "accent"
         };
         const ageCounts = {};
         ageGroups.forEach(g => ageCounts[g] = 0);
@@ -561,21 +563,23 @@ class AttendanceView {
 
 
     _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
-        const groups = ["Under 18", "Under 25", "25–34", "35–44", "45–54", "55+"];
-        const groupIcons = {
-            "Under 18": "ph-baby",
-            "Under 25": "ph-person-simple-run",
-            "25–34": "ph-user",
-            "35–44": "ph-user-circle",
-            "45–54": "ph-user-circle-gear",
-            "55+": "ph-user-focus",
+        const groups = ["Under 18", "Under 25", "25–34", "35–44", "45–54", "55–59", "60+"];
+        const ageGroupIcons = {
+            "Under 18": "ph-baby",                  // Child
+            "Under 25": "ph-student",               // Student / Young Adult
+            "25–34": "ph-person-simple",            // Young Adult
+            "35–44": "ph-user-circle",              // Adult
+            "45–54": "ph-user-circle-gear",         // Experienced Professional
+            "55-59": "ph-user-focus",               // Senior Adult
+            "60+": "ph-person-simple-tai-chi"       // Elderly
         };
         const groupCls = {
             "Under 25": "info",
             "25–34": "success",
             "35–44": "warning",
             "45–54": "accent",
-            "55+": "danger",
+            "55-59": "danger",
+            "60+": "accent"
         };
 
         // Date-range ke hisaab se day-wise records banao (jaise chart me hota hai)
