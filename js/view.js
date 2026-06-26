@@ -1408,7 +1408,6 @@ class AttendanceView {
 
         const deptEmps = emps.filter((e) => e.dept === dept);
 
-        // unique designations, respecting designationSortOrder
         const desigMap = {};
         deptEmps.forEach((e) => {
             const name = e.designation || "Staff";
@@ -1417,7 +1416,9 @@ class AttendanceView {
                 desigMap[name] = { name, order };
             }
         });
-        const desigs = Object.values(desigMap).sort((a, b) => (a.order !== b.order ? a.order - b.order : a.name.localeCompare(b.name))).map((d) => d.name);
+        const desigs = Object.values(desigMap)
+            .sort((a, b) => (a.order !== b.order ? a.order - b.order : a.name.localeCompare(b.name)))
+            .map((d) => d.name);
 
         const desigCounts = {};
         desigs.forEach((d) => (desigCounts[d] = 0));
@@ -1434,6 +1435,7 @@ class AttendanceView {
         const colorCls = ["info", "success", "warning", "accent", "danger"];
         const desigCardsHtml = desigs.map((d, i) => `
             <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
+                style="flex: 0 1 180px;"
                 data-dashboard-desig="${this._escapeAttr(d)}"
                 onclick="AppController.view._showDashboardDesigDrilldown('${this._escapeAttr(d)}')">
                 <div class="stat-icon"><i class="ph ph-identification-badge"></i></div>
@@ -1449,24 +1451,25 @@ class AttendanceView {
         if (!panel) return;
         panel.style.display = "block";
         panel.innerHTML = `
-            <div class="drilldown-box">
-                <div class="drilldown-header">
-                    <div class="drilldown-title">🔍 Dept: ${dept} — Designations</div>
-                    <div class="drilldown-btn-group">
-                        <button class="btn-drill btn-drill-back" onclick="AppController.view._closeStatCardDrilldown()">✕ Close</button>
-                    </div>
-                </div>
-                <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); padding:16px 0;">
-                    ${desigCardsHtml || '<p style="padding:16px;color:#94a3b8;">No designations found.</p>'}
-                </div>
+            <div style="
+                font-size:10px;font-weight:700;text-transform:uppercase;
+                letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px;
+                display:flex;align-items:center;gap:8px;
+            ">
+                BY ${dept.toUpperCase()} DEPARTMENT DESIGNATIONS
+                <span style="flex:1;height:1px;background:#e5e7eb;display:block;"></span>
             </div>
+            <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                ${desigCardsHtml || '<p style="padding:16px;color:#94a3b8;">No designations found.</p>'}
+            </div>
+            <div id="dashboard-desig-table-container" style="margin-top:8px;"></div>
         `;
         panel.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
 
     _showDashboardDesigDrilldown(designation) {
-        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
+        document.querySelectorAll('.stat-card-clickable[data-dashboard-desig]').forEach((c) => c.classList.remove("active"));
         const card = this.app.querySelector(`.stat-card-clickable[data-dashboard-desig="${designation}"]`);
         if (card) card.classList.add("active");
 
@@ -1485,7 +1488,20 @@ class AttendanceView {
             date: l.date,
         }));
 
-        this._renderStatCardDrilldown("dashboardDesig_" + designation, items, 1);
+        this._renderStatCardDrilldown(
+            "dashboardDesig_" + designation,
+            items,
+            1,
+            "dashboard-desig-table-container",
+            "AppController.view._closeDashboardDesigTable()"
+        );
+    }
+
+
+    _closeDashboardDesigTable() {
+        const c = document.getElementById("dashboard-desig-table-container");
+        if (c) c.innerHTML = "";
+        document.querySelectorAll('.stat-card-clickable[data-dashboard-desig]').forEach((el) => el.classList.remove("active"));
     }
 
     
@@ -3342,11 +3358,12 @@ class AttendanceView {
         });
     }
 
-    _renderStatCardDrilldown(key, items, page = 1) {
+    _renderStatCardDrilldown(key, items, page = 1, containerId = "stat-card-drilldown", closeHandler = "AppController.view._closeStatCardDrilldown()") {
         this._statCardKey = key;
         this._statCardItems = items;
 
-        const panel = document.getElementById("stat-card-drilldown");
+        const panel = document.getElementById(containerId);
+
         if (!panel) {
             return;
         }
@@ -3380,6 +3397,7 @@ class AttendanceView {
         const isShiftSummary = key.startsWith("shiftSummary_");
         const isStaffSummary = key.startsWith("staffSummary_");
         const isWorkerSummary = key.startsWith("workerSummary_");
+        const isDashboardDesig = key.startsWith("dashboardDesig_");
         const isNewJoinedOnly = key === "newJoined";
         const isStaffList = key === "staffList";
         const isWorkerList = key === "workerList";
@@ -3498,7 +3516,7 @@ class AttendanceView {
         for (let i = startP; i <= endP; i++) {
             pageButtons += `
                 <button class="btn-page ${i === currentPage ? "btn-page-active" : ""}"
-                    onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, ${i})">
+                    onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, ${i}, '${containerId}', '${closeHandler}')">
                     ${i}
                 </button>
             `;
@@ -3576,7 +3594,7 @@ class AttendanceView {
 			<div class="drilldown-box">
 				<div class="drilldown-header">
 					<div class="drilldown-title">
-                        ${titleMap[key] || (isAgeGroup ? "🎂 Age Group: " + key.replace("ageGroup_", "") : isCompany ? "🏢 Company: " + key.replace("company_", "") : isDeptSummary ? "💼 Dept: " + key.replace("deptSummary_", "") : isGenderSummary ? "⚧ Gender: " + key.replace("genderSummary_", "") : isShiftSummary ? "🕐 Shift: " + key.replace("shiftSummary_", "") : isStaffSummary ? "👔 Staff Dept: " + key.replace("staffSummary_", "") : isWorkerSummary ? "🔧 Workmen Dept: " + key.replace("workerSummary_", "") : key)}
+                        ${titleMap[key] || (isAgeGroup ? "🎂 Age Group: " + key.replace("ageGroup_", "") : isCompany ? "🏢 Company: " + key.replace("company_", "") : isDeptSummary ? "💼 Dept: " + key.replace("deptSummary_", "") : isGenderSummary ? "⚧ Gender: " + key.replace("genderSummary_", "") : isShiftSummary ? "🕐 Shift: " + key.replace("shiftSummary_", "") : isStaffSummary ? "👔 Staff Dept: " + key.replace("staffSummary_", "") : isWorkerSummary ? "🔧 Workmen Dept: " + key.replace("workerSummary_", "") : isDashboardDesig ? "🏷️ Designation: " + key.replace("dashboardDesig_", "") : key)}
 						<small>${items.length} records</small>
 					</div>
 					<div class="drilldown-btn-group">
@@ -3585,9 +3603,9 @@ class AttendanceView {
 							↓ Excel
 						</button>
 						<button class="btn-drill btn-drill-back"
-							onclick="AppController.view._closeStatCardDrilldown()">
-							✕ Close
-						</button>
+                            onclick="${closeHandler}">
+                            ✕ Close
+                        </button>
 					</div>
 				</div>
 
@@ -3607,7 +3625,7 @@ class AttendanceView {
 					</div>
 					<div class="pagination-buttons">
 						<button class="btn-page" ${currentPage === 1 ? "disabled" : ""}
-							onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, 1)">«</button>
+                            onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, 1, '${containerId}', '${closeHandler}')">«</button>
 						<button class="btn-page" ${currentPage === 1 ? "disabled" : ""}
 							onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, ${currentPage - 1})">‹</button>
 						${pageButtons}
