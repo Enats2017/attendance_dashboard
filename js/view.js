@@ -22,6 +22,8 @@ class AttendanceView {
             { id: "newjoined", label: "New Joined", icon: "ph-user-plus" },
             { id: "special", label: "Critical Alerts", icon: "ph-warning-circle", },
             { id: "designation_order", label: "Designations Order", icon: "ph-sliders", },
+            { id: "sort_order", label: "Sort Order Settings", icon: "ph-sort-ascending" },
+
         ];
         this._lastData = {};
         this._renderToken = 0;
@@ -52,7 +54,7 @@ class AttendanceView {
 				<div class="main-content">
 					${this._renderTopbar(state)}
 					<div class="content-body">
-						${this._renderFilters(state.filters, filterOpts)}
+						${state.activeTab !== "feature" ? this._renderFilters(state.filters, filterOpts) : ""}
                         ${
                             state.activeTab === "age"
                                 ? this._renderAgeSummaryCards(emps, stats, model, logs, empMap,) : state.activeTab === "company"
@@ -65,7 +67,8 @@ class AttendanceView {
                                 ? this._renderStaffSummaryCards(emps, stats, model, logs, empMap,) : state.activeTab === "worker"
                                 ? this._renderWorkerSummaryCards(emps, stats, model, logs, empMap,) : state.activeTab === "resigned"
                                 ? this._renderResignedSummaryCards(stats,) : state.activeTab === "newjoined"
-                                ? this._renderNewJoinedSummaryCards(stats,) : this._renderSummaryCards(stats,)
+                                ? this._renderNewJoinedSummaryCards(stats,) : state.activeTab === "feature"
+                                ? this._renderDashboardSummaryCards(emps, stats, model, logs, empMap) : this._renderSummaryCards(stats,)
                         }
 						<div id="stat-card-drilldown" class="stat-drilldown-panel" style="display:none;"></div>
 						<div class="tab-pane-container">
@@ -336,8 +339,8 @@ class AttendanceView {
             { key: "lateIn", label: "Late In", val: stats.lateIn, icon: "ph-clock-afternoon", cls: "info", },
             { key: "earlyOut", label: "Early Out", val: stats.earlyOut, icon: "ph-sign-out", cls: "accent", },
             { key: null, label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", },
-            { key: "staffList", label: "Staff", val: staffWorkerStats.staffTotal || 0, icon: "ph-identification-badge", cls: "info", },
-            { key: "workerList", label: "Workmen", val: staffWorkerStats.workerTotal || 0, icon: "ph-hard-hat", cls: "warning", },
+            { key: "staffList", label: "Staff Present", val: (staffWorkerStats.staffPresent || 0) + (staffWorkerStats.staffHalfPresent || 0), icon: "ph-identification-badge", cls: "info", },
+            { key: "workerList", label: "Workmen Present", val: (staffWorkerStats.workerPresent || 0) + (staffWorkerStats.workerHalfPresent || 0), icon: "ph-hard-hat", cls: "warning", },
             { key: "newJoined", label: "New Join", val: stats.newJoined || 0, icon: "ph-user-plus", cls: "success", },
             { key: "resigned", label: "Resigned", val: stats.resigned || 0, icon: "ph-user-minus", cls: "danger", },
         ];
@@ -359,10 +362,209 @@ class AttendanceView {
 		`;
     }
 
+
+    _renderDashboardSummaryCards(emps, stats, model, logs, empMap) {
+        const { dateFrom, dateTo } = model.state.filters;
+        const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
+        const staffWorkerStats = this._staffWorkerStats || {};
+
+        // --- Headcount ---
+        const headcountCard = `
+            <div class="stat-card stat-card-clickable" data-card-key="totalHeadcount">
+                <div class="stat-icon"><i class="ph ph-users"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">Total Headcount</span>
+                    <span class="stat-value">${stats.total}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+        `;
+
+        // --- Company cards ---
+        this._currentCompanyData = { emps, model, dayLogs, empMap };
+        const companies = [...new Set(emps.map(e => e.company))];
+        const companyCounts = {};
+        companies.forEach(c => companyCounts[c] = 0);
+        dayLogs.forEach(l => {
+            const e = empMap[l.empId];
+            if (e && companyCounts[e.company] !== undefined) companyCounts[e.company]++;
+        });
+        const compColorCls = ["info", "success", "warning", "accent", "danger"];
+        const companyCards = companies.map((c, i) => `
+            <div class="stat-card ${compColorCls[i % compColorCls.length]} stat-card-clickable"
+                data-company="${this._escapeAttr(c)}"
+                onclick="AppController.view._showCompanyDrilldown('${this._escapeAttr(c)}')">
+                <div class="stat-icon"><i class="ph ph-buildings"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">${c}</span>
+                    <span class="stat-value">${companyCounts[c]}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+        `).join("");
+
+        // --- Gender ---
+        this._currentGenderSummaryData = { emps, model, dayLogs, empMap };
+        const genderCounts = { Male: 0, Female: 0 };
+        dayLogs.forEach(l => {
+            const e = empMap[l.empId];
+            if (e && genderCounts[e.gender] !== undefined) genderCounts[e.gender]++;
+        });
+        const genderCards = `
+            <div class="stat-card info stat-card-clickable"
+                data-gender="Male"
+                onclick="AppController.view._showGenderSummaryDrilldown('Male')">
+                <div class="stat-icon"><i class="ph ph-gender-male"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">Male</span>
+                    <span class="stat-value">${genderCounts.Male}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+            <div class="stat-card accent stat-card-clickable"
+                data-gender="Female"
+                onclick="AppController.view._showGenderSummaryDrilldown('Female')">
+                <div class="stat-icon"><i class="ph ph-gender-female"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">Female</span>
+                    <span class="stat-value">${genderCounts.Female}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+        `;
+
+        // --- Staff / Workmen ---
+        const swCards = `
+            <div class="stat-card info stat-card-clickable" data-card-key="staffList">
+                <div class="stat-icon"><i class="ph ph-identification-badge"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">Staff</span>
+                    <span class="stat-value">${staffWorkerStats.staffTotal || 0}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+            <div class="stat-card warning stat-card-clickable" data-card-key="workerList">
+                <div class="stat-icon"><i class="ph ph-hard-hat"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">Workmen</span>
+                    <span class="stat-value">${staffWorkerStats.workerTotal || 0}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+        `;
+
+        // --- Age cards ---
+        this._currentAgeData = { emps, model, dayLogs, empMap };
+        const ageGroups = ["Under 18", "Under 25", "25–34", "35–44", "45–54", "55+"];
+        const ageGroupIcons = {
+            "Under 18": "ph-baby",
+            "Under 25": "ph-person-simple-run",
+            "25–34": "ph-user",
+            "35–44": "ph-user-circle",
+            "45–54": "ph-user-circle-gear",
+            "55+": "ph-user-focus",
+        };
+        const ageGroupCls = {
+            "Under 18": "",
+            "Under 25": "info",
+            "25–34": "success",
+            "35–44": "warning",
+            "45–54": "accent",
+            "55+": "danger",
+        };
+        const ageCounts = {};
+        ageGroups.forEach(g => ageCounts[g] = 0);
+        dayLogs.forEach(l => {
+            const e = empMap[l.empId];
+            if (!e) return;
+            const g = model.getAgeGroup(e.dob);
+            if (ageCounts[g] !== undefined) ageCounts[g]++;
+        });
+        const ageCards = ageGroups.map(g => `
+            <div class="stat-card ${ageGroupCls[g]} stat-card-clickable"
+                data-age-group="${this._escapeAttr(g)}"
+                onclick="AppController.view._showAgeGroupDrilldown('${this._escapeAttr(g)}')">
+                <div class="stat-icon"><i class="ph ${ageGroupIcons[g]}"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">${g}</span>
+                    <span class="stat-value">${ageCounts[g]}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+        `).join("");
+
+        // --- Department cards ---
+        this._currentDashboardDeptData = { emps, model, dayLogs, empMap };
+        const dashDepts = [...new Set(emps.map(e => e.dept))];
+        const dashDeptCounts = {};
+        dashDepts.forEach(d => dashDeptCounts[d] = 0);
+        dayLogs.forEach(l => {
+            const e = empMap[l.empId];
+            if (e && dashDeptCounts[e.dept] !== undefined) dashDeptCounts[e.dept]++;
+        });
+        const dashDeptColorCls = ["info", "success", "warning", "accent", "danger"];
+        const dashDeptCards = dashDepts.map((d, i) => `
+            <div class="stat-card ${dashDeptColorCls[i % dashDeptColorCls.length]} stat-card-clickable"
+                data-dashboard-dept="${this._escapeAttr(d)}"
+                onclick="AppController.view._showDashboardDeptDrilldown('${this._escapeAttr(d)}')">
+                <div class="stat-icon"><i class="ph ph-briefcase"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">${d}</span>
+                    <span class="stat-value">${dashDeptCounts[d]}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+        `).join("");
+
+        // Section label style (inline so no CSS file change needed)
+        const sectionLabel = (text) => `
+            <div style="
+                font-size:10px;font-weight:700;text-transform:uppercase;
+                letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px;
+                display:flex;align-items:center;gap:8px;
+            ">
+                ${text}
+                <span style="flex:1;height:1px;background:#e5e7eb;display:block;"></span>
+            </div>
+        `;
+
+        return `
+            <div style="margin-bottom:28px;">
+                ${sectionLabel("Overview")}
+                <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                    ${headcountCard}
+                </div>
+
+                ${sectionLabel("By Company")}
+                <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                    ${companyCards}
+                </div>
+
+                ${sectionLabel("Gender & Workforce Type")}
+                <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                    ${genderCards}
+                    ${swCards}
+                </div>
+
+                ${sectionLabel("By Age Group")}
+                <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));">
+                    ${ageCards}
+                </div>
+
+                ${sectionLabel("By Department")}
+                <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                    ${dashDeptCards}
+                </div>
+            </div>
+        `;
+    }
+
+
     _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
-        const groups = ["Under 25", "25–34", "35–44", "45–54", "55+"];
+        const groups = ["Under 18", "Under 25", "25–34", "35–44", "45–54", "55+"];
         const groupIcons = {
-            "Under 25": "ph-baby",
+            "Under 18": "ph-baby",
+            "Under 25": "ph-person-simple-run",
             "25–34": "ph-user",
             "35–44": "ph-user-circle",
             "45–54": "ph-user-circle-gear",
@@ -399,8 +601,7 @@ class AttendanceView {
 
         return `
 		<div class="summary-grid">
-			${cards.map(
-                    (c) => `
+			${cards.map((c) => `
 				<div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
 					${c.key === "totalHeadcount" ? `data-card-key="totalHeadcount"` : ""}
 					${c.ageGroup ? `data-age-group="${this._escapeAttr(c.ageGroup)}" onclick="AppController.view._showAgeGroupDrilldown('${this._escapeAttr(c.ageGroup)}')"` : ""}>
@@ -421,7 +622,7 @@ class AttendanceView {
         const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo,);
         this._currentCompanyData = { emps, model, dayLogs, empMap };
 
-        const companies = [...new Set(emps.map((e) => e.company))].sort();
+        const companies = [...new Set(emps.map((e) => e.company))];
         const colorCls = ["info", "success", "warning", "accent", "danger"];
 
         const counts = {};
@@ -491,7 +692,7 @@ class AttendanceView {
         const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo,);
         this._currentDeptSummaryData = { emps, model, dayLogs, empMap };
 
-        const depts = [...new Set(emps.map((e) => e.dept))].sort();
+        const depts = [...new Set(emps.map((e) => e.dept))];
         const colorCls = ["info", "success", "warning", "accent", "danger"];
 
         const counts = {};
@@ -1171,6 +1372,7 @@ class AttendanceView {
         this._renderStatCardDrilldown("avgHours", items, 1);
     }
 
+
     _showAgeGroupDrilldown(group) {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
         const card = this.app.querySelector(`.stat-card-clickable[data-age-group="${group}"]`,);
@@ -1194,6 +1396,99 @@ class AttendanceView {
         this._renderStatCardDrilldown("ageGroup_" + group, items, 1);
     }
 
+
+    _showDashboardDeptDrilldown(dept) {
+        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(`.stat-card-clickable[data-dashboard-dept="${dept}"]`);
+        if (card) card.classList.add("active");
+
+        const data = this._currentDashboardDeptData;
+        if (!data) return;
+        const { emps, dayLogs, empMap } = data;
+
+        const deptEmps = emps.filter((e) => e.dept === dept);
+
+        // unique designations, respecting designationSortOrder
+        const desigMap = {};
+        deptEmps.forEach((e) => {
+            const name = e.designation || "Staff";
+            const order = e.designationSortOrder || 0;
+            if (!desigMap[name] || order < desigMap[name].order) {
+                desigMap[name] = { name, order };
+            }
+        });
+        const desigs = Object.values(desigMap).sort((a, b) => (a.order !== b.order ? a.order - b.order : a.name.localeCompare(b.name))).map((d) => d.name);
+
+        const desigCounts = {};
+        desigs.forEach((d) => (desigCounts[d] = 0));
+        dayLogs.forEach((l) => {
+            const e = empMap[l.empId];
+            if (e && e.dept === dept) {
+                const name = e.designation || "Staff";
+                if (desigCounts[name] !== undefined) desigCounts[name]++;
+            }
+        });
+
+        this._currentDashboardDesigData = { dept, dayLogs, empMap };
+
+        const colorCls = ["info", "success", "warning", "accent", "danger"];
+        const desigCardsHtml = desigs.map((d, i) => `
+            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
+                data-dashboard-desig="${this._escapeAttr(d)}"
+                onclick="AppController.view._showDashboardDesigDrilldown('${this._escapeAttr(d)}')">
+                <div class="stat-icon"><i class="ph ph-identification-badge"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">${d}</span>
+                    <span class="stat-value">${desigCounts[d]}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+        `).join("");
+
+        const panel = document.getElementById("stat-card-drilldown");
+        if (!panel) return;
+        panel.style.display = "block";
+        panel.innerHTML = `
+            <div class="drilldown-box">
+                <div class="drilldown-header">
+                    <div class="drilldown-title">🔍 Dept: ${dept} — Designations</div>
+                    <div class="drilldown-btn-group">
+                        <button class="btn-drill btn-drill-back" onclick="AppController.view._closeStatCardDrilldown()">✕ Close</button>
+                    </div>
+                </div>
+                <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); padding:16px 0;">
+                    ${desigCardsHtml || '<p style="padding:16px;color:#94a3b8;">No designations found.</p>'}
+                </div>
+            </div>
+        `;
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+
+    _showDashboardDesigDrilldown(designation) {
+        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(`.stat-card-clickable[data-dashboard-desig="${designation}"]`);
+        if (card) card.classList.add("active");
+
+        const data = this._currentDashboardDesigData;
+        if (!data) return;
+        const { dept, dayLogs, empMap } = data;
+
+        const filteredLogs = dayLogs.filter((l) => {
+            const e = empMap[l.empId];
+            return e && e.dept === dept && (e.designation || "Staff") === designation;
+        });
+
+        const items = filteredLogs.map((l) => ({
+            log: l,
+            emp: empMap[l.empId],
+            date: l.date,
+        }));
+
+        this._renderStatCardDrilldown("dashboardDesig_" + designation, items, 1);
+    }
+
+    
     _renderTabContent(tabId, logs, emps, empMap, filters, counts, model) {
         let content;
         const stats = model.getSummaryStats();
@@ -1266,6 +1561,21 @@ class AttendanceView {
 					`,
                 };
                 break;
+            case "sort_order":
+                content = {
+                    html: `
+                        <div class="designation-order-container">
+                            <h2 class="section-title"><i class="ph-fill ph-sort-ascending"></i> Company & Department Sort Order</h2>
+                            <div id="sort-order-content">
+                                <div style="display:flex; align-items:center; gap:12px; padding:32px; color:#64748b;">
+                                    <div class="auth-spinner" style="width:24px; height:24px; border-width:2px; border-top-color:#6366f1;"></div>
+                                    <span>Loading data...</span>
+                                </div>
+                            </div>
+                        </div>
+                    `,
+                };
+                break;
             default:
                 content = { html: "<p>Tab not found</p>" };
         }
@@ -1277,6 +1587,11 @@ class AttendanceView {
     _initChartRendering(tabId, logs, emps, empMap, filters, counts, model, renderToken,) {
         if (tabId === "designation_order") {
             this._initDesignationOrderTab(model);
+            return;
+        }
+
+        if (tabId === "sort_order") {
+            setTimeout(() => this._initSortOrderTab(model), 50);
             return;
         }
 
@@ -1776,33 +2091,31 @@ class AttendanceView {
         const pageSize = 25;
         const currentPage = page;
         const totalPages = Math.ceil(logs.length / pageSize);
-        const pageLogs = logs.slice(
-            (currentPage - 1) * pageSize,
-            currentPage * pageSize,
-        );
+        const pageLogs = logs.slice((currentPage - 1) * pageSize, currentPage * pageSize,);
 
         const rows = pageLogs.map((l, index) => {
             const e = empMap[l.empId] || {};
             return `
-            <tr>
-                <td>${(currentPage - 1) * pageSize + index + 1}</td>
-                <td><b>${e.code || "–"}</b></td>
-                <td>${e.name || "–"}</td>
-                <td>${e.dept || "–"}</td>
-                <td>${e.company || "–"}</td>
-                <td>${e.shift || "–"}</td>
-                <td>${l.shiftStart || "–"}</td>
-                <td>${l.shiftEnd || "–"}</td>
-                <td>${this._formatDate(l.date)}</td>
-                <td>${l.inTime || "–"}</td>
-                <td>${l.outTime || "–"}</td>
-                <td><b>${l.hoursWorked || 0}h</b></td>
-                <td>${(l.lateBy || 0) > 0 ? "Yes" : "No"}</td>
-                <td>${(l.lateBy || 0) > 0 ? this._fmtMins(l.lateBy) : "-"}</td>
-                <td>${(l.earlyBy || 0) > 0 ? "Yes" : "No"}</td>
-                <td>${(l.earlyBy || 0) > 0 ? this._fmtMins(l.earlyBy) : "-"}</td>
-                <td>${l.status}</td>
-            </tr>`;
+                <tr>
+                    <td>${(currentPage - 1) * pageSize + index + 1}</td>
+                    <td><b>${e.code || "–"}</b></td>
+                    <td>${e.name || "–"}</td>
+                    <td>${e.dept || "–"}</td>
+                    <td>${e.company || "–"}</td>
+                    <td>${e.shift || "–"}</td>
+                    <td>${l.shiftStart || "–"}</td>
+                    <td>${l.shiftEnd || "–"}</td>
+                    <td>${this._formatDate(l.date)}</td>
+                    <td>${l.inTime || "–"}</td>
+                    <td>${l.outTime || "–"}</td>
+                    <td><b>${l.hoursWorked || 0}h</b></td>
+                    <td>${(l.lateBy || 0) > 0 ? "Yes" : "No"}</td>
+                    <td>${(l.lateBy || 0) > 0 ? this._fmtMins(l.lateBy) : "-"}</td>
+                    <td>${(l.earlyBy || 0) > 0 ? "Yes" : "No"}</td>
+                    <td>${(l.earlyBy || 0) > 0 ? this._fmtMins(l.earlyBy) : "-"}</td>
+                    <td>${l.status}</td>
+                </tr>
+            `;
         }).join("");
 
         this._drillData = logs.map((l) => {
@@ -2110,7 +2423,7 @@ class AttendanceView {
     }
 
     _renderAgeWise(logs, emps, empMap, model) {
-        const groups = ["Under 25", "25–34", "35–44", "45–54", "55+"];
+        const groups = ["Under 18", "Under 25", "25–34", "35–44", "45–54", "55+"];
 
         const gTotal = {};
         const gPresent = {};
@@ -2235,7 +2548,7 @@ class AttendanceView {
     }
 
     _renderCompanyWise(logs, emps, empMap, model) {
-        const comps = [...new Set(emps.map((e) => e.company))].sort();
+        const comps = [...new Set(emps.map((e) => e.company))];
         const { dateFrom, dateTo } = model.state.filters;
         const groups = this._computeGroupedDayStats(emps, logs, dateFrom, dateTo, (e) => e.company,);
 
@@ -2298,7 +2611,7 @@ class AttendanceView {
 
     _renderDeptWise(logs, emps, empMap, model) {
         this._currentDeptData = { emps, logs, empMap, model };
-        const depts = [...new Set(emps.map((e) => e.dept))].sort();
+        const depts = [...new Set(emps.map((e) => e.dept))];
         const { dateFrom, dateTo } = model.state.filters;
         const groups = this._computeGroupedDayStats(emps, logs, dateFrom, dateTo, (e) => e.dept,);
         const lBD = model.groupBy(logs, (l) => (empMap[l.empId] || {}).dept);
@@ -2520,7 +2833,7 @@ class AttendanceView {
         }
         try {
             const [year, month, day] = dateStr.split("-");
-            const monthNames = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december",];
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December",];
             const monthIndex = parseInt(month) - 1;
             if (monthIndex < 0 || monthIndex > 11) return dateStr;
             return `${day}-${monthNames[monthIndex]}-${year}`;
@@ -3085,7 +3398,7 @@ class AttendanceView {
         } else if (isNewJoinedOnly) {
             headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "DOJ", "Status",];
         } else if (isStaffList || isWorkerList || isTotalHeadcount) {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift", "Location",];
+            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift", "Shift Start", "Shift End", "Date", "In Time", "Out Time", "Hours Worked", "Status", "Location",];
         } else if (key === "lateIn") {
             headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Late By",];
         } else if (key === "earlyOut") {
@@ -3111,6 +3424,13 @@ class AttendanceView {
                         <td>${emp.company || "–"}</td>
                         <td>${emp.designation || "–"}</td>
                         <td>${emp.shift || "–"}</td>
+                        <td>${log?.shiftStart || emp?.shiftStart || "–"}</td>
+                        <td>${log?.shiftEnd || emp?.shiftEnd || "–"}</td>
+                        <td>${this._formatDate(date || log?.date || "")}</td>
+                        <td>${log?.inTime || "–"}</td>
+                        <td>${log?.outTime || "–"}</td>
+                        <td>${log?.hoursWorked != null ? log.hoursWorked : "–"}</td>
+                        <td>${log?.status || "–"}</td>
                         <td>${emp.location || "–"}</td>
                     </tr>
                 `;
@@ -3671,6 +3991,325 @@ class AttendanceView {
             }
         });
     }
+
+
+    async _initSortOrderTab(model) {
+        const contentEl = document.getElementById("sort-order-content");
+        if (!contentEl) return;
+
+        const [compRes, deptRes] = await Promise.all([
+            model.fetchCompaniesOrder(),
+            model.fetchDepartmentsOrder()
+        ]);
+
+        if (!compRes.success || !deptRes.success) {
+            contentEl.innerHTML = `
+                <div style="padding:24px;background:rgba(244,63,94,0.05);border:1px solid rgba(244,63,94,0.2);color:#f43f5e;border-radius:var(--radius-md);font-weight:500;">
+                    <i class="ph-fill ph-warning-circle" style="font-size:20px;"></i>
+                    Error loading data. Please try again.
+                </div>
+            `;
+            return;
+        }
+
+        const companies = compRes.data || [];
+        const departments = deptRes.data || [];
+
+        contentEl.innerHTML = `
+            <style>
+                .sort-order-tabs { display:flex; gap:8px; margin-bottom:24px; }
+                .sort-order-tab-btn {
+                    padding: 10px 24px;
+                    border-radius: 10px;
+                    border: 1px solid var(--border-color);
+                    background: var(--white);
+                    font-size: 14px;
+                    font-weight: 600;
+                    color: var(--text-muted);
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+                .sort-order-tab-btn.active {
+                    background: var(--primary);
+                    color: #fff;
+                    border-color: var(--primary);
+                    box-shadow: 0 4px 14px rgba(99,102,241,0.3);
+                }
+                .sort-order-panel { display: none; }
+                .sort-order-panel.active { display: block; }
+                .sort-order-card {
+                    background: var(--white);
+                    border: 1px solid var(--border-color);
+                    border-radius: var(--radius-md);
+                    box-shadow: var(--shadow-sm);
+                    padding: 24px;
+                    max-width: 560px;
+                    margin: 0 auto;
+                }
+                .sort-order-header-bar {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 20px;
+                    padding-bottom: 16px;
+                    border-bottom: 1px solid var(--border-color);
+                }
+                .sort-order-header-bar h3 {
+                    font-size: 15px;
+                    font-weight: 700;
+                    color: var(--text-main);
+                }
+                .sort-order-header-bar p {
+                    font-size: 12px;
+                    color: var(--text-muted);
+                    margin-top: 2px;
+                }
+                .sort-order-item {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    padding: 12px 16px;
+                    background: #f8fafc;
+                    border: 1px solid #f1f5f9;
+                    border-radius: 10px;
+                    margin-bottom: 10px;
+                    font-size: 14px;
+                    transition: background 0.15s, border-color 0.15s;
+                }
+                .sort-order-item:hover { background: #f1f5f9; border-color: #e2e8f0; }
+                .sort-order-item-name { font-weight: 600; color: #334155; }
+                .sort-order-null-badge {
+                    font-size: 11px;
+                    background: #f1f5f9;
+                    color: #94a3b8;
+                    padding: 2px 8px;
+                    border-radius: 9999px;
+                    margin-left: 8px;
+                }
+                .sort-order-control {
+                    display: flex;
+                    align-items: center;
+                    background: var(--white);
+                    border: 1px solid #cbd5e1;
+                    border-radius: 8px;
+                    overflow: hidden;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+                }
+                .sort-order-btn {
+                    background: none;
+                    border: none;
+                    width: 32px;
+                    height: 32px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: #64748b;
+                    cursor: pointer;
+                    font-size: 14px;
+                    transition: background 0.15s, color 0.15s;
+                }
+                .sort-order-btn:hover { background: #f1f5f9; color: var(--primary); }
+                .sort-order-input {
+                    width: 48px;
+                    border: none;
+                    border-left: 1px solid #cbd5e1;
+                    border-right: 1px solid #cbd5e1;
+                    text-align: center;
+                    font-size: 14px;
+                    font-weight: 700;
+                    color: #0f172a;
+                    padding: 4px 0;
+                    outline: none;
+                    -moz-appearance: textfield;
+                }
+                .sort-order-input::-webkit-outer-spin-button,
+                .sort-order-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+                .sort-order-clear-btn {
+                    background: none;
+                    border: none;
+                    color: #94a3b8;
+                    font-size: 12px;
+                    cursor: pointer;
+                    padding: 4px 6px;
+                    border-radius: 6px;
+                    transition: color 0.15s, background 0.15s;
+                }
+                .sort-order-clear-btn:hover { color: #f43f5e; background: rgba(244,63,94,0.07); }
+                .sort-order-save-bar {
+                    display: flex;
+                    justify-content: flex-end;
+                    margin-top: 20px;
+                }
+            </style>
+
+            <div class="sort-order-tabs">
+                <button class="sort-order-tab-btn active" data-panel="companies">
+                    <i class="ph ph-buildings"></i> Companies
+                </button>
+                <button class="sort-order-tab-btn" data-panel="departments">
+                    <i class="ph ph-briefcase"></i> Departments
+                </button>
+            </div>
+
+            <!-- Companies Panel -->
+            <div class="sort-order-panel active" id="sort-panel-companies">
+                <div class="sort-order-card">
+                    <div class="sort-order-header-bar">
+                        <div>
+                            <h3>Company Sort Order</h3>
+                            <p>Set priority order for companies. Lower number = appears first. Leave blank for alphabetical.</p>
+                        </div>
+                        <button class="btn-order-save" id="btn-save-companies">
+                            <i class="ph-bold ph-floppy-disk"></i> Save
+                        </button>
+                    </div>
+                    <div id="companies-list">
+                        ${companies.map(c => `
+                            <div class="sort-order-item">
+                                <div style="display:flex;align-items:center;">
+                                    <i class="ph ph-buildings" style="color:#6366f1;margin-right:10px;font-size:16px;"></i>
+                                    <span class="sort-order-item-name">${c.name}</span>
+                                    ${c.sortOrder === null ? '<span class="sort-order-null-badge">not set</span>' : ''}
+                                </div>
+                                <div style="display:flex;align-items:center;gap:6px;">
+                                    <div class="sort-order-control">
+                                        <button class="sort-order-btn btn-dec" type="button"><i class="ph ph-minus"></i></button>
+                                        <input type="number" class="sort-order-input company-order-input"
+                                            data-id="${c.id}"
+                                            value="${c.sortOrder !== null ? c.sortOrder : ''}"
+                                            placeholder="–">
+                                        <button class="sort-order-btn btn-inc" type="button"><i class="ph ph-plus"></i></button>
+                                    </div>
+                                    <button class="sort-order-clear-btn" data-target="company" data-id="${c.id}" title="Clear (reset to NULL)">
+                                        <i class="ph ph-x"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Departments Panel -->
+            <div class="sort-order-panel" id="sort-panel-departments">
+                <div class="sort-order-card">
+                    <div class="sort-order-header-bar">
+                        <div>
+                            <h3>Department Sort Order</h3>
+                            <p>Set priority order for departments. Lower number = appears first. Leave blank for alphabetical.</p>
+                        </div>
+                        <button class="btn-order-save" id="btn-save-departments">
+                            <i class="ph-bold ph-floppy-disk"></i> Save
+                        </button>
+                    </div>
+                    <div id="departments-list">
+                        ${departments.map(d => `
+                            <div class="sort-order-item">
+                                <div style="display:flex;align-items:center;">
+                                    <i class="ph ph-briefcase" style="color:#6366f1;margin-right:10px;font-size:16px;"></i>
+                                    <span class="sort-order-item-name">${d.name}</span>
+                                    ${d.sortOrder === null ? '<span class="sort-order-null-badge">not set</span>' : ''}
+                                </div>
+                                <div style="display:flex;align-items:center;gap:6px;">
+                                    <div class="sort-order-control">
+                                        <button class="sort-order-btn btn-dec" type="button"><i class="ph ph-minus"></i></button>
+                                        <input type="number" class="sort-order-input dept-order-input"
+                                            data-id="${d.id}"
+                                            value="${d.sortOrder !== null ? d.sortOrder : ''}"
+                                            placeholder="–">
+                                        <button class="sort-order-btn btn-inc" type="button"><i class="ph ph-plus"></i></button>
+                                    </div>
+                                    <button class="sort-order-clear-btn" data-target="dept" data-id="${d.id}" title="Clear (reset to NULL)">
+                                        <i class="ph ph-x"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        contentEl.querySelectorAll('.sort-order-tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                contentEl.querySelectorAll('.sort-order-tab-btn').forEach(b => b.classList.remove('active'));
+                contentEl.querySelectorAll('.sort-order-panel').forEach(p => p.classList.remove('active'));
+                btn.classList.add('active');
+                contentEl.querySelector(`#sort-panel-${btn.dataset.panel}`).classList.add('active');
+            });
+        });
+
+        contentEl.querySelectorAll('.sort-order-item').forEach(item => {
+            const dec = item.querySelector('.btn-dec');
+            const inc = item.querySelector('.btn-inc');
+            const input = item.querySelector('.sort-order-input');
+            if (!input) return;
+
+            dec.addEventListener('click', () => {
+                const val = input.value === '' ? null : parseInt(input.value);
+                if (val === null) return;
+                input.value = Math.max(1, val - 1);
+            });
+
+            inc.addEventListener('click', () => {
+                const val = input.value === '' ? 1 : parseInt(input.value) + 1;
+                input.value = val;
+            });
+        });
+
+        contentEl.querySelectorAll('.sort-order-clear-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const item = btn.closest('.sort-order-item');
+                const input = item.querySelector('.sort-order-input');
+                if (input) input.value = '';
+            });
+        });
+
+        document.getElementById('btn-save-companies').addEventListener('click', async () => {
+            const inputs = contentEl.querySelectorAll('.company-order-input');
+            const items = [];
+            inputs.forEach(input => {
+                items.push({
+                    id: parseInt(input.dataset.id),
+                    sortOrder: input.value !== '' ? parseInt(input.value) : null
+                });
+            });
+
+            this.showOverlay('Saving company order...');
+            const res = await model.saveCompaniesOrder(items);
+            this.hideOverlay();
+
+            if (res && res.success) {
+                alert('Company sort order saved successfully!');
+                model.state.filterLists = null;
+            } else {
+                alert('Failed: ' + (res ? res.message : 'Unknown error'));
+            }
+        });
+
+        document.getElementById('btn-save-departments').addEventListener('click', async () => {
+            const inputs = contentEl.querySelectorAll('.dept-order-input');
+            const items = [];
+            inputs.forEach(input => {
+                items.push({
+                    id: parseInt(input.dataset.id),
+                    sortOrder: input.value !== '' ? parseInt(input.value) : null
+                });
+            });
+
+            this.showOverlay('Saving department order...');
+            const res = await model.saveDepartmentsOrder(items);
+            this.hideOverlay();
+
+            if (res && res.success) {
+                alert('Department sort order saved successfully!');
+                model.state.filterLists = null;
+            } else {
+                alert('Failed: ' + (res ? res.message : 'Unknown error'));
+            }
+        });
+    }
+
 
     _renderStaff(logs, emps, empMap, model) {
         const staffCategoryIds = [58];

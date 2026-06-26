@@ -23,10 +23,12 @@ class AttendanceModel {
         this.onDataChanged = null;
     }
 
+    
     _getMonthStart() {
         const d = new Date();
         return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
     }
+
 
     _getToday() {
         const d = new Date();
@@ -35,15 +37,18 @@ class AttendanceModel {
         return `${d.getFullYear()}-${mm}-${dd}`;
     }
 
+
     bindDataChanged(callback) {
         this.onDataChanged = callback;
     }
+
 
     _commit() {
         if (this.onDataChanged) {
             this.onDataChanged(this.state);
         }
     }
+
 
     async fetchFilterOptions() {
         if (this.state.filterLists) return { success: true };
@@ -72,6 +77,7 @@ class AttendanceModel {
             return { success: false, error: error.message };
         }
     }
+
 
     async fetchData() {
         try {
@@ -151,12 +157,14 @@ class AttendanceModel {
         }
     }
 
+
     updateFilters(newFilters) {
         this.state.filters = { 
             ...this.state.filters, 
             ...newFilters 
         };
     }
+
 
     resetFilters() {
         this.state.filters = {
@@ -170,6 +178,7 @@ class AttendanceModel {
         };
     }
 
+
     switchTab(tabId) {
         if (this.state.activeTab === tabId) {
             return;
@@ -177,6 +186,7 @@ class AttendanceModel {
         this.state.activeTab = tabId;
         this._commit();
     }
+
 
     getFilteredData() {
         const { filters, data } = this.state;
@@ -231,11 +241,13 @@ class AttendanceModel {
         return { logs, emps, empMap };
     }
 
+
     getEmpMap() {
         const m = {};
         this.state.data.employees.forEach(e => { m[e.id] = e; });
         return m;
     }
+
 
     getNightShiftData() {
         const empMap = {};
@@ -251,6 +263,7 @@ class AttendanceModel {
         };
     }
 
+
     getAge(dob) {
         const birth = new Date(dob);
         const now = new Date();
@@ -262,19 +275,17 @@ class AttendanceModel {
         return age;
     }
 
+
     getAgeGroup(dob) {
         const age = this.getAge(dob);
-        if (age < 25) {
-            return 'Under 25';
-        } if (age < 35) {
-            return '25–34';
-        } if (age < 45) {
-            return '35–44';
-        } if (age < 55) {
-            return '45–54';
-        }
+        if (age < 18) return 'Under 18';
+        if (age < 25) return 'Under 25';
+        if (age < 35) return '25–34';
+        if (age < 45) return '35–44';
+        if (age < 55) return '45–54';
         return '55+';
     }
+
 
     findNoPunchEmployees() {
         const { filters } = this.state;
@@ -316,6 +327,7 @@ class AttendanceModel {
         return result;
     }
 
+
     groupBy(arr, keyFn) {
         const out = {};
         arr.forEach(item => {
@@ -327,6 +339,7 @@ class AttendanceModel {
         });
         return out;
     }
+
 
     getSummaryStats() {
         const { logs, emps } = this.getFilteredData();
@@ -355,6 +368,7 @@ class AttendanceModel {
             filteredOut: totalOut
         };
     }
+
 
     getFilterOptions() {
         const emps = this.state.data.employees || [];
@@ -422,6 +436,7 @@ class AttendanceModel {
         return result;
     }
 
+
     getAbsentEmployees() {
         const { filters } = this.state;
         const { logs, emps } = this.getFilteredData();
@@ -449,6 +464,7 @@ class AttendanceModel {
         return result;
     }
 
+
     getHalfPresentEmployees() {
         const { filters } = this.state;
         const { logs, emps } = this.getFilteredData();
@@ -475,6 +491,7 @@ class AttendanceModel {
         result.sort((a, b) => b.date.localeCompare(a.date));
         return result;
     }
+
 
     getWeeklyOffEmployees() {
         const { filters } = this.state;
@@ -547,6 +564,7 @@ class AttendanceModel {
         return result;
     }
 
+
     getLateInEmployees() {
         const { filters } = this.state;
         const { logs, emps } = this.getFilteredData();
@@ -580,6 +598,7 @@ class AttendanceModel {
         result.sort((a, b) => b.date.localeCompare(a.date));
         return result;
     }
+
 
     getEarlyOutEmployees() {
         const { filters } = this.state;
@@ -615,6 +634,7 @@ class AttendanceModel {
         return result;
     }
 
+
     getResignedEmployees() {
         const resigned = this.state.data.resignedEmployees || [];
         const { filters } = this.state;
@@ -634,6 +654,7 @@ class AttendanceModel {
             return true;
         }).sort((a, b) => (b.dor || '').localeCompare(a.dor || '')).map(emp => ({ log: null, emp }));
     }
+
 
     getNewJoinedEmployees() {
         const newJoined = this.state.data.newJoinedEmployees || [];
@@ -655,6 +676,7 @@ class AttendanceModel {
         }).sort((a, b) => (b.doj || '').localeCompare(a.doj || '')).map(emp => ({ log: null, emp }));
     }
 
+
     async fetchDesignationsOrder() {
         try {
             const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
@@ -667,6 +689,7 @@ class AttendanceModel {
             return { success: false, error: error.message };
         }
     }
+
 
     async saveDesignationsOrder(items) {
         try {
@@ -687,16 +710,60 @@ class AttendanceModel {
         }
     }
 
+
     getStaffEmployees() {
         const staffCategoryIds = [58];
-        const { emps } = this.getFilteredData();
-        return emps.filter(emp => staffCategoryIds.includes(emp.categoryId)).map(emp => ({ log: null, emp }));
+        const { logs, emps } = this.getFilteredData();
+        const staffEmps = emps.filter(emp => staffCategoryIds.includes(emp.categoryId));
+        const logMap = this._buildLogMap(logs);
+        const statusMap = this._buildStatusKeyMap(logs);       
+        const { dateFrom, dateTo } = this.state.filters;
+
+        const result = [];
+        
+        staffEmps.forEach(emp => {
+            const from = new Date(dateFrom);
+            const to = new Date(dateTo);
+            for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+                const dateStr = d.toISOString().slice(0, 10);
+                const key = emp.id + '_' + dateStr;
+                const status = statusMap[key];
+                if (status === 'present' || status === 'halfPresent') {
+                    result.push({ log: logMap[key] || null, emp, date: dateStr });
+                }
+            }
+        });
+        
+        result.sort((a, b) => b.date.localeCompare(a.date));
+        return result;
     }
+
 
     getWorkerEmployees() {
         const workerCategoryIds = [51, 59, 60];
-        const { emps } = this.getFilteredData();
-        return emps.filter(emp => workerCategoryIds.includes(emp.categoryId)).map(emp => ({ log: null, emp }));
+        const { logs, emps } = this.getFilteredData();
+        const workerEmps = emps.filter(emp => workerCategoryIds.includes(emp.categoryId));
+        const logMap = this._buildLogMap(logs);
+        const statusMap = this._buildStatusKeyMap(logs);
+        const { dateFrom, dateTo } = this.state.filters;
+
+        const result = [];
+
+        workerEmps.forEach(emp => {
+            const from = new Date(dateFrom);
+            const to = new Date(dateTo);
+            for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+                const dateStr = d.toISOString().slice(0, 10);
+                const key = emp.id + '_' + dateStr;
+                const status = statusMap[key];
+                if (status === 'present' || status === 'halfPresent') {
+                    result.push({ log: logMap[key] || null, emp, date: dateStr });
+                }
+            }
+        });
+        
+        result.sort((a, b) => b.date.localeCompare(a.date));
+        return result;
     }
 
 
@@ -732,6 +799,66 @@ class AttendanceModel {
             }
         });
         return map;
+    }
+
+
+    async fetchCompaniesOrder() {
+        try {
+            const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
+            url.searchParams.set('action', 'get_companies_order');
+            const response = await fetch(url.toString());
+            return await response.json();
+        } catch (error) {
+            console.error('Fetch Companies Order Error:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+
+    async saveCompaniesOrder(items) {
+        try {
+            const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
+            url.searchParams.set('action', 'save_companies_order');
+            const response = await fetch(url.toString(), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'save_companies_order', items })
+            });
+            return await response.json();
+        } catch (error) {
+            console.error('Save Companies Order Error:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+
+    async fetchDepartmentsOrder() {
+        try {
+            const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
+            url.searchParams.set('action', 'get_departments_order');
+            const response = await fetch(url.toString());
+            return await response.json();
+        } catch (error) {
+            console.error('Fetch Departments Order Error:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+
+    async saveDepartmentsOrder(items) {
+        try {
+            const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
+            url.searchParams.set('action', 'save_departments_order');
+            const response = await fetch(url.toString(), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'save_departments_order', items })
+            });
+            return await response.json();
+        } catch (error) {
+            console.error('Save Departments Order Error:', error);
+            return { success: false, error: error.message };
+        }
     }
 }
 

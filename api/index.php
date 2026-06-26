@@ -7,7 +7,7 @@
  */
 
 // Suppress errors for clean JSON output
-ini_set('display_errors', 0);
+ini_set('display_errors', 1);
 error_reporting(0);
 
 header('Content-Type: application/json');
@@ -122,6 +122,18 @@ switch ($action) {
         break;
     case 'save_designations_order':
         handleSaveDesignationsOrder($input);
+        break;
+    case 'get_companies_order':
+        handleGetCompaniesOrder();
+        break;
+    case 'save_companies_order':
+        handleSaveCompaniesOrder($input);
+        break;
+    case 'get_departments_order':
+        handleGetDepartmentsOrder();
+        break;
+    case 'save_departments_order':
+        handleSaveDepartmentsOrder($input);
         break;
     case 'setup_db':
         handleSetupDB();
@@ -573,7 +585,7 @@ function handleDashboardData($input, $returnData = false) {
         $paramsEmp[] = $locationFilter;
     }
     
-    $sqlEmp .= " ORDER BY D.DepartmentFName ASC, E.EmployeeName ASC";
+    $sqlEmp .= " ORDER BY CASE WHEN C.SortOrder IS NULL THEN 1 ELSE 0 END, C.SortOrder ASC, CASE WHEN D.SortOrder IS NULL THEN 1 ELSE 0 END, D.SortOrder ASC, E.EmployeeName ASC";
 
     $stmtEmp = sqlsrv_query($conn, $sqlEmp, $paramsEmp);
     
@@ -650,7 +662,7 @@ function handleDashboardData($input, $returnData = false) {
         $sqlResigned .= " AND L.LocationName = ?";
         $paramsResigned[] = $locationFilter;
     }
-    $sqlResigned .= " ORDER BY D.DepartmentFName ASC, E.EmployeeName ASC";
+    $sqlResigned .= " ORDER BY CASE WHEN C.SortOrder IS NULL THEN 1 ELSE 0 END, C.SortOrder ASC, CASE WHEN D.SortOrder IS NULL THEN 1 ELSE 0 END, D.SortOrder ASC, E.EmployeeName ASC";
 
     $stmtResigned = sqlsrv_query($conn, $sqlResigned, $paramsResigned);
     if ($stmtResigned) {
@@ -687,7 +699,7 @@ function handleDashboardData($input, $returnData = false) {
         $sqlNewJoined .= " AND L.LocationName = ?";
         $paramsNewJoined[] = $locationFilter;
     }
-    $sqlNewJoined .= " ORDER BY D.DepartmentFName ASC, E.EmployeeName ASC";
+    $sqlNewJoined .= " ORDER BY CASE WHEN C.SortOrder IS NULL THEN 1 ELSE 0 END, C.SortOrder ASC, CASE WHEN D.SortOrder IS NULL THEN 1 ELSE 0 END, D.SortOrder ASC, E.EmployeeName ASC";
 
     $stmtNewJoined = sqlsrv_query($conn, $sqlNewJoined, $paramsNewJoined);
     if ($stmtNewJoined) {
@@ -1524,7 +1536,7 @@ function handleGetDepts() {
     $locationList = implode(',', array_map('intval', $_SESSION['locations']));
     $departmentList = implode(',', array_map('intval', $_SESSION['departments']));
 
-    $sql = "SELECT DISTINCT D.DepartmentId, D.DepartmentFName as DepartmentName, D.std_hc FROM Departments D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON D.DepartmentId = E.DepartmentId WHERE E.Location IN ($locationList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working' ORDER BY D.DepartmentFName ASC";
+    $sql = "SELECT DISTINCT D.DepartmentId, D.DepartmentFName as DepartmentName, D.std_hc FROM Departments D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON D.DepartmentId = E.DepartmentId WHERE E.Location IN ($locationList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working' ORDER BY CASE WHEN D.SortOrder IS NULL THEN 1 ELSE 0 END,D.SortOrder ASC,D.DepartmentFName ASC";
 
     $stmt = sqlsrv_query($conn, $sql);
 
@@ -1544,7 +1556,7 @@ function handleGetCompanies() {
     $locationList = implode(',', array_map('intval', $_SESSION['locations']));
     $companyList = implode(',', array_map('intval', $_SESSION['companies']));
 
-    $sql = "SELECT DISTINCT C.CompanyId, C.CompanyFName as CompanyName FROM Companies C WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON C.CompanyId = E.CompanyId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.Status = 'Working' ORDER BY C.CompanyFName ASC";
+    $sql = "SELECT DISTINCT C.CompanyId, C.CompanyFName as CompanyName FROM Companies C WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON C.CompanyId = E.CompanyId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.Status = 'Working' ORDER BY CASE WHEN C.SortOrder IS NULL THEN 1 ELSE 0 END,C.SortOrder ASC,C.CompanyFName ASC";
 
     $stmt = sqlsrv_query($conn, $sql);
 
@@ -1623,21 +1635,7 @@ function handleGetDesignationsOrder() {
     $companyList = !empty($_SESSION['companies']) ? implode(',', array_map('intval', $_SESSION['companies'])) : '0';
     $departmentList = !empty($_SESSION['departments']) ? implode(',', array_map('intval', $_SESSION['departments'])) : '0';
 
-    $sql = "SELECT DISTINCT 
-                D.DepartmentId, 
-                D.DepartmentFName as DepartmentName, 
-                DG.DesignationId, 
-                DG.DesignationsName, 
-                ISNULL(DSO.SortOrder, 0) as sortOrder
-            FROM Employees E WITH (NOLOCK)
-            INNER JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId
-            INNER JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId
-            LEFT JOIN departmentDeginationSortOrder DSO WITH (NOLOCK) ON D.DepartmentId = DSO.DepartmentId AND DG.DesignationId = DSO.DesignationId
-            WHERE E.RecordStatus = 1 AND D.RecordStatus = 1 
-              AND E.Location IN ($locationList)
-              AND E.CompanyId IN ($companyList)
-              AND E.DepartmentId IN ($departmentList)
-            ORDER BY D.DepartmentFName ASC, sortOrder ASC, DG.DesignationsName ASC";
+    $sql = "SELECT DISTINCT D.DepartmentId, D.DepartmentFName as DepartmentName, DG.DesignationId, DG.DesignationsName, ISNULL(DSO.SortOrder, 0) as sortOrder FROM Employees E WITH (NOLOCK) INNER JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId INNER JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId LEFT JOIN departmentDeginationSortOrder DSO WITH (NOLOCK) ON D.DepartmentId = DSO.DepartmentId AND DG.DesignationId = DSO.DesignationId WHERE E.RecordStatus = 1 AND D.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) ORDER BY D.DepartmentFName ASC, sortOrder ASC, DG.DesignationsName ASC";
 
     $stmt = sqlsrv_query($conn, $sql);
     $data = [];
@@ -1686,17 +1684,13 @@ function handleSaveDesignationsOrder($input) {
         $id = intval($item['id']);
         $sortOrder = intval($item['sortOrder']);
         
-        $sqlUpdate = "UPDATE [eSSLSmartOffice].[dbo].[departmentDeginationSortOrder] 
-                      SET SortOrder = ? 
-                      WHERE DepartmentId = ? AND DesignationId = ?";
+        $sqlUpdate = "UPDATE [eSSLSmartOffice].[dbo].[departmentDeginationSortOrder] SET SortOrder = ? WHERE DepartmentId = ? AND DesignationId = ?";
         $stmtUpdate = sqlsrv_query($conn, $sqlUpdate, [$sortOrder, $deptId, $id]);
         
         if ($stmtUpdate) {
             $rowsAffected = sqlsrv_rows_affected($stmtUpdate);
             if ($rowsAffected === 0) {
-                $sqlInsert = "INSERT INTO [eSSLSmartOffice].[dbo].[departmentDeginationSortOrder] 
-                              (DepartmentId, DesignationId, SortOrder) 
-                              VALUES (?, ?, ?)";
+                $sqlInsert = "INSERT INTO [eSSLSmartOffice].[dbo].[departmentDeginationSortOrder] (DepartmentId, DesignationId, SortOrder) VALUES (?, ?, ?)";
                 $stmtInsert = sqlsrv_query($conn, $sqlInsert, [$deptId, $id, $sortOrder]);
                 if (!$stmtInsert) {
                     $success = false;
@@ -1712,6 +1706,105 @@ function handleSaveDesignationsOrder($input) {
         'message' => $success ? 'Designation orders updated successfully' : 'Some updates failed'
     ]);
 }
+
+
+function handleGetCompaniesOrder() {
+    $conn = getSQLServer();
+
+    $locationList = !empty($_SESSION['locations']) ? implode(',', array_map('intval', $_SESSION['locations'])) : '0';
+    $companyList  = !empty($_SESSION['companies'])  ? implode(',', array_map('intval', $_SESSION['companies']))  : '0';
+
+    error_log("CompaniesOrder - locationList: $locationList, companyList: $companyList");
+
+    $sql = "SELECT C.CompanyId, C.CompanyFName AS CompanyName, C.SortOrder FROM Companies C WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON C.CompanyId = E.CompanyId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.Status = 'Working' GROUP BY C.CompanyId, C.CompanyFName, C.SortOrder ORDER BY CASE WHEN C.SortOrder IS NULL THEN 1 ELSE 0 END, C.SortOrder, C.CompanyFName;";
+    
+    $stmt = sqlsrv_query($conn, $sql);
+    
+    $data = [];
+    if ($stmt) {
+        while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+            $data[] = [
+                'id' => $row['CompanyId'],
+                'name' => $row['CompanyName'],
+                'sortOrder' => $row['SortOrder']
+            ];
+        }
+    }
+
+    echo json_encode(['success' => true, 'data' => $data, 'debug_lists' => ['loc' => $locationList, 'comp' => $companyList]]);
+}
+
+function handleSaveCompaniesOrder($input) {
+    $conn = getSQLServer();
+    $items = isset($input['items']) ? $input['items'] : [];
+
+    $success = true;
+    foreach ($items as $item) {
+        $companyId = intval($item['id']);
+        $sortOrder = isset($item['sortOrder']) && $item['sortOrder'] !== '' ? intval($item['sortOrder']) : null;
+
+        $sql = "UPDATE Companies SET SortOrder = ? WHERE CompanyId = ?";
+        $params = [$sortOrder, $companyId];
+        $stmt = sqlsrv_query($conn, $sql, $params);
+
+        if (!$stmt) {
+            $success = false;
+        }
+    }
+
+    echo json_encode([
+        'success' => $success,
+        'message' => $success ? 'Company order saved successfully' : 'Some updates failed'
+    ]);
+}
+
+function handleGetDepartmentsOrder() {
+    $conn = getSQLServer();
+
+    $locationList = !empty($_SESSION['locations'])   ? implode(',', array_map('intval', $_SESSION['locations']))   : '0';
+    $departmentList = !empty($_SESSION['departments']) ? implode(',', array_map('intval', $_SESSION['departments'])) : '0';
+
+    $sql = "SELECT D.DepartmentId, D.DepartmentFName AS DepartmentName, D.SortOrder FROM Departments D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON D.DepartmentId = E.DepartmentId WHERE E.Location IN ($locationList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working' GROUP BY D.DepartmentId, D.DepartmentFName, D.SortOrder ORDER BY CASE WHEN D.SortOrder IS NULL THEN 1 ELSE 0 END, D.SortOrder ASC, D.DepartmentFName ASC";
+
+    $stmt = sqlsrv_query($conn, $sql);
+    $data = [];
+    if ($stmt) {
+        while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+            $data[] = [
+                'id' => $row['DepartmentId'],
+                'name' => $row['DepartmentName'],
+                'sortOrder' => $row['SortOrder']
+            ];
+        }
+    }
+
+    echo json_encode(['success' => true, 'data' => $data]);
+}
+
+function handleSaveDepartmentsOrder($input) {
+    $conn = getSQLServer();
+    $items = isset($input['items']) ? $input['items'] : [];
+
+    $success = true;
+    foreach ($items as $item) {
+        $deptId = intval($item['id']);
+        $sortOrder = isset($item['sortOrder']) && $item['sortOrder'] !== '' ? intval($item['sortOrder']) : null;
+
+        $sql = "UPDATE Departments SET SortOrder = ? WHERE DepartmentId = ?";
+        $params = [$sortOrder, $deptId];
+        $stmt = sqlsrv_query($conn, $sql, $params);
+
+        if (!$stmt) {
+            $success = false;
+        }
+    }
+
+    echo json_encode([
+        'success' => $success,
+        'message' => $success ? 'Department order saved successfully' : 'Some updates failed'
+    ]);
+}
+
 
 function handleLogout() {
     unset($_SESSION['userId']);
