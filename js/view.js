@@ -1989,7 +1989,7 @@ class AttendanceView {
         const counts = dates.map((d) => byDate[d]);
         const byDept = this._countBy(logs, (l) => (empMap[l.empId] || {}).dept || "Unknown",);
 
-        let pageButtons = "";
+        let pageButtons = "";	
         const startPage = Math.max(1, currentPage - 2);
         const endPage = Math.min(totalPages, currentPage + 2);
         for (let i = startPage; i <= endPage; i++) {
