@@ -531,10 +531,11 @@ var Charts = (function () {
 			return;
 		}
 
-		if (!categories || categories.length === 0) {
-			el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:300px;color:#94a3b8;font-size:13px;">No data available for this period</div>';
-			return;
-		}
+        const hasAnyData = seriesArr.some(s => Array.isArray(s.data) && s.data.some(v => v > 0));
+        if (!hasAnyData) {
+            el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:300px;color:#94a3b8;font-size:13px;flex-direction:column;gap:8px;"><i class="ph ph-chart-bar" style="font-size:32px;"></i> No data available for the selected period</div>';
+            return;
+        }
 
 		var stackColors = seriesArr.map(function (s, i) {
 			var n = (s.name || "").toLowerCase();

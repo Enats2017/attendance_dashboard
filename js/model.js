@@ -60,20 +60,36 @@ class AttendanceModel {
             const urlShifts = new URL(window.APP_CONFIG.API_URL, window.location.origin);
             urlShifts.searchParams.set('action', 'get_shifts');
 
+            const safeJson = async (response) => {
+                const text = await response.text();
+                if (!text || text.trim() === '') return [];
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    console.error('Invalid JSON response:', text.substring(0, 200));
+                    return [];
+                }
+            };
+
             const [deptRes, compRes, shiftRes] = await Promise.all([
-                fetch(urlDepts.toString()).then(r => r.json()),
-                fetch(urlComps.toString()).then(r => r.json()),
-                fetch(urlShifts.toString()).then(r => r.json())
+                fetch(urlDepts.toString(), { credentials: 'include' }).then(safeJson),
+                fetch(urlComps.toString(), { credentials: 'include' }).then(safeJson),
+                fetch(urlShifts.toString(), { credentials: 'include' }).then(safeJson)
             ]);
 
             this.state.filterLists = {
-                depts: deptRes.map(d => d.DepartmentName),
-                companies: compRes.map(c => c.CompanyName),
-                shifts: shiftRes.map(s => s.ShiftName)
+                depts:     Array.isArray(deptRes)  ? deptRes.map(d => d.DepartmentName).filter(Boolean)  : [],
+                companies: Array.isArray(compRes)  ? compRes.map(c => c.CompanyName).filter(Boolean)      : [],
+                shifts:    Array.isArray(shiftRes) ? shiftRes.map(s => s.ShiftName).filter(Boolean)       : []
             };
+
+            console.log('Filter lists loaded:', this.state.filterLists);
             return { success: true };
+
         } catch (error) {
             console.error('Fetch Filter Options Error:', error);
+            // Don't crash the app - just use empty lists
+            this.state.filterLists = { depts: [], companies: [], shifts: [] };
             return { success: false, error: error.message };
         }
     }
@@ -91,7 +107,7 @@ class AttendanceModel {
             url.searchParams.set('shift', this.state.filters.shift);
             url.searchParams.set('location', this.state.filters.location);
             console.log('Dashboard URL:', url.toString());
-            const response = await fetch(url.toString());
+            const response = await fetch(url.toString(), { credentials: 'include' });
             const data = await response.json();
 
             if (data.success) {
@@ -283,7 +299,8 @@ class AttendanceModel {
         if (age < 35) return '25–34';
         if (age < 45) return '35–44';
         if (age < 55) return '45–54';
-        return '55+';
+        if (age < 60) return '55–59';
+        return '60+';
     }
 
 
@@ -681,7 +698,7 @@ class AttendanceModel {
         try {
             const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
             url.searchParams.set('action', 'get_designations_order');
-            const response = await fetch(url.toString());
+            const response = await fetch(url.toString(), { credentials: 'include' });
             const data = await response.json();
             return data;
         } catch (error) {
@@ -697,9 +714,8 @@ class AttendanceModel {
             url.searchParams.set('action', 'save_designations_order');
             const response = await fetch(url.toString(), {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'save_designations_order', items })
             });
             const data = await response.json();
@@ -806,7 +822,7 @@ class AttendanceModel {
         try {
             const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
             url.searchParams.set('action', 'get_companies_order');
-            const response = await fetch(url.toString());
+            const response = await fetch(url.toString(), { credentials: 'include' });
             return await response.json();
         } catch (error) {
             console.error('Fetch Companies Order Error:', error);
@@ -821,6 +837,7 @@ class AttendanceModel {
             url.searchParams.set('action', 'save_companies_order');
             const response = await fetch(url.toString(), {
                 method: 'POST',
+                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'save_companies_order', items })
             });
@@ -836,7 +853,7 @@ class AttendanceModel {
         try {
             const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
             url.searchParams.set('action', 'get_departments_order');
-            const response = await fetch(url.toString());
+            const response = await fetch(url.toString(), { credentials: 'include' });
             return await response.json();
         } catch (error) {
             console.error('Fetch Departments Order Error:', error);
@@ -851,6 +868,7 @@ class AttendanceModel {
             url.searchParams.set('action', 'save_departments_order');
             const response = await fetch(url.toString(), {
                 method: 'POST',
+                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'save_departments_order', items })
             });

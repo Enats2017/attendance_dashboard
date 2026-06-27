@@ -455,14 +455,15 @@ class AttendanceView {
 
         // --- Age cards ---
         this._currentAgeData = { emps, model, dayLogs, empMap };
-        const ageGroups = ["Under 18", "Under 25", "25–34", "35–44", "45–54", "55+"];
+        const ageGroups = ["Under 18", "Under 25", "25–34", "35–44", "45–54", "55–59", "60+"];
         const ageGroupIcons = {
-            "Under 18": "ph-baby",
-            "Under 25": "ph-person-simple-run",
-            "25–34": "ph-user",
-            "35–44": "ph-user-circle",
-            "45–54": "ph-user-circle-gear",
-            "55+": "ph-user-focus",
+            "Under 18": "ph-baby",                  
+            "Under 25": "ph-student",               
+            "25–34": "ph-person-simple",            
+            "35–44": "ph-user-circle",              
+            "45–54": "ph-user-circle-gear",         
+            "55–59": "ph-user-focus",         
+            "60+": "ph-person-simple-tai-chi"       
         };
         const ageGroupCls = {
             "Under 18": "",
@@ -470,7 +471,8 @@ class AttendanceView {
             "25–34": "success",
             "35–44": "warning",
             "45–54": "accent",
-            "55+": "danger",
+            "55-59": "danger",
+            "60+": "accent"
         };
         const ageCounts = {};
         ageGroups.forEach(g => ageCounts[g] = 0);
@@ -561,21 +563,23 @@ class AttendanceView {
 
 
     _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
-        const groups = ["Under 18", "Under 25", "25–34", "35–44", "45–54", "55+"];
-        const groupIcons = {
-            "Under 18": "ph-baby",
-            "Under 25": "ph-person-simple-run",
-            "25–34": "ph-user",
-            "35–44": "ph-user-circle",
-            "45–54": "ph-user-circle-gear",
-            "55+": "ph-user-focus",
+        const groups = ["Under 18", "Under 25", "25–34", "35–44", "45–54", "55–59", "60+"];
+        const ageGroupIcons = {
+            "Under 18": "ph-baby",                  
+            "Under 25": "ph-student",               
+            "25–34": "ph-person-simple",            
+            "35–44": "ph-user-circle",              
+            "45–54": "ph-user-circle-gear",         
+            "55–59": "ph-user-focus",
+            "60+": "ph-person-simple-tai-chi"       
         };
         const groupCls = {
             "Under 25": "info",
             "25–34": "success",
             "35–44": "warning",
             "45–54": "accent",
-            "55+": "danger",
+            "55–59": "danger",
+            "60+": "accent"
         };
 
         // Date-range ke hisaab se day-wise records banao (jaise chart me hota hai)
@@ -595,26 +599,26 @@ class AttendanceView {
 
         const cards = [
             { key: "totalHeadcount", label: "Total Headcount", val: stats.total, icon: "ph-users", cls: "", ageGroup: null, },
-            ...groups.map((g) => ({ key: "ageGroup", label: g, val: counts[g], icon: groupIcons[g], cls: groupCls[g], ageGroup: g, })),
+            ...groups.map((g) => ({ key: "ageGroup", label: g, val: counts[g], icon: ageGroupIcons[g], cls: groupCls[g], ageGroup: g, })),
             { key: null, label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", ageGroup: null, },
         ];
 
         return `
-		<div class="summary-grid">
-			${cards.map((c) => `
-				<div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
-					${c.key === "totalHeadcount" ? `data-card-key="totalHeadcount"` : ""}
-					${c.ageGroup ? `data-age-group="${this._escapeAttr(c.ageGroup)}" onclick="AppController.view._showAgeGroupDrilldown('${this._escapeAttr(c.ageGroup)}')"` : ""}>
-					<div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-					<div class="stat-content">
-						<span class="stat-label">${c.label}</span>
-						<span class="stat-value">${c.val}</span>
-						${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
-					</div>
-				</div>
-			`,).join("")}
-		</div>
-	`;
+            <div class="summary-grid">
+                ${cards.map((c) => `
+                    <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
+                        ${c.key === "totalHeadcount" ? `data-card-key="totalHeadcount"` : ""}
+                        ${c.ageGroup ? `data-age-group="${this._escapeAttr(c.ageGroup)}" onclick="AppController.view._showAgeGroupDrilldown('${this._escapeAttr(c.ageGroup)}')"` : ""}>
+                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                        <div class="stat-content">
+                            <span class="stat-label">${c.label}</span>
+                            <span class="stat-value">${c.val}</span>
+                            ${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
+                        </div>
+                    </div>
+                `,).join("")}
+            </div>
+        `;
     }
 
     _renderCompanySummaryCards(emps, stats, model, logs, empMap) {
@@ -1408,7 +1412,6 @@ class AttendanceView {
 
         const deptEmps = emps.filter((e) => e.dept === dept);
 
-        // unique designations, respecting designationSortOrder
         const desigMap = {};
         deptEmps.forEach((e) => {
             const name = e.designation || "Staff";
@@ -1417,7 +1420,9 @@ class AttendanceView {
                 desigMap[name] = { name, order };
             }
         });
-        const desigs = Object.values(desigMap).sort((a, b) => (a.order !== b.order ? a.order - b.order : a.name.localeCompare(b.name))).map((d) => d.name);
+        const desigs = Object.values(desigMap)
+            .sort((a, b) => (a.order !== b.order ? a.order - b.order : a.name.localeCompare(b.name)))
+            .map((d) => d.name);
 
         const desigCounts = {};
         desigs.forEach((d) => (desigCounts[d] = 0));
@@ -1434,6 +1439,7 @@ class AttendanceView {
         const colorCls = ["info", "success", "warning", "accent", "danger"];
         const desigCardsHtml = desigs.map((d, i) => `
             <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
+                style="flex: 0 1 180px;"
                 data-dashboard-desig="${this._escapeAttr(d)}"
                 onclick="AppController.view._showDashboardDesigDrilldown('${this._escapeAttr(d)}')">
                 <div class="stat-icon"><i class="ph ph-identification-badge"></i></div>
@@ -1449,24 +1455,25 @@ class AttendanceView {
         if (!panel) return;
         panel.style.display = "block";
         panel.innerHTML = `
-            <div class="drilldown-box">
-                <div class="drilldown-header">
-                    <div class="drilldown-title">🔍 Dept: ${dept} — Designations</div>
-                    <div class="drilldown-btn-group">
-                        <button class="btn-drill btn-drill-back" onclick="AppController.view._closeStatCardDrilldown()">✕ Close</button>
-                    </div>
-                </div>
-                <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); padding:16px 0;">
-                    ${desigCardsHtml || '<p style="padding:16px;color:#94a3b8;">No designations found.</p>'}
-                </div>
+            <div style="
+                font-size:10px;font-weight:700;text-transform:uppercase;
+                letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px;
+                display:flex;align-items:center;gap:8px;
+            ">
+                BY ${dept.toUpperCase()} DEPARTMENT DESIGNATIONS
+                <span style="flex:1;height:1px;background:#e5e7eb;display:block;"></span>
             </div>
+            <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                ${desigCardsHtml || '<p style="padding:16px;color:#94a3b8;">No designations found.</p>'}
+            </div>
+            <div id="dashboard-desig-table-container" style="margin-top:8px;"></div>
         `;
         panel.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
 
     _showDashboardDesigDrilldown(designation) {
-        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
+        document.querySelectorAll('.stat-card-clickable[data-dashboard-desig]').forEach((c) => c.classList.remove("active"));
         const card = this.app.querySelector(`.stat-card-clickable[data-dashboard-desig="${designation}"]`);
         if (card) card.classList.add("active");
 
@@ -1485,7 +1492,20 @@ class AttendanceView {
             date: l.date,
         }));
 
-        this._renderStatCardDrilldown("dashboardDesig_" + designation, items, 1);
+        this._renderStatCardDrilldown(
+            "dashboardDesig_" + designation,
+            items,
+            1,
+            "dashboard-desig-table-container",
+            "AppController.view._closeDashboardDesigTable()"
+        );
+    }
+
+
+    _closeDashboardDesigTable() {
+        const c = document.getElementById("dashboard-desig-table-container");
+        if (c) c.innerHTML = "";
+        document.querySelectorAll('.stat-card-clickable[data-dashboard-desig]').forEach((el) => el.classList.remove("active"));
     }
 
     
@@ -3342,11 +3362,12 @@ class AttendanceView {
         });
     }
 
-    _renderStatCardDrilldown(key, items, page = 1) {
+    _renderStatCardDrilldown(key, items, page = 1, containerId = "stat-card-drilldown", closeHandler = "AppController.view._closeStatCardDrilldown()") {
         this._statCardKey = key;
         this._statCardItems = items;
 
-        const panel = document.getElementById("stat-card-drilldown");
+        const panel = document.getElementById(containerId);
+
         if (!panel) {
             return;
         }
@@ -3380,6 +3401,7 @@ class AttendanceView {
         const isShiftSummary = key.startsWith("shiftSummary_");
         const isStaffSummary = key.startsWith("staffSummary_");
         const isWorkerSummary = key.startsWith("workerSummary_");
+        const isDashboardDesig = key.startsWith("dashboardDesig_");
         const isNewJoinedOnly = key === "newJoined";
         const isStaffList = key === "staffList";
         const isWorkerList = key === "workerList";
@@ -3498,7 +3520,7 @@ class AttendanceView {
         for (let i = startP; i <= endP; i++) {
             pageButtons += `
                 <button class="btn-page ${i === currentPage ? "btn-page-active" : ""}"
-                    onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, ${i})">
+                    onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, ${i}, '${containerId}', '${closeHandler}')">
                     ${i}
                 </button>
             `;
@@ -3576,7 +3598,7 @@ class AttendanceView {
 			<div class="drilldown-box">
 				<div class="drilldown-header">
 					<div class="drilldown-title">
-                        ${titleMap[key] || (isAgeGroup ? "🎂 Age Group: " + key.replace("ageGroup_", "") : isCompany ? "🏢 Company: " + key.replace("company_", "") : isDeptSummary ? "💼 Dept: " + key.replace("deptSummary_", "") : isGenderSummary ? "⚧ Gender: " + key.replace("genderSummary_", "") : isShiftSummary ? "🕐 Shift: " + key.replace("shiftSummary_", "") : isStaffSummary ? "👔 Staff Dept: " + key.replace("staffSummary_", "") : isWorkerSummary ? "🔧 Workmen Dept: " + key.replace("workerSummary_", "") : key)}
+                        ${titleMap[key] || (isAgeGroup ? "🎂 Age Group: " + key.replace("ageGroup_", "") : isCompany ? "🏢 Company: " + key.replace("company_", "") : isDeptSummary ? "💼 Dept: " + key.replace("deptSummary_", "") : isGenderSummary ? "⚧ Gender: " + key.replace("genderSummary_", "") : isShiftSummary ? "🕐 Shift: " + key.replace("shiftSummary_", "") : isStaffSummary ? "👔 Staff Dept: " + key.replace("staffSummary_", "") : isWorkerSummary ? "🔧 Workmen Dept: " + key.replace("workerSummary_", "") : isDashboardDesig ? "🏷️ Designation: " + key.replace("dashboardDesig_", "") : key)}
 						<small>${items.length} records</small>
 					</div>
 					<div class="drilldown-btn-group">
@@ -3585,9 +3607,9 @@ class AttendanceView {
 							↓ Excel
 						</button>
 						<button class="btn-drill btn-drill-back"
-							onclick="AppController.view._closeStatCardDrilldown()">
-							✕ Close
-						</button>
+                            onclick="${closeHandler}">
+                            ✕ Close
+                        </button>
 					</div>
 				</div>
 
@@ -3607,7 +3629,7 @@ class AttendanceView {
 					</div>
 					<div class="pagination-buttons">
 						<button class="btn-page" ${currentPage === 1 ? "disabled" : ""}
-							onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, 1)">«</button>
+                            onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, 1, '${containerId}', '${closeHandler}')">«</button>
 						<button class="btn-page" ${currentPage === 1 ? "disabled" : ""}
 							onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, ${currentPage - 1})">‹</button>
 						${pageButtons}
@@ -4581,6 +4603,20 @@ class AttendanceView {
                 <div id="drilldown-table" style="margin-top:16px"></div>
             `,
             renderCharts: () => {
+                if (!items || items.length === 0) {
+                    const chartEl = document.getElementById(chartId);
+                    if (chartEl) {
+                        chartEl.innerHTML = `
+                            <div style="display:flex;align-items:center;justify-content:center;
+                                height:200px;flex-direction:column;gap:8px;color:#94a3b8;font-size:13px;">
+                                <i class="ph ph-user-minus" style="font-size:32px;"></i>
+                                No ${isResigned ? 'resignations' : 'new joinings'} in selected date range
+                            </div>
+                        `;
+                    }
+                    return;
+                }
+
                 Charts.stacked(
                     chartId,
                     formattedDates,
@@ -4589,7 +4625,7 @@ class AttendanceView {
                     (category, index) => {
                         const dateVal = dates[index];
                         const filteredEmps = items.filter(({ emp }) => emp[dateField] === dateVal).map(({ emp }) => emp);
-                        this._renderJoinExitDrillDown(filteredEmps, `${isResigned ? "Resigned" : "Joined"} on ${this._formatDate(dateVal)}`, isResigned,);
+                        this._renderJoinExitDrillDown(filteredEmps, `${isResigned ? "Resigned" : "Joined"} on ${this._formatDate(dateVal)}`, isResigned);
                     },
                 );
             },
