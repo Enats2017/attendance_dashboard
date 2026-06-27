@@ -491,7 +491,7 @@ class AttendanceView {
             {
                 key: "totalHeadcount",
                 label: "TotalHeadcount",
-                val: totalPresentHalf, // CHANGED: pehle stats.total tha
+                val: emps.length, // CHANGED: pehle stats.total tha
                 icon: "ph-users",
                 cls: "",
             },
