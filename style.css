@@ -588,7 +588,7 @@ body {
 /* ── Charts Grid ─────────────────────────────────────────────────────── */
 .charts-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(30px, 1fr));
+    grid-template-columns: 1fr;
     gap: 24px;
     margin-bottom: 24px;
     width: 100%;
@@ -825,3 +825,24 @@ body {
     border-color: var(--primary) !important;
 }
 
+/* ===== Dashboard Overview: Total Headcount Card ===== */
+.stat-card[data-card-key="totalHeadcount"] {
+    background: #424590 !important;
+    border: 1.5px solid #424590 !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    min-height: 120px;
+    gap: 8px !important;
+}
+
+.stat-card[data-card-key="totalHeadcount"] .stat-icon {
+    background: #bfdbfe !important;
+    color: #1d4ed8 !important;
+}
+
+.stat-card[data-card-key="totalHeadcount"] .stat-content {
+    align-items: center !important;
+    text-align: center !important;
+}
