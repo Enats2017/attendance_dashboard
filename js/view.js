@@ -62,18 +62,110 @@ class AttendanceView {
 						${state.activeTab !== "feature" ? this._renderFilters(state.filters, filterOpts) : ""}
                         ${
                             state.activeTab === "age"
-                                ? this._renderAgeSummaryCards(emps, stats, model, logs, empMap,) : state.activeTab === "company"
-                                ? this._renderCompanySummaryCards(emps, stats, model, logs, empMap,) : state.activeTab === "dept"
-                                ? this._renderDeptSummaryCards(emps, stats, model, logs, empMap,) : state.activeTab === "gender"
-                                ? this._renderGenderSummaryCards(emps, stats, model, logs, empMap,) : state.activeTab === "latein"
-                                ? this._renderLateInSummaryCards(stats,) : state.activeTab === "earlyout"
-                                ? this._renderEarlyOutSummaryCards(stats,) : state.activeTab === "shift"
-                                ? this._renderShiftSummaryCards(emps, stats, model, logs, empMap,) : state.activeTab === "staff"
-                                ? this._renderStaffSummaryCards(emps, stats, model, logs, empMap,) : state.activeTab === "worker"
-                                ? this._renderWorkerSummaryCards(emps, stats, model, logs, empMap,) : state.activeTab === "resigned"
-                                ? this._renderResignedSummaryCards(stats,) : state.activeTab === "newjoined"
-                                ? this._renderNewJoinedSummaryCards(stats,) : state.activeTab === "feature"
-                                ? this._renderDashboardSummaryCards(emps, stats, model, logs, empMap) : this._renderSummaryCards(stats, emps, logs, empMap, model)
+                                ? this._renderAgeSummaryCards(
+                                      emps,
+                                      stats,
+                                      model,
+                                      logs,
+                                      empMap,
+                                  )
+                                : state.activeTab === "company"
+                                  ? this._renderCompanySummaryCards(
+                                        emps,
+                                        stats,
+                                        model,
+                                        logs,
+                                        empMap,
+                                    )
+                                  : state.activeTab === "dept"
+                                    ? this._renderDeptSummaryCards(
+                                          emps,
+                                          stats,
+                                          model,
+                                          logs,
+                                          empMap,
+                                      )
+                                    : state.activeTab === "gender"
+                                      ? this._renderGenderSummaryCards(
+                                            emps,
+                                            stats,
+                                            model,
+                                            logs,
+                                            empMap,
+                                        )
+                                      : state.activeTab === "latein"
+                                        ? this._renderLateInSummaryCards(
+                                              emps,
+                                              stats,
+                                              model,
+                                              logs,
+                                              empMap,
+                                          )
+                                        : state.activeTab === "earlyout"
+                                          ? this._renderEarlyOutSummaryCards(
+                                                emps,
+                                                stats,
+                                                model,
+                                                logs,
+                                                empMap,
+                                            )
+                                          : state.activeTab === "shift"
+                                            ? this._renderShiftSummaryCards(
+                                                  emps,
+                                                  stats,
+                                                  model,
+                                                  logs,
+                                                  empMap,
+                                              )
+                                            : state.activeTab === "staff"
+                                              ? this._renderStaffSummaryCards(
+                                                    emps,
+                                                    stats,
+                                                    model,
+                                                    logs,
+                                                    empMap,
+                                                )
+                                              : state.activeTab === "worker"
+                                                ? this._renderWorkerSummaryCards(
+                                                      emps,
+                                                      stats,
+                                                      model,
+                                                      logs,
+                                                      empMap,
+                                                  )
+                                                : state.activeTab === "resigned"
+                                                  ? this._renderResignedSummaryCards(
+                                                        emps,
+                                                        stats,
+                                                        model,
+                                                        logs,
+                                                        empMap,
+                                                    )
+                                                  : state.activeTab ===
+                                                      "newjoined"
+                                                    ? this._renderNewJoinedSummaryCards(
+                                                          emps,
+                                                          stats,
+                                                          model,
+                                                          logs,
+                                                          empMap,
+                                                      )
+                                                    : state.activeTab ===
+                                                        "feature"
+                                                      ? this._renderDashboardSummaryCards(
+                                                            emps,
+                                                            stats,
+                                                            model,
+                                                            logs,
+                                                            empMap,
+                                                        )
+                                                      : this._renderSummaryCards(
+                                                            stats,
+                                                            emps,
+                                                            logs,
+                                                            empMap,
+                                                            model,
+                                                        )
                         }
 						<div id="stat-card-drilldown" class="stat-drilldown-panel" style="display:none;"></div>
 						<div class="tab-pane-container">
@@ -333,28 +425,51 @@ class AttendanceView {
 
     _renderSummaryCards(stats, emps, logs, empMap, model) {
         const staffWorkerStats = this._staffWorkerStats || {};
+        let totalPresentHalf = stats.total;
 
         if (emps && logs && empMap && model) {
             const { dateFrom, dateTo } = model.state.filters;
-            const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
-            const staffEmps = emps.filter(e => [58].includes(e.categoryId));
-            const workerEmps = emps.filter(e => [51, 59, 60].includes(e.categoryId));
+            const dayLogs = this._buildEmployeeDayLogs(
+                emps,
+                logs,
+                dateFrom,
+                dateTo,
+            );
+            const staffEmps = emps.filter((e) => [58].includes(e.categoryId));
+            const workerEmps = emps.filter((e) =>
+                [51, 59, 60].includes(e.categoryId),
+            );
 
             this._currentStaffSummaryData = {
-                emps: staffEmps, model, dayLogs, empMap, isDashboard: false
+                emps: staffEmps,
+                model,
+                dayLogs,
+                empMap,
+                isDashboard: false,
             };
             this._currentWorkerSummaryData = {
-                emps: workerEmps, model, dayLogs, empMap, isDashboard: false
+                emps: workerEmps,
+                model,
+                dayLogs,
+                empMap,
+                isDashboard: false,
             };
 
-            let staffPresent = 0, staffHalf = 0, workerPresent = 0, workerHalf = 0;
-            dayLogs.forEach(l => {
+            let staffPresent = 0,
+                staffHalf = 0,
+                workerPresent = 0,
+                workerHalf = 0;
+            totalPresentHalf = 0;
+
+            dayLogs.forEach((l) => {
                 const e = empMap[l.empId];
                 if (!e) return;
                 const present = parseFloat(l.present);
                 const absent = parseFloat(l.absent ?? 0);
                 const isPresent = present == 1 && absent == 0;
                 const isHalf = present == 0.5 && absent == 0.5;
+
+                if (isPresent || isHalf) totalPresentHalf++; // CHANGED
 
                 if ([58].includes(e.categoryId)) {
                     if (isPresent) staffPresent++;
@@ -366,7 +481,6 @@ class AttendanceView {
                 }
             });
 
-            // Override the staffWorkerStats values with live counts
             staffWorkerStats.staffPresent = staffPresent;
             staffWorkerStats.staffHalfPresent = staffHalf;
             staffWorkerStats.workerPresent = workerPresent;
@@ -374,50 +488,141 @@ class AttendanceView {
         }
 
         const cards = [
-            { key: "totalHeadcount", label: "Total Headcount", val: stats.total, icon: "ph-users", cls: "", },
-            { key: "present", label: "Present", val: stats.present, icon: "ph-check-circle", cls: "success", },
-            { key: "halfPresent", label: "Half Day", val: stats.halfPresent ?? 0, icon: "ph-circle-half", cls: "warning", },
-            { key: "absent", label: "Absent", val: stats.absent, icon: "ph-x-circle", cls: "danger", },
-            { key: "weeklyOff", label: "Weekly Off", val: stats.weeklyOff ?? 0, icon: "ph-calendar-x", cls: "info", },
-            { key: "singlePunch", label: "Single Punch", val: stats.singlePunch, icon: "ph-lightning", cls: "warning", },
-            { key: "lateIn", label: "Late In", val: stats.lateIn, icon: "ph-clock-afternoon", cls: "info", },
-            { key: "earlyOut", label: "Early Out", val: stats.earlyOut, icon: "ph-sign-out", cls: "accent", },
-            { key: null, label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", },
-            { key: "staffList", label: "Staff Present", val: (staffWorkerStats.staffPresent || 0) + (staffWorkerStats.staffHalfPresent || 0), icon: "ph-identification-badge", cls: "info", },
-            { key: "workerList", label: "Workmen Present", val: (staffWorkerStats.workerPresent || 0) + (staffWorkerStats.workerHalfPresent || 0), icon: "ph-hard-hat", cls: "warning", },
-            { key: "newJoined", label: "New Join", val: stats.newJoined || 0, icon: "ph-user-plus", cls: "success", },
-            { key: "resigned", label: "Resigned", val: stats.resigned || 0, icon: "ph-user-minus", cls: "danger", },
+            {
+                key: "totalHeadcount",
+                label: "TotalHeadcount",
+                val: totalPresentHalf, // CHANGED: pehle stats.total tha
+                icon: "ph-users",
+                cls: "",
+            },
+            {
+                key: "present",
+                label: "Present",
+                val: stats.present,
+                icon: "ph-check-circle",
+                cls: "success",
+            },
+            {
+                key: "halfPresent",
+                label: "Half Day",
+                val: stats.halfPresent ?? 0,
+                icon: "ph-circle-half",
+                cls: "warning",
+            },
+            {
+                key: "absent",
+                label: "Absent",
+                val: stats.absent,
+                icon: "ph-x-circle",
+                cls: "danger",
+            },
+            {
+                key: "weeklyOff",
+                label: "Weekly Off",
+                val: stats.weeklyOff ?? 0,
+                icon: "ph-calendar-x",
+                cls: "info",
+            },
+            {
+                key: "singlePunch",
+                label: "Single Punch",
+                val: stats.singlePunch,
+                icon: "ph-lightning",
+                cls: "warning",
+            },
+            {
+                key: "lateIn",
+                label: "Late In",
+                val: stats.lateIn,
+                icon: "ph-clock-afternoon",
+                cls: "info",
+            },
+            {
+                key: "earlyOut",
+                label: "Early Out",
+                val: stats.earlyOut,
+                icon: "ph-sign-out",
+                cls: "accent",
+            },
+            {
+                key: null,
+                label: "Avg Hours",
+                val: stats.avgHours + "h",
+                icon: "ph-timer",
+                cls: "",
+            },
+            {
+                key: "staffList",
+                label: "Staff Present",
+                val:
+                    (staffWorkerStats.staffPresent || 0) +
+                    (staffWorkerStats.staffHalfPresent || 0),
+                icon: "ph-identification-badge",
+                cls: "info",
+            },
+            {
+                key: "workerList",
+                label: "Workmen Present",
+                val:
+                    (staffWorkerStats.workerPresent || 0) +
+                    (staffWorkerStats.workerHalfPresent || 0),
+                icon: "ph-hard-hat",
+                cls: "warning",
+            },
+            {
+                key: "newJoined",
+                label: "New Join",
+                val: stats.newJoined || 0,
+                icon: "ph-user-plus",
+                cls: "success",
+            },
+            {
+                key: "resigned",
+                label: "Resigned",
+                val: stats.resigned || 0,
+                icon: "ph-user-minus",
+                cls: "danger",
+            },
         ];
 
         return `
-			<div class="summary-grid">
-				${cards.map((c) => `
-					<div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
-						${c.key ? `data-card-key="${c.key}"` : ""}>
-						<div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-						<div class="stat-content">
-							<span class="stat-label">${c.label}</span>
-							<span class="stat-value">${c.val}</span>
-							${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
-						</div>
+		<div class="summary-grid">
+			${cards
+                .map(
+                    (c) => `
+				<div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
+					${c.key ? `data-card-key="${c.key}"` : ""}>
+					<div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+					<div class="stat-content">
+						<span class="stat-label">${c.label}</span>
+						<span class="stat-value">${c.val}</span>
+						${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
 					</div>
-				`,).join("")}
-			</div>
-		`;
+				</div>
+			`,
+                )
+                .join("")}
+		</div>
+	`;
     }
-
     _renderDashboardSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
         const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo,);
         const staffWorkerStats = this._staffWorkerStats || {};
 
         this._currentStaffSummaryData = {
-            emps: emps.filter(e => [58].includes(e.categoryId)),
-            model, dayLogs, empMap, isDashboard: true
+            emps: emps.filter((e) => [58].includes(e.categoryId)),
+            model,
+            dayLogs,
+            empMap,
+            isDashboard: true,
         };
         this._currentWorkerSummaryData = {
-            emps: emps.filter(e => [51, 59, 60].includes(e.categoryId)),
-            model, dayLogs, empMap, isDashboard: true
+            emps: emps.filter((e) => [51, 59, 60].includes(e.categoryId)),
+            model,
+            dayLogs,
+            empMap,
+            isDashboard: true,
         };
 
         // --- Headcount ---
@@ -433,12 +638,19 @@ class AttendanceView {
         `;
 
         // --- Company cards ---
-        this._currentCompanyData = { emps, model, dayLogs, empMap, isDashboard: true };
-        const companies = [...new Set(emps.map(e => e.company))];
+        this._currentCompanyData = {
+            emps,
+            model,
+            dayLogs,
+            empMap,
+            isDashboard: true,
+        };
+        const companies = [...new Set(emps.map((e) => e.company))];
         const companyCounts = {};
-        companies.forEach(c => companyCounts[c] = 0);
-        emps.forEach(e => {
-            if (companyCounts[e.company] !== undefined) companyCounts[e.company]++;
+        companies.forEach((c) => (companyCounts[c] = 0));
+        emps.forEach((e) => {
+            if (companyCounts[e.company] !== undefined)
+                companyCounts[e.company]++;
         });
         const compColorCls = ["info", "success", "warning", "accent", "danger"];
         const companyCards = companies.map((c, i) => `
@@ -455,9 +667,15 @@ class AttendanceView {
         `,).join("");
 
         // --- Gender ---
-        this._currentGenderSummaryData = { emps, model, dayLogs, empMap, isDashboard: true };
+        this._currentGenderSummaryData = {
+            emps,
+            model,
+            dayLogs,
+            empMap,
+            isDashboard: true,
+        };
         const genderCounts = { Male: 0, Female: 0 };
-        emps.forEach(e => {
+        emps.forEach((e) => {
             if (genderCounts[e.gender] !== undefined) genderCounts[e.gender]++;
         });
         const genderCards = `
@@ -504,8 +722,22 @@ class AttendanceView {
         `;
 
         // --- Age cards ---
-        this._currentAgeData = { emps, model, dayLogs, empMap, isDashboard: true };
-        const ageGroups = ["Under 18", "Under 25", "25–34", "35–44", "45–54", "55–59", "60+"];
+        this._currentAgeData = {
+            emps,
+            model,
+            dayLogs,
+            empMap,
+            isDashboard: true,
+        };
+        const ageGroups = [
+            "Under 18",
+            "Under 25",
+            "25–34",
+            "35–44",
+            "45–54",
+            "55–59",
+            "60+",
+        ];
         const ageGroupIcons = {
             "Under 18": "ph-baby",
             "Under 25": "ph-student",
@@ -525,8 +757,8 @@ class AttendanceView {
             "60+": "accent",
         };
         const ageCounts = {};
-        ageGroups.forEach(g => ageCounts[g] = 0);
-        emps.forEach(e => {
+        ageGroups.forEach((g) => (ageCounts[g] = 0));
+        emps.forEach((e) => {
             const g = model.getAgeGroup(e.dob);
             if (ageCounts[g] !== undefined) ageCounts[g]++;
         });
@@ -544,11 +776,17 @@ class AttendanceView {
         `,).join("");
 
         // --- Department cards ---
-        this._currentDashboardDeptData = { emps, model, dayLogs, empMap, isDashboard: true };
-        const dashDepts = [...new Set(emps.map(e => e.dept))];
+        this._currentDashboardDeptData = {
+            emps,
+            model,
+            dayLogs,
+            empMap,
+            isDashboard: true,
+        };
+        const dashDepts = [...new Set(emps.map((e) => e.dept))];
         const dashDeptCounts = {};
-        dashDepts.forEach(d => dashDeptCounts[d] = 0);
-        emps.forEach(e => {
+        dashDepts.forEach((d) => (dashDeptCounts[d] = 0));
+        emps.forEach((e) => {
             if (dashDeptCounts[e.dept] !== undefined) dashDeptCounts[e.dept]++;
         });
         const dashDeptColorCls = ["info", "success", "warning", "accent", "danger",];
@@ -567,7 +805,6 @@ class AttendanceView {
             </div>
         `,).join("");
 
-        // Section label style (inline so no CSS file change needed)
         const sectionLabel = (text) => `
             <div style="
                 font-size:10px;font-weight:700;text-transform:uppercase;
@@ -610,59 +847,91 @@ class AttendanceView {
         `;
     }
 
-_renderAgeSummaryCards(emps, stats, model, logs, empMap) {
-    const groups = ["Under 18", "Under 25", "25–34", "35–44", "45–54", "55–59", "60+"];
-    const ageGroupIcons = {
-        "Under 18": "ph-baby",                  
-        "Under 25": "ph-student",               
-        "25–34": "ph-person-simple",            
-        "35–44": "ph-user-circle",              
-        "45–54": "ph-user-circle-gear",         
-        "55–59": "ph-user-focus",
-        "60+": "ph-person-simple-tai-chi"       
-    };
-    const groupCls = {
-        "Under 25": "info",
-        "25–34": "success",
-        "35–44": "warning",
-        "45–54": "accent",
-        "55–59": "danger",
-        "60+": "accent"
-    };
+    _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
+        const groups = [
+            "Under 18",
+            "Under 25",
+            "25–34",
+            "35–44",
+            "45–54",
+            "55–59",
+            "60+",
+        ];
+        const ageGroupIcons = {
+            "Under 18": "ph-baby",
+            "Under 25": "ph-student",
+            "25–34": "ph-person-simple",
+            "35–44": "ph-user-circle",
+            "45–54": "ph-user-circle-gear",
+            "55–59": "ph-user-focus",
+            "60+": "ph-person-simple-tai-chi",
+        };
+        const groupCls = {
+            "Under 25": "info",
+            "25–34": "success",
+            "35–44": "warning",
+            "45–54": "accent",
+            "55–59": "danger",
+            "60+": "accent",
+        };
 
-    // Date-range ke hisaab se day-wise records banao (jaise chart me hota hai)
-    const { dateFrom, dateTo } = model.state.filters;
-    const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo,);
+        const { dateFrom, dateTo } = model.state.filters;
+        const dayLogs = this._buildEmployeeDayLogs(
+            emps,
+            logs,
+            dateFrom,
+            dateTo,
+        );
 
-    this._currentAgeData = { emps, model, dayLogs, empMap };
+        this._currentAgeData = { emps, model, dayLogs, empMap };
 
-    // ✅ FIXED: sirf Present + Half Present din count ho rahe hain
-    const counts = {};
-    groups.forEach((g) => (counts[g] = 0));
-    dayLogs.forEach((l) => {
-        const e = empMap[l.empId];
-        if (!e) return;
-        const isPresentOrHalf =
-            this._matchesStatus(l, "Present") ||
-            this._matchesStatus(l, "Half Present");
-        if (!isPresentOrHalf) return;
-        const g = model.getAgeGroup(e.dob);
-        if (counts[g] !== undefined) counts[g]++;
-    });
+        const counts = {};
+        groups.forEach((g) => (counts[g] = 0));
+        dayLogs.forEach((l) => {
+            const e = empMap[l.empId];
+            if (!e) return;
+            const isPresentOrHalf =
+                this._matchesStatus(l, "Present") ||
+                this._matchesStatus(l, "Half Present");
+            if (!isPresentOrHalf) return;
+            const g = model.getAgeGroup(e.dob);
+            if (counts[g] !== undefined) counts[g]++;
+        });
 
-    // ✅ FIXED: Total Headcount card ab sab age-groups ke
-    // Present+Half counts ka sum dikhata hai
-    const totalPresentHalf = groups.reduce((sum, g) => sum + counts[g], 0);
+        const totalPresentHalf = groups.reduce((sum, g) => sum + counts[g], 0);
 
-    const cards = [
-        { key: "totalHeadcount", label: "Total Headcount", val: totalPresentHalf, icon: "ph-users", cls: "", ageGroup: null, },
-        ...groups.map((g) => ({ key: "ageGroup", label: g, val: counts[g], icon: ageGroupIcons[g], cls: groupCls[g], ageGroup: g, })),
-        { key: null, label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", ageGroup: null, },
-    ];
+        const cards = [
+            {
+                key: "totalHeadcount",
+                label: "Total Presentcount",
+                val: totalPresentHalf,
+                icon: "ph-users",
+                cls: "",
+                ageGroup: null,
+            },
+            ...groups.map((g) => ({
+                key: "ageGroup",
+                label: g,
+                val: counts[g],
+                icon: ageGroupIcons[g],
+                cls: groupCls[g],
+                ageGroup: g,
+            })),
+            {
+                key: null,
+                label: "Avg Hours",
+                val: stats.avgHours + "h",
+                icon: "ph-timer",
+                cls: "",
+                ageGroup: null,
+            },
+        ];
 
-    return `
+        return `
         <div class="summary-grid">
-            ${cards.map((c) => `
+            ${cards
+                .map(
+                    (c) => `
                 <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
                     ${c.key === "totalHeadcount" ? `data-card-key="totalHeadcount"` : ""}
                     ${c.ageGroup ? `data-age-group="${this._escapeAttr(c.ageGroup)}" onclick="AppController.view._showAgeGroupDrilldown('${this._escapeAttr(c.ageGroup)}')"` : ""}>
@@ -673,15 +942,22 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
                         ${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
                     </div>
                 </div>
-            `,).join("")}
+            `,
+                )
+                .join("")}
         </div>
     `;
-}
+    }
 
     _renderCompanySummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
-        const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo,);
-        this._currentCompanyData = { emps, model, dayLogs, empMap, isDashboard: false };
+        const dayLogs = this._buildEmployeeDayLogs(
+            emps,
+            logs,
+            dateFrom,
+            dateTo,
+        );
+        this._currentCompanyData = { emps, model, dayLogs, empMap };
 
         const companies = [...new Set(emps.map((e) => e.company))];
         const colorCls = ["info", "success", "warning", "accent", "danger"];
@@ -693,16 +969,27 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
             if (!e) {
                 return;
             }
+            const isPresentOrHalf =
+                this._matchesStatus(l, "Present") ||
+                this._matchesStatus(l, "Half Present");
+            if (!isPresentOrHalf) {
+                return;
+            }
             if (counts[e.company] !== undefined) {
                 counts[e.company]++;
             }
         });
 
+        const totalPresentHalf = companies.reduce(
+            (sum, c) => sum + counts[c],
+            0,
+        );
+
         const cards = [
             {
                 type: "headcount",
-                label: "Total Headcount",
-                val: stats.total,
+                label: "Total Presentcount",
+                val: totalPresentHalf,
                 icon: "ph-users",
                 cls: "",
             },
@@ -724,37 +1011,14 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
         ];
 
         return `
-            <div class="summary-grid">
-                ${cards
-                    .map((c) => {
-                        if (c.type === "company") {
-                            return `
-                            <div class="stat-card ${c.cls} stat-card-clickable"
-                                data-company="${this._escapeAttr(c.company)}"
-                                onclick="AppController.view._showCompanyDrilldown('${this._escapeAttr(c.company)}')">
-                                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                                <div class="stat-content">
-                                    <span class="stat-label">${c.label}</span>
-                                    <span class="stat-value">${c.val}</span>
-                                    <span class="stat-card-hint">↓ click to view</span>
-                                </div>
-                            </div>
-                        `;
-                        }
-                        if (c.type === "avgHours") {
-                            return `
-                            <div class="stat-card">
-                                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                                <div class="stat-content">
-                                    <span class="stat-label">${c.label}</span>
-                                    <span class="stat-value">${c.val}</span>
-                                </div>
-                            </div>
-                        `;
-                        }
-                        // headcount
+        <div class="summary-grid">
+            ${cards
+                .map((c) => {
+                    if (c.type === "company") {
                         return `
-                        <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="totalHeadcount">
+                        <div class="stat-card ${c.cls} stat-card-clickable"
+                            data-company="${this._escapeAttr(c.company)}"
+                            onclick="AppController.view._showCompanyDrilldown('${this._escapeAttr(c.company)}')">
                             <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                             <div class="stat-content">
                                 <span class="stat-label">${c.label}</span>
@@ -763,10 +1027,32 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
                             </div>
                         </div>
                     `;
-                    })
-                    .join("")}
-            </div>
-        `;
+                    }
+                    if (c.type === "avgHours") {
+                        return `
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                            <div class="stat-content">
+                                <span class="stat-label">${c.label}</span>
+                                <span class="stat-value">${c.val}</span>
+                            </div>
+                        </div>
+                    `;
+                    }
+                    return `
+                    <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="totalHeadcount">
+                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                        <div class="stat-content">
+                            <span class="stat-label">${c.label}</span>
+                            <span class="stat-value">${c.val}</span>
+                            <span class="stat-card-hint">↓ click to view</span>
+                        </div>
+                    </div>
+                `;
+                })
+                .join("")}
+        </div>
+    `;
     }
 
     _renderDeptSummaryCards(emps, stats, model, logs, empMap) {
@@ -784,21 +1070,26 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
 
         const counts = {};
         depts.forEach((d) => (counts[d] = 0));
+
         dayLogs.forEach((l) => {
             const e = empMap[l.empId];
-            if (!e) {
-                return;
-            }
+            if (!e) return;
+            const isPresentOrHalf =
+                this._matchesStatus(l, "Present") ||
+                this._matchesStatus(l, "Half Present");
+            if (!isPresentOrHalf) return;
             if (counts[e.dept] !== undefined) {
                 counts[e.dept]++;
             }
         });
 
+        const totalPresentHalf = depts.reduce((sum, d) => sum + counts[d], 0);
+
         const cards = [
             {
                 type: "headcount",
-                label: "Total Headcount",
-                val: stats.total,
+                label: "Total Presentcount",
+                val: totalPresentHalf, // <-- pehle stats.total tha
                 icon: "ph-users",
                 cls: "",
             },
@@ -820,37 +1111,14 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
         ];
 
         return `
-		<div class="summary-grid">
-			${cards
-                .map((c) => {
-                    if (c.type === "dept") {
-                        return `
-                        <div class="stat-card ${c.cls} stat-card-clickable"
-                            data-dept="${this._escapeAttr(c.dept)}"
-                            onclick="AppController.view._showDeptSummaryDrilldown('${this._escapeAttr(c.dept)}')">
-                            <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                            <div class="stat-content">
-                                <span class="stat-label">${c.label}</span>
-                                <span class="stat-value">${c.val}</span>
-                                <span class="stat-card-hint">↓ click to view</span>
-                            </div>
-                        </div>
-                    `;
-                    }
-                    if (c.type === "avgHours") {
-                        return `
-                        <div class="stat-card">
-                            <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                            <div class="stat-content">
-                                <span class="stat-label">${c.label}</span>
-                                <span class="stat-value">${c.val}</span>
-                            </div>
-                        </div>
-                    `;
-                    }
-                    // headcount
+	<div class="summary-grid">
+		${cards
+            .map((c) => {
+                if (c.type === "dept") {
                     return `
-                    <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="totalHeadcount">
+                    <div class="stat-card ${c.cls} stat-card-clickable"
+                        data-dept="${this._escapeAttr(c.dept)}"
+                        onclick="AppController.view._showDeptSummaryDrilldown('${this._escapeAttr(c.dept)}')">
                         <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                         <div class="stat-content">
                             <span class="stat-label">${c.label}</span>
@@ -859,16 +1127,50 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
                         </div>
                     </div>
                 `;
-                })
-                .join("")}
-		</div>
-	`;
+                }
+                if (c.type === "avgHours") {
+                    return `
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                        <div class="stat-content">
+                            <span class="stat-label">${c.label}</span>
+                            <span class="stat-value">${c.val}</span>
+                        </div>
+                    </div>
+                `;
+                }
+                // headcount
+                return `
+                <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="totalHeadcount">
+                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">${c.label}</span>
+                        <span class="stat-value">${c.val}</span>
+                        <span class="stat-card-hint">↓ click to view</span>
+                    </div>
+                </div>
+            `;
+            })
+            .join("")}
+	</div>
+`;
     }
 
     _renderGenderSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
-        const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo,);
-        this._currentGenderSummaryData = { emps, model, dayLogs, empMap, isDashboard: false };
+        const dayLogs = this._buildEmployeeDayLogs(
+            emps,
+            logs,
+            dateFrom,
+            dateTo,
+        );
+        this._currentGenderSummaryData = {
+            emps,
+            model,
+            dayLogs,
+            empMap,
+            isDashboard: false,
+        };
 
         const genders = ["Male", "Female"];
         const genderIcons = {
@@ -881,19 +1183,23 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
         genders.forEach((g) => (counts[g] = 0));
         dayLogs.forEach((l) => {
             const e = empMap[l.empId];
-            if (!e) {
-                return;
-            }
+            if (!e) return;
+            const isPresentOrHalf =
+                this._matchesStatus(l, "Present") ||
+                this._matchesStatus(l, "Half Present");
+            if (!isPresentOrHalf) return;
             if (counts[e.gender] !== undefined) {
                 counts[e.gender]++;
             }
         });
 
+        const totalPresentHalf = genders.reduce((sum, g) => sum + counts[g], 0);
+
         const cards = [
             {
                 type: "headcount",
-                label: "Total Headcount",
-                val: stats.total,
+                label: "Total Presentcount",
+                val: totalPresentHalf,
                 icon: "ph-users",
                 cls: "",
             },
@@ -915,190 +1221,14 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
         ];
 
         return `
-            <div class="summary-grid">
-                ${cards
-                    .map((c) => {
-                        if (c.type === "gender") {
-                            return `
-                                <div class="stat-card ${c.cls} stat-card-clickable"
-                                    data-gender="${this._escapeAttr(c.gender)}"
-                                    onclick="AppController.view._showGenderSummaryDrilldown('${this._escapeAttr(c.gender)}')">
-                                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                                    <div class="stat-content">
-                                        <span class="stat-label">${c.label}</span>
-                                        <span class="stat-value">${c.val}</span>
-                                        <span class="stat-card-hint">↓ click to view</span>
-                                    </div>
-                                </div>
-                            `;
-                        }
-                        if (c.type === "avgHours") {
-                            return `
-                                <div class="stat-card">
-                                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                                    <div class="stat-content">
-                                        <span class="stat-label">${c.label}</span>
-                                        <span class="stat-value">${c.val}</span>
-                                    </div>
-                                </div>
-                            `;
-                        }
-                        // headcount
-                        return `
-                            <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="totalHeadcount">
-                                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                                <div class="stat-content">
-                                    <span class="stat-label">${c.label}</span>
-                                    <span class="stat-value">${c.val}</span>
-                                    <span class="stat-card-hint">↓ click to view</span>
-                                </div>
-                            </div>
-                        `;
-                    })
-                    .join("")}
-            </div>
-        `;
-    }
-
-    _renderLateInSummaryCards(stats) {
-        const cards = [
-            {
-                key: "totalHeadcount",
-                label: "Total Headcount",
-                val: stats.total,
-                icon: "ph-users",
-                cls: "",
-            },
-            {
-                key: "lateIn",
-                label: "Late In",
-                val: stats.lateIn,
-                icon: "ph-clock-afternoon",
-                cls: "info",
-            },
-            {
-                key: null,
-                label: "Avg Hours",
-                val: stats.avgHours + "h",
-                icon: "ph-timer",
-                cls: "",
-            },
-        ];
-
-        return `
-            <div class="summary-grid">
-                ${cards
-                    .map(
-                        (c) => `
-                    <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
-                        ${c.key ? `data-card-key="${c.key}"` : ""}>
-                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                        <div class="stat-content">
-                            <span class="stat-label">${c.label}</span>
-                            <span class="stat-value">${c.val}</span>
-                            ${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
-                        </div>
-                    </div>
-                `,
-                    )
-                    .join("")}
-            </div>
-        `;
-    }
-
-    _renderEarlyOutSummaryCards(stats) {
-        const cards = [
-            {
-                key: "totalHeadcount",
-                label: "Total Headcount",
-                val: stats.total,
-                icon: "ph-users",
-                cls: "",
-            },
-            {
-                key: "earlyOut",
-                label: "Early Out",
-                val: stats.earlyOut,
-                icon: "ph-sign-out",
-                cls: "accent",
-            },
-            {
-                key: null,
-                label: "Avg Hours",
-                val: stats.avgHours + "h",
-                icon: "ph-timer",
-                cls: "",
-            },
-        ];
-
-        return `
-            <div class="summary-grid">
-                ${cards
-                    .map(
-                        (c) => `
-                    <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
-                        ${c.key ? `data-card-key="${c.key}"` : ""}>
-                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                        <div class="stat-content">
-                            <span class="stat-label">${c.label}</span>
-                            <span class="stat-value">${c.val}</span>
-                            ${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
-                        </div>
-                    </div>
-                `,
-                    )
-                    .join("")}
-            </div>
-        `;
-    }
-
-    _renderShiftSummaryCards(emps, stats, model, logs, empMap) {
-        const { dateFrom, dateTo } = model.state.filters;
-        const dayLogs = this._buildEmployeeDayLogs(
-            emps,
-            logs,
-            dateFrom,
-            dateTo,
-        );
-        this._currentShiftSummaryData = { emps, model, dayLogs, empMap };
-
-        const shiftStats = model.state.data.shiftStats || [];
-        const colorCls = ["info", "success", "warning", "accent", "danger"];
-
-        const cards = [
-            {
-                type: "headcount",
-                label: "Total Headcount",
-                val: stats.total,
-                icon: "ph-users",
-                cls: "",
-            },
-            ...shiftStats.map((s, i) => ({
-                type: "shift",
-                label: s.shiftName,
-                val: s.total,
-                icon: "ph-clock-clockwise",
-                cls: colorCls[i % colorCls.length],
-                shift: s.shiftName,
-            })),
-            {
-                type: "avgHours",
-                label: "Avg Hours",
-                val: stats.avgHours + "h",
-                icon: "ph-timer",
-                cls: "",
-            },
-        ];
-
-        return `
-		<div class="summary-grid">
-			${cards
+        <div class="summary-grid">
+            ${cards
                 .map((c) => {
-                    if (c.type === "shift") {
+                    if (c.type === "gender") {
                         return `
                         <div class="stat-card ${c.cls} stat-card-clickable"
-                            data-shift="${this._escapeAttr(c.shift)}"
-                            onclick="AppController.view._showShiftSummaryDrilldown('${this._escapeAttr(c.shift)}')">
+                            data-gender="${this._escapeAttr(c.gender)}"
+                            onclick="AppController.view._showGenderSummaryDrilldown('${this._escapeAttr(c.gender)}')">
                             <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                             <div class="stat-content">
                                 <span class="stat-label">${c.label}</span>
@@ -1119,7 +1249,6 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
                         </div>
                     `;
                     }
-                    // headcount
                     return `
                     <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="totalHeadcount">
                         <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
@@ -1132,8 +1261,326 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
                 `;
                 })
                 .join("")}
-		</div>
-	`;
+        </div>
+    `;
+    }
+
+    _renderLateInSummaryCards(emps, stats, model, logs, empMap) {
+        const { dateFrom, dateTo } = model.state.filters;
+        const dayLogs = this._buildEmployeeDayLogs(
+            emps,
+            logs,
+            dateFrom,
+            dateTo,
+        );
+        const totalPresentHalf = dayLogs.filter(
+            (l) =>
+                this._matchesStatus(l, "Present") ||
+                this._matchesStatus(l, "Half Present"),
+        ).length;
+
+        const cards = [
+            {
+                key: "totalHeadcount",
+                label: "Total Presentcount",
+                val: totalPresentHalf,
+                icon: "ph-users",
+                cls: "",
+            },
+            {
+                key: "lateIn",
+                label: "Late In",
+                val: stats.lateIn,
+                icon: "ph-clock-afternoon",
+                cls: "info",
+            },
+            {
+                key: null,
+                label: "Avg Hours",
+                val: stats.avgHours + "h",
+                icon: "ph-timer",
+                cls: "",
+            },
+        ];
+
+        return `
+        <div class="summary-grid">
+            ${cards
+                .map(
+                    (c) => `
+                <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
+                    ${c.key ? `data-card-key="${c.key}"` : ""}>
+                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">${c.label}</span>
+                        <span class="stat-value">${c.val}</span>
+                        ${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
+                    </div>
+                </div>
+            `,
+                )
+                .join("")}
+        </div>
+    `;
+    }
+
+    _renderEarlyOutSummaryCards(emps, stats, model, logs, empMap) {
+        const { dateFrom, dateTo } = model.state.filters;
+        const dayLogs = this._buildEmployeeDayLogs(
+            emps,
+            logs,
+            dateFrom,
+            dateTo,
+        );
+        const totalPresentHalf = dayLogs.filter(
+            (l) =>
+                this._matchesStatus(l, "Present") ||
+                this._matchesStatus(l, "Half Present"),
+        ).length;
+
+        const cards = [
+            {
+                key: "totalHeadcount",
+                label: "Total Presentcount",
+                val: totalPresentHalf,
+                icon: "ph-users",
+                cls: "",
+            },
+            {
+                key: "earlyOut",
+                label: "Early Out",
+                val: stats.earlyOut,
+                icon: "ph-sign-out",
+                cls: "accent",
+            },
+            {
+                key: null,
+                label: "Avg Hours",
+                val: stats.avgHours + "h",
+                icon: "ph-timer",
+                cls: "",
+            },
+        ];
+
+        return `
+        <div class="summary-grid">
+            ${cards
+                .map(
+                    (c) => `
+                <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
+                    ${c.key ? `data-card-key="${c.key}"` : ""}>
+                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">${c.label}</span>
+                        <span class="stat-value">${c.val}</span>
+                        ${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
+                    </div>
+                </div>
+            `,
+                )
+                .join("")}
+        </div>
+    `;
+    }
+
+    _renderResignedSummaryCards(emps, stats, model, logs, empMap) {
+        const { dateFrom, dateTo } = model.state.filters;
+        const dayLogs = this._buildEmployeeDayLogs(
+            emps,
+            logs,
+            dateFrom,
+            dateTo,
+        );
+        const totalPresentHalf = dayLogs.filter(
+            (l) =>
+                this._matchesStatus(l, "Present") ||
+                this._matchesStatus(l, "Half Present"),
+        ).length;
+
+        const cards = [
+            {
+                key: "totalHeadcount",
+                label: "Total Presentcount",
+                val: totalPresentHalf,
+                icon: "ph-users",
+                cls: "",
+            },
+            {
+                key: "resigned",
+                label: "Resigned",
+                val: stats.resigned || 0,
+                icon: "ph-user-minus",
+                cls: "danger",
+            },
+            {
+                key: null,
+                label: "Avg Hours",
+                val: stats.avgHours + "h",
+                icon: "ph-timer",
+                cls: "",
+            },
+        ];
+
+        return `
+        <div class="summary-grid">
+            ${cards
+                .map(
+                    (c) => `
+                <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
+                    ${c.key ? `data-card-key="${c.key}"` : ""}>
+                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">${c.label}</span>
+                        <span class="stat-value">${c.val}</span>
+                        ${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
+                    </div>
+                </div>
+            `,
+                )
+                .join("")}
+        </div>
+    `;
+    }
+
+    _renderNewJoinedSummaryCards(emps, stats, model, logs, empMap) {
+        const { dateFrom, dateTo } = model.state.filters;
+        const dayLogs = this._buildEmployeeDayLogs(
+            emps,
+            logs,
+            dateFrom,
+            dateTo,
+        );
+        const totalPresentHalf = dayLogs.filter(
+            (l) =>
+                this._matchesStatus(l, "Present") ||
+                this._matchesStatus(l, "Half Present"),
+        ).length;
+
+        const cards = [
+            {
+                key: "totalHeadcount",
+                label: "Total Presentcount",
+                val: totalPresentHalf,
+                icon: "ph-users",
+                cls: "",
+            },
+            {
+                key: "newJoined",
+                label: "New Join",
+                val: stats.newJoined || 0,
+                icon: "ph-user-plus",
+                cls: "success",
+            },
+            {
+                key: null,
+                label: "Avg Hours",
+                val: stats.avgHours + "h",
+                icon: "ph-timer",
+                cls: "",
+            },
+        ];
+
+        return `
+        <div class="summary-grid">
+            ${cards
+                .map(
+                    (c) => `
+                <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
+                    ${c.key ? `data-card-key="${c.key}"` : ""}>
+                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">${c.label}</span>
+                        <span class="stat-value">${c.val}</span>
+                        ${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
+                    </div>
+                </div>
+            `,
+                )
+                .join("")}
+        </div>
+    `;
+    }
+
+    _renderShiftSummaryCards(emps, stats, model, logs, empMap) {
+        const { dateFrom, dateTo } = model.state.filters;
+        const dayLogs = this._buildEmployeeDayLogs(
+            emps,
+            logs,
+            dateFrom,
+            dateTo,
+        );
+        this._currentShiftSummaryData = { emps, model, dayLogs, empMap };
+
+        const shiftStats = model.state.data.shiftStats || [];
+        const colorCls = ["info", "success", "warning", "accent", "danger"];
+
+        const cards = [
+            {
+                type: "headcount",
+                label: "Total Presentcount",
+                val: shiftStats.reduce(
+                    (sum, s) => sum + (s.present || 0) + (s.halfPresent || 0),
+                    0,
+                ),
+                icon: "ph-users",
+                cls: "",
+            },
+            ...shiftStats.map((s, i) => ({
+                type: "shift",
+                label: s.shiftName,
+                val: (s.present || 0) + (s.halfPresent || 0),
+                icon: "ph-clock-clockwise",
+                cls: colorCls[i % colorCls.length],
+                shift: s.shiftName,
+            })),
+            {
+                type: "avgHours",
+                label: "Avg Hours",
+                val: stats.avgHours + "h",
+                icon: "ph-timer",
+                cls: "",
+            },
+        ];
+
+        return `
+	<div class="summary-grid">
+		${cards
+            .map((c) => {
+                if (c.type === "shift") {
+                    return `
+                <div class="stat-card ${c.cls} stat-card-clickable"
+                    data-shift="${this._escapeAttr(c.shift)}"
+                    onclick="AppController.view._showShiftSummaryDrilldown('${this._escapeAttr(c.shift)}')">
+                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">${c.label}</span>
+                        <span class="stat-value">${c.val}</span>
+                        <span class="stat-card-hint">↓ click to view</span>
+                    </div>
+                </div>`;
+                }
+                if (c.type === "avgHours") {
+                    return `
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">${c.label}</span>
+                        <span class="stat-value">${c.val}</span>
+                    </div>
+                </div>`;
+                }
+                return `
+            <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="totalHeadcount">
+                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">${c.label}</span>
+                    <span class="stat-value">${c.val}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>`;
+            })
+            .join("")}
+	</div>`;
     }
 
     _renderStaffSummaryCards(emps, stats, model, logs, empMap) {
@@ -1163,19 +1610,23 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
         depts.forEach((d) => (counts[d] = 0));
         dayLogs.forEach((l) => {
             const e = empMap[l.empId];
-            if (!e) {
-                return;
-            }
+            if (!e) return;
+            const isPresentOrHalf =
+                this._matchesStatus(l, "Present") ||
+                this._matchesStatus(l, "Half Present");
+            if (!isPresentOrHalf) return;
             if (counts[e.dept] !== undefined) {
                 counts[e.dept]++;
             }
         });
 
+        const totalPresentHalf = depts.reduce((sum, d) => sum + counts[d], 0);
+
         const cards = [
             {
                 type: "headcount",
-                label: "Total Headcount",
-                val: stats.total,
+                label: "Total Presentcount",
+                val: totalPresentHalf,
                 icon: "ph-users",
                 cls: "",
             },
@@ -1197,49 +1648,44 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
         ];
 
         return `
-		<div class="summary-grid">
-			${cards
-                .map((c) => {
-                    if (c.type === "dept") {
-                        return `
-                        <div class="stat-card ${c.cls} stat-card-clickable"
-                            data-staff-dept="${this._escapeAttr(c.dept)}"
-                            onclick="AppController.view._showStaffSummaryDrilldown('${this._escapeAttr(c.dept)}')">
-                            <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                            <div class="stat-content">
-                                <span class="stat-label">${c.label}</span>
-                                <span class="stat-value">${c.val}</span>
-                                <span class="stat-card-hint">↓ click to view</span>
-                            </div>
-                        </div>
-                    `;
-                    }
-                    if (c.type === "avgHours") {
-                        return `
-                        <div class="stat-card">
-                            <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                            <div class="stat-content">
-                                <span class="stat-label">${c.label}</span>
-                                <span class="stat-value">${c.val}</span>
-                            </div>
-                        </div>
-                    `;
-                    }
-                    // headcount
+	<div class="summary-grid">
+		${cards
+            .map((c) => {
+                if (c.type === "dept") {
                     return `
-                    <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="totalHeadcount">
-                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                        <div class="stat-content">
-                            <span class="stat-label">${c.label}</span>
-                            <span class="stat-value">${c.val}</span>
-                            <span class="stat-card-hint">↓ click to view</span>
-                        </div>
+                <div class="stat-card ${c.cls} stat-card-clickable"
+                    data-staff-dept="${this._escapeAttr(c.dept)}"
+                    onclick="AppController.view._showStaffSummaryDrilldown('${this._escapeAttr(c.dept)}')">
+                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">${c.label}</span>
+                        <span class="stat-value">${c.val}</span>
+                        <span class="stat-card-hint">↓ click to view</span>
                     </div>
-                `;
-                })
-                .join("")}
-		</div>
-	`;
+                </div>`;
+                }
+                if (c.type === "avgHours") {
+                    return `
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">${c.label}</span>
+                        <span class="stat-value">${c.val}</span>
+                    </div>
+                </div>`;
+                }
+                return `
+            <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="totalHeadcount">
+                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">${c.label}</span>
+                    <span class="stat-value">${c.val}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>`;
+            })
+            .join("")}
+	</div>`;
     }
 
     _renderWorkerSummaryCards(emps, stats, model, logs, empMap) {
@@ -1269,18 +1715,23 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
         depts.forEach((d) => (counts[d] = 0));
         dayLogs.forEach((l) => {
             const e = empMap[l.empId];
-            if (!e) {
-            }
+            if (!e) return;
+            const isPresentOrHalf =
+                this._matchesStatus(l, "Present") ||
+                this._matchesStatus(l, "Half Present");
+            if (!isPresentOrHalf) return;
             if (counts[e.dept] !== undefined) {
                 counts[e.dept]++;
             }
         });
 
+        const totalPresentHalf = depts.reduce((sum, d) => sum + counts[d], 0);
+
         const cards = [
             {
                 type: "headcount",
-                label: "Total Headcount",
-                val: stats.total,
+                label: "Total Presentcount",
+                val: totalPresentHalf,
                 icon: "ph-users",
                 cls: "",
             },
@@ -1302,146 +1753,53 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
         ];
 
         return `
-            <div class="summary-grid">
-                ${cards
-                    .map((c) => {
-                        if (c.type === "dept") {
-                            return `
-                            <div class="stat-card ${c.cls} stat-card-clickable"
-                                data-worker-dept="${this._escapeAttr(c.dept)}"
-                                onclick="AppController.view._showWorkerSummaryDrilldown('${this._escapeAttr(c.dept)}')">
-                                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                                <div class="stat-content">
-                                    <span class="stat-label">${c.label}</span>
-                                    <span class="stat-value">${c.val}</span>
-                                    <span class="stat-card-hint">↓ click to view</span>
-                                </div>
-                            </div>
-                        `;
-                        }
-                        if (c.type === "avgHours") {
-                            return `
-                            <div class="stat-card">
-                                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                                <div class="stat-content">
-                                    <span class="stat-label">${c.label}</span>
-                                    <span class="stat-value">${c.val}</span>
-                                </div>
-                            </div>
-                        `;
-                        }
-                        // headcount
+        <div class="summary-grid">
+            ${cards
+                .map((c) => {
+                    if (c.type === "dept") {
                         return `
-                        <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="totalHeadcount">
-                            <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                            <div class="stat-content">
-                                <span class="stat-label">${c.label}</span>
-                                <span class="stat-value">${c.val}</span>
-                                <span class="stat-card-hint">↓ click to view</span>
-                            </div>
-                        </div>
-                    `;
-                    })
-                    .join("")}
-            </div>
-        `;
-    }
-
-    _renderResignedSummaryCards(stats) {
-        const cards = [
-            {
-                key: "totalHeadcount",
-                label: "Total Headcount",
-                val: stats.total,
-                icon: "ph-users",
-                cls: "",
-            },
-            {
-                key: "resigned",
-                label: "Resigned",
-                val: stats.resigned || 0,
-                icon: "ph-user-minus",
-                cls: "danger",
-            },
-            {
-                key: null,
-                label: "Avg Hours",
-                val: stats.avgHours + "h",
-                icon: "ph-timer",
-                cls: "",
-            },
-        ];
-
-        return `
-            <div class="summary-grid">
-                ${cards
-                    .map(
-                        (c) => `
-                    <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
-                        ${c.key ? `data-card-key="${c.key}"` : ""}>
+                    <div class="stat-card ${c.cls} stat-card-clickable"
+                        data-worker-dept="${this._escapeAttr(c.dept)}"
+                        onclick="AppController.view._showWorkerSummaryDrilldown('${this._escapeAttr(c.dept)}')">
                         <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                         <div class="stat-content">
                             <span class="stat-label">${c.label}</span>
                             <span class="stat-value">${c.val}</span>
-                            ${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
+                            <span class="stat-card-hint">↓ click to view</span>
                         </div>
-                    </div>
-                `,
-                    )
-                    .join("")}
-            </div>
-        `;
-    }
-
-    _renderNewJoinedSummaryCards(stats) {
-        const cards = [
-            {
-                key: "totalHeadcount",
-                label: "Total Headcount",
-                val: stats.total,
-                icon: "ph-users",
-                cls: "",
-            },
-            {
-                key: "newJoined",
-                label: "New Join",
-                val: stats.newJoined || 0,
-                icon: "ph-user-plus",
-                cls: "success",
-            },
-            {
-                key: null,
-                label: "Avg Hours",
-                val: stats.avgHours + "h",
-                icon: "ph-timer",
-                cls: "",
-            },
-        ];
-
-        return `
-            <div class="summary-grid">
-                ${cards
-                    .map(
-                        (c) => `
-                    <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
-                        ${c.key ? `data-card-key="${c.key}"` : ""}>
+                    </div>`;
+                    }
+                    if (c.type === "avgHours") {
+                        return `
+                    <div class="stat-card">
                         <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                         <div class="stat-content">
                             <span class="stat-label">${c.label}</span>
                             <span class="stat-value">${c.val}</span>
-                            ${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
                         </div>
+                    </div>`;
+                    }
+                    return `
+                <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="totalHeadcount">
+                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">${c.label}</span>
+                        <span class="stat-value">${c.val}</span>
+                        <span class="stat-card-hint">↓ click to view</span>
                     </div>
-                `,
-                    )
-                    .join("")}
-            </div>
-    	`;
+                </div>`;
+                })
+                .join("")}
+        </div>`;
     }
 
     _showWorkerSummaryDrilldown(dept) {
-        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-worker-dept="${dept}"]`);
+        document
+            .querySelectorAll(".stat-card-clickable")
+            .forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(
+            `.stat-card-clickable[data-worker-dept="${dept}"]`,
+        );
         if (card) card.classList.add("active");
 
         const data = this._currentWorkerSummaryData;
@@ -1452,13 +1810,19 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
         let items;
         if (data.isDashboard) {
             // Dashboard: emp-only, no logs
-            items = emps.filter(e => e.dept === dept).map(emp => ({ log: null, emp, date: null }));
+            items = emps
+                .filter((e) => e.dept === dept)
+                .map((emp) => ({ log: null, emp, date: null }));
         } else {
-            const deptLogs = dayLogs.filter(l => {
+            const deptLogs = dayLogs.filter((l) => {
                 const e = empMap[l.empId];
                 return e && e.dept === dept;
             });
-            items = deptLogs.map(l => ({ log: l, emp: empMap[l.empId], date: l.date }));
+            items = deptLogs.map((l) => ({
+                log: l,
+                emp: empMap[l.empId],
+                date: l.date,
+            }));
         }
 
         this._renderStatCardDrilldown("workerSummary_" + dept, items, 1);
@@ -1488,8 +1852,12 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
     }
 
     _showStaffSummaryDrilldown(dept) {
-        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-staff-dept="${dept}"]`);
+        document
+            .querySelectorAll(".stat-card-clickable")
+            .forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(
+            `.stat-card-clickable[data-staff-dept="${dept}"]`,
+        );
         if (card) card.classList.add("active");
 
         const data = this._currentStaffSummaryData;
@@ -1501,14 +1869,18 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
         if (data.isDashboard) {
             // Dashboard: emp-only, no logs
             items = emps
-                .filter(e => e.dept === dept)
-                .map(emp => ({ log: null, emp, date: null }));
+                .filter((e) => e.dept === dept)
+                .map((emp) => ({ log: null, emp, date: null }));
         } else {
-            const deptLogs = dayLogs.filter(l => {
+            const deptLogs = dayLogs.filter((l) => {
                 const e = empMap[l.empId];
                 return e && e.dept === dept;
             });
-            items = deptLogs.map(l => ({ log: l, emp: empMap[l.empId], date: l.date }));
+            items = deptLogs.map((l) => ({
+                log: l,
+                emp: empMap[l.empId],
+                date: l.date,
+            }));
         }
 
         this._renderStatCardDrilldown("staffSummary_" + dept, items, 1);
@@ -1588,8 +1960,12 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
     }
 
     _showGenderSummaryDrilldown(gender) {
-        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-gender="${gender}"]`);
+        document
+            .querySelectorAll(".stat-card-clickable")
+            .forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(
+            `.stat-card-clickable[data-gender="${gender}"]`,
+        );
         if (card) card.classList.add("active");
 
         const data = this._currentGenderSummaryData;
@@ -1598,12 +1974,19 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
         let items;
         if (data.isDashboard) {
             items = data.emps
-                .filter(e => e.gender === gender)
-                .map(emp => ({ log: null, emp, date: null }));
+                .filter((e) => e.gender === gender)
+                .map((emp) => ({ log: null, emp, date: null }));
         } else {
             items = data.dayLogs
-                .filter(l => { const e = data.empMap[l.empId]; return e && e.gender === gender; })
-                .map(l => ({ log: l, emp: data.empMap[l.empId], date: l.date }));
+                .filter((l) => {
+                    const e = data.empMap[l.empId];
+                    return e && e.gender === gender;
+                })
+                .map((l) => ({
+                    log: l,
+                    emp: data.empMap[l.empId],
+                    date: l.date,
+                }));
         }
 
         this._renderStatCardDrilldown("genderSummary_" + gender, items, 1);
@@ -1683,8 +2066,12 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
     }
 
     _showCompanyDrilldown(company) {
-        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-company="${company}"]`);
+        document
+            .querySelectorAll(".stat-card-clickable")
+            .forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(
+            `.stat-card-clickable[data-company="${company}"]`,
+        );
         if (card) card.classList.add("active");
 
         const data = this._currentCompanyData;
@@ -1692,9 +2079,20 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
 
         let items;
         if (data.isDashboard) {
-            items = data.emps.filter(e => e.company === company).map(emp => ({ log: null, emp, date: null }));
+            items = data.emps
+                .filter((e) => e.company === company)
+                .map((emp) => ({ log: null, emp, date: null }));
         } else {
-            items = data.dayLogs.filter(l => { const e = data.empMap[l.empId]; return e && e.company === company; }).map(l => ({ log: l, emp: data.empMap[l.empId], date: l.date }));
+            items = data.dayLogs
+                .filter((l) => {
+                    const e = data.empMap[l.empId];
+                    return e && e.company === company;
+                })
+                .map((l) => ({
+                    log: l,
+                    emp: data.empMap[l.empId],
+                    date: l.date,
+                }));
         }
 
         this._renderStatCardDrilldown("company_" + company, items, 1);
@@ -1722,8 +2120,12 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
     }
 
     _showAgeGroupDrilldown(group) {
-        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-age-group="${group}"]`);
+        document
+            .querySelectorAll(".stat-card-clickable")
+            .forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(
+            `.stat-card-clickable[data-age-group="${group}"]`,
+        );
         if (card) card.classList.add("active");
 
         const data = this._currentAgeData;
@@ -1731,9 +2133,20 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
 
         let items;
         if (data.isDashboard) {
-            items = data.emps.filter(e => data.model.getAgeGroup(e.dob) === group).map(emp => ({ log: null, emp, date: null }));
+            items = data.emps
+                .filter((e) => data.model.getAgeGroup(e.dob) === group)
+                .map((emp) => ({ log: null, emp, date: null }));
         } else {
-            items = data.dayLogs.filter(l => { const e = data.empMap[l.empId]; return e && data.model.getAgeGroup(e.dob) === group; }).map(l => ({ log: l, emp: data.empMap[l.empId], date: l.date }));
+            items = data.dayLogs
+                .filter((l) => {
+                    const e = data.empMap[l.empId];
+                    return e && data.model.getAgeGroup(e.dob) === group;
+                })
+                .map((l) => ({
+                    log: l,
+                    emp: data.empMap[l.empId],
+                    date: l.date,
+                }));
         }
 
         this._renderStatCardDrilldown("ageGroup_" + group, items, 1);
@@ -1762,11 +2175,17 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
                 desigMap[name] = { name, order };
             }
         });
-        const desigs = Object.values(desigMap).sort((a, b) => (a.order !== b.order ? a.order - b.order : a.name.localeCompare(b.name))).map((d) => d.name);
+        const desigs = Object.values(desigMap)
+            .sort((a, b) =>
+                a.order !== b.order
+                    ? a.order - b.order
+                    : a.name.localeCompare(b.name),
+            )
+            .map((d) => d.name);
 
         const desigCounts = {};
         desigs.forEach((d) => (desigCounts[d] = 0));
-        deptEmps.forEach(e => {
+        deptEmps.forEach((e) => {
             const name = e.designation || "Staff";
             if (desigCounts[name] !== undefined) desigCounts[name]++;
         });
@@ -1825,7 +2244,9 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
         if (!data) return;
         const { dept, deptEmps, empMap } = data;
 
-        const items = deptEmps.filter(e => (e.designation || "Staff") === designation).map(emp => ({ log: null, emp, date: null }));
+        const items = deptEmps
+            .filter((e) => (e.designation || "Staff") === designation)
+            .map((emp) => ({ log: null, emp, date: null }));
 
         this._renderStatCardDrilldown(
             "dashboardDesig_" + designation,
@@ -2456,9 +2877,6 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
         ${this._chartCard("ch-all-io", '<i class="ph-fill ph-chart-pie-slice"></i>', "sky", "In vs Out Distribution")}
     </div>
 </div>
-            <div class="charts-grid">
-                ${this._chartCard("ch-all-io", '<i class="ph-fill ph-chart-pie-slice"></i>', "sky", "In vs Out Distribution")}
-            </div>
 
             ${this._tableHTML("tbl-all", ["Code", "Name", "Dept", "Company", "Date", "In", "Out", "Hours", "Late In", "Early Out", "Status"], rows, "all-attendance")}
             <div class="pagination-bar">
@@ -4229,7 +4647,13 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
         const isTotalHeadcount = key === "totalHeadcount";
         const isHalfPresent = key === "halfPresent";
         const isWeeklyOff = key === "weeklyOff";
-        const isDashboardMode = items.length > 0 && items[0].log === null && !isResignedOnly && !isNewJoinedOnly && !isStaffList && !isWorkerList;
+        const isDashboardMode =
+            items.length > 0 &&
+            items[0].log === null &&
+            !isResignedOnly &&
+            !isNewJoinedOnly &&
+            !isStaffList &&
+            !isWorkerList;
         const pageSize = 10;
         const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
         const currentPage = Math.min(page, totalPages);
@@ -4241,19 +4665,88 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
         let headers, ths;
 
         if (isDashboardMode) {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift", "Shift Start", "Shift End", "Location"];
+            headers = [
+                "Sr.No",
+                "Code",
+                "Name",
+                "Dept",
+                "Company",
+                "Designation",
+                "Shift",
+                "Shift Start",
+                "Shift End",
+                "Location",
+            ];
         } else if (isResignedOnly) {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "DOJ", "DOR", "Status",];
+            headers = [
+                "Sr.No",
+                "Code",
+                "Name",
+                "Dept",
+                "Company",
+                "Designation",
+                "DOJ",
+                "DOR",
+                "Status",
+            ];
         } else if (isNewJoinedOnly) {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "DOJ", "Status",];
+            headers = [
+                "Sr.No",
+                "Code",
+                "Name",
+                "Dept",
+                "Company",
+                "Designation",
+                "DOJ",
+                "Status",
+            ];
         } else if (isTotalHeadcount) {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift", "Shift Start", "Shift End", "Location"];
+            headers = [
+                "Sr.No",
+                "Code",
+                "Name",
+                "Dept",
+                "Company",
+                "Designation",
+                "Shift",
+                "Shift Start",
+                "Shift End",
+                "Location",
+            ];
         } else if (isStaffList || isWorkerList) {
-            const isDashboardStaffWorker = items.length > 0 && items[0].log === null;
+            const isDashboardStaffWorker =
+                items.length > 0 && items[0].log === null;
             if (isDashboardStaffWorker) {
-                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift", "Shift Start", "Shift End", "Location"];
+                headers = [
+                    "Sr.No",
+                    "Code",
+                    "Name",
+                    "Dept",
+                    "Company",
+                    "Designation",
+                    "Shift",
+                    "Shift Start",
+                    "Shift End",
+                    "Location",
+                ];
             } else {
-                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift", "Shift Start", "Shift End", "Date", "In Time", "Out Time", "Hours Worked", "Status", "Location"];
+                headers = [
+                    "Sr.No",
+                    "Code",
+                    "Name",
+                    "Dept",
+                    "Company",
+                    "Designation",
+                    "Shift",
+                    "Shift Start",
+                    "Shift End",
+                    "Date",
+                    "In Time",
+                    "Out Time",
+                    "Hours Worked",
+                    "Status",
+                    "Location",
+                ];
             }
         } else if (key === "lateIn") {
             headers = [
@@ -4316,44 +4809,44 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
                 }
                 const sr = (currentPage - 1) * pageSize + i + 1;
 
-            if (isDashboardMode) {
-                return `
-                    <tr>
-                        <td>${sr}</td>
-                        <td><b>${emp.code || "–"}</b></td>
-                        <td>${emp.name || "–"}</td>
-                        <td>${emp.dept || "–"}</td>
-                        <td>${emp.company || "–"}</td>
-                        <td>${emp.designation || "–"}</td>
-                        <td>${emp.shift || "–"}</td>
-                        <td>${emp.shiftStart || "–"}</td>
-                        <td>${emp.shiftEnd || "–"}</td>
-                        <td>${emp.location || "–"}</td>
-                    </tr>
-                `;
-            }
-
-            if (isTotalHeadcount) {
-                return `
-                    <tr>
-                        <td>${sr}</td>
-                        <td><b>${emp.code || "–"}</b></td>
-                        <td>${emp.name || "–"}</td>
-                        <td>${emp.dept || "–"}</td>
-                        <td>${emp.company || "–"}</td>
-                        <td>${emp.designation || "–"}</td>
-                        <td>${emp.shift || "–"}</td>
-                        <td>${emp.shiftStart || "–"}</td>
-                        <td>${emp.shiftEnd || "–"}</td>
-                        <td>${emp.location || "–"}</td>
-                    </tr>
-                `;
-            }
-
-            if (isStaffList || isWorkerList) {
-                if (log === null) {
-                    // Dashboard mode — emp only, no log columns
+                if (isDashboardMode) {
                     return `
+                    <tr>
+                        <td>${sr}</td>
+                        <td><b>${emp.code || "–"}</b></td>
+                        <td>${emp.name || "–"}</td>
+                        <td>${emp.dept || "–"}</td>
+                        <td>${emp.company || "–"}</td>
+                        <td>${emp.designation || "–"}</td>
+                        <td>${emp.shift || "–"}</td>
+                        <td>${emp.shiftStart || "–"}</td>
+                        <td>${emp.shiftEnd || "–"}</td>
+                        <td>${emp.location || "–"}</td>
+                    </tr>
+                `;
+                }
+
+                if (isTotalHeadcount) {
+                    return `
+                    <tr>
+                        <td>${sr}</td>
+                        <td><b>${emp.code || "–"}</b></td>
+                        <td>${emp.name || "–"}</td>
+                        <td>${emp.dept || "–"}</td>
+                        <td>${emp.company || "–"}</td>
+                        <td>${emp.designation || "–"}</td>
+                        <td>${emp.shift || "–"}</td>
+                        <td>${emp.shiftStart || "–"}</td>
+                        <td>${emp.shiftEnd || "–"}</td>
+                        <td>${emp.location || "–"}</td>
+                    </tr>
+                `;
+                }
+
+                if (isStaffList || isWorkerList) {
+                    if (log === null) {
+                        // Dashboard mode — emp only, no log columns
+                        return `
                         <tr>
                             <td>${sr}</td>
                             <td><b>${emp.code || "–"}</b></td>
@@ -4367,8 +4860,8 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
                             <td>${emp.location || "–"}</td>
                         </tr>
                     `;
-                }
-                return `
+                    }
+                    return `
                     <tr>
                         <td>${sr}</td>
                         <td><b>${emp.code || "–"}</b></td>
@@ -4466,7 +4959,7 @@ _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
         }
 
         this._statCardExportData = items.map(({ log, emp, date }) => {
-           if (isDashboardMode) {
+            if (isDashboardMode) {
                 return {
                     Code: emp?.code,
                     Name: emp?.name,
