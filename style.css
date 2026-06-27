@@ -827,8 +827,8 @@ body {
 
 /* ===== Dashboard Overview: Total Headcount Card ===== */
 .stat-card[data-card-key="totalHeadcount"] {
-    background: #424590 !important;
-    border: 1.5px solid #424590 !important;
+    background: var(--white) !important;
+    border: 1px solid var(--border-color) !important;
     flex-direction: column !important;
     align-items: center !important;
     justify-content: center !important;
