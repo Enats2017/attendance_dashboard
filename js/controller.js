@@ -46,9 +46,30 @@ class AttendanceController {
         this.view.bindStatCardClick((key) => {
             let items = [];
             switch (key) {
-                case 'totalHeadcount':
-                    items = model.getAllEmployees();
+                // case 'totalHeadcount':
+                //     items = model.getAllEmployees();
+                //     break;
+                case 'totalHeadcount': {
+                    const activeTab = this.model.state.activeTab;
+                    if (activeTab === 'feature') {
+                        items = model.getAllEmployees();
+                    } else {
+                        const { logs, emps, empMap } = this.model.getFilteredData();
+                        const { dateFrom, dateTo } = this.model.state.filters;
+                        const dayLogs = this.view._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
+                        items = dayLogs
+                            .filter((l) =>
+                                this.view._matchesStatus(l, 'Present') ||
+                                this.view._matchesStatus(l, 'Half Present')
+                            )
+                            .map((l) => ({
+                                log: l,
+                                emp: empMap[l.empId],
+                                date: l.date,
+                            }));
+                    }
                     break;
+                }
                 case 'present': 
                     items = this.model.getPresentEmployees(); 
                     break;
