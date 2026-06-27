@@ -610,89 +610,73 @@ class AttendanceView {
         `;
     }
 
-    _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
-        const groups = ["Under 18", "Under 25", "25–34", "35–44", "45–54", "55–59", "60+",];
-        const ageGroupIcons = {
-            "Under 18": "ph-baby",
-            "Under 25": "ph-student",
-            "25–34": "ph-person-simple",
-            "35–44": "ph-user-circle",
-            "45–54": "ph-user-circle-gear",
-            "55–59": "ph-user-focus",
-            "60+": "ph-person-simple-tai-chi",
-        };
-        const groupCls = {
-            "Under 25": "info",
-            "25–34": "success",
-            "35–44": "warning",
-            "45–54": "accent",
-            "55–59": "danger",
-            "60+": "accent",
-        };
+_renderAgeSummaryCards(emps, stats, model, logs, empMap) {
+    const groups = ["Under 18", "Under 25", "25–34", "35–44", "45–54", "55–59", "60+"];
+    const ageGroupIcons = {
+        "Under 18": "ph-baby",                  
+        "Under 25": "ph-student",               
+        "25–34": "ph-person-simple",            
+        "35–44": "ph-user-circle",              
+        "45–54": "ph-user-circle-gear",         
+        "55–59": "ph-user-focus",
+        "60+": "ph-person-simple-tai-chi"       
+    };
+    const groupCls = {
+        "Under 25": "info",
+        "25–34": "success",
+        "35–44": "warning",
+        "45–54": "accent",
+        "55–59": "danger",
+        "60+": "accent"
+    };
 
-        // Date-range ke hisaab se day-wise records banao (jaise chart me hota hai)
-        const { dateFrom, dateTo } = model.state.filters;
-        const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo,);
+    // Date-range ke hisaab se day-wise records banao (jaise chart me hota hai)
+    const { dateFrom, dateTo } = model.state.filters;
+    const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo,);
 
-        this._currentAgeData = { emps, model, dayLogs, empMap, isDashboard: false };
+    this._currentAgeData = { emps, model, dayLogs, empMap };
 
-        const counts = {};
-        groups.forEach((g) => (counts[g] = 0));
-        dayLogs.forEach((l) => {
-            const e = empMap[l.empId];
-            if (!e) return;
-            const g = model.getAgeGroup(e.dob);
-            if (counts[g] !== undefined) counts[g]++;
-        });
+    // ✅ FIXED: sirf Present + Half Present din count ho rahe hain
+    const counts = {};
+    groups.forEach((g) => (counts[g] = 0));
+    dayLogs.forEach((l) => {
+        const e = empMap[l.empId];
+        if (!e) return;
+        const isPresentOrHalf =
+            this._matchesStatus(l, "Present") ||
+            this._matchesStatus(l, "Half Present");
+        if (!isPresentOrHalf) return;
+        const g = model.getAgeGroup(e.dob);
+        if (counts[g] !== undefined) counts[g]++;
+    });
 
-        const cards = [
-            {
-                key: "totalHeadcount",
-                label: "Total Headcount",
-                val: stats.total,
-                icon: "ph-users",
-                cls: "",
-                ageGroup: null,
-            },
-            ...groups.map((g) => ({
-                key: "ageGroup",
-                label: g,
-                val: counts[g],
-                icon: ageGroupIcons[g],
-                cls: groupCls[g],
-                ageGroup: g,
-            })),
-            {
-                key: null,
-                label: "Avg Hours",
-                val: stats.avgHours + "h",
-                icon: "ph-timer",
-                cls: "",
-                ageGroup: null,
-            },
-        ];
+    // ✅ FIXED: Total Headcount card ab sab age-groups ke
+    // Present+Half counts ka sum dikhata hai
+    const totalPresentHalf = groups.reduce((sum, g) => sum + counts[g], 0);
 
-        return `
-            <div class="summary-grid">
-                ${cards
-                    .map(
-                        (c) => `
-                    <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
-                        ${c.key === "totalHeadcount" ? `data-card-key="totalHeadcount"` : ""}
-                        ${c.ageGroup ? `data-age-group="${this._escapeAttr(c.ageGroup)}" onclick="AppController.view._showAgeGroupDrilldown('${this._escapeAttr(c.ageGroup)}')"` : ""}>
-                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                        <div class="stat-content">
-                            <span class="stat-label">${c.label}</span>
-                            <span class="stat-value">${c.val}</span>
-                            ${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
-                        </div>
+    const cards = [
+        { key: "totalHeadcount", label: "Total Headcount", val: totalPresentHalf, icon: "ph-users", cls: "", ageGroup: null, },
+        ...groups.map((g) => ({ key: "ageGroup", label: g, val: counts[g], icon: ageGroupIcons[g], cls: groupCls[g], ageGroup: g, })),
+        { key: null, label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", ageGroup: null, },
+    ];
+
+    return `
+        <div class="summary-grid">
+            ${cards.map((c) => `
+                <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
+                    ${c.key === "totalHeadcount" ? `data-card-key="totalHeadcount"` : ""}
+                    ${c.ageGroup ? `data-age-group="${this._escapeAttr(c.ageGroup)}" onclick="AppController.view._showAgeGroupDrilldown('${this._escapeAttr(c.ageGroup)}')"` : ""}>
+                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">${c.label}</span>
+                        <span class="stat-value">${c.val}</span>
+                        ${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
                     </div>
-                `,
-                    )
-                    .join("")}
-            </div>
-        `;
-    }
+                </div>
+            `,).join("")}
+        </div>
+    `;
+}
 
     _renderCompanySummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;

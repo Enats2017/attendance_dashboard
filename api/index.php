@@ -8,7 +8,9 @@
 
 // Suppress errors for clean JSON output
 ini_set('display_errors', 1);
-error_reporting(0);
+error_reporting(E_ALL);
+ini_set('memory_limit', '512M');
+ini_set('max_execution_time', 120);
 
 header('Content-Type: application/json');
 session_start();
@@ -447,6 +449,10 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
 
 
 function resolveShiftFromPunchTime($punchTimeStr, $shiftGroupId, $shiftGroupMap, $allShifts) {
+    if ($punchTimeStr instanceof DateTime) {
+        $punchTimeStr = $punchTimeStr->format('H:i');
+    }
+    
     $skipShiftIds = [1, 3, 4]; 
 
     if (!$punchTimeStr || !isset($shiftGroupMap[$shiftGroupId])) {
@@ -509,6 +515,8 @@ function handleDashboardData($input, $returnData = false) {
     if (isset($input['date_from']) && isset($input['date_to'])) {
         $dayFrom = $input['date_from'];
         $dayTo = $input['date_to'];
+        $deviceFrom = (new DateTime($dayFrom))->modify('-1 day')->format('Y-m-d');
+        $deviceTo = (new DateTime($dayTo))->modify('+1 day')->format('Y-m-d');
     } else {
         // Backward-compatible fallback for any old caller still using month/year/day_from/day_to
         $month = isset($input['month']) ? intval($input['month']) : intval(date('n'));
@@ -643,7 +651,7 @@ function handleDashboardData($input, $returnData = false) {
             }
         }
     }
-
+        
     $resignedEmployees = [];
     $newJoinedEmployees = [];
 
@@ -774,8 +782,8 @@ function handleDashboardData($input, $returnData = false) {
                     $logs[] = [
                         'empId' => (string)$row['EmployeeId'],
                         'date' => $row['AttendanceDate'] ? $row['AttendanceDate']->format('Y-m-d') : null,
-                        'inTime' => $row['InTime'],
-                        'outTime' => $row['OutTime'],
+                        'inTime' => $row['InTime'] ? (is_object($row['InTime']) ? $row['InTime']->format('H:i:s') : $row['InTime']) : null,
+                        'outTime' => $row['OutTime'] ? (is_object($row['OutTime']) ? $row['OutTime']->format('H:i:s') : $row['OutTime']) : null,
                         'status' => $status,
                         'present' => floatval($row['Present']),
                         'absent' => floatval($row['Absent']),
@@ -824,7 +832,7 @@ function handleDashboardData($input, $returnData = false) {
             
             $devTables[] = $devTable;
 
-            $sqlDevRaw = "SELECT D.AttDirection, D.LogDate, CAST(D.LogDate AS DATE) AS PunchDate, E.EmployeeId FROM $devTable D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON CAST(D.UserId AS VARCHAR(50)) = CAST(E.EmployeeCodeInDevice AS VARCHAR(50)) LEFT JOIN Departments De WITH (NOLOCK) ON E.DepartmentId = De.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND D.LogDate >= '$dayFrom' AND D.LogDate <= '$dayTo 23:59:59' AND E.Status = 'Working' AND E.RecordStatus = 1";
+            $sqlDevRaw = "SELECT D.AttDirection, D.LogDate, CAST(D.LogDate AS DATE) AS PunchDate, E.EmployeeId FROM $devTable D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON CAST(D.UserId AS VARCHAR(50)) = CAST(E.EmployeeCodeInDevice AS VARCHAR(50)) LEFT JOIN Departments De WITH (NOLOCK) ON E.DepartmentId = De.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND D.LogDate >= '$deviceFrom' AND D.LogDate <= '$deviceTo 23:59:59' AND E.Status = 'Working' AND E.RecordStatus = 1";
 
             $paramsDevRaw = [];
 
@@ -847,13 +855,47 @@ function handleDashboardData($input, $returnData = false) {
 
             $devEmpDayBuckets = [];
             if ($stmtDevRaw) {
-				while ($row = sqlsrv_fetch_array($stmtDevRaw, SQLSRV_FETCH_ASSOC)) {
+				$deviceRows = [];
+                while ($row = sqlsrv_fetch_array($stmtDevRaw, SQLSRV_FETCH_ASSOC)) {
+                    $deviceRows[] = $row;
+                    $dir = trim($row['AttDirection'] ?? '');
+                    $isIn = (strcasecmp($dir, 'in') == 0 || $dir === '0');
+
+                    if ($isIn) {
+                        $empId = (string)$row['EmployeeId'];
+                        if (!isset($empLatestPunchTime[$empId]) || $row['LogDate'] < $empLatestPunchTime[$empId]) {
+                            $empLatestPunchTime[$empId] = clone $row['LogDate'];
+                        }
+                    }
+                }
+
+                $devEmpDayBuckets = [];
+                foreach ($deviceRows as $row) {
                     $dir = trim($row['AttDirection'] ?? '');
                     $isIn = (strcasecmp($dir, 'in') == 0 || $dir === '0');
                     $isOut = (strcasecmp($dir, 'out') == 0 || $dir === '1');
+                    $empId = (string)$row['EmployeeId'];
 
-                    $punchDate = $row['PunchDate']->format('Y-m-d');
-                    $key = (string)$row['EmployeeId'] . '_' . $punchDate;
+                    $groupId = $empShiftGroupMap[$empId] ?? null;
+
+                    $resolved = resolveShiftFromPunchTime(isset($empLatestPunchTime[$empId]) ? $empLatestPunchTime[$empId]->format('H:i') : null, $groupId, $shiftGroupMap, $allShifts);
+
+                    $attendanceDate = clone $row['LogDate'];
+                    $attendanceDate->setTime(0,0,0);
+
+                    if ($resolved && !empty($resolved['start']) && !empty($resolved['end'])) {
+                        $start = strtotime($resolved['start']);
+                        $end = strtotime($resolved['end']);
+
+                        if ($start !== false && $end !== false && $start > $end && $isOut) {
+                            $logTime = strtotime($row['LogDate']->format('H:i'));
+                            if ($logTime !== false && $logTime <= $end) {
+                                $attendanceDate->modify('-1 day');
+                            }
+                        }
+                    }
+
+                    $key = $empId . '_' . $attendanceDate->format('Y-m-d');
 
                     if (!isset($devEmpDayBuckets[$key])) {
                         $devEmpDayBuckets[$key] = [
@@ -886,6 +928,7 @@ function handleDashboardData($input, $returnData = false) {
                     if ($row['LogDate'] < $devEmpDayBuckets[$key]['first']) {
                         $devEmpDayBuckets[$key]['first'] = $row['LogDate'];
                     }
+
                     if ($row['LogDate'] > $devEmpDayBuckets[$key]['last']) {
                         $devEmpDayBuckets[$key]['last'] = $row['LogDate'];
                     }
@@ -928,22 +971,6 @@ function handleDashboardData($input, $returnData = false) {
         }
     }
     unset($log);
-
-    $empLatestPunchTime = [];
-    foreach ($deviceEmployeeStats as $key => $stat) {
-        [$empId] = explode('_', $key, 2);
-        if ($stat['firstIn']) {
-            $t = $stat['firstIn']->format('H:i');
-            $empLatestPunchTime[$empId] = $t;
-        }
-    }
-
-    foreach ($logs as $log) {
-        $empId = $log['empId'];
-        if (!isset($empLatestPunchTime[$empId]) && $log['inTime']) {
-            $empLatestPunchTime[$empId] = is_object($log['inTime']) ? $log['inTime']->format('H:i') : substr($log['inTime'], 0, 5);
-        }
-    }
 
     foreach ($employees as &$emp) {
         $empId = $emp['id'];
@@ -1065,24 +1092,44 @@ function handleDashboardData($input, $returnData = false) {
 		}
 	}
 
-	$singlePunchData = []; 
-	foreach ($deviceEmployeeStats as $key => $stat) {
-		[$empId] = explode('_', $key, 2);
-		if (!isset($validEmpIdSet[$empId])) {
-			continue;
-		}
-		if (isset($weeklyOffKeySet[$key])) {
-			continue;
-		}
+    $singlePunchData = []; 
+    foreach ($deviceEmployeeStats as $key => $stat) {
+        [$empId, $keyDate] = explode('_', $key, 2);
 
-		$hasIn = ($stat['inCount'] ?? 0) >= 1;
-		$hasOut = ($stat['outCount'] ?? 0) >= 1;
+        if ($keyDate < $dayFrom || $keyDate > $dayTo) {
+            continue;
+        }
+        if (!isset($validEmpIdSet[$empId])) {
+            continue;
+        }
+        if (isset($weeklyOffKeySet[$key])) {
+            continue;
+        }
+        if (isset($employeesInAttendanceLogs[$key])) {
+            continue;
+        }
 
-		$shiftTimes = $empShiftTimeMap[$empId] ?? ['start' => null, 'end' => null];
+        $hasIn = ($stat['inCount'] ?? 0) >= 1;
+        $hasOut = ($stat['outCount'] ?? 0) >= 1;
 
-		if ($hasIn !== $hasOut) {
-			$singlePunch++;
-			$singlePunchKeys[] = $key;
+        $shiftTimes = $empShiftTimeMap[$empId] ?? ['start' => null, 'end' => null];
+
+        if ($hasIn !== $hasOut) {
+            if (!$hasIn && $hasOut) {
+                $prevKey = $empId . '_' . (new DateTime($keyDate))->modify('-1 day')->format('Y-m-d');
+                if (isset($deviceEmployeeStats[$prevKey]) && ($deviceEmployeeStats[$prevKey]['inCount'] ?? 0) >= 1) {
+                    continue; 
+                }
+            }
+            if ($hasIn && !$hasOut) {
+                $nextKey = $empId . '_' . (new DateTime($keyDate))->modify('+1 day')->format('Y-m-d');
+                if (isset($deviceEmployeeStats[$nextKey]) && ($deviceEmployeeStats[$nextKey]['outCount'] ?? 0) >= 1) {
+                    continue;
+                }
+            }
+
+            $singlePunch++;
+            $singlePunchKeys[] = $key;
 
 			if ($hasIn && $stat['firstIn']) {
 				$singlePunchData[$key] = [
