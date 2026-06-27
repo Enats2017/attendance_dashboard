@@ -76,12 +76,24 @@ class AttendanceController {
                 case 'earlyOut':    
                     items = this.model.getEarlyOutEmployees();    
                     break;
-                case 'staffList':
-                    items = this.model.getStaffEmployees();
+                case "staffList": {
+                    const data = view._currentStaffSummaryData;
+                    if (data && data.isDashboard) {
+                        items = data.emps.map(emp => ({ log: null, emp, date: null }));
+                    } else {
+                        items = this.model.getStaffEmployees();
+                    }
                     break;
-                case 'workerList':
-                    items = this.model.getWorkerEmployees();
+                }
+                case "workerList": {
+                    const data = view._currentWorkerSummaryData;
+                    if (data && data.isDashboard) {
+                        items = data.emps.map(emp => ({ log: null, emp, date: null }));
+                    } else {
+                        items = this.model.getWorkerEmployees();
+                    }
                     break;
+                }
             }
             this.view._renderStatCardDrilldown(key, items);
         });
