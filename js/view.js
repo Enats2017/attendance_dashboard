@@ -2459,8 +2459,7 @@ class AttendanceView {
     }
 
     _renderAgeWise(logs, emps, empMap, model) {
-        const groups = ["Under 18", "Under 25", "25–34", "35–44", "45–54", "55+"];
-
+        const groups = ["Under 18", "Under 25", "25–34", "35–44", "45–54", "55–59", "60+"];
         const gTotal = {};
         const gPresent = {};
         const gHalfPresent = {};
