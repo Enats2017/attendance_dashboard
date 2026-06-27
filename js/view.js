@@ -457,13 +457,13 @@ class AttendanceView {
         this._currentAgeData = { emps, model, dayLogs, empMap };
         const ageGroups = ["Under 18", "Under 25", "25–34", "35–44", "45–54", "55–59", "60+"];
         const ageGroupIcons = {
-            "Under 18": "ph-baby",                  // Child
-            "Under 25": "ph-student",               // Student / Young Adult
-            "25–34": "ph-person-simple",            // Young Adult
-            "35–44": "ph-user-circle",              // Adult
-            "45–54": "ph-user-circle-gear",         // Experienced Professional
-            "55-59": "ph-user-focus",               // Senior Adult
-            "60+": "ph-person-simple-tai-chi"       // Elderly
+            "Under 18": "ph-baby",                  
+            "Under 25": "ph-student",               
+            "25–34": "ph-person-simple",            
+            "35–44": "ph-user-circle",              
+            "45–54": "ph-user-circle-gear",         
+            "55-59": "ph-user-focus",               
+            "60+": "ph-person-simple-tai-chi"       
         };
         const ageGroupCls = {
             "Under 18": "",
@@ -599,7 +599,7 @@ class AttendanceView {
 
         const cards = [
             { key: "totalHeadcount", label: "Total Headcount", val: stats.total, icon: "ph-users", cls: "", ageGroup: null, },
-            ...groups.map((g) => ({ key: "ageGroup", label: g, val: counts[g], icon: groupIcons[g], cls: groupCls[g], ageGroup: g, })),
+            ...groups.map((g) => ({ key: "ageGroup", label: g, val: counts[g], icon: ageGroupIcons[g], cls: groupCls[g], ageGroup: g, })),
             { key: null, label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", ageGroup: null, },
         ];
 
@@ -4603,6 +4603,20 @@ class AttendanceView {
                 <div id="drilldown-table" style="margin-top:16px"></div>
             `,
             renderCharts: () => {
+                if (!items || items.length === 0) {
+                    const chartEl = document.getElementById(chartId);
+                    if (chartEl) {
+                        chartEl.innerHTML = `
+                            <div style="display:flex;align-items:center;justify-content:center;
+                                height:200px;flex-direction:column;gap:8px;color:#94a3b8;font-size:13px;">
+                                <i class="ph ph-user-minus" style="font-size:32px;"></i>
+                                No ${isResigned ? 'resignations' : 'new joinings'} in selected date range
+                            </div>
+                        `;
+                    }
+                    return;
+                }
+
                 Charts.stacked(
                     chartId,
                     formattedDates,
@@ -4611,7 +4625,7 @@ class AttendanceView {
                     (category, index) => {
                         const dateVal = dates[index];
                         const filteredEmps = items.filter(({ emp }) => emp[dateField] === dateVal).map(({ emp }) => emp);
-                        this._renderJoinExitDrillDown(filteredEmps, `${isResigned ? "Resigned" : "Joined"} on ${this._formatDate(dateVal)}`, isResigned,);
+                        this._renderJoinExitDrillDown(filteredEmps, `${isResigned ? "Resigned" : "Joined"} on ${this._formatDate(dateVal)}`, isResigned);
                     },
                 );
             },

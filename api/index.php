@@ -1533,6 +1533,11 @@ function handleGetReport($input) {
 function handleGetDepts() {
     $conn = getSQLServer();
 
+    if (empty($_SESSION['locations']) || empty($_SESSION['departments'])) {
+        echo json_encode(['success' => false, 'message' => 'Session expired. Please login again.']);
+        return;
+    }
+
     $locationList = implode(',', array_map('intval', $_SESSION['locations']));
     $departmentList = implode(',', array_map('intval', $_SESSION['departments']));
 
@@ -1552,6 +1557,11 @@ function handleGetDepts() {
  */
 function handleGetCompanies() {
     $conn = getSQLServer();
+
+    if (empty($_SESSION['locations']) || empty($_SESSION['companies'])) {
+        echo json_encode(['success' => false, 'message' => 'Session expired. Please login again.']);
+        return;
+    }
 
     $locationList = implode(',', array_map('intval', $_SESSION['locations']));
     $companyList = implode(',', array_map('intval', $_SESSION['companies']));
@@ -1575,6 +1585,11 @@ function handleGetCompanies() {
  */
 function handleGetShifts() {
     $conn = getSQLServer();
+
+    if (empty($_SESSION['locations']) || empty($_SESSION['companies'])) {
+        echo json_encode(['success' => false, 'message' => 'Session expired. Please login again.']);
+        return;
+    }
 
     $locationList = implode(',', array_map('intval', $_SESSION['locations']));
     $companyList = implode(',', array_map('intval', $_SESSION['companies']));
@@ -1709,29 +1724,48 @@ function handleSaveDesignationsOrder($input) {
 
 
 function handleGetCompaniesOrder() {
+    // Add this session check first - same pattern as handleGetDepts()
+    if (empty($_SESSION['locations']) || empty($_SESSION['companies'])) {
+        echo json_encode(['success' => false, 'message' => 'Session expired. Please login again.']);
+        return;
+    }
+
     $conn = getSQLServer();
 
-    $locationList = !empty($_SESSION['locations']) ? implode(',', array_map('intval', $_SESSION['locations'])) : '0';
-    $companyList  = !empty($_SESSION['companies'])  ? implode(',', array_map('intval', $_SESSION['companies']))  : '0';
+    $locationList = implode(',', array_map('intval', $_SESSION['locations']));
+    $companyList  = implode(',', array_map('intval', $_SESSION['companies']));
 
-    error_log("CompaniesOrder - locationList: $locationList, companyList: $companyList");
-
-    $sql = "SELECT C.CompanyId, C.CompanyFName AS CompanyName, C.SortOrder FROM Companies C WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON C.CompanyId = E.CompanyId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.Status = 'Working' GROUP BY C.CompanyId, C.CompanyFName, C.SortOrder ORDER BY CASE WHEN C.SortOrder IS NULL THEN 1 ELSE 0 END, C.SortOrder, C.CompanyFName;";
+    $sql = "SELECT C.CompanyId, C.CompanyFName AS CompanyName, C.SortOrder 
+            FROM Companies C WITH (NOLOCK) 
+            INNER JOIN Employees E WITH (NOLOCK) ON C.CompanyId = E.CompanyId 
+            WHERE E.Location IN ($locationList) 
+            AND E.CompanyId IN ($companyList) 
+            AND E.Status = 'Working' 
+            GROUP BY C.CompanyId, C.CompanyFName, C.SortOrder 
+            ORDER BY CASE WHEN C.SortOrder IS NULL THEN 1 ELSE 0 END, C.SortOrder, C.CompanyFName";
     
     $stmt = sqlsrv_query($conn, $sql);
     
+    // Add this error check - this is what's missing and causing the 500
+    if (!$stmt) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Query failed',
+            'errors' => sqlsrv_errors()
+        ]);
+        return;
+    }
+    
     $data = [];
-    if ($stmt) {
-        while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
-            $data[] = [
-                'id' => $row['CompanyId'],
-                'name' => $row['CompanyName'],
-                'sortOrder' => $row['SortOrder']
-            ];
-        }
+    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+        $data[] = [
+            'id' => $row['CompanyId'],
+            'name' => $row['CompanyName'],
+            'sortOrder' => $row['SortOrder']
+        ];
     }
 
-    echo json_encode(['success' => true, 'data' => $data, 'debug_lists' => ['loc' => $locationList, 'comp' => $companyList]]);
+    echo json_encode(['success' => true, 'data' => $data]);
 }
 
 function handleSaveCompaniesOrder($input) {
