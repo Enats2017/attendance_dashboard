@@ -418,7 +418,7 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
                 }
             } elseif (isset($deviceEmployeeStats[$key])) {
                 $stat = $deviceEmployeeStats[$key];
-                if (($stat['inCount'] ?? 0) >= 1) {
+                if (($stat['inCount'] ?? 0) >= 1 && ($stat['outCount'] ?? 0) >= 1) {
                     $shiftStats[$shiftName]['present']++;
                 } else {
                     $shiftStats[$shiftName]['absent']++;
