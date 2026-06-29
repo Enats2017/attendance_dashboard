@@ -471,7 +471,8 @@ class AttendanceModel {
             for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
                 const dateStr = d.toISOString().slice(0, 10);
                 const key = emp.id + '_' + dateStr;
-                if ((statusKeyMap[key] ?? 'absent') === 'absent') {
+                const status = statusKeyMap[key] ?? 'absent';
+                if (status === 'absent') {
                     result.push({ log: logMap[key] || null, emp, date: dateStr });
                 }
             }
@@ -784,15 +785,24 @@ class AttendanceModel {
 
 
     _buildStatusKeyMap(logs) {
+        const singlePunchKeys = this.state.data.singlePunchKeys || new Set();
         const map = {};
         logs.forEach(l => {
             const key = l.empId + '_' + l.date;
             const present = parseFloat(l.present ?? 0);
-            const absent = parseFloat(l.absent  ?? 0);
+            const absent  = parseFloat(l.absent  ?? 0);
+
+            if (singlePunchKeys.has(key)) {
+                map[key] = 'singlePunch';
+                return;
+            }
 
             if (present == 1 && absent == 0) {
-                const hasBothPunches = (l.missedInPunch == 0 && l.missedOutPunch == 0);
-                map[key] = hasBothPunches ? 'present' : 'absent';
+                if (l.missedInPunch == 1 || l.missedOutPunch == 1) {
+                    map[key] = 'singlePunch';
+                } else {
+                    map[key] = 'present';
+                }
             } else if (present == 0.5 && absent == 0.5) {
                 map[key] = 'halfPresent';
             } else if (present == 0 && absent == 0) {
