@@ -66,7 +66,10 @@ class AttendanceView {
                             ? this._renderStaffSummaryCards( emps, stats, model, logs, empMap, ) : state.activeTab === "worker"
                             ? this._renderWorkerSummaryCards(emps, stats, model, logs, empMap,) : state.activeTab === "resigned"
                             ? this._renderResignedSummaryCards(emps, stats, model, logs, empMap,) : state.activeTab === "newjoined"
-                            ? this._renderNewJoinedSummaryCards(emps, stats, model, logs, empMap,) : state.activeTab === "feature"
+                            ? this._renderNewJoinedSummaryCards(emps, stats, model, logs, empMap,) : state.activeTab === "special"
+                            ? "" : state.activeTab === "designation_order"
+                            ? "" : state.activeTab === "sort_order"
+                            ? "" : state.activeTab === "feature"
                             ? this._renderDashboardSummaryCards(emps, stats, model, logs, empMap,) : this._renderSummaryCards(stats, emps, logs, empMap, model,)
                         }
 						<div id="stat-card-drilldown" class="stat-drilldown-panel" style="display:none;"></div>
@@ -82,6 +85,7 @@ class AttendanceView {
         this._restoreFilterValues(state.filters);
         this._initChartRendering(state.activeTab, logs, emps, empMap, state.filters, state.data.counts, model, myToken,);
     }
+
     _handleDeptAccordionClick(e) {
         const seg = e.target.closest(".dept-acc-seg");
         if (seg) {
