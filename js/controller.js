@@ -96,6 +96,12 @@ class AttendanceController {
                     }
                     break;
                 }
+                case 'weeklyOffPresent':
+                    items = model.getWeeklyOffPresentEmployees();
+                    break;
+                case 'weeklyOffHalfPresent':
+                    items = model.getWeeklyOffHalfPresentEmployees();
+                    break;
             }
             this.view._renderStatCardDrilldown(key, items);
         });

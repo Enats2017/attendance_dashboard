@@ -1091,18 +1091,25 @@ function handleDashboardData($input, $returnData = false) {
         $key = $log['empId'] . '_' . $log['date'];
         $present = floatval($log['present']);
         $absent = floatval($log['absent']);
+        $isWeeklyOff = intval($log['weeklyOff']) == 1;
 
         if (isset($singlePunchData[$key])) {
             $statusKeyMap[$key] = 'singlePunch';
         } elseif ($present == 1 && $absent == 0) {
             if ($log['missedInPunch'] == 1 || $log['missedOutPunch'] == 1) {
                 $statusKeyMap[$key] = 'singlePunch';
+            } elseif ($isWeeklyOff) {
+                $statusKeyMap[$key] = 'weeklyOffPresent';
             } else {
                 $statusKeyMap[$key] = 'present';
             }
-        } elseif ($present == 0.5 && $absent == 0.5) {
-            $statusKeyMap[$key] = 'halfPresent';
-        } elseif ($present == 0 && $absent == 0) {
+        } elseif ($present == 0.5) {
+            if ($isWeeklyOff) {
+                $statusKeyMap[$key] = 'weeklyOffHalfPresent';
+            } else {
+                $statusKeyMap[$key] = 'halfPresent';
+            }
+        } elseif ($present == 0 && $absent == 0 && $isWeeklyOff) {
             $statusKeyMap[$key] = 'weeklyOff';
         } else {
             $statusKeyMap[$key] = 'absent';
@@ -1116,10 +1123,14 @@ function handleDashboardData($input, $returnData = false) {
     $staffHalfPresent = 0; 
     $staffAbsent = 0; 
     $staffWeeklyOff = 0;
+    $staffWeeklyOffPresent = 0;
+    $staffWeeklyOffHalfPresent = 0;
     $workerPresent = 0; 
     $workerHalfPresent = 0; 
     $workerAbsent = 0; 
     $workerWeeklyOff = 0;
+    $workerWeeklyOffPresent = 0;
+    $workerWeeklyOffHalfPresent = 0;
 
     for ($d = clone $rangeStart; $d <= $rangeEnd; $d->modify('+1 day')) {
         $dateStr = $d->format('Y-m-d');
@@ -1130,8 +1141,12 @@ function handleDashboardData($input, $returnData = false) {
             if (isset($staffEmpIds[$e['id']])) {
                 if ($empStatus === 'present') {
                     $staffPresent++;
+                } elseif ($empStatus === 'weeklyOffPresent') {
+                    $staffWeeklyOffPresent++;
                 } elseif ($empStatus === 'halfPresent') {
                     $staffHalfPresent++;
+                } elseif ($empStatus === 'weeklyOffHalfPresent') {
+                    $staffWeeklyOffHalfPresent++;
                 } elseif ($empStatus === 'weeklyOff') {
                     $staffWeeklyOff++;
                 } elseif ($empStatus === 'singlePunch') {
@@ -1142,8 +1157,12 @@ function handleDashboardData($input, $returnData = false) {
             } if (isset($workerEmpIds[$e['id']])) {
                 if ($empStatus === 'present') {
                     $workerPresent++;
+                } elseif ($empStatus === 'weeklyOffPresent') {
+                    $workerWeeklyOffPresent++;
                 } elseif ($empStatus === 'halfPresent') {
                     $workerHalfPresent++;
+                } elseif ($empStatus === 'weeklyOffHalfPresent') {
+                    $workerWeeklyOffHalfPresent++;
                 } elseif ($empStatus === 'weeklyOff') {
                     $workerWeeklyOff++;
                 } elseif ($empStatus === 'singlePunch') {
@@ -1157,7 +1176,9 @@ function handleDashboardData($input, $returnData = false) {
 
     $totalEmployeeDays = 0;
     $presentEmployeeDays = 0;
+    $weeklyOffPresentDays = 0;
     $halfPresentEmployeeDays = 0;
+    $weeklyOffHalfPresentDays = 0;
     $weeklyOffEmployeeDays = 0;
     $absentEmployeeDays = 0;
 
@@ -1170,8 +1191,12 @@ function handleDashboardData($input, $returnData = false) {
 
             if ($empStatus === 'present') {
                 $presentEmployeeDays++;
+            } elseif ($empStatus === 'weeklyOffPresent') {
+                $weeklyOffPresentDays++;
             } elseif ($empStatus === 'halfPresent') {
                 $halfPresentEmployeeDays++;
+            } elseif ($empStatus === 'weeklyOffHalfPresent') {
+                $weeklyOffHalfPresentDays++;
             } elseif ($empStatus === 'weeklyOff') {
                 $weeklyOffEmployeeDays++;
             } elseif ($empStatus === 'singlePunch') {
@@ -1208,7 +1233,9 @@ function handleDashboardData($input, $returnData = false) {
         'success' => true,
         'todayStats' => [
             'present' => $presentEmployees,
+            'weeklyOffPresent' => $weeklyOffPresentDays,
             'halfPresent' => $halfPresentTotal,
+            'weeklyOffHalfPresent' => $weeklyOffHalfPresentDays,
             'weeklyOff' => $weeklyOffTotal,
             'absent' => $absentEmployees,
             'total' => $totalEmployees,
@@ -1224,12 +1251,16 @@ function handleDashboardData($input, $returnData = false) {
         'staffWorkerStats' => [
             'staffTotal' => count($staffEmpIds),
             'staffPresent' => $staffPresent,
+            'staffWeeklyOffPresent' => $staffWeeklyOffPresent,
             'staffHalfPresent' => $staffHalfPresent,
+            'staffWeeklyOffHalfPresent' => $staffWeeklyOffHalfPresent,
             'staffWeeklyOff' => $staffWeeklyOff,
             'staffAbsent' => $staffAbsent,
             'workerTotal' => count($workerEmpIds),
             'workerPresent' => $workerPresent,
+            'workerWeeklyOffPresent' => $workerWeeklyOffPresent,
             'workerHalfPresent' => $workerHalfPresent,
+            'workerWeeklyOffHalfPresent' => $workerWeeklyOffHalfPresent,
             'workerWeeklyOff' => $workerWeeklyOff,
             'workerAbsent' => $workerAbsent,
         ],

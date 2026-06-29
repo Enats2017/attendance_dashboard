@@ -388,12 +388,14 @@ class AttendanceView {
             { key: "halfPresent", label: "Half Day", val: stats.halfPresent ?? 0, icon: "ph-circle-half", cls: "warning", },
             { key: "absent", label: "Absent", val: stats.absent, icon: "ph-x-circle", cls: "danger", },
             { key: "weeklyOff", label: "Weekly Off", val: stats.weeklyOff ?? 0, icon: "ph-calendar-x", cls: "info", },
+            { key: "weeklyOffPresent", label: "WO Present", val: stats.weeklyOffPresent ?? 0, icon: "ph-calendar-check", cls: "success", },
+            { key: "weeklyOffHalfPresent", label: "WO Half Present", val: stats.weeklyOffHalfPresent ?? 0, icon: "ph-calendar-check", cls: "warning", },
             { key: "singlePunch", label: "Single Punch", val: stats.singlePunch, icon: "ph-lightning", cls: "warning", },
             { key: "lateIn", label: "Late In", val: stats.lateIn, icon: "ph-clock-afternoon", cls: "info", },
             { key: "earlyOut", label: "Early Out", val: stats.earlyOut, icon: "ph-sign-out", cls: "accent", },
             { key: null, label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", },
-            { key: "staffList", label: "Staff Present", val: (staffWorkerStats.staffPresent || 0) + (staffWorkerStats.staffHalfPresent || 0), icon: "ph-identification-badge", cls: "info", },
-            { key: "workerList", label: "Workmen Present", val: (staffWorkerStats.workerPresent || 0) + (staffWorkerStats.workerHalfPresent || 0), icon: "ph-hard-hat", cls: "warning", },
+            { key: "staffList", label: "Staff Present", val: (staffWorkerStats.staffPresent || 0) + (staffWorkerStats.staffHalfPresent || 0) + (staffWorkerStats.staffWeeklyOffPresent || 0) + (staffWorkerStats.staffWeeklyOffHalfPresent || 0), icon: "ph-identification-badge", cls: "info", },
+            { key: "workerList", label: "Workmen Present", val: (staffWorkerStats.workerPresent || 0) + (staffWorkerStats.workerHalfPresent || 0) + (staffWorkerStats.workerWeeklyOffPresent || 0) + (staffWorkerStats.workerWeeklyOffHalfPresent || 0), icon: "ph-hard-hat", cls: "warning", },
             { key: "newJoined", label: "New Join", val: stats.newJoined || 0, icon: "ph-user-plus", cls: "success", },
             { key: "resigned", label: "Resigned", val: stats.resigned || 0, icon: "ph-user-minus", cls: "danger", },
         ];
@@ -3583,6 +3585,8 @@ class AttendanceView {
             avgHoursStaff: "⏱️ Avg Hours Records",
             avgHoursWorker: "⏱️ Avg Hours Records",
             presentHeadcount: "✅ Present + Half Present Employees",
+            weeklyOffPresent: "📅✅ Weekly Off Present Employees",
+            weeklyOffHalfPresent: "📅½ Weekly Off Half Present Employees",
         };
 
         const isResignedOnly = key === "resigned";

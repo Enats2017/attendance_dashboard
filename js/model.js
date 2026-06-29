@@ -126,6 +126,8 @@ class AttendanceModel {
                 this.state.todayStats = data.todayStats || {
                     present: 0, 
                     halfPresent: 0, 
+                    weeklyOffPresent: 0,     
+                    weeklyOffHalfPresent: 0, 
                     weeklyOff: 0, 
                     absent: 0, 
                     total: 0,
@@ -140,6 +142,8 @@ class AttendanceModel {
                     staffTotal: 0, 
                     staffPresent: 0, 
                     staffHalfPresent: 0, 
+                    staffWeeklyOffPresent: 0,      
+                    staffWeeklyOffHalfPresent: 0,  
                     staffWeeklyOff: 0, 
                     staffAbsent: 0,
                     workerTotal: 0, 
@@ -372,6 +376,8 @@ class AttendanceModel {
         return {
             present: todayStats?.present ?? 0,
             halfPresent: todayStats?.halfPresent ?? 0,
+            weeklyOffPresent: todayStats?.weeklyOffPresent ?? 0,
+            weeklyOffHalfPresent: todayStats?.weeklyOffHalfPresent ?? 0,
             weeklyOff: todayStats?.weeklyOff ?? 0,
             absent: todayStats?.absent ?? 0,
             singlePunch: todayStats?.singlePunch ?? 0,
@@ -784,6 +790,57 @@ class AttendanceModel {
     }
 
 
+    getWeeklyOffPresentEmployees() {
+        const { filters } = this.state;
+        const { logs, emps } = this.getFilteredData();
+        const statusKeyMap = this._buildStatusKeyMap(logs);
+        const logMap = this._buildLogMap(logs);
+        const fromStr = filters.dateFrom;
+        const toStr = filters.dateTo;
+        const result = [];
+
+        emps.forEach(emp => {
+            const from = new Date(fromStr);
+            const to = new Date(toStr);
+            for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+                const dateStr = d.toISOString().slice(0, 10);
+                const key = emp.id + '_' + dateStr;
+                if (statusKeyMap[key] === 'weeklyOffPresent') {
+                    result.push({ log: logMap[key] || null, emp, date: dateStr });
+                }
+            }
+        });
+
+        result.sort((a, b) => b.date.localeCompare(a.date));
+        return result;
+    }
+
+    getWeeklyOffHalfPresentEmployees() {
+        const { filters } = this.state;
+        const { logs, emps } = this.getFilteredData();
+        const statusKeyMap = this._buildStatusKeyMap(logs);
+        const logMap = this._buildLogMap(logs);
+        const fromStr = filters.dateFrom;
+        const toStr = filters.dateTo;
+        const result = [];
+
+        emps.forEach(emp => {
+            const from = new Date(fromStr);
+            const to = new Date(toStr);
+            for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+                const dateStr = d.toISOString().slice(0, 10);
+                const key = emp.id + '_' + dateStr;
+                if (statusKeyMap[key] === 'weeklyOffHalfPresent') {
+                    result.push({ log: logMap[key] || null, emp, date: dateStr });
+                }
+            }
+        });
+
+        result.sort((a, b) => b.date.localeCompare(a.date));
+        return result;
+    }
+
+
     _buildStatusKeyMap(logs) {
         const singlePunchKeys = this.state.data.singlePunchKeys || new Set();
         const map = {};
@@ -796,15 +853,20 @@ class AttendanceModel {
                 map[key] = 'singlePunch';
                 return;
             }
-
             if (present == 1 && absent == 0) {
                 if (l.missedInPunch == 1 || l.missedOutPunch == 1) {
                     map[key] = 'singlePunch';
+                } else if (intval(l.weeklyOff) == 1) {
+                    map[key] = 'weeklyOffPresent';
                 } else {
                     map[key] = 'present';
                 }
-            } else if (present == 0.5 && absent == 0.5) {
-                map[key] = 'halfPresent';
+            } else if (present == 0.5) {
+                if (parseInt(l.weeklyOff) == 1) {
+                    map[key] = 'weeklyOffHalfPresent';
+                } else {
+                    map[key] = 'halfPresent';
+                }
             } else if (present == 0 && absent == 0) {
                 map[key] = 'weeklyOff';
             } else {
