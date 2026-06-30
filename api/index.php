@@ -358,28 +358,7 @@ function setupPassword($data) {
 
 
 function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesInAttendanceLogs, $dayFrom, $dayTo, $conn) {
-    $shiftStats = [];
-    $empShiftLookup = [];
-    foreach ($employees as $employee) {
-        $shiftName = $employee['shiftGroupName'] ?: 'No Shift Group';
-        $empShiftLookup[$employee['id']] = $shiftName;
-
-        if (!isset($shiftStats[$shiftName])) {
-            $shiftStats[$shiftName] = [
-                'shiftCode' => $shiftName,
-                'shiftName' => $shiftName,
-                'total' => 0,
-                'present' => 0,
-                'halfPresent' => 0,
-                'weeklyOff' => 0,
-                'holiday' => 0,
-                'leave' => 0,
-                'absent' => 0
-            ];
-        }
-        $shiftStats[$shiftName]['total']++;
-    }
-
+    $shiftStats = [];    
     $logKeyMap = [];
     foreach ($logs as $log) {
         $key = $log['empId'] . '_' . $log['date'];
@@ -392,6 +371,30 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
         }
     }
 
+    $shiftLookup = [];
+    foreach ($logs as $log) {
+        $key = $log['empId'] . '_' . $log['date'];
+        $shiftLookup[$key] = [
+            'shiftId' => $log['shiftId'],
+            'shiftCode' => $log['shiftCode'],
+            'shiftName' => $log['shiftName']
+        ];
+
+        if (!isset($shiftStats[$log['shiftName']])) {
+            $shiftStats[$log['shiftName']] = [
+                'shiftCode' => $log['shiftCode'],
+                'shiftName' => $log['shiftName'],
+                'total' => 0,
+                'present' => 0,
+                'halfPresent' => 0,
+                'weeklyOff' => 0,
+                'holiday' => 0,
+                'leave' => 0,
+                'absent' => 0
+            ];
+        }
+    }
+
     $rangeStart = new DateTime($dayFrom);
     $rangeEnd = new DateTime($dayTo);
 
@@ -399,9 +402,15 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
         $dateStr = $d->format('Y-m-d');
         foreach ($employees as $e) {
             $empId = $e['id'];
-            $shiftName = $empShiftLookup[$empId] ?? 'No Shift Group'; 
             $key = $empId . '_' . $dateStr;
 
+            if (!isset($shiftLookup[$key])) {
+                continue;
+            }
+
+            $shiftName = $shiftLookup[$key]['shiftName'];
+            $shiftStats[$shiftName]['total']++;
+            
             if (isset($logKeyMap[$key])) {
                 $log = $logKeyMap[$key];
                 $present = floatval($log['present']);
@@ -469,8 +478,8 @@ function handleDashboardData($input, $returnData = false) {
     if (isset($input['date_from']) && isset($input['date_to'])) {
         $dayFrom = $input['date_from'];
         $dayTo = $input['date_to'];
-        $deviceFrom = (new DateTime($dayFrom))->modify('-1 day')->format('Y-m-d');
-        $deviceTo = (new DateTime($dayTo))->modify('+1 day')->format('Y-m-d');
+        $deviceFrom = $dayFrom;
+        $deviceTo = $dayTo;
     } else {
         // Backward-compatible fallback for any old caller still using month/year/day_from/day_to
         $month = isset($input['month']) ? intval($input['month']) : intval(date('n'));
@@ -940,8 +949,8 @@ function handleDashboardData($input, $returnData = false) {
             'earlyBy' => 0,
             'missedInPunch' => 0,                  
             'missedOutPunch' => 0,   
-            'shiftId' => 0,
-            'shiftName' => null,
+            'shiftId' => 3,
+            'shiftName' => 'No Shift',
             'shiftCode' => null,
             'shiftStart' => null,
             'shiftEnd' => null,

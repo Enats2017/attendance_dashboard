@@ -904,8 +904,7 @@ class AttendanceView {
 
         this._currentTabPresentHeadcountItems = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present")).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
         // const totalPresentHalf = this._currentTabPresentHeadcountItems.length;
-        const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) +
-                          (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0);
+        const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) + (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0);
 
         const cards = [
             { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
@@ -958,12 +957,10 @@ class AttendanceView {
 
     _renderLateInSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
-const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
-this._currentTabPresentHeadcountItems = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present")).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
-const totalPresentHalf = this._currentTabPresentHeadcountItems.length;
+        const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
+        this._currentTabPresentHeadcountItems = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present")).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
+        const totalPresentHalf = this._currentTabPresentHeadcountItems.length;
         
-        // const cards = [
-        //     { key: "totalHeadcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
         const cards = [
             { key: "presentHeadcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
             { key: "lateIn", label: "Late In", val: stats.lateIn, icon: "ph-clock-afternoon", cls: "info", },
@@ -1995,6 +1992,10 @@ const totalPresentHalf = this._currentTabPresentHeadcountItems.length;
 
     _computeGroupedDayStats(emps, logs, dateFrom, dateTo, groupKeyFn) {
         const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
+        console.log("========== DEBUG START ==========");
+        console.log("Employees:", emps.length);
+        console.log("Dates:", dateFrom, dateTo);
+        console.log("dayLogs:", dayLogs.length);
         const empGroupMap = {};
         emps.forEach((e) => {
             empGroupMap[e.id] = groupKeyFn(e);
@@ -3387,6 +3388,17 @@ const totalPresentHalf = this._currentTabPresentHeadcountItems.length;
 			`,
 
             renderCharts: () => {
+                console.log("shiftStats:", shiftStats);
+
+                console.log("categories:", shiftStats.map((s) => s.shiftName));
+
+                console.log("present:", shiftStats.map((s) => s.present));
+
+                console.log("half:", shiftStats.map((s) => s.halfPresent));
+
+                console.log("weekly:", shiftStats.map((s) => s.weeklyOff));
+
+                console.log("absent:", shiftStats.map((s) => s.absent));
                 Charts.stacked(
                     "ch-shift-bar",
                     shiftStats.map((s) => s.shiftName),
