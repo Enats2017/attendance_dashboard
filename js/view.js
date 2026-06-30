@@ -1262,6 +1262,30 @@ class AttendanceView {
         `;
     }
 
+
+    _showInOutDrilldown(type) {
+        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(`.stat-card-clickable[data-io="${type}"]`);
+        if (card) card.classList.add("active");
+
+        const data = this._currentAllInOutData;
+        if (!data) return;
+
+        const { dayLogsForChart, empMap } = data;
+
+        const filtered = dayLogsForChart.filter((l) => {
+            if (!this._isPresentOrHalf(l)) return false;
+            return type === "in" ? !!l.inTime : !!l.outTime;
+        });
+
+        this._renderDrillDown(
+            filtered,
+            type === "in" ? "🔓 Total In Punches" : "🔒 Total Out Punches",
+            empMap
+        );
+    }
+    
+
     _showWorkerSummaryDrilldown(dept) {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
         const card = this.app.querySelector(`.stat-card-clickable[data-worker-dept="${dept}"]`,);
@@ -2040,25 +2064,23 @@ class AttendanceView {
         ).join("");
 
         return `
-            <div id="main-table-wrap">
-                <div class="table-wrap">
-                    <div class="table-header">
-                        <h3>📄 Detail Records</h3>
-                        <div class="table-actions">
-                            <button class="btn-tbl btn-tbl-excel" onclick="AppController.view.exportExcel(AppController.view._lastData['${exportName}'], '${exportName}')">
-                                ↓ Excel
-                            </button>
-                            <button class="btn-tbl btn-tbl-pdf" onclick="AppController.view.exportPDF('${id}', '${exportName}')">
-                                ↓ PDF
-                            </button>
-                        </div>
+            <div class="table-wrap">
+                <div class="table-header">
+                    <h3>📄 Detail Records</h3>
+                    <div class="table-actions">
+                        <button class="btn-tbl btn-tbl-excel" onclick="AppController.view.exportExcel(AppController.view._lastData['${exportName}'], '${exportName}')">
+                            ↓ Excel
+                        </button>
+                        <button class="btn-tbl btn-tbl-pdf" onclick="AppController.view.exportPDF('${id}', '${exportName}')">
+                            ↓ PDF
+                        </button>
                     </div>
-                    <div style="overflow-x:auto">
-                        <table class="data-table" id="${id}">
-                            <thead><tr>${ths}</tr></thead>
-                            <tbody>${trs}</tbody>
-                        </table>
-                    </div>
+                </div>
+                <div style="overflow-x:auto">
+                    <table class="data-table" id="${id}">
+                        <thead><tr>${ths}</tr></thead>
+                        <tbody>${trs}</tbody>
+                    </table>
                 </div>
             </div>
         `;
@@ -2162,12 +2184,14 @@ class AttendanceView {
 
         const byDept = this._countBy(logs, (l) => (empMap[l.empId] || {}).dept || "Unknown",);
 
-        // ── In vs Out punch counts (moved here from Dashboard tab) ──
         let totalIn = 0, totalOut = 0;
-        logs.forEach((l) => {
+        dayLogsForChart.forEach((l) => {
+            if (!this._isPresentOrHalf(l)) return;
             if (l.inTime) totalIn++;
             if (l.outTime) totalOut++;
         });
+
+        this._currentAllInOutData = { dayLogsForChart, empMap };
 
         let pageButtons = "";
         const startPage = Math.max(1, currentPage - 2);
@@ -2191,18 +2215,20 @@ class AttendanceView {
                 <h2 class="section-title" style="margin-top:32px;"><i class="ph-fill ph-chart-bar"></i> Employee Entry/Exit Overview</h2>
                 <div style="display:flex; gap:24px; margin-bottom:24px; align-items:stretch;">
                     <div style="flex:0 0 280px; display:flex; flex-direction:column; gap:16px;">
-                        <div class="stat-card info" style="flex:1">
+                        <div class="stat-card info stat-card-clickable" style="flex:1" data-io="in" onclick="AppController.view._showInOutDrilldown('in')">
                             <div class="stat-icon"><i class="ph ph-sign-in"></i></div>
                             <div class="stat-content">
                                 <span class="stat-label">Total In Punches</span>
                                 <span class="stat-value">${totalIn}</span>
+                                <span class="stat-card-hint">↓ click to view</span>
                             </div>
                         </div>
-                        <div class="stat-card accent" style="flex:1">
+                        <div class="stat-card accent stat-card-clickable" style="flex:1" data-io="out" onclick="AppController.view._showInOutDrilldown('out')">
                             <div class="stat-icon"><i class="ph ph-sign-out"></i></div>
                             <div class="stat-content">
                                 <span class="stat-label">Total Out Punches</span>
                                 <span class="stat-value">${totalOut}</span>
+                                <span class="stat-card-hint">↓ click to view</span>
                             </div>
                         </div>
                     </div>
@@ -2211,17 +2237,19 @@ class AttendanceView {
                     </div>
                 </div>
 
-                ${this._tableHTML("tbl-all", ["Code", "Name", "Dept", "Company", "Date", "In", "Out", "Hours", "Late In", "Early Out", "Status"], rows, "all-attendance")}
-                <div class="pagination-bar">
-                    <div class="pagination-text">
-                        Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, logs.length)} of ${logs.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
-                    </div>
-                    <div class="pagination-buttons">
-                        <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderAllPage(1)">«</button>
-                        <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderAllPage(${currentPage - 1})">‹</button>
-                        ${pageButtons}
-                        <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderAllPage(${currentPage + 1})">›</button>
-                        <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderAllPage(${totalPages})">»</button>
+                <div id="main-table-wrap">
+                    ${this._tableHTML("tbl-all", ["Code", "Name", "Dept", "Company", "Date", "In", "Out", "Hours", "Late In", "Early Out", "Status"], rows, "all-attendance")}
+                    <div class="pagination-bar">
+                        <div class="pagination-text">
+                            Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, logs.length)} of ${logs.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
+                        </div>
+                        <div class="pagination-buttons">
+                            <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderAllPage(1)">«</button>
+                            <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderAllPage(${currentPage - 1})">‹</button>
+                            ${pageButtons}
+                            <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderAllPage(${currentPage + 1})">›</button>
+                            <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderAllPage(${totalPages})">»</button>
+                        </div>
                     </div>
                 </div>
                 <div id="drilldown-table" style="margin-top:16px"></div>
