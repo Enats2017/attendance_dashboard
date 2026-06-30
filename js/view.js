@@ -1,9 +1,15 @@
 class AttendanceView {
     constructor() {
         this.app = document.getElementById("app");
-        this.app.addEventListener("click", (e) => this._handleDeptAccordionClick(e),);
-        this.app.addEventListener("mousemove", (e) => this._handleDeptAccordionHover(e),);
-        this.app.addEventListener("mouseleave", () => this._hideDeptAccTooltip(),);
+        this.app.addEventListener("click", (e) =>
+            this._handleDeptAccordionClick(e),
+        );
+        this.app.addEventListener("mousemove", (e) =>
+            this._handleDeptAccordionHover(e),
+        );
+        this.app.addEventListener("mouseleave", () =>
+            this._hideDeptAccTooltip(),
+        );
         this.TABS = [
             { id: "feature", label: "Dashboard", icon: "ph-house" },
             { id: "all", label: "Attendance Logs", icon: "ph-list-dashes" },
@@ -14,15 +20,35 @@ class AttendanceView {
             { id: "latein", label: "Late In", icon: "ph-clock-afternoon" },
             { id: "earlyout", label: "Early Out", icon: "ph-sign-out" },
             { id: "night", label: "Night Shift", icon: "ph-moon" },
-            { id: "designation", label: "Designation Stats", icon: "ph-identification-badge", },
+            {
+                id: "designation",
+                label: "Designation Stats",
+                icon: "ph-identification-badge",
+            },
             { id: "shift", label: "Shift Stats", icon: "ph-clock-clockwise" },
             { id: "staff", label: "Staff", icon: "ph-identification-badge" },
             { id: "worker", label: "Workmen", icon: "ph-hard-hat" },
-            { id: "resigned", label: "Resigned Employees", icon: "ph-user-minus", },
+            {
+                id: "resigned",
+                label: "Resigned Employees",
+                icon: "ph-user-minus",
+            },
             { id: "newjoined", label: "New Joined", icon: "ph-user-plus" },
-            { id: "special", label: "Critical Alerts", icon: "ph-warning-circle", },
-            { id: "designation_order", label: "Designations Order", icon: "ph-sliders", },
-            { id: "sort_order", label: "Sort Order Settings", icon: "ph-sort-ascending", },
+            {
+                id: "special",
+                label: "Critical Alerts",
+                icon: "ph-warning-circle",
+            },
+            {
+                id: "designation_order",
+                label: "Designations Order",
+                icon: "ph-sliders",
+            },
+            {
+                id: "sort_order",
+                label: "Sort Order Settings",
+                icon: "ph-sort-ascending",
+            },
         ];
         this._lastData = {};
         this._renderToken = 0;
@@ -56,21 +82,119 @@ class AttendanceView {
 						${state.activeTab !== "feature" ? this._renderFilters(state.filters, filterOpts) : ""}
                         ${
                             state.activeTab === "age"
-                            ? this._renderAgeSummaryCards(emps, stats, model, logs, empMap,) : state.activeTab === "company"
-                            ? this._renderCompanySummaryCards(emps, stats, model, logs, empMap,) : state.activeTab === "dept"
-                            ? this._renderDeptSummaryCards(emps, stats, model, logs, empMap,) : state.activeTab === "gender"
-                            ? this._renderGenderSummaryCards(emps, stats, model, logs, empMap,) : state.activeTab === "latein"
-                            ? this._renderLateInSummaryCards(emps, stats, model, logs, empMap,) : state.activeTab === "earlyout"
-                            ? this._renderEarlyOutSummaryCards(emps, stats, model, logs, empMap,) : state.activeTab === "shift"
-                            ? this._renderShiftSummaryCards(emps, stats, model, logs, empMap,) : state.activeTab === "staff"
-                            ? this._renderStaffSummaryCards( emps, stats, model, logs, empMap, ) : state.activeTab === "worker"
-                            ? this._renderWorkerSummaryCards(emps, stats, model, logs, empMap,) : state.activeTab === "resigned"
-                            ? this._renderResignedSummaryCards(emps, stats, model, logs, empMap,) : state.activeTab === "newjoined"
-                            ? this._renderNewJoinedSummaryCards(emps, stats, model, logs, empMap,) : state.activeTab === "special"
-                            ? "" : state.activeTab === "designation_order"
-                            ? "" : state.activeTab === "sort_order"
-                            ? "" : state.activeTab === "feature"
-                            ? this._renderDashboardSummaryCards(emps, stats, model, logs, empMap,) : this._renderSummaryCards(stats, emps, logs, empMap, model,)
+                                ? this._renderAgeSummaryCards(
+                                      emps,
+                                      stats,
+                                      model,
+                                      logs,
+                                      empMap,
+                                  )
+                                : state.activeTab === "company"
+                                  ? this._renderCompanySummaryCards(
+                                        emps,
+                                        stats,
+                                        model,
+                                        logs,
+                                        empMap,
+                                    )
+                                  : state.activeTab === "dept"
+                                    ? this._renderDeptSummaryCards(
+                                          emps,
+                                          stats,
+                                          model,
+                                          logs,
+                                          empMap,
+                                      )
+                                    : state.activeTab === "gender"
+                                      ? this._renderGenderSummaryCards(
+                                            emps,
+                                            stats,
+                                            model,
+                                            logs,
+                                            empMap,
+                                        )
+                                      : state.activeTab === "latein"
+                                        ? this._renderLateInSummaryCards(
+                                              emps,
+                                              stats,
+                                              model,
+                                              logs,
+                                              empMap,
+                                          )
+                                        : state.activeTab === "earlyout"
+                                          ? this._renderEarlyOutSummaryCards(
+                                                emps,
+                                                stats,
+                                                model,
+                                                logs,
+                                                empMap,
+                                            )
+                                          : state.activeTab === "shift"
+                                            ? this._renderShiftSummaryCards(
+                                                  emps,
+                                                  stats,
+                                                  model,
+                                                  logs,
+                                                  empMap,
+                                              )
+                                            : state.activeTab === "staff"
+                                              ? this._renderStaffSummaryCards(
+                                                    emps,
+                                                    stats,
+                                                    model,
+                                                    logs,
+                                                    empMap,
+                                                )
+                                              : state.activeTab === "worker"
+                                                ? this._renderWorkerSummaryCards(
+                                                      emps,
+                                                      stats,
+                                                      model,
+                                                      logs,
+                                                      empMap,
+                                                  )
+                                                : state.activeTab === "resigned"
+                                                  ? this._renderResignedSummaryCards(
+                                                        emps,
+                                                        stats,
+                                                        model,
+                                                        logs,
+                                                        empMap,
+                                                    )
+                                                  : state.activeTab ===
+                                                      "newjoined"
+                                                    ? this._renderNewJoinedSummaryCards(
+                                                          emps,
+                                                          stats,
+                                                          model,
+                                                          logs,
+                                                          empMap,
+                                                      )
+                                                    : state.activeTab ===
+                                                        "special"
+                                                      ? ""
+                                                      : state.activeTab ===
+                                                          "designation_order"
+                                                        ? ""
+                                                        : state.activeTab ===
+                                                            "sort_order"
+                                                          ? ""
+                                                          : state.activeTab ===
+                                                              "feature"
+                                                            ? this._renderDashboardSummaryCards(
+                                                                  emps,
+                                                                  stats,
+                                                                  model,
+                                                                  logs,
+                                                                  empMap,
+                                                              )
+                                                            : this._renderSummaryCards(
+                                                                  stats,
+                                                                  emps,
+                                                                  logs,
+                                                                  empMap,
+                                                                  model,
+                                                              )
                         }
 						<div id="stat-card-drilldown" class="stat-drilldown-panel" style="display:none;"></div>
 						<div class="tab-pane-container">
@@ -83,7 +207,16 @@ class AttendanceView {
 		`;
 
         this._restoreFilterValues(state.filters);
-        this._initChartRendering(state.activeTab, logs, emps, empMap, state.filters, state.data.counts, model, myToken,);
+        this._initChartRendering(
+            state.activeTab,
+            logs,
+            emps,
+            empMap,
+            state.filters,
+            state.data.counts,
+            model,
+            myToken,
+        );
     }
 
     _handleDeptAccordionClick(e) {
@@ -107,15 +240,26 @@ class AttendanceView {
 
             if (subRow) {
                 const designation = subRow.dataset.designation;
-                scopedEmps = data.emps.filter((emp) => emp.dept === dept && (emp.designation || "Staff") === designation,);
+                scopedEmps = data.emps.filter(
+                    (emp) =>
+                        emp.dept === dept &&
+                        (emp.designation || "Staff") === designation,
+                );
                 title = `Dept: ${dept} - ${designation} - ${status}`;
             } else {
                 scopedEmps = data.emps.filter((emp) => emp.dept === dept);
                 title = `Dept: ${dept} - ${status}`;
             }
 
-            const dayLogs = this._buildEmployeeDayLogs(scopedEmps, data.logs, dateFrom, dateTo,);
-            const filteredLogs = dayLogs.filter((l) => this._matchesStatus(l, status),);
+            const dayLogs = this._buildEmployeeDayLogs(
+                scopedEmps,
+                data.logs,
+                dateFrom,
+                dateTo,
+            );
+            const filteredLogs = dayLogs.filter((l) =>
+                this._matchesStatus(l, status),
+            );
             this._renderDrillDown(filteredLogs, title, data.empMap);
             return;
         }
@@ -132,7 +276,13 @@ class AttendanceView {
             if (!data) {
                 return;
             }
-            this._toggleDeptAccordionEl(expandEl, dept, data.emps, data.logs, data.model,);
+            this._toggleDeptAccordionEl(
+                expandEl,
+                dept,
+                data.emps,
+                data.logs,
+                data.model,
+            );
         }
     }
 
@@ -169,7 +319,8 @@ class AttendanceView {
             tip.style.color = "#fff";
             tip.style.borderRadius = "10px";
             tip.style.padding = "12px 16px";
-            tip.style.fontFamily = "'Plus Jakarta Sans','Inter','Segoe UI',sans-serif";
+            tip.style.fontFamily =
+                "'Plus Jakarta Sans','Inter','Segoe UI',sans-serif";
             tip.style.fontSize = "12px";
             tip.style.boxShadow = "0 8px 24px rgba(0,0,0,0.25)";
             tip.style.minWidth = "160px";
@@ -253,7 +404,12 @@ class AttendanceView {
     _renderTopbar(state) {
         const user = window.HRMS_USER || {};
         const displayName = user.name || user.username || "Admin User";
-        const initials = displayName.split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase();
+        const initials = displayName
+            .split(" ")
+            .map((w) => w[0])
+            .join("")
+            .substring(0, 2)
+            .toUpperCase();
 
         return `
 			<header class="topbar">
@@ -335,9 +491,16 @@ class AttendanceView {
 
         if (emps && logs && empMap && model) {
             const { dateFrom, dateTo } = model.state.filters;
-            const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo,);
+            const dayLogs = this._buildEmployeeDayLogs(
+                emps,
+                logs,
+                dateFrom,
+                dateTo,
+            );
             const staffEmps = emps.filter((e) => [58].includes(e.categoryId));
-            const workerEmps = emps.filter((e) => [51, 59, 60].includes(e.categoryId),);
+            const workerEmps = emps.filter((e) =>
+                [51, 59, 60].includes(e.categoryId),
+            );
 
             this._currentStaffSummaryData = {
                 emps: staffEmps,
@@ -354,7 +517,11 @@ class AttendanceView {
                 isDashboard: false,
             };
 
-            let staffPresent = 0, staffHalf = 0, workerPresent = 0, workerHalf = 0; totalPresentHalf = 0;
+            let staffPresent = 0,
+                staffHalf = 0,
+                workerPresent = 0,
+                workerHalf = 0;
+            totalPresentHalf = 0;
 
             dayLogs.forEach((l) => {
                 const e = empMap[l.empId];
@@ -365,8 +532,11 @@ class AttendanceView {
                 const isHalf = present == 0.5 && absent == 0.5;
 
                 if (isPresent || isHalf);
-                totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) +
-                    (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0); // CHANGED
+                totalPresentHalf =
+                    (stats.present || 0) +
+                    (stats.halfPresent || 0) +
+                    (stats.weeklyOffPresent || 0) +
+                    (stats.weeklyOffHalfPresent || 0); // CHANGED
 
                 if ([58].includes(e.categoryId)) {
                     if (isPresent) staffPresent++;
@@ -385,26 +555,126 @@ class AttendanceView {
         }
 
         const cards = [
-            { key: "totalHeadcount", label: "TotalHeadcount", val: emps.length,  icon: "ph-users", cls: "", },
-            { key: "present", label: "Present", val: stats.present, icon: "ph-check-circle", cls: "success", },
-            { key: "halfPresent", label: "Half Day", val: stats.halfPresent ?? 0, icon: "ph-circle-half", cls: "warning", },
-            { key: "absent", label: "Absent", val: stats.absent, icon: "ph-x-circle", cls: "danger", },
-            { key: "weeklyOff", label: "Weekly Off", val: stats.weeklyOff ?? 0, icon: "ph-calendar-x", cls: "info", },
-            { key: "weeklyOffPresent", label: "WO Present", val: stats.weeklyOffPresent ?? 0, icon: "ph-calendar-check", cls: "success", },
-            { key: "weeklyOffHalfPresent", label: "WO Half Present", val: stats.weeklyOffHalfPresent ?? 0, icon: "ph-calendar-check", cls: "warning", },
-            { key: "singlePunch", label: "Single Punch", val: stats.singlePunch, icon: "ph-lightning", cls: "warning", },
-            { key: "lateIn", label: "Late In", val: stats.lateIn, icon: "ph-clock-afternoon", cls: "info", },
-            { key: "earlyOut", label: "Early Out", val: stats.earlyOut, icon: "ph-sign-out", cls: "accent", },
-            { key: null, label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", },
-            { key: "staffList", label: "Staff Present", val: (staffWorkerStats.staffPresent || 0) + (staffWorkerStats.staffHalfPresent || 0) + (staffWorkerStats.staffWeeklyOffPresent || 0) + (staffWorkerStats.staffWeeklyOffHalfPresent || 0), icon: "ph-identification-badge", cls: "info", },
-            { key: "workerList", label: "Workmen Present", val: (staffWorkerStats.workerPresent || 0) + (staffWorkerStats.workerHalfPresent || 0) + (staffWorkerStats.workerWeeklyOffPresent || 0) + (staffWorkerStats.workerWeeklyOffHalfPresent || 0), icon: "ph-hard-hat", cls: "warning", },
-            { key: "newJoined", label: "New Join", val: stats.newJoined || 0, icon: "ph-user-plus", cls: "success", },
-            { key: "resigned", label: "Resigned", val: stats.resigned || 0, icon: "ph-user-minus", cls: "danger", },
+            {
+                key: "totalHeadcount",
+                label: "TotalHeadcount",
+                val: emps.length,
+                icon: "ph-users",
+                cls: "",
+            },
+            {
+                key: "present",
+                label: "Present",
+                val: stats.present,
+                icon: "ph-check-circle",
+                cls: "success",
+            },
+            {
+                key: "halfPresent",
+                label: "Half Day",
+                val: stats.halfPresent ?? 0,
+                icon: "ph-circle-half",
+                cls: "warning",
+            },
+            {
+                key: "absent",
+                label: "Absent",
+                val: stats.absent,
+                icon: "ph-x-circle",
+                cls: "danger",
+            },
+            {
+                key: "weeklyOff",
+                label: "Weekly Off",
+                val: stats.weeklyOff ?? 0,
+                icon: "ph-calendar-x",
+                cls: "info",
+            },
+            {
+                key: "weeklyOffPresent",
+                label: "WO Present",
+                val: stats.weeklyOffPresent ?? 0,
+                icon: "ph-calendar-check",
+                cls: "success",
+            },
+            {
+                key: "weeklyOffHalfPresent",
+                label: "WO Half Present",
+                val: stats.weeklyOffHalfPresent ?? 0,
+                icon: "ph-calendar-check",
+                cls: "warning",
+            },
+            {
+                key: "singlePunch",
+                label: "Single Punch",
+                val: stats.singlePunch,
+                icon: "ph-lightning",
+                cls: "warning",
+            },
+            {
+                key: "lateIn",
+                label: "Late In",
+                val: stats.lateIn,
+                icon: "ph-clock-afternoon",
+                cls: "info",
+            },
+            {
+                key: "earlyOut",
+                label: "Early Out",
+                val: stats.earlyOut,
+                icon: "ph-sign-out",
+                cls: "accent",
+            },
+            {
+                key: null,
+                label: "Avg Hours",
+                val: stats.avgHours + "h",
+                icon: "ph-timer",
+                cls: "",
+            },
+            {
+                key: "staffList",
+                label: "Staff Present",
+                val:
+                    (staffWorkerStats.staffPresent || 0) +
+                    (staffWorkerStats.staffHalfPresent || 0) +
+                    (staffWorkerStats.staffWeeklyOffPresent || 0) +
+                    (staffWorkerStats.staffWeeklyOffHalfPresent || 0),
+                icon: "ph-identification-badge",
+                cls: "info",
+            },
+            {
+                key: "workerList",
+                label: "Workmen Present",
+                val:
+                    (staffWorkerStats.workerPresent || 0) +
+                    (staffWorkerStats.workerHalfPresent || 0) +
+                    (staffWorkerStats.workerWeeklyOffPresent || 0) +
+                    (staffWorkerStats.workerWeeklyOffHalfPresent || 0),
+                icon: "ph-hard-hat",
+                cls: "warning",
+            },
+            {
+                key: "newJoined",
+                label: "New Join",
+                val: stats.newJoined || 0,
+                icon: "ph-user-plus",
+                cls: "success",
+            },
+            {
+                key: "resigned",
+                label: "Resigned",
+                val: stats.resigned || 0,
+                icon: "ph-user-minus",
+                cls: "danger",
+            },
         ];
 
         return `
             <div class="summary-grid">
-                ${cards.map((c) => `
+                ${cards
+                    .map(
+                        (c) => `
                     <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
                         ${c.key ? `data-card-key="${c.key}"` : ""}>
                         <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
@@ -414,13 +684,20 @@ class AttendanceView {
                             ${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
                         </div>
                     </div>
-                `,).join("")}
+                `,
+                    )
+                    .join("")}
             </div>
         `;
     }
     _renderDashboardSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
-        const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo,);
+        const dayLogs = this._buildEmployeeDayLogs(
+            emps,
+            logs,
+            dateFrom,
+            dateTo,
+        );
         const staffWorkerStats = this._staffWorkerStats || {};
 
         this._currentStaffSummaryData = {
@@ -466,7 +743,9 @@ class AttendanceView {
                 companyCounts[e.company]++;
         });
         const compColorCls = ["info", "success", "warning", "accent", "danger"];
-        const companyCards = companies.map((c, i) => `
+        const companyCards = companies
+            .map(
+                (c, i) => `
             <div class="stat-card ${compColorCls[i % compColorCls.length]} stat-card-clickable"
                 data-company="${this._escapeAttr(c)}"
                 onclick="AppController.view._showCompanyDrilldown('${this._escapeAttr(c)}')">
@@ -477,7 +756,9 @@ class AttendanceView {
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
             </div>
-        `,).join("");
+        `,
+            )
+            .join("");
 
         // --- Gender ---
         this._currentGenderSummaryData = {
@@ -575,7 +856,9 @@ class AttendanceView {
             const g = model.getAgeGroup(e.dob);
             if (ageCounts[g] !== undefined) ageCounts[g]++;
         });
-        const ageCards = ageGroups.map((g) => `
+        const ageCards = ageGroups
+            .map(
+                (g) => `
             <div class="stat-card ${ageGroupCls[g]} stat-card-clickable"
                 data-age-group="${this._escapeAttr(g)}"
                 onclick="AppController.view._showAgeGroupDrilldown('${this._escapeAttr(g)}')">
@@ -586,18 +869,34 @@ class AttendanceView {
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
             </div>
-        `,).join("");
+        `,
+            )
+            .join("");
 
         // --- Department cards ---
-        this._currentDashboardDeptData = { emps, model, dayLogs, empMap, isDashboard: true, };
+        this._currentDashboardDeptData = {
+            emps,
+            model,
+            dayLogs,
+            empMap,
+            isDashboard: true,
+        };
         const dashDepts = [...new Set(emps.map((e) => e.dept))];
         const dashDeptCounts = {};
         dashDepts.forEach((d) => (dashDeptCounts[d] = 0));
         emps.forEach((e) => {
             if (dashDeptCounts[e.dept] !== undefined) dashDeptCounts[e.dept]++;
         });
-        const dashDeptColorCls = ["info", "success", "warning", "accent", "danger",];
-        const dashDeptCards = dashDepts.map((d, i) => `
+        const dashDeptColorCls = [
+            "info",
+            "success",
+            "warning",
+            "accent",
+            "danger",
+        ];
+        const dashDeptCards = dashDepts
+            .map(
+                (d, i) => `
             <div class="stat-card ${dashDeptColorCls[i % dashDeptColorCls.length]} stat-card-clickable"
                 data-dashboard-dept="${this._escapeAttr(d)}"
                 onclick="AppController.view._showDashboardDeptDrilldown('${this._escapeAttr(d)}')">
@@ -608,7 +907,9 @@ class AttendanceView {
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
             </div>
-        `,).join("");
+        `,
+            )
+            .join("");
 
         const sectionLabel = (text) => `
             <div style="
@@ -653,7 +954,15 @@ class AttendanceView {
     }
 
     _renderAgeSummaryCards(emps, stats, model, logs, empMap) {
-        const groups = ["Under 18", "Under 25", "25–34", "35–44", "45–54", "55–59", "60+"];
+        const groups = [
+            "Under 18",
+            "Under 25",
+            "25–34",
+            "35–44",
+            "45–54",
+            "55–59",
+            "60+",
+        ];
         const ageGroupIcons = {
             "Under 18": "ph-baby",
             "Under 25": "ph-student",
@@ -673,11 +982,22 @@ class AttendanceView {
         };
 
         const { dateFrom, dateTo } = model.state.filters;
-        const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
+        const dayLogs = this._buildEmployeeDayLogs(
+            emps,
+            logs,
+            dateFrom,
+            dateTo,
+        );
 
         this._currentAgeData = { emps, model, dayLogs, empMap };
 
-        this._currentTabPresentHeadcountItems = dayLogs.filter(l => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present")).map(l => ({ log: l, emp: empMap[l.empId], date: l.date }));
+        this._currentTabPresentHeadcountItems = dayLogs
+            .filter(
+                (l) =>
+                    this._matchesStatus(l, "Present") ||
+                    this._matchesStatus(l, "Half Present"),
+            )
+            .map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
 
         const counts = {};
         groups.forEach((g) => (counts[g] = 0));
@@ -693,18 +1013,44 @@ class AttendanceView {
         });
 
         // const totalPresentHalf = groups.reduce((sum, g) => sum + counts[g], 0);
-        const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) +
-                          (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0);
+        const totalPresentHalf =
+            (stats.present || 0) +
+            (stats.halfPresent || 0) +
+            (stats.weeklyOffPresent || 0) +
+            (stats.weeklyOffHalfPresent || 0);
 
         const cards = [
-            { key: "presentHeadcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", ageGroup: null, },
-            ...groups.map((g) => ({ key: "ageGroup", label: g, val: counts[g], icon: ageGroupIcons[g], cls: groupCls[g], ageGroup: g, })),
-            { key: null, label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", ageGroup: null, },
+            {
+                key: "presentHeadcount",
+                label: "Total Presentcount",
+                val: totalPresentHalf,
+                icon: "ph-users",
+                cls: "",
+                ageGroup: null,
+            },
+            ...groups.map((g) => ({
+                key: "ageGroup",
+                label: g,
+                val: counts[g],
+                icon: ageGroupIcons[g],
+                cls: groupCls[g],
+                ageGroup: g,
+            })),
+            {
+                key: null,
+                label: "Avg Hours",
+                val: stats.avgHours + "h",
+                icon: "ph-timer",
+                cls: "",
+                ageGroup: null,
+            },
         ];
 
         return `
             <div class="summary-grid">
-                ${cards.map((c) => `
+                ${cards
+                    .map(
+                        (c) => `
                     <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
                         style="flex-direction:column; align-items:center; text-align:center;"
                         ${c.key === "presentHeadcount" ? `data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()"` : ""}
@@ -716,14 +1062,21 @@ class AttendanceView {
                             ${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
                         </div>
                     </div>
-                `,).join("")}
+                `,
+                    )
+                    .join("")}
             </div>
         `;
     }
 
     _renderCompanySummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
-        const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo,);
+        const dayLogs = this._buildEmployeeDayLogs(
+            emps,
+            logs,
+            dateFrom,
+            dateTo,
+        );
         this._currentCompanyData = { emps, model, dayLogs, empMap };
 
         const companies = [...new Set(emps.map((e) => e.company))];
@@ -748,18 +1101,47 @@ class AttendanceView {
         });
 
         // const totalPresentHalf = companies.reduce((sum, c) => sum + counts[c], 0,);
-        const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) +
-                          (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0);
-        this._currentTabPresentHeadcountItems = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present")).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
+        const totalPresentHalf =
+            (stats.present || 0) +
+            (stats.halfPresent || 0) +
+            (stats.weeklyOffPresent || 0) +
+            (stats.weeklyOffHalfPresent || 0);
+        this._currentTabPresentHeadcountItems = dayLogs
+            .filter(
+                (l) =>
+                    this._matchesStatus(l, "Present") ||
+                    this._matchesStatus(l, "Half Present"),
+            )
+            .map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
         const cards = [
-            { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
-            ...companies.map((c, i) => ({ type: "company", label: c, val: counts[c], icon: "ph-buildings", cls: colorCls[i % colorCls.length], company: c, })),
-            { type: "avgHours", label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", },
+            {
+                type: "headcount",
+                label: "Total Presentcount",
+                val: totalPresentHalf,
+                icon: "ph-users",
+                cls: "",
+            },
+            ...companies.map((c, i) => ({
+                type: "company",
+                label: c,
+                val: counts[c],
+                icon: "ph-buildings",
+                cls: colorCls[i % colorCls.length],
+                company: c,
+            })),
+            {
+                type: "avgHours",
+                label: "Avg Hours",
+                val: stats.avgHours + "h",
+                icon: "ph-timer",
+                cls: "",
+            },
         ];
 
         return `
             <div class="summary-grid">
-                ${cards.map((c) => {
+                ${cards
+                    .map((c) => {
                         if (c.type === "company") {
                             return `
                                 <div class="stat-card ${c.cls} stat-card-clickable"
@@ -795,14 +1177,20 @@ class AttendanceView {
                                 </div>
                             </div>
                         `;
-                    }).join("")}
+                    })
+                    .join("")}
             </div>
         `;
     }
 
     _renderDeptSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
-        const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
+        const dayLogs = this._buildEmployeeDayLogs(
+            emps,
+            logs,
+            dateFrom,
+            dateTo,
+        );
         this._currentDeptSummaryData = { emps, model, dayLogs, empMap };
 
         const depts = [...new Set(emps.map((e) => e.dept))];
@@ -814,7 +1202,9 @@ class AttendanceView {
         dayLogs.forEach((l) => {
             const e = empMap[l.empId];
             if (!e) return;
-            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present");
+            const isPresentOrHalf =
+                this._matchesStatus(l, "Present") ||
+                this._matchesStatus(l, "Half Present");
             if (!isPresentOrHalf) return;
             if (counts[e.dept] !== undefined) {
                 counts[e.dept]++;
@@ -822,19 +1212,48 @@ class AttendanceView {
         });
 
         // const totalPresentHalf = depts.reduce((sum, d) => sum + counts[d], 0);
-        const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) +
-                          (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0);
-        this._currentTabPresentHeadcountItems = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present")).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
+        const totalPresentHalf =
+            (stats.present || 0) +
+            (stats.halfPresent || 0) +
+            (stats.weeklyOffPresent || 0) +
+            (stats.weeklyOffHalfPresent || 0);
+        this._currentTabPresentHeadcountItems = dayLogs
+            .filter(
+                (l) =>
+                    this._matchesStatus(l, "Present") ||
+                    this._matchesStatus(l, "Half Present"),
+            )
+            .map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
 
         const cards = [
-            { type: "headcount", label: "Total Presentcount", val: totalPresentHalf,  icon: "ph-users", cls: "", },
-            ...depts.map((d, i) => ({ type: "dept", label: d, val: counts[d], icon: "ph-briefcase", cls: colorCls[i % colorCls.length], dept: d, })),
-            { type: "avgHours", label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", },
+            {
+                type: "headcount",
+                label: "Total Presentcount",
+                val: totalPresentHalf,
+                icon: "ph-users",
+                cls: "",
+            },
+            ...depts.map((d, i) => ({
+                type: "dept",
+                label: d,
+                val: counts[d],
+                icon: "ph-briefcase",
+                cls: colorCls[i % colorCls.length],
+                dept: d,
+            })),
+            {
+                type: "avgHours",
+                label: "Avg Hours",
+                val: stats.avgHours + "h",
+                icon: "ph-timer",
+                cls: "",
+            },
         ];
 
         return `
             <div class="summary-grid">
-                ${cards.map((c) => {
+                ${cards
+                    .map((c) => {
                         if (c.type === "dept") {
                             return `
                                 <div class="stat-card ${c.cls} stat-card-clickable"
@@ -871,15 +1290,27 @@ class AttendanceView {
                                 </div>
                             </div>
                         `;
-                    }).join("")}
+                    })
+                    .join("")}
             </div>
         `;
     }
 
     _renderGenderSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
-        const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo,);
-        this._currentGenderSummaryData = { emps, model, dayLogs, empMap, isDashboard: false, };
+        const dayLogs = this._buildEmployeeDayLogs(
+            emps,
+            logs,
+            dateFrom,
+            dateTo,
+        );
+        this._currentGenderSummaryData = {
+            emps,
+            model,
+            dayLogs,
+            empMap,
+            isDashboard: false,
+        };
 
         const genders = ["Male", "Female"];
         const genderIcons = {
@@ -902,19 +1333,49 @@ class AttendanceView {
             }
         });
 
-        this._currentTabPresentHeadcountItems = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present")).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
+        this._currentTabPresentHeadcountItems = dayLogs
+            .filter(
+                (l) =>
+                    this._matchesStatus(l, "Present") ||
+                    this._matchesStatus(l, "Half Present"),
+            )
+            .map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
         // const totalPresentHalf = this._currentTabPresentHeadcountItems.length;
-        const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) + (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0);
+        const totalPresentHalf =
+            (stats.present || 0) +
+            (stats.halfPresent || 0) +
+            (stats.weeklyOffPresent || 0) +
+            (stats.weeklyOffHalfPresent || 0);
 
         const cards = [
-            { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
-            ...genders.map((g) => ({ type: "gender", label: g, val: counts[g], icon: genderIcons[g], cls: genderCls[g], gender: g, })),
-            { type: "avgHours", label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", },
+            {
+                type: "headcount",
+                label: "Total Presentcount",
+                val: totalPresentHalf,
+                icon: "ph-users",
+                cls: "",
+            },
+            ...genders.map((g) => ({
+                type: "gender",
+                label: g,
+                val: counts[g],
+                icon: genderIcons[g],
+                cls: genderCls[g],
+                gender: g,
+            })),
+            {
+                type: "avgHours",
+                label: "Avg Hours",
+                val: stats.avgHours + "h",
+                icon: "ph-timer",
+                cls: "",
+            },
         ];
 
         return `
             <div class="summary-grid">
-                ${cards.map((c) => {
+                ${cards
+                    .map((c) => {
                         if (c.type === "gender") {
                             return `
                                 <div class="stat-card ${c.cls} stat-card-clickable"
@@ -950,26 +1411,50 @@ class AttendanceView {
                                 </div>
                             </div>
                         `;
-                    }).join("")}
+                    })
+                    .join("")}
             </div>
         `;
     }
 
     _renderLateInSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
-        const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
-        this._currentTabPresentHeadcountItems = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present")).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
+        const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo,);
+        this._currentTabPresentHeadcountItems = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present"))
+            .map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
         const totalPresentHalf = this._currentTabPresentHeadcountItems.length;
-        
+
+        // const cards = [
+        //     { key: "totalHeadcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
         const cards = [
-            { key: "presentHeadcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
-            { key: "lateIn", label: "Late In", val: stats.lateIn, icon: "ph-clock-afternoon", cls: "info", },
-            { key: null, label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", },
+            {
+                key: "presentHeadcount",
+                label: "Total Presentcount",
+                val: totalPresentHalf,
+                icon: "ph-users",
+                cls: "",
+            },
+            {
+                key: "lateIn",
+                label: "Late In",
+                val: stats.lateIn,
+                icon: "ph-clock-afternoon",
+                cls: "info",
+            },
+            {
+                key: null,
+                label: "Avg Hours",
+                val: stats.avgHours + "h",
+                icon: "ph-timer",
+                cls: "",
+            },
         ];
 
         return `
         <div class="summary-grid">
-            ${cards.map((c) => `
+            ${cards
+                .map(
+                    (c) => `
                 <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
                     ${c.key ? `data-card-key="${c.key}"` : ""}>
                     <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
@@ -979,25 +1464,56 @@ class AttendanceView {
                         ${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
                     </div>
                 </div>
-            `,).join("")}
+            `,
+                )
+                .join("")}
         </div>
     `;
     }
 
     _renderEarlyOutSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
-        const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
-        const totalPresentHalf = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present")).length;
+        const dayLogs = this._buildEmployeeDayLogs(
+            emps,
+            logs,
+            dateFrom,
+            dateTo,
+        );
+        const totalPresentHalf = dayLogs.filter(
+            (l) =>
+                this._matchesStatus(l, "Present") ||
+                this._matchesStatus(l, "Half Present"),
+        ).length;
 
         const cards = [
-            { key: "presentHeadcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
-            { key: "earlyOut", label: "Early Out", val: stats.earlyOut, icon: "ph-sign-out", cls: "accent", },
-            { key: null, label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", },
+            {
+                key: "presentHeadcount",
+                label: "Total Presentcount",
+                val: totalPresentHalf,
+                icon: "ph-users",
+                cls: "",
+            },
+            {
+                key: "earlyOut",
+                label: "Early Out",
+                val: stats.earlyOut,
+                icon: "ph-sign-out",
+                cls: "accent",
+            },
+            {
+                key: null,
+                label: "Avg Hours",
+                val: stats.avgHours + "h",
+                icon: "ph-timer",
+                cls: "",
+            },
         ];
 
         return `
         <div class="summary-grid">
-            ${cards.map((c) => `
+            ${cards
+                .map(
+                    (c) => `
                 <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
                     ${c.key ? `data-card-key="${c.key}"` : ""}>
                     <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
@@ -1007,89 +1523,607 @@ class AttendanceView {
                         ${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
                     </div>
                 </div>
-            `,).join("")}
+            `,
+                )
+                .join("")}
         </div>
     `;
     }
 
     _renderResignedSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
-        const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo,);
-        const totalPresentHalf = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present"),).length;
+        const dayLogs = this._buildEmployeeDayLogs(
+            emps,
+            logs,
+            dateFrom,
+            dateTo,
+        );
+        const totalPresentHalf = dayLogs.filter(
+            (l) =>
+                this._matchesStatus(l, "Present") ||
+                this._matchesStatus(l, "Half Present"),
+        ).length;
 
         const cards = [
-            { key: "presentHeadcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
-            { key: "resigned", label: "Resigned", val: stats.resigned || 0, icon: "ph-user-minus", cls: "danger", },
-            { key: null, label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", },
+            {
+                key: "resigned",
+                label: "Resigned",
+                val: stats.resigned || 0,
+                icon: "ph-user-minus",
+                cls: "danger",
+            },
         ];
 
-        return `
-            <div class="summary-grid">
-                ${cards.map((c) => `
-                    <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
-                        ${c.key ? `data-card-key="${c.key}"` : ""}>
-                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                        <div class="stat-content">
-                            <span class="stat-label">${c.label}</span>
-                            <span class="stat-value">${c.val}</span>
-                            ${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
-                        </div>
+        const topRow = `
+        <div class="summary-grid">
+            ${cards
+                .map(
+                    (c) => `
+                <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
+                    ${c.key ? `data-card-key="${c.key}"` : ""}>
+                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">${c.label}</span>
+                        <span class="stat-value">${c.val}</span>
+                        ${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
                     </div>
-                `,).join("")}
-            </div>
+                </div>
+            `,
+                )
+                .join("")}
+        </div>
+    `;
+
+        // ---- Resigned employees ka breakdown (Dashboard jaisa) ----
+        const resignedItems = model.getResignedEmployees
+            ? model.getResignedEmployees()
+            : [];
+        const resEmps = resignedItems.map((it) => it.emp);
+
+        const sectionLabel = (text) => `
+        <div style="
+            font-size:10px;font-weight:700;text-transform:uppercase;
+            letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px;
+            display:flex;align-items:center;gap:8px;
+        ">
+            ${text}
+            <span style="flex:1;height:1px;background:#e5e7eb;display:block;"></span>
+        </div>
+    `;
+
+        if (resEmps.length === 0) {
+            return `
+            ${topRow}
+            ${sectionLabel("Resigned Breakdown")}
+            <p style="padding:16px;color:#94a3b8;">No resigned employees in selected date range.</p>
         `;
+        }
+
+        // --- By Company ---
+        this._currentResignedBreakdown = { emps: resEmps };
+        const companies = [...new Set(resEmps.map((e) => e.company))];
+        const compColorCls = ["info", "success", "warning", "accent", "danger"];
+        const companyCounts = {};
+        companies.forEach((c) => (companyCounts[c] = 0));
+        resEmps.forEach((e) => {
+            if (companyCounts[e.company] !== undefined)
+                companyCounts[e.company]++;
+        });
+        const companyCards = companies
+            .map(
+                (c, i) => `
+        <div class="stat-card ${compColorCls[i % compColorCls.length]} stat-card-clickable"
+            data-res-company="${this._escapeAttr(c)}"
+            onclick="AppController.view._showResignedBreakdownDrilldown('company', '${this._escapeAttr(c)}')">
+            <div class="stat-icon"><i class="ph ph-buildings"></i></div>
+            <div class="stat-content">
+                <span class="stat-label">${c}</span>
+                <span class="stat-value">${companyCounts[c]}</span>
+                <span class="stat-card-hint">↓ click to view</span>
+            </div>
+        </div>
+    `,
+            )
+            .join("");
+
+        // --- Gender ---
+        const genderCounts = { Male: 0, Female: 0 };
+        resEmps.forEach((e) => {
+            if (genderCounts[e.gender] !== undefined) genderCounts[e.gender]++;
+        });
+        const genderCards = `
+        <div class="stat-card info stat-card-clickable"
+            data-res-gender="Male"
+            onclick="AppController.view._showResignedBreakdownDrilldown('gender', 'Male')">
+            <div class="stat-icon"><i class="ph ph-gender-male"></i></div>
+            <div class="stat-content">
+                <span class="stat-label">Male</span>
+                <span class="stat-value">${genderCounts.Male}</span>
+                <span class="stat-card-hint">↓ click to view</span>
+            </div>
+        </div>
+        <div class="stat-card accent stat-card-clickable"
+            data-res-gender="Female"
+            onclick="AppController.view._showResignedBreakdownDrilldown('gender', 'Female')">
+            <div class="stat-icon"><i class="ph ph-gender-female"></i></div>
+            <div class="stat-content">
+                <span class="stat-label">Female</span>
+                <span class="stat-value">${genderCounts.Female}</span>
+                <span class="stat-card-hint">↓ click to view</span>
+            </div>
+        </div>
+    `;
+
+        // --- Staff / Workmen ---
+        const staffCount = resEmps.filter((e) =>
+            [58].includes(e.categoryId),
+        ).length;
+        const workerCount = resEmps.filter((e) =>
+            [51, 59, 60].includes(e.categoryId),
+        ).length;
+        const swCards = `
+        <div class="stat-card info stat-card-clickable"
+            data-res-workforce="Staff"
+            onclick="AppController.view._showResignedBreakdownDrilldown('workforce', 'Staff')">
+            <div class="stat-icon"><i class="ph ph-identification-badge"></i></div>
+            <div class="stat-content">
+                <span class="stat-label">Staff</span>
+                <span class="stat-value">${staffCount}</span>
+                <span class="stat-card-hint">↓ click to view</span>
+            </div>
+        </div>
+        <div class="stat-card warning stat-card-clickable"
+            data-res-workforce="Workmen"
+            onclick="AppController.view._showResignedBreakdownDrilldown('workforce', 'Workmen')">
+            <div class="stat-icon"><i class="ph ph-hard-hat"></i></div>
+            <div class="stat-content">
+                <span class="stat-label">Workmen</span>
+                <span class="stat-value">${workerCount}</span>
+                <span class="stat-card-hint">↓ click to view</span>
+            </div>
+        </div>
+    `;
+
+        // --- Age Group ---
+        const ageGroups = [
+            "Under 18",
+            "Under 25",
+            "25–34",
+            "35–44",
+            "45–54",
+            "55–59",
+            "60+",
+        ];
+        const ageGroupIcons = {
+            "Under 18": "ph-baby",
+            "Under 25": "ph-student",
+            "25–34": "ph-person-simple",
+            "35–44": "ph-user-circle",
+            "45–54": "ph-user-circle-gear",
+            "55–59": "ph-user-focus",
+            "60+": "ph-person-simple-tai-chi",
+        };
+        const ageGroupCls = {
+            "Under 18": "",
+            "Under 25": "info",
+            "25–34": "success",
+            "35–44": "warning",
+            "45–54": "accent",
+            "55–59": "danger",
+            "60+": "accent",
+        };
+        const ageCounts = {};
+        ageGroups.forEach((g) => (ageCounts[g] = 0));
+        resEmps.forEach((e) => {
+            const g = model.getAgeGroup(e.dob);
+            if (ageCounts[g] !== undefined) ageCounts[g]++;
+        });
+        const ageCards = ageGroups
+            .map(
+                (g) => `
+        <div class="stat-card ${ageGroupCls[g]} stat-card-clickable"
+            data-res-age="${this._escapeAttr(g)}"
+            onclick="AppController.view._showResignedBreakdownDrilldown('age', '${this._escapeAttr(g)}')">
+            <div class="stat-icon"><i class="ph ${ageGroupIcons[g]}"></i></div>
+            <div class="stat-content">
+                <span class="stat-label">${g}</span>
+                <span class="stat-value">${ageCounts[g]}</span>
+                <span class="stat-card-hint">↓ click to view</span>
+            </div>
+        </div>
+    `,
+            )
+            .join("");
+
+        // --- By Department (clickable -> designation drilldown) ---
+        this._currentResignedDeptData = { resEmps };
+
+        const resDepts = [...new Set(resEmps.map((e) => e.dept))];
+        const resDeptColorCls = [
+            "info",
+            "success",
+            "warning",
+            "accent",
+            "danger",
+        ];
+        const resDeptCounts = {};
+        resDepts.forEach((d) => (resDeptCounts[d] = 0));
+        resEmps.forEach((e) => {
+            if (resDeptCounts[e.dept] !== undefined) resDeptCounts[e.dept]++;
+        });
+        const resDeptCards = resDepts
+            .map(
+                (d, i) => `
+        <div class="stat-card ${resDeptColorCls[i % resDeptColorCls.length]} stat-card-clickable"
+            data-resigned-dept="${this._escapeAttr(d)}"
+            onclick="AppController.view._showResignedDeptDrilldown('${this._escapeAttr(d)}')">
+            <div class="stat-icon"><i class="ph ph-briefcase"></i></div>
+            <div class="stat-content">
+                <span class="stat-label">${d}</span>
+                <span class="stat-value">${resDeptCounts[d]}</span>
+                <span class="stat-card-hint">↓ click to view</span>
+            </div>
+        </div>
+    `,
+            )
+            .join("");
+
+        return `
+        ${topRow}
+
+        <div style="margin-top:8px;">
+            ${sectionLabel("Resigned — By Company")}
+            <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                ${companyCards}
+            </div>
+
+            ${sectionLabel("Resigned — Gender & Workforce Type")}
+            <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                ${genderCards}
+                ${swCards}
+            </div>
+
+            ${sectionLabel("Resigned — By Age Group")}
+            <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));">
+                ${ageCards}
+            </div>
+
+            <div id="resigned-breakdown-drilldown" style="margin-top:8px;"></div>
+
+            ${sectionLabel("Resigned — By Department")}
+            <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                ${resDeptCards}
+            </div>
+            <div id="resigned-desig-drilldown" style="margin-top:8px;"></div>
+        </div>
+    `;
     }
 
     _renderNewJoinedSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
-        const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
-        const totalPresentHalf = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present"),).length;
+        const dayLogs = this._buildEmployeeDayLogs(
+            emps,
+            logs,
+            dateFrom,
+            dateTo,
+        );
+        const totalPresentHalf = dayLogs.filter(
+            (l) =>
+                this._matchesStatus(l, "Present") ||
+                this._matchesStatus(l, "Half Present"),
+        ).length;
 
         const cards = [
-            { key: "presentHeadcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
-            { key: "newJoined", label: "New Join", val: stats.newJoined || 0, icon: "ph-user-plus", cls: "success", },
-            { key: null, label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", },
+            {
+                key: "newJoined",
+                label: "New Join",
+                val: stats.newJoined || 0,
+                icon: "ph-user-plus",
+                cls: "success",
+            },
         ];
 
-        return `
-            <div class="summary-grid">
-                ${cards.map((c) => `
-                    <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
-                        ${c.key ? `data-card-key="${c.key}"` : ""}>
-                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                        <div class="stat-content">
-                            <span class="stat-label">${c.label}</span>
-                            <span class="stat-value">${c.val}</span>
-                            ${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
-                        </div>
+        const topRow = `
+        <div class="summary-grid">
+            ${cards
+                .map(
+                    (c) => `
+                <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
+                    ${c.key ? `data-card-key="${c.key}"` : ""}>
+                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">${c.label}</span>
+                        <span class="stat-value">${c.val}</span>
+                        ${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
                     </div>
-                `,).join("")}
-            </div>
+                </div>
+            `,
+                )
+                .join("")}
+        </div>
+    `;
+
+        // ---- New Joined employees ke breakdown cards (Dashboard jaisa) ----
+        const newJoinedItems = model.getNewJoinedEmployees
+            ? model.getNewJoinedEmployees()
+            : [];
+        const njEmps = newJoinedItems.map((it) => it.emp);
+
+        const sectionLabel = (text) => `
+        <div style="
+            font-size:10px;font-weight:700;text-transform:uppercase;
+            letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px;
+            display:flex;align-items:center;gap:8px;
+        ">
+            ${text}
+            <span style="flex:1;height:1px;background:#e5e7eb;display:block;"></span>
+        </div>
+    `;
+
+        if (njEmps.length === 0) {
+            return `
+            ${topRow}
+            ${sectionLabel("New Joined Breakdown")}
+            <p style="padding:16px;color:#94a3b8;">No new joined employees in selected date range.</p>
         `;
+        }
+
+        this._currentNewJoinedBreakdown = { emps: njEmps };
+
+        // --- By Company ---
+        const companies = [...new Set(njEmps.map((e) => e.company))];
+        const compColorCls = ["info", "success", "warning", "accent", "danger"];
+        const companyCounts = {};
+        companies.forEach((c) => (companyCounts[c] = 0));
+        njEmps.forEach((e) => {
+            if (companyCounts[e.company] !== undefined)
+                companyCounts[e.company]++;
+        });
+        const companyCards = companies
+            .map(
+                (c, i) => `
+        <div class="stat-card ${compColorCls[i % compColorCls.length]} stat-card-clickable"
+            data-nj-company="${this._escapeAttr(c)}"
+            onclick="AppController.view._showNewJoinedBreakdownDrilldown('company', '${this._escapeAttr(c)}')">
+            <div class="stat-icon"><i class="ph ph-buildings"></i></div>
+            <div class="stat-content">
+                <span class="stat-label">${c}</span>
+                <span class="stat-value">${companyCounts[c]}</span>
+                <span class="stat-card-hint">↓ click to view</span>
+            </div>
+        </div>
+    `,
+            )
+            .join("");
+
+        // --- Gender ---
+        const genderCounts = { Male: 0, Female: 0 };
+        njEmps.forEach((e) => {
+            if (genderCounts[e.gender] !== undefined) genderCounts[e.gender]++;
+        });
+        const genderCards = `
+        <div class="stat-card info stat-card-clickable"
+            data-nj-gender="Male"
+            onclick="AppController.view._showNewJoinedBreakdownDrilldown('gender', 'Male')">
+            <div class="stat-icon"><i class="ph ph-gender-male"></i></div>
+            <div class="stat-content">
+                <span class="stat-label">Male</span>
+                <span class="stat-value">${genderCounts.Male}</span>
+                <span class="stat-card-hint">↓ click to view</span>
+            </div>
+        </div>
+        <div class="stat-card accent stat-card-clickable"
+            data-nj-gender="Female"
+            onclick="AppController.view._showNewJoinedBreakdownDrilldown('gender', 'Female')">
+            <div class="stat-icon"><i class="ph ph-gender-female"></i></div>
+            <div class="stat-content">
+                <span class="stat-label">Female</span>
+                <span class="stat-value">${genderCounts.Female}</span>
+                <span class="stat-card-hint">↓ click to view</span>
+            </div>
+        </div>
+    `;
+        // --- Staff / Workmen (Workforce Type) ---
+        const staffCount = njEmps.filter((e) =>
+            [58].includes(e.categoryId),
+        ).length;
+        const workerCount = njEmps.filter((e) =>
+            [51, 59, 60].includes(e.categoryId),
+        ).length;
+        const swCards = `
+        <div class="stat-card info stat-card-clickable"
+            data-nj-workforce="Staff"
+            onclick="AppController.view._showNewJoinedBreakdownDrilldown('workforce', 'Staff')">
+            <div class="stat-icon"><i class="ph ph-identification-badge"></i></div>
+            <div class="stat-content">
+                <span class="stat-label">Staff</span>
+                <span class="stat-value">${staffCount}</span>
+                <span class="stat-card-hint">↓ click to view</span>
+            </div>
+        </div>
+        <div class="stat-card warning stat-card-clickable"
+            data-nj-workforce="Workmen"
+            onclick="AppController.view._showNewJoinedBreakdownDrilldown('workforce', 'Workmen')">
+            <div class="stat-icon"><i class="ph ph-hard-hat"></i></div>
+            <div class="stat-content">
+                <span class="stat-label">Workmen</span>
+                <span class="stat-value">${workerCount}</span>
+                <span class="stat-card-hint">↓ click to view</span>
+            </div>
+        </div>
+    `;
+
+        // --- Age Group ---
+        const ageGroups = [
+            "Under 18",
+            "Under 25",
+            "25–34",
+            "35–44",
+            "45–54",
+            "55–59",
+            "60+",
+        ];
+        const ageGroupIcons = {
+            "Under 18": "ph-baby",
+            "Under 25": "ph-student",
+            "25–34": "ph-person-simple",
+            "35–44": "ph-user-circle",
+            "45–54": "ph-user-circle-gear",
+            "55–59": "ph-user-focus",
+            "60+": "ph-person-simple-tai-chi",
+        };
+        const ageGroupCls = {
+            "Under 18": "",
+            "Under 25": "info",
+            "25–34": "success",
+            "35–44": "warning",
+            "45–54": "accent",
+            "55–59": "danger",
+            "60+": "accent",
+        };
+        const ageCounts = {};
+        ageGroups.forEach((g) => (ageCounts[g] = 0));
+        njEmps.forEach((e) => {
+            const g = model.getAgeGroup(e.dob);
+            if (ageCounts[g] !== undefined) ageCounts[g]++;
+        });
+        const ageCards = ageGroups
+            .map(
+                (g) => `
+        <div class="stat-card ${ageGroupCls[g]} stat-card-clickable"
+            data-nj-age="${this._escapeAttr(g)}"
+            onclick="AppController.view._showNewJoinedBreakdownDrilldown('age', '${this._escapeAttr(g)}')">
+            <div class="stat-icon"><i class="ph ${ageGroupIcons[g]}"></i></div>
+            <div class="stat-content">
+                <span class="stat-label">${g}</span>
+                <span class="stat-value">${ageCounts[g]}</span>
+                <span class="stat-card-hint">↓ click to view</span>
+            </div>
+        </div>
+    `,
+            )
+            .join("");
+
+        // --- By Department ---
+        const njDepts = [...new Set(njEmps.map((e) => e.dept))];
+        const njDeptColorCls = [
+            "info",
+            "success",
+            "warning",
+            "accent",
+            "danger",
+        ];
+        const njDeptCounts = {};
+        njDepts.forEach((d) => (njDeptCounts[d] = 0));
+        njEmps.forEach((e) => {
+            if (njDeptCounts[e.dept] !== undefined) njDeptCounts[e.dept]++;
+        });
+        this._currentNewJoinedDeptData = { njEmps };
+
+        const njDeptCards = njDepts
+            .map(
+                (d, i) => `
+    <div class="stat-card ${njDeptColorCls[i % njDeptColorCls.length]} stat-card-clickable"
+        data-newjoined-dept="${this._escapeAttr(d)}"
+        onclick="AppController.view._showNewJoinedDeptDrilldown('${this._escapeAttr(d)}')">
+        <div class="stat-icon"><i class="ph ph-briefcase"></i></div>
+        <div class="stat-content">
+            <span class="stat-label">${d}</span>
+            <span class="stat-value">${njDeptCounts[d]}</span>
+            <span class="stat-card-hint">↓ click to view</span>
+        </div>
+    </div>
+`,
+            )
+            .join("");
+
+        return `
+        ${topRow}
+
+        <div style="margin-top:8px;">
+            ${sectionLabel("New Joined — By Company")}
+            <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                ${companyCards}
+            </div>
+
+            ${sectionLabel("New Joined — Gender & Workforce Type")}
+            <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                ${genderCards}
+                ${swCards}
+            </div>
+
+            ${sectionLabel("New Joined — By Age Group")}
+            <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));">
+                ${ageCards}
+            </div>
+
+            <div id="newjoined-breakdown-drilldown" style="margin-top:8px;"></div>
+
+            ${sectionLabel("New Joined — By Department")}
+            <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                ${njDeptCards}
+            </div>
+            <div id="newjoined-desig-drilldown" style="margin-top:8px;"></div>
+        </div>
+    `;
     }
 
     _renderShiftSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
-        const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo,);
+        const dayLogs = this._buildEmployeeDayLogs(
+            emps,
+            logs,
+            dateFrom,
+            dateTo,
+        );
         this._currentShiftSummaryData = { emps, model, dayLogs, empMap };
 
         const shiftStats = model.state.data.shiftStats || [];
         const colorCls = ["info", "success", "warning", "accent", "danger"];
 
-        this._currentTabPresentHeadcountItems = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present")).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
+        this._currentTabPresentHeadcountItems = dayLogs
+            .filter(
+                (l) =>
+                    this._matchesStatus(l, "Present") ||
+                    this._matchesStatus(l, "Half Present"),
+            )
+            .map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
         // const totalPresentHalf = this._currentTabPresentHeadcountItems.length;
-        const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) +
-                          (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0);
+        const totalPresentHalf =
+            (stats.present || 0) +
+            (stats.halfPresent || 0) +
+            (stats.weeklyOffPresent || 0) +
+            (stats.weeklyOffHalfPresent || 0);
 
         const cards = [
-            { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
-            ...shiftStats.map((s, i) => ({ type: "shift", label: s.shiftName, val: (s.present || 0) + (s.halfPresent || 0), icon: "ph-clock-clockwise", cls: colorCls[i % colorCls.length], shift: s.shiftName, })),
-            { type: "avgHours", label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", },
+            {
+                type: "headcount",
+                label: "Total Presentcount",
+                val: totalPresentHalf,
+                icon: "ph-users",
+                cls: "",
+            },
+            ...shiftStats.map((s, i) => ({
+                type: "shift",
+                label: s.shiftName,
+                val: (s.present || 0) + (s.halfPresent || 0),
+                icon: "ph-clock-clockwise",
+                cls: colorCls[i % colorCls.length],
+                shift: s.shiftName,
+            })),
+            {
+                type: "avgHours",
+                label: "Avg Hours",
+                val: stats.avgHours + "h",
+                icon: "ph-timer",
+                cls: "",
+            },
         ];
 
         return `
             <div class="summary-grid">
-                ${cards.map((c) => {
+                ${cards
+                    .map((c) => {
                         if (c.type === "shift") {
                             return `
                                 <div class="stat-card ${c.cls} stat-card-clickable"
@@ -1125,18 +2159,31 @@ class AttendanceView {
                                 </div>
                             </div>
                         `;
-                    }).join("")}
+                    })
+                    .join("")}
             </div>
         `;
     }
 
     _renderStaffSummaryCards(emps, stats, model, logs, empMap) {
         const staffCategoryIds = [58];
-        const staffEmps = emps.filter((e) => staffCategoryIds.includes(e.categoryId),);
+        const staffEmps = emps.filter((e) =>
+            staffCategoryIds.includes(e.categoryId),
+        );
 
         const { dateFrom, dateTo } = model.state.filters;
-        const dayLogs = this._buildEmployeeDayLogs(staffEmps, logs, dateFrom, dateTo,);
-        this._currentStaffSummaryData = { emps: staffEmps, model, dayLogs, empMap, };
+        const dayLogs = this._buildEmployeeDayLogs(
+            staffEmps,
+            logs,
+            dateFrom,
+            dateTo,
+        );
+        this._currentStaffSummaryData = {
+            emps: staffEmps,
+            model,
+            dayLogs,
+            empMap,
+        };
 
         const depts = [...new Set(staffEmps.map((e) => e.dept))].sort();
         const colorCls = ["info", "success", "warning", "accent", "danger"];
@@ -1146,7 +2193,9 @@ class AttendanceView {
         dayLogs.forEach((l) => {
             const e = empMap[l.empId];
             if (!e) return;
-            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present");
+            const isPresentOrHalf =
+                this._matchesStatus(l, "Present") ||
+                this._matchesStatus(l, "Half Present");
             if (!isPresentOrHalf) return;
             if (counts[e.dept] !== undefined) {
                 counts[e.dept]++;
@@ -1154,16 +2203,42 @@ class AttendanceView {
         });
 
         const totalPresentHalf = depts.reduce((sum, d) => sum + counts[d], 0);
-        this._currentTabPresentHeadcountItems = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present")).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
+        this._currentTabPresentHeadcountItems = dayLogs
+            .filter(
+                (l) =>
+                    this._matchesStatus(l, "Present") ||
+                    this._matchesStatus(l, "Half Present"),
+            )
+            .map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
         const cards = [
-            { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
-            ...depts.map((d, i) => ({ type: "dept", label: d, val: counts[d], icon: "ph-briefcase", cls: colorCls[i % colorCls.length], dept: d, })),
-            { type: "avgHours", label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", },
+            {
+                type: "headcount",
+                label: "Total Presentcount",
+                val: totalPresentHalf,
+                icon: "ph-users",
+                cls: "",
+            },
+            ...depts.map((d, i) => ({
+                type: "dept",
+                label: d,
+                val: counts[d],
+                icon: "ph-briefcase",
+                cls: colorCls[i % colorCls.length],
+                dept: d,
+            })),
+            {
+                type: "avgHours",
+                label: "Avg Hours",
+                val: stats.avgHours + "h",
+                icon: "ph-timer",
+                cls: "",
+            },
         ];
 
         return `
             <div class="summary-grid">
-                ${cards.map((c) => {
+                ${cards
+                    .map((c) => {
                         if (c.type === "dept") {
                             return `
                                 <div class="stat-card ${c.cls} stat-card-clickable"
@@ -1199,17 +2274,25 @@ class AttendanceView {
                                 </div>
                             </div>
                         `;
-                    }).join("")}
+                    })
+                    .join("")}
             </div>
         `;
     }
 
     _renderWorkerSummaryCards(emps, stats, model, logs, empMap) {
         const workerCategoryIds = [51, 59, 60];
-        const workerEmps = emps.filter((e) => workerCategoryIds.includes(e.categoryId),);
+        const workerEmps = emps.filter((e) =>
+            workerCategoryIds.includes(e.categoryId),
+        );
 
         const { dateFrom, dateTo } = model.state.filters;
-        const dayLogs = this._buildEmployeeDayLogs(workerEmps, logs, dateFrom, dateTo);
+        const dayLogs = this._buildEmployeeDayLogs(
+            workerEmps,
+            logs,
+            dateFrom,
+            dateTo,
+        );
         this._currentWorkerSummaryData = {
             emps: workerEmps,
             model,
@@ -1234,20 +2317,49 @@ class AttendanceView {
             }
         });
 
-        this._currentTabPresentHeadcountItems = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present")).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
+        this._currentTabPresentHeadcountItems = dayLogs
+            .filter(
+                (l) =>
+                    this._matchesStatus(l, "Present") ||
+                    this._matchesStatus(l, "Half Present"),
+            )
+            .map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
         // const totalPresentHalf = this._currentTabPresentHeadcountItems.length;
-        const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) +
-                          (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0);
+        const totalPresentHalf =
+            (stats.present || 0) +
+            (stats.halfPresent || 0) +
+            (stats.weeklyOffPresent || 0) +
+            (stats.weeklyOffHalfPresent || 0);
 
         const cards = [
-            { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
-            ...depts.map((d, i) => ({ type: "dept", label: d, val: counts[d], icon: "ph-briefcase", cls: colorCls[i % colorCls.length], dept: d, })),
-            { type: "avgHours", label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", },
+            {
+                type: "headcount",
+                label: "Total Presentcount",
+                val: totalPresentHalf,
+                icon: "ph-users",
+                cls: "",
+            },
+            ...depts.map((d, i) => ({
+                type: "dept",
+                label: d,
+                val: counts[d],
+                icon: "ph-briefcase",
+                cls: colorCls[i % colorCls.length],
+                dept: d,
+            })),
+            {
+                type: "avgHours",
+                label: "Avg Hours",
+                val: stats.avgHours + "h",
+                icon: "ph-timer",
+                cls: "",
+            },
         ];
 
         return `
             <div class="summary-grid">
-                ${cards.map((c) => {
+                ${cards
+                    .map((c) => {
                         if (c.type === "dept") {
                             return `
                                 <div class="stat-card ${c.cls} stat-card-clickable"
@@ -1283,14 +2395,19 @@ class AttendanceView {
                                 </div>
                             </div>
                         `;
-                    }).join("")}
+                    })
+                    .join("")}
             </div>
         `;
     }
 
     _showWorkerSummaryDrilldown(dept) {
-        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-worker-dept="${dept}"]`,);
+        document
+            .querySelectorAll(".stat-card-clickable")
+            .forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(
+            `.stat-card-clickable[data-worker-dept="${dept}"]`,
+        );
         if (card) card.classList.add("active");
 
         const data = this._currentWorkerSummaryData;
@@ -1300,12 +2417,17 @@ class AttendanceView {
 
         let items;
         if (data.isDashboard) {
-            items = emps.filter((e) => e.dept === dept).map((emp) => ({ log: null, emp, date: null }));
+            items = emps
+                .filter((e) => e.dept === dept)
+                .map((emp) => ({ log: null, emp, date: null }));
         } else {
             const deptLogs = dayLogs.filter((l) => {
                 const e = empMap[l.empId];
                 if (!e || e.dept !== dept) return false;
-                return this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present");
+                return (
+                    this._matchesStatus(l, "Present") ||
+                    this._matchesStatus(l, "Half Present")
+                );
             });
             items = deptLogs.map((l) => ({
                 log: l,
@@ -1318,8 +2440,12 @@ class AttendanceView {
     }
 
     _showAvgHoursWorkerDrilldown() {
-        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-card-key="avgHoursWorker"]`,);
+        document
+            .querySelectorAll(".stat-card-clickable")
+            .forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(
+            `.stat-card-clickable[data-card-key="avgHoursWorker"]`,
+        );
         if (card) {
             card.classList.add("active");
         }
@@ -1328,14 +2454,21 @@ class AttendanceView {
         if (!data) return;
 
         const { dayLogs, empMap } = data;
-        const items = dayLogs.filter((l) => (l.hoursWorked || 0) > 0).sort((a, b) => (b.hoursWorked || 0) - (a.hoursWorked || 0)).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
+        const items = dayLogs
+            .filter((l) => (l.hoursWorked || 0) > 0)
+            .sort((a, b) => (b.hoursWorked || 0) - (a.hoursWorked || 0))
+            .map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
 
         this._renderStatCardDrilldown("avgHoursWorker", items, 1);
     }
 
     _showStaffSummaryDrilldown(dept) {
-        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-staff-dept="${dept}"]`,);
+        document
+            .querySelectorAll(".stat-card-clickable")
+            .forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(
+            `.stat-card-clickable[data-staff-dept="${dept}"]`,
+        );
         if (card) card.classList.add("active");
 
         const data = this._currentStaffSummaryData;
@@ -1345,12 +2478,17 @@ class AttendanceView {
 
         let items;
         if (data.isDashboard) {
-            items = emps.filter((e) => e.dept === dept).map((emp) => ({ log: null, emp, date: null }));
+            items = emps
+                .filter((e) => e.dept === dept)
+                .map((emp) => ({ log: null, emp, date: null }));
         } else {
             const deptLogs = dayLogs.filter((l) => {
                 const e = empMap[l.empId];
                 if (!e || e.dept !== dept) return false;
-                return this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present");
+                return (
+                    this._matchesStatus(l, "Present") ||
+                    this._matchesStatus(l, "Half Present")
+                );
             });
             items = deptLogs.map((l) => ({
                 log: l,
@@ -1363,8 +2501,12 @@ class AttendanceView {
     }
 
     _showAvgHoursStaffDrilldown() {
-        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-card-key="avgHoursStaff"]`,);
+        document
+            .querySelectorAll(".stat-card-clickable")
+            .forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(
+            `.stat-card-clickable[data-card-key="avgHoursStaff"]`,
+        );
         if (card) {
             card.classList.add("active");
         }
@@ -1373,14 +2515,21 @@ class AttendanceView {
         if (!data) return;
 
         const { dayLogs, empMap } = data;
-        const items = dayLogs.filter((l) => (l.hoursWorked || 0) > 0).sort((a, b) => (b.hoursWorked || 0) - (a.hoursWorked || 0)).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
+        const items = dayLogs
+            .filter((l) => (l.hoursWorked || 0) > 0)
+            .sort((a, b) => (b.hoursWorked || 0) - (a.hoursWorked || 0))
+            .map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
 
         this._renderStatCardDrilldown("avgHoursStaff", items, 1);
     }
 
     _showShiftSummaryDrilldown(shiftName) {
-        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-shift="${shiftName}"]`,);
+        document
+            .querySelectorAll(".stat-card-clickable")
+            .forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(
+            `.stat-card-clickable[data-shift="${shiftName}"]`,
+        );
         if (card) {
             card.classList.add("active");
         }
@@ -1392,7 +2541,10 @@ class AttendanceView {
         const shiftLogs = dayLogs.filter((l) => {
             const e = empMap[l.empId];
             if (!e || (e.shift || "No Shift") !== shiftName) return false;
-            return this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present");
+            return (
+                this._matchesStatus(l, "Present") ||
+                this._matchesStatus(l, "Half Present")
+            );
         });
 
         const items = shiftLogs.map((l) => ({
@@ -1405,22 +2557,33 @@ class AttendanceView {
     }
 
     _showAvgHoursShiftDrilldown() {
-        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-card-key="avgHoursShift"]`,);
+        document
+            .querySelectorAll(".stat-card-clickable")
+            .forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(
+            `.stat-card-clickable[data-card-key="avgHoursShift"]`,
+        );
         if (card) card.classList.add("active");
 
         const data = this._currentShiftSummaryData;
         if (!data) return;
 
         const { dayLogs, empMap } = data;
-        const items = dayLogs.filter((l) => (l.hoursWorked || 0) > 0).sort((a, b) => (b.hoursWorked || 0) - (a.hoursWorked || 0)).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
+        const items = dayLogs
+            .filter((l) => (l.hoursWorked || 0) > 0)
+            .sort((a, b) => (b.hoursWorked || 0) - (a.hoursWorked || 0))
+            .map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
 
         this._renderStatCardDrilldown("avgHoursShift", items, 1);
     }
 
     _showGenderSummaryDrilldown(gender) {
-        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-gender="${gender}"]`,);
+        document
+            .querySelectorAll(".stat-card-clickable")
+            .forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(
+            `.stat-card-clickable[data-gender="${gender}"]`,
+        );
         if (card) card.classList.add("active");
 
         const data = this._currentGenderSummaryData;
@@ -1428,25 +2591,36 @@ class AttendanceView {
 
         let items;
         if (data.isDashboard) {
-            items = data.emps.filter((e) => e.gender === gender).map((emp) => ({ log: null, emp, date: null }));
+            items = data.emps
+                .filter((e) => e.gender === gender)
+                .map((emp) => ({ log: null, emp, date: null }));
         } else {
-            items = data.dayLogs.filter((l) => {
-                const e = data.empMap[l.empId];
-                if (!e || e.gender !== gender) return false;
-                return this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present");
-            }).map((l) => ({
-                log: l,
-                emp: data.empMap[l.empId],
-                date: l.date,
-            }));
+            items = data.dayLogs
+                .filter((l) => {
+                    const e = data.empMap[l.empId];
+                    if (!e || e.gender !== gender) return false;
+                    return (
+                        this._matchesStatus(l, "Present") ||
+                        this._matchesStatus(l, "Half Present")
+                    );
+                })
+                .map((l) => ({
+                    log: l,
+                    emp: data.empMap[l.empId],
+                    date: l.date,
+                }));
         }
 
         this._renderStatCardDrilldown("genderSummary_" + gender, items, 1);
     }
 
     _showAvgHoursGenderDrilldown() {
-        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-card-key="avgHoursGender"]`,);
+        document
+            .querySelectorAll(".stat-card-clickable")
+            .forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(
+            `.stat-card-clickable[data-card-key="avgHoursGender"]`,
+        );
         if (card) {
             card.classList.add("active");
         }
@@ -1455,14 +2629,21 @@ class AttendanceView {
         if (!data) return;
 
         const { dayLogs, empMap } = data;
-        const items = dayLogs.filter((l) => (l.hoursWorked || 0) > 0).sort((a, b) => (b.hoursWorked || 0) - (a.hoursWorked || 0)).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
+        const items = dayLogs
+            .filter((l) => (l.hoursWorked || 0) > 0)
+            .sort((a, b) => (b.hoursWorked || 0) - (a.hoursWorked || 0))
+            .map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
 
         this._renderStatCardDrilldown("avgHoursGender", items, 1);
     }
 
     _showDeptSummaryDrilldown(dept) {
-        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-dept="${dept}"]`,);
+        document
+            .querySelectorAll(".stat-card-clickable")
+            .forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(
+            `.stat-card-clickable[data-dept="${dept}"]`,
+        );
         if (card) {
             card.classList.add("active");
         }
@@ -1471,11 +2652,14 @@ class AttendanceView {
         if (!data) return;
 
         const { dayLogs, empMap } = data;
-        
+
         const deptLogs = dayLogs.filter((l) => {
             const e = empMap[l.empId];
             if (!e || e.dept !== dept) return false;
-            return this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present");
+            return (
+                this._matchesStatus(l, "Present") ||
+                this._matchesStatus(l, "Half Present")
+            );
         });
 
         const items = deptLogs.map((l) => ({
@@ -1488,22 +2672,33 @@ class AttendanceView {
     }
 
     _showAvgHoursDeptDrilldown() {
-        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-card-key="avgHoursDept"]`,);
+        document
+            .querySelectorAll(".stat-card-clickable")
+            .forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(
+            `.stat-card-clickable[data-card-key="avgHoursDept"]`,
+        );
         if (card) card.classList.add("active");
 
         const data = this._currentDeptSummaryData;
         if (!data) return;
 
         const { dayLogs, empMap } = data;
-        const items = dayLogs.filter((l) => (l.hoursWorked || 0) > 0).sort((a, b) => (b.hoursWorked || 0) - (a.hoursWorked || 0)).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
+        const items = dayLogs
+            .filter((l) => (l.hoursWorked || 0) > 0)
+            .sort((a, b) => (b.hoursWorked || 0) - (a.hoursWorked || 0))
+            .map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
 
         this._renderStatCardDrilldown("avgHoursDept", items, 1);
     }
 
     _showCompanyDrilldown(company) {
-        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-company="${company}"]`,);
+        document
+            .querySelectorAll(".stat-card-clickable")
+            .forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(
+            `.stat-card-clickable[data-company="${company}"]`,
+        );
         if (card) card.classList.add("active");
 
         const data = this._currentCompanyData;
@@ -1511,39 +2706,57 @@ class AttendanceView {
 
         let items;
         if (data.isDashboard) {
-            items = data.emps.filter((e) => e.company === company).map((emp) => ({ log: null, emp, date: null }));
+            items = data.emps
+                .filter((e) => e.company === company)
+                .map((emp) => ({ log: null, emp, date: null }));
         } else {
-            items = data.dayLogs.filter((l) => {
-                const e = data.empMap[l.empId];
-                if (!e || e.company !== company) return false;
-                return this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present");
-            }).map((l) => ({
-                log: l,
-                emp: data.empMap[l.empId],
-                date: l.date,
-            }));
+            items = data.dayLogs
+                .filter((l) => {
+                    const e = data.empMap[l.empId];
+                    if (!e || e.company !== company) return false;
+                    return (
+                        this._matchesStatus(l, "Present") ||
+                        this._matchesStatus(l, "Half Present")
+                    );
+                })
+                .map((l) => ({
+                    log: l,
+                    emp: data.empMap[l.empId],
+                    date: l.date,
+                }));
         }
 
         this._renderStatCardDrilldown("company_" + company, items, 1);
     }
 
     _showAvgHoursDrilldown() {
-        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-card-key="avgHours"]`,);
+        document
+            .querySelectorAll(".stat-card-clickable")
+            .forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(
+            `.stat-card-clickable[data-card-key="avgHours"]`,
+        );
         if (card) card.classList.add("active");
 
         const data = this._currentCompanyData;
         if (!data) return;
 
         const { dayLogs, empMap } = data;
-        const items = dayLogs.filter((l) => (l.hoursWorked || 0) > 0).sort((a, b) => (b.hoursWorked || 0) - (a.hoursWorked || 0)).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
+        const items = dayLogs
+            .filter((l) => (l.hoursWorked || 0) > 0)
+            .sort((a, b) => (b.hoursWorked || 0) - (a.hoursWorked || 0))
+            .map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
 
         this._renderStatCardDrilldown("avgHours", items, 1);
     }
 
     _showAgeGroupDrilldown(group) {
-        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-age-group="${group}"]`,);
+        document
+            .querySelectorAll(".stat-card-clickable")
+            .forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(
+            `.stat-card-clickable[data-age-group="${group}"]`,
+        );
         if (card) card.classList.add("active");
 
         const data = this._currentAgeData;
@@ -1551,25 +2764,37 @@ class AttendanceView {
 
         let items;
         if (data.isDashboard) {
-            items = data.emps.filter((e) => data.model.getAgeGroup(e.dob) === group).map((emp) => ({ log: null, emp, date: null }));
+            items = data.emps
+                .filter((e) => data.model.getAgeGroup(e.dob) === group)
+                .map((emp) => ({ log: null, emp, date: null }));
         } else {
-            items = data.dayLogs.filter((l) => {
-                const e = data.empMap[l.empId];
-                if (!e || data.model.getAgeGroup(e.dob) !== group) return false;
-                return this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present");
-            }).map((l) => ({
-                log: l,
-                emp: data.empMap[l.empId],
-                date: l.date,
-            }));
+            items = data.dayLogs
+                .filter((l) => {
+                    const e = data.empMap[l.empId];
+                    if (!e || data.model.getAgeGroup(e.dob) !== group)
+                        return false;
+                    return (
+                        this._matchesStatus(l, "Present") ||
+                        this._matchesStatus(l, "Half Present")
+                    );
+                })
+                .map((l) => ({
+                    log: l,
+                    emp: data.empMap[l.empId],
+                    date: l.date,
+                }));
         }
 
         this._renderStatCardDrilldown("ageGroup_" + group, items, 1);
     }
 
     _showDashboardDeptDrilldown(dept) {
-        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-dashboard-dept="${dept}"]`,);
+        document
+            .querySelectorAll(".stat-card-clickable")
+            .forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(
+            `.stat-card-clickable[data-dashboard-dept="${dept}"]`,
+        );
         if (card) card.classList.add("active");
 
         const data = this._currentDashboardDeptData;
@@ -1586,9 +2811,13 @@ class AttendanceView {
                 desigMap[name] = { name, order };
             }
         });
-        const desigs = Object.values(desigMap).sort((a, b) =>
-            a.order !== b.order ? a.order - b.order : a.name.localeCompare(b.name),
-        ).map((d) => d.name);
+        const desigs = Object.values(desigMap)
+            .sort((a, b) =>
+                a.order !== b.order
+                    ? a.order - b.order
+                    : a.name.localeCompare(b.name),
+            )
+            .map((d) => d.name);
 
         const desigCounts = {};
         desigs.forEach((d) => (desigCounts[d] = 0));
@@ -1600,7 +2829,9 @@ class AttendanceView {
         this._currentDashboardDesigData = { dept, deptEmps, empMap };
 
         const colorCls = ["info", "success", "warning", "accent", "danger"];
-        const desigCardsHtml = desigs.map((d, i) => `
+        const desigCardsHtml = desigs
+            .map(
+                (d, i) => `
             <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
                 style="flex: 0 1 180px;"
                 data-dashboard-desig="${this._escapeAttr(d)}"
@@ -1612,7 +2843,9 @@ class AttendanceView {
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
             </div>
-        `,).join("");
+        `,
+            )
+            .join("");
 
         const panel = document.getElementById("stat-card-drilldown");
         if (!panel) return;
@@ -1635,23 +2868,371 @@ class AttendanceView {
     }
 
     _showDashboardDesigDrilldown(designation) {
-        document.querySelectorAll(".stat-card-clickable[data-dashboard-desig]").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-dashboard-desig="${designation}"]`,);
+        document
+            .querySelectorAll(".stat-card-clickable[data-dashboard-desig]")
+            .forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(
+            `.stat-card-clickable[data-dashboard-desig="${designation}"]`,
+        );
         if (card) card.classList.add("active");
 
         const data = this._currentDashboardDesigData;
         if (!data) return;
         const { dept, deptEmps, empMap } = data;
 
-        const items = deptEmps.filter((e) => (e.designation || "Staff") === designation).map((emp) => ({ log: null, emp, date: null }));
+        const items = deptEmps
+            .filter((e) => (e.designation || "Staff") === designation)
+            .map((emp) => ({ log: null, emp, date: null }));
 
-        this._renderStatCardDrilldown("dashboardDesig_" + designation, items, 1, "dashboard-desig-table-container", "AppController.view._closeDashboardDesigTable()");
+        this._renderStatCardDrilldown(
+            "dashboardDesig_" + designation,
+            items,
+            1,
+            "dashboard-desig-table-container",
+            "AppController.view._closeDashboardDesigTable()",
+        );
+    }
+
+    _showNewJoinedBreakdownDrilldown(type, value) {
+        document
+            .querySelectorAll(
+                "[data-nj-company],[data-nj-gender],[data-nj-workforce],[data-nj-age]",
+            )
+            .forEach((c) => c.classList.remove("active"));
+
+        const attrMap = {
+            company: "data-nj-company",
+            gender: "data-nj-gender",
+            workforce: "data-nj-workforce",
+            age: "data-nj-age",
+        };
+        const card = this.app.querySelector(`[${attrMap[type]}="${value}"]`);
+        if (card) card.classList.add("active");
+
+        const data = this._currentNewJoinedBreakdown;
+        if (!data) return;
+        const { emps } = data;
+
+        let filtered;
+        if (type === "company") {
+            filtered = emps.filter((e) => e.company === value);
+        } else if (type === "gender") {
+            filtered = emps.filter((e) => e.gender === value);
+        } else if (type === "workforce") {
+            filtered =
+                value === "Staff"
+                    ? emps.filter((e) => [58].includes(e.categoryId))
+                    : emps.filter((e) => [51, 59, 60].includes(e.categoryId));
+        } else if (type === "age") {
+            filtered = emps.filter(
+                (e) => AppController.model.getAgeGroup(e.dob) === value,
+            );
+        }
+
+        const items = filtered.map((emp) => ({ log: null, emp, date: null }));
+        this._renderStatCardDrilldown(
+            `njBreakdown_${type}_${value}`,
+            items,
+            1,
+            "newjoined-breakdown-drilldown",
+            "AppController.view._closeNewJoinedBreakdownDrilldown()",
+        );
+    }
+
+    _closeNewJoinedBreakdownDrilldown() {
+        const c = document.getElementById("newjoined-breakdown-drilldown");
+        if (c) c.innerHTML = "";
+        document
+            .querySelectorAll(
+                "[data-nj-company],[data-nj-gender],[data-nj-workforce],[data-nj-age]",
+            )
+            .forEach((el) => el.classList.remove("active"));
+    }
+
+    _showNewJoinedDeptDrilldown(dept) {
+        document
+            .querySelectorAll(".stat-card-clickable[data-newjoined-dept]")
+            .forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(
+            `.stat-card-clickable[data-newjoined-dept="${dept}"]`,
+        );
+        if (card) card.classList.add("active");
+
+        const data = this._currentNewJoinedDeptData;
+        if (!data) return;
+
+        const deptEmps = data.njEmps.filter((e) => e.dept === dept);
+
+        const desigMap = {};
+        deptEmps.forEach((e) => {
+            const name = e.designation || "Staff";
+            const order = e.designationSortOrder || 0;
+            if (!desigMap[name] || order < desigMap[name].order) {
+                desigMap[name] = { name, order };
+            }
+        });
+        const desigs = Object.values(desigMap)
+            .sort((a, b) =>
+                a.order !== b.order
+                    ? a.order - b.order
+                    : a.name.localeCompare(b.name),
+            )
+            .map((d) => d.name);
+
+        const desigCounts = {};
+        desigs.forEach((d) => (desigCounts[d] = 0));
+        deptEmps.forEach((e) => {
+            const name = e.designation || "Staff";
+            if (desigCounts[name] !== undefined) desigCounts[name]++;
+        });
+
+        this._currentNewJoinedDesigData = { dept, deptEmps };
+
+        const colorCls = ["info", "success", "warning", "accent", "danger"];
+        const desigCardsHtml = desigs
+            .map(
+                (d, i) => `
+        <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
+            style="flex: 0 1 180px;"
+            data-newjoined-desig="${this._escapeAttr(d)}"
+            onclick="AppController.view._showNewJoinedDesigDrilldown('${this._escapeAttr(d)}')">
+            <div class="stat-icon"><i class="ph ph-identification-badge"></i></div>
+            <div class="stat-content">
+                <span class="stat-label">${d}</span>
+                <span class="stat-value">${desigCounts[d]}</span>
+                <span class="stat-card-hint">↓ click to view</span>
+            </div>
+        </div>
+    `,
+            )
+            .join("");
+
+        const panel = document.getElementById("newjoined-desig-drilldown");
+        if (!panel) return;
+        panel.innerHTML = `
+        <div style="
+            font-size:10px;font-weight:700;text-transform:uppercase;
+            letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px;
+            display:flex;align-items:center;gap:8px;
+        ">
+            BY ${dept.toUpperCase()} DEPARTMENT DESIGNATIONS
+            <span style="flex:1;height:1px;background:#e5e7eb;display:block;"></span>
+        </div>
+        <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+            ${desigCardsHtml || '<p style="padding:16px;color:#94a3b8;">No designations found.</p>'}
+        </div>
+        <div id="newjoined-desig-table-container" style="margin-top:8px;"></div>
+    `;
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    _showResignedBreakdownDrilldown(type, value) {
+        document
+            .querySelectorAll(
+                "[data-res-company],[data-res-gender],[data-res-workforce],[data-res-age]",
+            )
+            .forEach((c) => c.classList.remove("active"));
+
+        const attrMap = {
+            company: "data-res-company",
+            gender: "data-res-gender",
+            workforce: "data-res-workforce",
+            age: "data-res-age",
+        };
+        const card = this.app.querySelector(`[${attrMap[type]}="${value}"]`);
+        if (card) card.classList.add("active");
+
+        const data = this._currentResignedBreakdown;
+        if (!data) return;
+        const { emps } = data;
+
+        let filtered;
+        if (type === "company") {
+            filtered = emps.filter((e) => e.company === value);
+        } else if (type === "gender") {
+            filtered = emps.filter((e) => e.gender === value);
+        } else if (type === "workforce") {
+            filtered =
+                value === "Staff"
+                    ? emps.filter((e) => [58].includes(e.categoryId))
+                    : emps.filter((e) => [51, 59, 60].includes(e.categoryId));
+        } else if (type === "age") {
+            filtered = emps.filter(
+                (e) => AppController.model.getAgeGroup(e.dob) === value,
+            );
+        }
+
+        const items = filtered.map((emp) => ({ log: null, emp, date: null }));
+        this._renderStatCardDrilldown(
+            `resBreakdown_${type}_${value}`,
+            items,
+            1,
+            "resigned-breakdown-drilldown",
+            "AppController.view._closeResignedBreakdownDrilldown()",
+        );
+    }
+
+    _closeResignedBreakdownDrilldown() {
+        const c = document.getElementById("resigned-breakdown-drilldown");
+        if (c) c.innerHTML = "";
+        document
+            .querySelectorAll(
+                "[data-res-company],[data-res-gender],[data-res-workforce],[data-res-age]",
+            )
+            .forEach((el) => el.classList.remove("active"));
+    }
+
+    _showResignedDeptDrilldown(dept) {
+        document
+            .querySelectorAll(".stat-card-clickable[data-resigned-dept]")
+            .forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(
+            `.stat-card-clickable[data-resigned-dept="${dept}"]`,
+        );
+        if (card) card.classList.add("active");
+
+        const data = this._currentResignedDeptData;
+        if (!data) return;
+
+        const deptEmps = data.resEmps.filter((e) => e.dept === dept);
+
+        const desigMap = {};
+        deptEmps.forEach((e) => {
+            const name = e.designation || "Staff";
+            const order = e.designationSortOrder || 0;
+            if (!desigMap[name] || order < desigMap[name].order) {
+                desigMap[name] = { name, order };
+            }
+        });
+        const desigs = Object.values(desigMap)
+            .sort((a, b) =>
+                a.order !== b.order
+                    ? a.order - b.order
+                    : a.name.localeCompare(b.name),
+            )
+            .map((d) => d.name);
+
+        const desigCounts = {};
+        desigs.forEach((d) => (desigCounts[d] = 0));
+        deptEmps.forEach((e) => {
+            const name = e.designation || "Staff";
+            if (desigCounts[name] !== undefined) desigCounts[name]++;
+        });
+
+        this._currentResignedDesigData = { dept, deptEmps };
+
+        const colorCls = ["info", "success", "warning", "accent", "danger"];
+        const desigCardsHtml = desigs
+            .map(
+                (d, i) => `
+        <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
+            style="flex: 0 1 180px;"
+            data-resigned-desig="${this._escapeAttr(d)}"
+            onclick="AppController.view._showResignedDesigDrilldown('${this._escapeAttr(d)}')">
+            <div class="stat-icon"><i class="ph ph-identification-badge"></i></div>
+            <div class="stat-content">
+                <span class="stat-label">${d}</span>
+                <span class="stat-value">${desigCounts[d]}</span>
+                <span class="stat-card-hint">↓ click to view</span>
+            </div>
+        </div>
+    `,
+            )
+            .join("");
+
+        const panel = document.getElementById("resigned-desig-drilldown");
+        if (!panel) return;
+        panel.innerHTML = `
+        <div style="
+            font-size:10px;font-weight:700;text-transform:uppercase;
+            letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px;
+            display:flex;align-items:center;gap:8px;
+        ">
+            BY ${dept.toUpperCase()} DEPARTMENT DESIGNATIONS
+            <span style="flex:1;height:1px;background:#e5e7eb;display:block;"></span>
+        </div>
+        <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+            ${desigCardsHtml || '<p style="padding:16px;color:#94a3b8;">No designations found.</p>'}
+        </div>
+        <div id="resigned-desig-table-container" style="margin-top:8px;"></div>
+    `;
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    _showResignedDesigDrilldown(designation) {
+        document
+            .querySelectorAll(".stat-card-clickable[data-resigned-desig]")
+            .forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(
+            `.stat-card-clickable[data-resigned-desig="${designation}"]`,
+        );
+        if (card) card.classList.add("active");
+
+        const data = this._currentResignedDesigData;
+        if (!data) return;
+        const { deptEmps } = data;
+
+        const items = deptEmps
+            .filter((e) => (e.designation || "Staff") === designation)
+            .map((emp) => ({ log: null, emp, date: null }));
+
+        this._renderStatCardDrilldown(
+            "resignedDesig_" + designation,
+            items,
+            1,
+            "resigned-desig-table-container",
+            "AppController.view._closeResignedDesigTable()",
+        );
+    }
+
+    _closeResignedDesigTable() {
+        const c = document.getElementById("resigned-desig-table-container");
+        if (c) c.innerHTML = "";
+        document
+            .querySelectorAll(".stat-card-clickable[data-resigned-desig]")
+            .forEach((el) => el.classList.remove("active"));
+    }
+
+    _showNewJoinedDesigDrilldown(designation) {
+        document
+            .querySelectorAll(".stat-card-clickable[data-newjoined-desig]")
+            .forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(
+            `.stat-card-clickable[data-newjoined-desig="${designation}"]`,
+        );
+        if (card) card.classList.add("active");
+
+        const data = this._currentNewJoinedDesigData;
+        if (!data) return;
+        const { deptEmps } = data;
+
+        const items = deptEmps
+            .filter((e) => (e.designation || "Staff") === designation)
+            .map((emp) => ({ log: null, emp, date: null }));
+
+        this._renderStatCardDrilldown(
+            "newjoinedDesig_" + designation,
+            items,
+            1,
+            "newjoined-desig-table-container",
+            "AppController.view._closeNewJoinedDesigTable()",
+        );
+    }
+
+    _closeNewJoinedDesigTable() {
+        const c = document.getElementById("newjoined-desig-table-container");
+        if (c) c.innerHTML = "";
+        document
+            .querySelectorAll(".stat-card-clickable[data-newjoined-desig]")
+            .forEach((el) => el.classList.remove("active"));
     }
 
     _closeDashboardDesigTable() {
         const c = document.getElementById("dashboard-desig-table-container");
         if (c) c.innerHTML = "";
-        document.querySelectorAll(".stat-card-clickable[data-dashboard-desig]").forEach((el) => el.classList.remove("active"));
+        document
+            .querySelectorAll(".stat-card-clickable[data-dashboard-desig]")
+            .forEach((el) => el.classList.remove("active"));
     }
 
     _renderTabContent(tabId, logs, emps, empMap, filters, counts, model) {
@@ -1684,10 +3265,19 @@ class AttendanceView {
                 break;
             case "night":
                 const nightData = model.getNightShiftData();
-                content = this._renderNightShift(nightData.logs, nightData.emps, nightData.empMap);
+                content = this._renderNightShift(
+                    nightData.logs,
+                    nightData.emps,
+                    nightData.empMap,
+                );
                 break;
             case "designation":
-                content = this._renderDesignationWise(logs, emps, empMap, model);
+                content = this._renderDesignationWise(
+                    logs,
+                    emps,
+                    empMap,
+                    model,
+                );
                 break;
             case "shift":
                 content = this._renderShiftWise(logs, emps, empMap, model);
@@ -1705,7 +3295,13 @@ class AttendanceView {
                 content = this._renderJoinExitTab(model, "newjoined");
                 break;
             case "special":
-                content = this._renderSpecial(logs, emps, empMap, filters, model);
+                content = this._renderSpecial(
+                    logs,
+                    emps,
+                    empMap,
+                    filters,
+                    model,
+                );
                 break;
             case "designation_order":
                 content = {
@@ -1745,7 +3341,16 @@ class AttendanceView {
         return typeof content === "object" ? content.html : content;
     }
 
-    _initChartRendering(tabId, logs, emps, empMap, filters, counts, model, renderToken) {
+    _initChartRendering(
+        tabId,
+        logs,
+        emps,
+        empMap,
+        filters,
+        counts,
+        model,
+        renderToken,
+    ) {
         if (tabId === "designation_order") {
             this._initDesignationOrderTab(model);
             return;
@@ -1939,8 +3544,14 @@ class AttendanceView {
         const dates = this._getDateRange(dateFrom, dateTo);
         const result = [];
 
-        const singlePunchKeys = (window.AppController && AppController.model) ? (AppController.model.state.data.singlePunchKeys || new Set()) : new Set();
-        const singlePunchData = (window.AppController && AppController.model) ? (AppController.model.state.data.singlePunchData || {}) : {};
+        const singlePunchKeys =
+            window.AppController && AppController.model
+                ? AppController.model.state.data.singlePunchKeys || new Set()
+                : new Set();
+        const singlePunchData =
+            window.AppController && AppController.model
+                ? AppController.model.state.data.singlePunchData || {}
+                : {};
 
         emps.forEach((e) => {
             dates.forEach((date) => {
@@ -1953,11 +3564,17 @@ class AttendanceView {
                     result.push({
                         empId: e.id,
                         date: date,
-                        inTime: punchInfo.direction === 'in'  ? punchInfo.time : null,
-                        outTime: punchInfo.direction === 'out' ? punchInfo.time : null,
+                        inTime:
+                            punchInfo.direction === "in"
+                                ? punchInfo.time
+                                : null,
+                        outTime:
+                            punchInfo.direction === "out"
+                                ? punchInfo.time
+                                : null,
                         status: "Single Punch",
                         present: 0,
-                        absent: 0,   
+                        absent: 0,
                         weeklyOff: 0,
                         hoursWorked: 0,
                         lateBy: 0,
@@ -1991,11 +3608,12 @@ class AttendanceView {
     }
 
     _computeGroupedDayStats(emps, logs, dateFrom, dateTo, groupKeyFn) {
-        const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
-        console.log("========== DEBUG START ==========");
-        console.log("Employees:", emps.length);
-        console.log("Dates:", dateFrom, dateTo);
-        console.log("dayLogs:", dayLogs.length);
+        const dayLogs = this._buildEmployeeDayLogs(
+            emps,
+            logs,
+            dateFrom,
+            dateTo,
+        );
         const empGroupMap = {};
         emps.forEach((e) => {
             empGroupMap[e.id] = groupKeyFn(e);
@@ -2057,14 +3675,19 @@ class AttendanceView {
     }
 
     _tableHTML(id, headers, rows, exportName) {
-        const ths = `<th class="sr-col">Sr No</th>` + headers.map((h) => `<th>${h}</th>`).join("");
+        const ths =
+            `<th class="sr-col">Sr No</th>` +
+            headers.map((h) => `<th>${h}</th>`).join("");
 
-        const trs = rows.map((r, index) =>
-            `<tr>
+        const trs = rows
+            .map(
+                (r, index) =>
+                    `<tr>
                 <td class="sr-col">${index + 1}</td>
                 ${r.map((c) => `<td>${c}</td>`).join("")}
             </tr>`,
-        ).join("");
+            )
+            .join("");
 
         return `
             <div id="main-table-wrap">
@@ -2118,7 +3741,12 @@ class AttendanceView {
 
             // ← This was missing entirely
             renderCharts: () => {
-                Charts.donut("ch-feat-io", ["In Punches", "Out Punches"], [counts.in || 0, counts.out || 0], "In vs Out");
+                Charts.donut(
+                    "ch-feat-io",
+                    ["In Punches", "Out Punches"],
+                    [counts.in || 0, counts.out || 0],
+                    "In vs Out",
+                );
             },
         };
     }
@@ -2130,7 +3758,10 @@ class AttendanceView {
         const pageSize = 25;
         const currentPage = page;
         const totalPages = Math.ceil(logs.length / pageSize);
-        const pageLogs = logs.slice((currentPage - 1) * pageSize, currentPage * pageSize,);
+        const pageLogs = logs.slice(
+            (currentPage - 1) * pageSize,
+            currentPage * pageSize,
+        );
 
         const rows = pageLogs.map((l) => {
             const e = empMap[l.empId] || {};
@@ -2143,8 +3774,12 @@ class AttendanceView {
                 l.inTime || "-",
                 l.outTime || "-",
                 l.hoursWorked || 0,
-                l.lateIn ? '<span class="badge badge-warning">Yes</span>' : "No",
-                l.earlyOut ? '<span class="badge badge-warning">Yes</span>' : "No",
+                l.lateIn
+                    ? '<span class="badge badge-warning">Yes</span>'
+                    : "No",
+                l.earlyOut
+                    ? '<span class="badge badge-warning">Yes</span>'
+                    : "No",
                 `<span class="badge ${l.status === "Present" ? "badge-success" : "badge-danger"}">${l.status}</span>`,
             ];
         });
@@ -2171,9 +3806,17 @@ class AttendanceView {
         const formattedDates = dates.map((d) => this._formatDate(d));
 
         const { dateFrom, dateTo } = filters;
-        const dayLogsForChart = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
+        const dayLogsForChart = this._buildEmployeeDayLogs(
+            emps,
+            logs,
+            dateFrom,
+            dateTo,
+        );
 
-        const presentByDate = {}, halfByDate = {}, woByDate = {}, absentByDate = {};
+        const presentByDate = {},
+            halfByDate = {},
+            woByDate = {},
+            absentByDate = {};
         dates.forEach((d) => {
             presentByDate[d] = 0;
             halfByDate[d] = 0;
@@ -2182,15 +3825,20 @@ class AttendanceView {
         });
         dayLogsForChart.forEach((l) => {
             if (this._matchesStatus(l, "Present")) presentByDate[l.date]++;
-            else if (this._matchesStatus(l, "Half Present")) halfByDate[l.date]++;
+            else if (this._matchesStatus(l, "Half Present"))
+                halfByDate[l.date]++;
             else if (this._matchesStatus(l, "Weekly Off")) woByDate[l.date]++;
             else absentByDate[l.date]++;
         });
 
-        const byDept = this._countBy(logs, (l) => (empMap[l.empId] || {}).dept || "Unknown",);
+        const byDept = this._countBy(
+            logs,
+            (l) => (empMap[l.empId] || {}).dept || "Unknown",
+        );
 
         // ── In vs Out punch counts (moved here from Dashboard tab) ──
-        let totalIn = 0, totalOut = 0;
+        let totalIn = 0,
+            totalOut = 0;
         logs.forEach((l) => {
             if (l.inTime) totalIn++;
             if (l.outTime) totalOut++;
@@ -2259,16 +3907,36 @@ class AttendanceView {
                     "ch-all-trend",
                     formattedDates,
                     [
-                        { name: "Present", data: dates.map((d) => presentByDate[d]), },
-                        { name: "Half Present", data: dates.map((d) => halfByDate[d]), },
-                        { name: "Weekly Off", data: dates.map((d) => woByDate[d]), },
-                        { name: "Absent", data: dates.map((d) => absentByDate[d]), },
+                        {
+                            name: "Present",
+                            data: dates.map((d) => presentByDate[d]),
+                        },
+                        {
+                            name: "Half Present",
+                            data: dates.map((d) => halfByDate[d]),
+                        },
+                        {
+                            name: "Weekly Off",
+                            data: dates.map((d) => woByDate[d]),
+                        },
+                        {
+                            name: "Absent",
+                            data: dates.map((d) => absentByDate[d]),
+                        },
                     ],
                     "Daily Attendance",
                     (category, index, seriesIndex, seriesName) => {
                         const dateVal = dates[index];
-                        const filteredLogs = dayLogsForChart.filter((l) => l.date === dateVal && this._matchesStatus(l, seriesName));
-                        this._renderDrillDown(filteredLogs, `Date: ${formattedDates[index]} - ${seriesName}`, empMap);
+                        const filteredLogs = dayLogsForChart.filter(
+                            (l) =>
+                                l.date === dateVal &&
+                                this._matchesStatus(l, seriesName),
+                        );
+                        this._renderDrillDown(
+                            filteredLogs,
+                            `Date: ${formattedDates[index]} - ${seriesName}`,
+                            empMap,
+                        );
                     },
                 );
                 Charts.donut(
@@ -2276,16 +3944,34 @@ class AttendanceView {
                     Object.keys(byDept),
                     Object.values(byDept),
                     "Dept Distribution",
-                    (dept) => this._renderDrillDown(logs.filter((l) => (empMap[l.empId] || {}).dept === dept), `Department: ${dept}`,empMap),
+                    (dept) =>
+                        this._renderDrillDown(
+                            logs.filter(
+                                (l) => (empMap[l.empId] || {}).dept === dept,
+                            ),
+                            `Department: ${dept}`,
+                            empMap,
+                        ),
                 );
                 // In vs Out donut (moved here from Dashboard tab)
-                Charts.donut("ch-all-io", ["In Punches", "Out Punches"], [totalIn, totalOut], "In vs Out");
+                Charts.donut(
+                    "ch-all-io",
+                    ["In Punches", "Out Punches"],
+                    [totalIn, totalOut],
+                    "In vs Out",
+                );
             },
         };
     }
 
     _reRenderAllPage(page) {
-        const content = this._renderAll(this._currentAllLogs, null, this._currentAllEmpMap, null, page);
+        const content = this._renderAll(
+            this._currentAllLogs,
+            null,
+            this._currentAllEmpMap,
+            null,
+            page,
+        );
         document.querySelector(".tab-pane-container").innerHTML = content.html;
         content.renderCharts();
     }
@@ -2325,9 +4011,13 @@ class AttendanceView {
         const pageSize = 25;
         const currentPage = page;
         const totalPages = Math.ceil(logs.length / pageSize);
-        const pageLogs = logs.slice((currentPage - 1) * pageSize, currentPage * pageSize,);
+        const pageLogs = logs.slice(
+            (currentPage - 1) * pageSize,
+            currentPage * pageSize,
+        );
 
-        const rows = pageLogs.map((l, index) => {
+        const rows = pageLogs
+            .map((l, index) => {
                 const e = empMap[l.empId] || {};
                 return `
                     <tr>
@@ -2351,7 +4041,8 @@ class AttendanceView {
                         <td>${l.status}</td>
                     </tr>
                 `;
-            }).join("");
+            })
+            .join("");
 
         this._drillData = logs.map((l) => {
             const e = empMap[l.empId] || {};
@@ -2468,7 +4159,11 @@ class AttendanceView {
     }
 
     _escapeAttr(str) {
-        return String(str).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        return String(str)
+            .replace(/&/g, "&amp;")
+            .replace(/"/g, "&quot;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
     }
 
     _computeNiceAxis(maxValue, tickCount = 4) {
@@ -2506,13 +4201,18 @@ class AttendanceView {
         const maxTotal = Math.max(1, ...rows.map((r) => r[1]));
         const { ticks, niceMax } = this._computeNiceAxis(maxTotal);
         const tickPercents = [0, 25, 50, 75, 100];
-        const tickValues = tickPercents.map((p) => Math.round((p / 100) * niceMax),);
+        const tickValues = tickPercents.map((p) =>
+            Math.round((p / 100) * niceMax),
+        );
 
         const rowsHtml = depts
             .map((d, i) => {
                 const r = rows[i];
                 const total = r[1] || 1;
-                const present = r[2], half = r[3], wo = r[4], absent = r[5];
+                const present = r[2],
+                    half = r[3],
+                    wo = r[4],
+                    absent = r[5];
                 const scale = (r[1] / niceMax) * 100;
                 const pPct = (present / total) * 100;
                 const hPct = (half / total) * 100;
@@ -2539,7 +4239,8 @@ class AttendanceView {
                         <div class="dept-acc-expand" id="dept-acc-expand-${i}" style="display:none;"></div>
                     </div>
                 `;
-            }).join("");
+            })
+            .join("");
 
         return `
 			<div class="dept-accordion">
@@ -2603,10 +4304,17 @@ class AttendanceView {
 
         const deptEmps = emps.filter((e) => e.dept === dept);
         const { dateFrom, dateTo } = model.state.filters;
-        const groups = this._computeGroupedDayStats(deptEmps, logs, dateFrom, dateTo, (e) => e.designation || "Staff");
+        const groups = this._computeGroupedDayStats(
+            deptEmps,
+            logs,
+            dateFrom,
+            dateTo,
+            (e) => e.designation || "Staff",
+        );
         const desigOrderMap = {};
         deptEmps.forEach((e) => {
-            desigOrderMap[e.designation || "Staff"] = e.designationSortOrder || 0;
+            desigOrderMap[e.designation || "Staff"] =
+                e.designationSortOrder || 0;
         });
         const desigs = Object.keys(groups).sort((a, b) => {
             const orderA = desigOrderMap[a] || 0;
@@ -2619,9 +4327,12 @@ class AttendanceView {
         const maxTotal = Math.max(1, ...desigs.map((d) => groups[d].total));
         const { ticks, niceMax } = this._computeNiceAxis(maxTotal);
         const tickPercents = [0, 25, 50, 75, 100];
-        const tickValues = tickPercents.map((p) => Math.round((p / 100) * niceMax),);
+        const tickValues = tickPercents.map((p) =>
+            Math.round((p / 100) * niceMax),
+        );
 
-        const rowsHtml = desigs.map((d) => {
+        const rowsHtml = desigs
+            .map((d) => {
                 const g = groups[d];
                 const total = g.total || 1;
                 const scale = (g.total / niceMax) * 100;
@@ -2645,7 +4356,8 @@ class AttendanceView {
                     </div>
                     </div>
                 `;
-            }).join("");
+            })
+            .join("");
 
         expandEl.innerHTML = `
 			<div class="dept-acc-sub-title">🔍 ${dept} — Designation Breakdown</div>
@@ -2658,7 +4370,15 @@ class AttendanceView {
     }
 
     _renderAgeWise(logs, emps, empMap, model) {
-        const groups = ["Under 18", "Under 25", "25–34", "35–44", "45–54", "55–59", "60+"];
+        const groups = [
+            "Under 18",
+            "Under 25",
+            "25–34",
+            "35–44",
+            "45–54",
+            "55–59",
+            "60+",
+        ];
         const gTotal = {};
         const gPresent = {};
         const gHalfPresent = {};
@@ -2673,7 +4393,8 @@ class AttendanceView {
             gAbsent[g] = 0;
         });
 
-        const isSingleDay = model.state.filters.dateFrom === model.state.filters.dateTo;
+        const isSingleDay =
+            model.state.filters.dateFrom === model.state.filters.dateTo;
 
         emps.forEach((e) => {
             const g = model.getAgeGroup(e.dob);
@@ -2681,7 +4402,12 @@ class AttendanceView {
         });
 
         const { dateFrom, dateTo } = model.state.filters;
-        const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
+        const dayLogs = this._buildEmployeeDayLogs(
+            emps,
+            logs,
+            dateFrom,
+            dateTo,
+        );
 
         dayLogs.forEach((l) => {
             const e = empMap[l.empId];
@@ -2705,8 +4431,18 @@ class AttendanceView {
         });
 
         const rows = groups.map((g) => {
-            const attendancePercent = gTotal[g] ? (gPresent[g] / gTotal[g]) * 100 : 0;
-            return [g, gTotal[g], gPresent[g], gHalfPresent[g], gWeeklyOff[g], gAbsent[g], attendancePercent.toFixed(2) + "%"];
+            const attendancePercent = gTotal[g]
+                ? (gPresent[g] / gTotal[g]) * 100
+                : 0;
+            return [
+                g,
+                gTotal[g],
+                gPresent[g],
+                gHalfPresent[g],
+                gWeeklyOff[g],
+                gAbsent[g],
+                attendancePercent.toFixed(2) + "%",
+            ];
         });
 
         this._lastData["age-wise"] = rows.map((r) => ({
@@ -2740,9 +4476,18 @@ class AttendanceView {
                     "ch-age-bar",
                     groups,
                     [
-                        { name: "Present", data: groups.map((g) => gPresent[g]), },
-                        { name: "Half Present", data: groups.map((g) => gHalfPresent[g]), },
-                        { name: "Weekly Off", data: groups.map((g) => gWeeklyOff[g]), },
+                        {
+                            name: "Present",
+                            data: groups.map((g) => gPresent[g]),
+                        },
+                        {
+                            name: "Half Present",
+                            data: groups.map((g) => gHalfPresent[g]),
+                        },
+                        {
+                            name: "Weekly Off",
+                            data: groups.map((g) => gWeeklyOff[g]),
+                        },
                         { name: "Absent", data: groups.map((g) => gAbsent[g]) },
                     ],
                     "Age-wise",
@@ -2758,36 +4503,51 @@ class AttendanceView {
                             return this._matchesStatus(l, seriesName);
                         });
 
-                        this._renderDrillDown(filteredLogs, `Age: ${g} - ${seriesName}`, empMap,);
+                        this._renderDrillDown(
+                            filteredLogs,
+                            `Age: ${g} - ${seriesName}`,
+                            empMap,
+                        );
                     },
                 );
             },
         };
     }
 
-   _matchesStatus(log, seriesName) {
+    _matchesStatus(log, seriesName) {
         const present = parseFloat(log.present);
         const absent = parseFloat(log.absent ?? 0);
 
-        if (log.status === 'Single Punch') {
-            return seriesName === 'Single Punch';
+        if (log.status === "Single Punch") {
+            return seriesName === "Single Punch";
         }
 
         // Real DB logs with missed punch flags
-        if (present == 1 && absent == 0 && (log.missedInPunch == 1 || log.missedOutPunch == 1)) {
-            return seriesName === 'Single Punch';
+        if (
+            present == 1 &&
+            absent == 0 &&
+            (log.missedInPunch == 1 || log.missedOutPunch == 1)
+        ) {
+            return seriesName === "Single Punch";
         }
 
-        if (present == 1 && absent == 0) return seriesName === 'Present';
-        if (present == 0.5 && absent == 0.5) return seriesName === 'Half Present';
-        if (present == 0 && absent == 0) return seriesName === 'Weekly Off';
-        return seriesName === 'Absent';
+        if (present == 1 && absent == 0) return seriesName === "Present";
+        if (present == 0.5 && absent == 0.5)
+            return seriesName === "Half Present";
+        if (present == 0 && absent == 0) return seriesName === "Weekly Off";
+        return seriesName === "Absent";
     }
 
     _renderCompanyWise(logs, emps, empMap, model) {
         const comps = [...new Set(emps.map((e) => e.company))];
         const { dateFrom, dateTo } = model.state.filters;
-        const groups = this._computeGroupedDayStats(emps, logs, dateFrom, dateTo, (e) => e.company);
+        const groups = this._computeGroupedDayStats(
+            emps,
+            logs,
+            dateFrom,
+            dateTo,
+            (e) => e.company,
+        );
 
         const rows = comps.map((c) => {
             const g = groups[c] || {
@@ -2797,8 +4557,18 @@ class AttendanceView {
                 weeklyOff: 0,
                 absent: 0,
             };
-            const rate = g.total ? Math.round((g.present / g.total) * 100) + "%" : "0%";
-            return [c, g.total, g.present, g.halfPresent, g.weeklyOff, g.absent, rate];
+            const rate = g.total
+                ? Math.round((g.present / g.total) * 100) + "%"
+                : "0%";
+            return [
+                c,
+                g.total,
+                g.present,
+                g.halfPresent,
+                g.weeklyOff,
+                g.absent,
+                rate,
+            ];
         });
 
         this._lastData["company-wise"] = rows.map((r) => ({
@@ -2839,7 +4609,11 @@ class AttendanceView {
                             }
                             return this._matchesStatus(l, seriesName);
                         });
-                        this._renderDrillDown(filteredLogs, `Company: ${company} - ${seriesName}`, empMap);
+                        this._renderDrillDown(
+                            filteredLogs,
+                            `Company: ${company} - ${seriesName}`,
+                            empMap,
+                        );
                     },
                 );
             },
@@ -2850,7 +4624,13 @@ class AttendanceView {
         this._currentDeptData = { emps, logs, empMap, model };
         const depts = [...new Set(emps.map((e) => e.dept))];
         const { dateFrom, dateTo } = model.state.filters;
-        const groups = this._computeGroupedDayStats(emps, logs, dateFrom, dateTo, (e) => e.dept);
+        const groups = this._computeGroupedDayStats(
+            emps,
+            logs,
+            dateFrom,
+            dateTo,
+            (e) => e.dept,
+        );
         const lBD = model.groupBy(logs, (l) => (empMap[l.empId] || {}).dept);
 
         const rows = depts.map((d) => {
@@ -2862,9 +4642,25 @@ class AttendanceView {
                 absent: 0,
             };
             const ls = lBD[d] || [];
-            const avg = ls.length ? (ls.reduce((s, l) => s + (l.hoursWorked || 0), 0) / ls.length).toFixed(1) : 0;
-            const rate = g.total ? Math.round((g.present / g.total) * 100) + "%" : "0%";
-            return [d, g.total, g.present, g.halfPresent, g.weeklyOff, g.absent, avg, rate];
+            const avg = ls.length
+                ? (
+                      ls.reduce((s, l) => s + (l.hoursWorked || 0), 0) /
+                      ls.length
+                  ).toFixed(1)
+                : 0;
+            const rate = g.total
+                ? Math.round((g.present / g.total) * 100) + "%"
+                : "0%";
+            return [
+                d,
+                g.total,
+                g.present,
+                g.halfPresent,
+                g.weeklyOff,
+                g.absent,
+                avg,
+                rate,
+            ];
         });
 
         this._lastData["dept-wise"] = rows.map((r) => ({
@@ -2902,23 +4698,29 @@ class AttendanceView {
             `,
 
             renderCharts: () => {
-                const legendItems = document.querySelectorAll(".dept-accordion .dept-acc-legend span",);
+                const legendItems = document.querySelectorAll(
+                    ".dept-accordion .dept-acc-legend span",
+                );
                 const accordion = document.querySelector(".dept-accordion");
 
                 legendItems.forEach((item) => {
                     item.addEventListener("mouseenter", () => {
                         const status = item.dataset.legend;
                         accordion.classList.add("dimmed");
-                        document.querySelectorAll(".dept-acc-seg." + status).forEach((seg) => {
-                            seg.classList.add("active-highlight");
-                        });
+                        document
+                            .querySelectorAll(".dept-acc-seg." + status)
+                            .forEach((seg) => {
+                                seg.classList.add("active-highlight");
+                            });
                     });
 
                     item.addEventListener("mouseleave", () => {
                         accordion.classList.remove("dimmed");
-                        document.querySelectorAll(".dept-acc-seg").forEach((seg) => {
-                            seg.classList.remove("active-highlight");
-                        });
+                        document
+                            .querySelectorAll(".dept-acc-seg")
+                            .forEach((seg) => {
+                                seg.classList.remove("active-highlight");
+                            });
                     });
                 });
             },
@@ -2928,7 +4730,13 @@ class AttendanceView {
     _renderDeptDesignationDrilldown(dept, emps, logs, model, anchorEl) {
         const deptEmps = emps.filter((e) => e.dept === dept);
         const { dateFrom, dateTo } = model.state.filters;
-        const groups = this._computeGroupedDayStats(deptEmps, logs, dateFrom, dateTo, (e) => e.designation || "Staff");
+        const groups = this._computeGroupedDayStats(
+            deptEmps,
+            logs,
+            dateFrom,
+            dateTo,
+            (e) => e.designation || "Staff",
+        );
         const desigs = Object.keys(groups).sort();
 
         const old = document.getElementById("dept-desig-popover");
@@ -2970,17 +4778,31 @@ class AttendanceView {
 
         chartCard.appendChild(popover);
 
-        document.getElementById("dept-desig-popover-close").addEventListener("click", () => popover.remove());
+        document
+            .getElementById("dept-desig-popover-close")
+            .addEventListener("click", () => popover.remove());
 
         setTimeout(() => {
             Charts.stacked(
                 "ch-dept-desig-drill",
                 desigs,
                 [
-                    { name: "Present", data: desigs.map((d) => groups[d].present), },
-                    { name: "Half Present", data: desigs.map((d) => groups[d].halfPresent), },
-                    { name: "Weekly Off", data: desigs.map((d) => groups[d].weeklyOff), },
-                    { name: "Absent", data: desigs.map((d) => groups[d].absent), },
+                    {
+                        name: "Present",
+                        data: desigs.map((d) => groups[d].present),
+                    },
+                    {
+                        name: "Half Present",
+                        data: desigs.map((d) => groups[d].halfPresent),
+                    },
+                    {
+                        name: "Weekly Off",
+                        data: desigs.map((d) => groups[d].weeklyOff),
+                    },
+                    {
+                        name: "Absent",
+                        data: desigs.map((d) => groups[d].absent),
+                    },
                 ],
                 `${dept} - Designation Attendance`,
                 null,
@@ -2993,7 +4815,13 @@ class AttendanceView {
         const genders = ["Male", "Female"];
         const { dateFrom, dateTo } = model.state.filters;
 
-        const groups = this._computeGroupedDayStats(emps, logs, dateFrom, dateTo, (e) => e.gender);
+        const groups = this._computeGroupedDayStats(
+            emps,
+            logs,
+            dateFrom,
+            dateTo,
+            (e) => e.gender,
+        );
 
         const rows = genders.map((g) => {
             const grp = groups[g] || {
@@ -3003,8 +4831,18 @@ class AttendanceView {
                 weeklyOff: 0,
                 absent: 0,
             };
-            const rate = grp.total ? Math.round((grp.present / grp.total) * 100) + "%" : "0%";
-            return [g, grp.total, grp.present, grp.halfPresent, grp.weeklyOff, grp.absent, rate];
+            const rate = grp.total
+                ? Math.round((grp.present / grp.total) * 100) + "%"
+                : "0%";
+            return [
+                g,
+                grp.total,
+                grp.present,
+                grp.halfPresent,
+                grp.weeklyOff,
+                grp.absent,
+                rate,
+            ];
         });
 
         this._lastData["gender-wise"] = rows.map((r) => ({
@@ -3036,10 +4874,30 @@ class AttendanceView {
                     "ch-gender-bar",
                     genders,
                     [
-                        { name: "Present", data: genders.map((g) => (groups[g] || {}).present || 0) },
-                        { name: "Half Present", data: genders.map((g) => (groups[g] || {}).halfPresent || 0) },
-                        { name: "Weekly Off", data: genders.map((g) => (groups[g] || {}).weeklyOff || 0) },
-                        { name: "Absent", data: genders.map((g) => (groups[g] || {}).absent || 0) },
+                        {
+                            name: "Present",
+                            data: genders.map(
+                                (g) => (groups[g] || {}).present || 0,
+                            ),
+                        },
+                        {
+                            name: "Half Present",
+                            data: genders.map(
+                                (g) => (groups[g] || {}).halfPresent || 0,
+                            ),
+                        },
+                        {
+                            name: "Weekly Off",
+                            data: genders.map(
+                                (g) => (groups[g] || {}).weeklyOff || 0,
+                            ),
+                        },
+                        {
+                            name: "Absent",
+                            data: genders.map(
+                                (g) => (groups[g] || {}).absent || 0,
+                            ),
+                        },
                     ],
                     "Gender Attendance",
                     (gender, index, seriesIndex, seriesName) => {
@@ -3049,8 +4907,12 @@ class AttendanceView {
                                 return false;
                             }
                             return this._matchesStatus(l, seriesName);
-                        }); 
-                        this._renderDrillDown(filteredLogs, `Gender: ${gender} - ${seriesName}`, empMap,);
+                        });
+                        this._renderDrillDown(
+                            filteredLogs,
+                            `Gender: ${gender} - ${seriesName}`,
+                            empMap,
+                        );
                     },
                 );
             },
@@ -3074,7 +4936,20 @@ class AttendanceView {
         }
         try {
             const [year, month, day] = dateStr.split("-");
-            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            const monthNames = [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December",
+            ];
             const monthIndex = parseInt(month) - 1;
             if (monthIndex < 0 || monthIndex > 11) return dateStr;
             return `${day}-${monthNames[monthIndex]}-${year}`;
@@ -3084,14 +4959,19 @@ class AttendanceView {
     }
 
     _renderLateIn(logs, emps, empMap, model, page = 1) {
-        const items = model ? model.getLateInEmployees() : this._currentLateInItems;
+        const items = model
+            ? model.getLateInEmployees()
+            : this._currentLateInItems;
         this._currentLateInItems = items;
         this._currentLateInEmpMap = empMap || this._currentLateInEmpMap;
 
         const pageSize = 25;
         const currentPage = page;
         const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
-        const pageItems = items.slice((currentPage - 1) * pageSize, currentPage * pageSize,);
+        const pageItems = items.slice(
+            (currentPage - 1) * pageSize,
+            currentPage * pageSize,
+        );
 
         const rows = pageItems.map(({ log, emp, date }) => [
             emp.code || "-",
@@ -3121,7 +5001,10 @@ class AttendanceView {
             LateByMins: log?.lateBy,
         }));
 
-        const byShift = this._countBy(items, (it) => it.emp.shift || "No Shift");
+        const byShift = this._countBy(
+            items,
+            (it) => it.emp.shift || "No Shift",
+        );
         const shifts = Object.keys(byShift);
 
         let pageButtons = "";
@@ -3162,12 +5045,24 @@ class AttendanceView {
                     "ch-latein-shift",
                     shifts,
                     [
-                        { name: "Late In Count", data: shifts.map((s) => byShift[s]), },
+                        {
+                            name: "Late In Count",
+                            data: shifts.map((s) => byShift[s]),
+                        },
                     ],
                     "Late-In by Shift",
                     (shiftName) => {
-                        const shiftLogs = items.filter((it) => (it.emp.shift || "No Shift") === shiftName).map((it) => it.log);
-                        this._renderDrillDown(shiftLogs, `Late In - Shift: ${shiftName}`, empMap || this._currentLateInEmpMap,);
+                        const shiftLogs = items
+                            .filter(
+                                (it) =>
+                                    (it.emp.shift || "No Shift") === shiftName,
+                            )
+                            .map((it) => it.log);
+                        this._renderDrillDown(
+                            shiftLogs,
+                            `Late In - Shift: ${shiftName}`,
+                            empMap || this._currentLateInEmpMap,
+                        );
                     },
                 );
             },
@@ -3175,20 +5070,31 @@ class AttendanceView {
     }
 
     _reRenderLateInPage(page) {
-        const content = this._renderLateIn(null, null, this._currentLateInEmpMap, null, page);
+        const content = this._renderLateIn(
+            null,
+            null,
+            this._currentLateInEmpMap,
+            null,
+            page,
+        );
         document.querySelector(".tab-pane-container").innerHTML = content.html;
         content.renderCharts();
     }
 
     _renderEarlyOut(logs, emps, empMap, model, page = 1) {
-        const items = model ? model.getEarlyOutEmployees() : this._currentEarlyOutItems;
+        const items = model
+            ? model.getEarlyOutEmployees()
+            : this._currentEarlyOutItems;
         this._currentEarlyOutItems = items;
         this._currentEarlyOutEmpMap = empMap || this._currentEarlyOutEmpMap;
 
         const pageSize = 25;
         const currentPage = page;
         const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
-        const pageItems = items.slice((currentPage - 1) * pageSize, currentPage * pageSize,);
+        const pageItems = items.slice(
+            (currentPage - 1) * pageSize,
+            currentPage * pageSize,
+        );
 
         const rows = pageItems.map(({ log, emp, date }) => [
             emp.code || "-",
@@ -3220,7 +5126,10 @@ class AttendanceView {
             EarlyByMins: log?.earlyBy,
         }));
 
-        const byShift = this._countBy(items, (it) => it.emp.shift || "No Shift");
+        const byShift = this._countBy(
+            items,
+            (it) => it.emp.shift || "No Shift",
+        );
         const shifts = Object.keys(byShift);
 
         let pageButtons = "";
@@ -3261,12 +5170,24 @@ class AttendanceView {
                     "ch-earlyout-shift",
                     shifts,
                     [
-                        { name: "Early Out Count", data: shifts.map((s) => byShift[s]) },
+                        {
+                            name: "Early Out Count",
+                            data: shifts.map((s) => byShift[s]),
+                        },
                     ],
                     "Early-Out by Shift",
                     (shiftName) => {
-                        const shiftLogs = items.filter((it) => (it.emp.shift || "No Shift") === shiftName).map((it) => it.log);
-                        this._renderDrillDown(shiftLogs, `Early Out - Shift: ${shiftName}`, empMap || this._currentEarlyOutEmpMap);
+                        const shiftLogs = items
+                            .filter(
+                                (it) =>
+                                    (it.emp.shift || "No Shift") === shiftName,
+                            )
+                            .map((it) => it.log);
+                        this._renderDrillDown(
+                            shiftLogs,
+                            `Early Out - Shift: ${shiftName}`,
+                            empMap || this._currentEarlyOutEmpMap,
+                        );
                     },
                 );
             },
@@ -3274,7 +5195,13 @@ class AttendanceView {
     }
 
     _reRenderEarlyOutPage(page) {
-        const content = this._renderEarlyOut(null, null, this._currentEarlyOutEmpMap, null, page);
+        const content = this._renderEarlyOut(
+            null,
+            null,
+            this._currentEarlyOutEmpMap,
+            null,
+            page,
+        );
         document.querySelector(".tab-pane-container").innerHTML = content.html;
         content.renderCharts();
     }
@@ -3283,7 +5210,15 @@ class AttendanceView {
         const filtered = logs;
         const rows = filtered.slice(0, 100).map((l) => {
             const e = empMap[l.empId] || {};
-            return [e.name, e.dept, this._formatDate(l.date), l.inTime, l.outTime, l.hoursWorked, l.status];
+            return [
+                e.name,
+                e.dept,
+                this._formatDate(l.date),
+                l.inTime,
+                l.outTime,
+                l.hoursWorked,
+                l.status,
+            ];
         });
         return {
             html: `
@@ -3305,18 +5240,25 @@ class AttendanceView {
                 desigMap[name] = { name, order };
             }
         });
-        const desigs = Object.values(desigMap).sort((a, b) => {
-            if (a.order !== b.order) {
-                return a.order - b.order;
-            }
-            return a.name.localeCompare(b.name);
-        }).map((d) => d.name);
+        const desigs = Object.values(desigMap)
+            .sort((a, b) => {
+                if (a.order !== b.order) {
+                    return a.order - b.order;
+                }
+                return a.name.localeCompare(b.name);
+            })
+            .map((d) => d.name);
         const eBD = model.groupBy(emps, (e) => e.designation || "Staff");
-        const lBD = model.groupBy(logs, (l) => (empMap[l.empId] || {}).designation || "Staff",);
+        const lBD = model.groupBy(
+            logs,
+            (l) => (empMap[l.empId] || {}).designation || "Staff",
+        );
         const rows = desigs.map((d) => {
             const t = (eBD[d] || []).length;
             const ls = lBD[d] || [];
-            const p = new Set(ls.filter((l) => l.present === 1).map((l) => l.empId),).size;
+            const p = new Set(
+                ls.filter((l) => l.present === 1).map((l) => l.empId),
+            ).size;
             return [d, t, p, t - p, t ? Math.round((p / t) * 100) + "%" : "0%"];
         });
         this._lastData["designation-wise"] = rows.map((r) => ({
@@ -3347,7 +5289,10 @@ class AttendanceView {
                     true,
                     (d) => {
                         this._renderDrillDown(
-                            logs.filter((l) => (empMap[l.empId] || {}).designation === d,),
+                            logs.filter(
+                                (l) =>
+                                    (empMap[l.empId] || {}).designation === d,
+                            ),
                             `Designation: ${d}`,
                             empMap,
                         );
@@ -3360,7 +5305,15 @@ class AttendanceView {
     _renderShiftWise(logs, emps, empMap, model) {
         const shiftStats = model.state.data.shiftStats || [];
         const { dateFrom, dateTo } = model.state.filters;
-        const rows = shiftStats.map((s) => [s.shiftName, s.total, s.present, s.halfPresent, s.weeklyOff, s.absent, s.rate + "%"]);
+        const rows = shiftStats.map((s) => [
+            s.shiftName,
+            s.total,
+            s.present,
+            s.halfPresent,
+            s.weeklyOff,
+            s.absent,
+            s.rate + "%",
+        ]);
 
         this._lastData["shift-wise"] = rows.map((r) => ({
             Shift: r[0],
@@ -3372,7 +5325,12 @@ class AttendanceView {
             Rate: r[6],
         }));
 
-        const fullLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
+        const fullLogs = this._buildEmployeeDayLogs(
+            emps,
+            logs,
+            dateFrom,
+            dateTo,
+        );
 
         return {
             html: `
@@ -3403,10 +5361,22 @@ class AttendanceView {
                     "ch-shift-bar",
                     shiftStats.map((s) => s.shiftName),
                     [
-                        { name: "Present", data: shiftStats.map((s) => s.present), },
-                        { name: "Half Present", data: shiftStats.map((s) => s.halfPresent), },
-                        { name: "Weekly Off", data: shiftStats.map((s) => s.weeklyOff), },
-                        { name: "Absent", data: shiftStats.map((s) => s.absent), },
+                        {
+                            name: "Present",
+                            data: shiftStats.map((s) => s.present),
+                        },
+                        {
+                            name: "Half Present",
+                            data: shiftStats.map((s) => s.halfPresent),
+                        },
+                        {
+                            name: "Weekly Off",
+                            data: shiftStats.map((s) => s.weeklyOff),
+                        },
+                        {
+                            name: "Absent",
+                            data: shiftStats.map((s) => s.absent),
+                        },
                     ],
                     "Shift Attendance",
                     (shiftName, index, seriesIndex, seriesName) => {
@@ -3421,23 +5391,47 @@ class AttendanceView {
                             return this._matchesStatus(l, seriesName);
                         });
 
-                        this._renderDrillDown(filteredLogs, `Shift: ${shiftName} - ${seriesName}`, empMap,);
+                        this._renderDrillDown(
+                            filteredLogs,
+                            `Shift: ${shiftName} - ${seriesName}`,
+                            empMap,
+                        );
                     },
                 );
             },
         };
     }
 
-    _buildPaginatedTable(rows, headers, page, pageSize, tableId, reRenderFnName) {
+    _buildPaginatedTable(
+        rows,
+        headers,
+        page,
+        pageSize,
+        tableId,
+        reRenderFnName,
+    ) {
         const currentPage = page;
         const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
-        const pageRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+        const pageRows = rows.slice(
+            (currentPage - 1) * pageSize,
+            currentPage * pageSize,
+        );
         const colCount = headers.length;
 
-        const trs = pageRows.map((r) => `
-            <tr>${r.map((c) => `
-                <td>${c}</td>`,).join("")}
-            </tr>`,).join("") ||`
+        const trs =
+            pageRows
+                .map(
+                    (r) => `
+            <tr>${r
+                .map(
+                    (c) => `
+                <td>${c}</td>`,
+                )
+                .join("")}
+            </tr>`,
+                )
+                .join("") ||
+            `
             <tr>
                 <td colspan="${colCount}">None</td>
             </tr>
@@ -3504,8 +5498,26 @@ class AttendanceView {
         this._currentNoPunchRows = npRows;
         this._currentSinglePunchRows = spRows;
 
-        const npHeaders = ["Code", "Name", "Dept", "Designation", "Shift", "Company", "Gap", "Start"];
-        const spHeaders = ["Code", "Name", "Dept", "Designation", "Shift", "Company", "Date", "Time"];
+        const npHeaders = [
+            "Code",
+            "Name",
+            "Dept",
+            "Designation",
+            "Shift",
+            "Company",
+            "Gap",
+            "Start",
+        ];
+        const spHeaders = [
+            "Code",
+            "Name",
+            "Dept",
+            "Designation",
+            "Shift",
+            "Company",
+            "Date",
+            "Time",
+        ];
         const pageSize = 10;
 
         return {
@@ -3530,19 +5542,51 @@ class AttendanceView {
 
     _reRenderNoPunchPage(page) {
         const rows = this._currentNoPunchRows || [];
-        const headers = ["Code", "Name", "Dept", "Designation", "Shift", "Company", "Gap", "Start"];
+        const headers = [
+            "Code",
+            "Name",
+            "Dept",
+            "Designation",
+            "Shift",
+            "Company",
+            "Gap",
+            "Start",
+        ];
         const wrap = document.getElementById("special-np-table-wrap");
         if (wrap) {
-            wrap.innerHTML = this._buildPaginatedTable(rows, headers, page, 10, "tbl-np", "_reRenderNoPunchPage");
+            wrap.innerHTML = this._buildPaginatedTable(
+                rows,
+                headers,
+                page,
+                10,
+                "tbl-np",
+                "_reRenderNoPunchPage",
+            );
         }
     }
 
     _reRenderSinglePunchPage(page) {
         const rows = this._currentSinglePunchRows || [];
-        const headers = ["Code", "Name", "Dept", "Designation", "Shift", "Company", "Date", "Time"];
+        const headers = [
+            "Code",
+            "Name",
+            "Dept",
+            "Designation",
+            "Shift",
+            "Company",
+            "Date",
+            "Time",
+        ];
         const wrap = document.getElementById("special-sp-table-wrap");
         if (wrap) {
-            wrap.innerHTML = this._buildPaginatedTable(rows, headers, page, 10, "tbl-sp", "_reRenderSinglePunchPage");
+            wrap.innerHTML = this._buildPaginatedTable(
+                rows,
+                headers,
+                page,
+                10,
+                "tbl-sp",
+                "_reRenderSinglePunchPage",
+            );
         }
     }
 
@@ -3571,7 +5615,9 @@ class AttendanceView {
             if (key === "presentHeadcount") return;
 
             const wasActive = card.classList.contains("active");
-            document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
+            document
+                .querySelectorAll(".stat-card-clickable")
+                .forEach((c) => c.classList.remove("active"));
             if (wasActive) {
                 this._closeStatCardDrilldown();
             } else {
@@ -3581,7 +5627,13 @@ class AttendanceView {
         });
     }
 
-    _renderStatCardDrilldown(key, items, page = 1, containerId = "stat-card-drilldown", closeHandler = "AppController.view._closeStatCardDrilldown()") {
+    _renderStatCardDrilldown(
+        key,
+        items,
+        page = 1,
+        containerId = "stat-card-drilldown",
+        closeHandler = "AppController.view._closeStatCardDrilldown()",
+    ) {
         this._statCardKey = key;
         this._statCardItems = items;
 
@@ -3625,89 +5677,253 @@ class AttendanceView {
         const isWorkerSummary = key.startsWith("workerSummary_");
         const isDashboardDesig = key.startsWith("dashboardDesig_");
         const isNewJoinedOnly = key === "newJoined";
+        const isNewJoinedRelated =
+            key === "newJoined" ||
+            key.startsWith("njBreakdown_") ||
+            key.startsWith("newjoinedDesig_");
+        const isResignedRelated =
+            key.startsWith("resBreakdown_") || key.startsWith("resignedDesig_");
+        const isJoinExitRelated = isNewJoinedRelated || isResignedRelated;
         const isStaffList = key === "staffList";
         const isWorkerList = key === "workerList";
         const isTotalHeadcount = key === "totalHeadcount";
         const isHalfPresent = key === "halfPresent";
         const isWeeklyOff = key === "weeklyOff";
-        const isDashboardMode = items.length > 0 && items[0].log === null && !isResignedOnly && !isNewJoinedOnly && !isStaffList && !isWorkerList;
+        const isDashboardMode =
+            items.length > 0 &&
+            items[0].log === null &&
+            !isResignedOnly &&
+            !isNewJoinedOnly &&
+            !isStaffList &&
+            !isWorkerList;
         const pageSize = 10;
         const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
         const currentPage = Math.min(page, totalPages);
-        const pageItems = items.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+        const pageItems = items.slice(
+            (currentPage - 1) * pageSize,
+            currentPage * pageSize,
+        );
 
         let headers, ths;
 
         if (isDashboardMode) {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Shift", "Shift Start", "Shift End", "Location"];
+            headers = isJoinExitRelated
+                ? [
+                      "Sr.No",
+                      "Code",
+                      "Name",
+                      "Dept",
+                      "Company",
+                      "Designation",
+                      "Shift Group",
+                      "Location",
+                  ]
+                : [
+                      "Sr.No",
+                      "Code",
+                      "Name",
+                      "Dept",
+                      "Company",
+                      "Designation",
+                      "Shift Group",
+                      "Shift",
+                      "Shift Start",
+                      "Shift End",
+                      "Location",
+                  ];
         } else if (isResignedOnly) {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "DOJ", "DOR", "Status"];
+            headers = [
+                "Sr.No",
+                "Code",
+                "Name",
+                "Dept",
+                "Company",
+                "Designation",
+                "Shift Group",
+                "DOJ",
+                "DOR",
+                "Status",
+            ];
         } else if (isNewJoinedOnly) {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "DOJ", "Status"];
+            headers = [
+                "Sr.No",
+                "Code",
+                "Name",
+                "Dept",
+                "Company",
+                "Designation",
+                "Shift Group",
+                "DOJ",
+                "Status",
+            ];
         } else if (isTotalHeadcount) {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Shift", "Shift Start", "Shift End", "Location"];
+            headers = [
+                "Sr.No",
+                "Code",
+                "Name",
+                "Dept",
+                "Company",
+                "Designation",
+                "Shift Group",
+                "Shift",
+                "Shift Start",
+                "Shift End",
+                "Location",
+            ];
         } else if (isStaffList || isWorkerList) {
             const isDashboardStaffWorker =
                 items.length > 0 && items[0].log === null;
             if (isDashboardStaffWorker) {
-                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Shift", "Shift Start", "Shift End", "Location"];
+                headers = [
+                    "Sr.No",
+                    "Code",
+                    "Name",
+                    "Dept",
+                    "Company",
+                    "Designation",
+                    "Shift Group",
+                    "Shift",
+                    "Shift Start",
+                    "Shift End",
+                    "Location",
+                ];
             } else {
-                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Shift", "Shift Start", "Shift End", "Date", "In Time", "Out Time", "Hours Worked", "Status", "Location"];
+                headers = [
+                    "Sr.No",
+                    "Code",
+                    "Name",
+                    "Dept",
+                    "Company",
+                    "Designation",
+                    "Shift Group",
+                    "Shift",
+                    "Shift Start",
+                    "Shift End",
+                    "Date",
+                    "In Time",
+                    "Out Time",
+                    "Hours Worked",
+                    "Status",
+                    "Location",
+                ];
             }
         } else if (key === "lateIn") {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Late By"];
+            headers = [
+                "Sr.No",
+                "Code",
+                "Name",
+                "Dept",
+                "Company",
+                "Designation",
+                "Shift Group",
+                "Shift",
+                "Shift Start",
+                "Shift End",
+                "Date",
+                "In",
+                "Out",
+                "Hours",
+                "Late By",
+            ];
         } else if (key === "earlyOut") {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Early By"];
+            headers = [
+                "Sr.No",
+                "Code",
+                "Name",
+                "Dept",
+                "Company",
+                "Designation",
+                "Shift Group",
+                "Shift",
+                "Shift Start",
+                "Shift End",
+                "Date",
+                "In",
+                "Out",
+                "Hours",
+                "Early By",
+            ];
         } else {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Status"];
+            headers = [
+                "Sr.No",
+                "Code",
+                "Name",
+                "Dept",
+                "Company",
+                "Designation",
+                "Shift Group",
+                "Shift",
+                "Shift Start",
+                "Shift End",
+                "Date",
+                "In",
+                "Out",
+                "Hours",
+                "Status",
+            ];
         }
         ths = headers.map((h) => `<th>${h}</th>`).join("");
 
-        const trs = pageItems.map(({ log, emp, date }, i) => {
-            if (!emp) {
-                return "";
-            }
-            const sr = (currentPage - 1) * pageSize + i + 1;
+        const trs = pageItems
+            .map(({ log, emp, date }, i) => {
+                if (!emp) {
+                    return "";
+                }
+                const sr = (currentPage - 1) * pageSize + i + 1;
 
-            if (isDashboardMode) {
-                return `
-                    <tr>
-                        <td>${sr}</td>
-                        <td><b>${emp.code || "–"}</b></td>
-                        <td>${emp.name || "–"}</td>
-                        <td>${emp.dept || "–"}</td>
-                        <td>${emp.company || "–"}</td>
-                        <td>${emp.designation || "–"}</td>
-                        <td>${emp.shiftGroupName || "–"}</td>
-                        <td>${emp.shift || "–"}</td>
-                        <td>${emp.shiftStart || "–"}</td>
-                        <td>${emp.shiftEnd || "–"}</td>
-                        <td>${emp.location || "–"}</td>
-                    </tr>
-                `;
-            }
-
-            if (isTotalHeadcount) {
-                return `
-                    <tr>
-                        <td>${sr}</td>
-                        <td><b>${emp.code || "–"}</b></td>
-                        <td>${emp.name || "–"}</td>
-                        <td>${emp.dept || "–"}</td>
-                        <td>${emp.company || "–"}</td>
-                        <td>${emp.designation || "–"}</td>
-                        <td>${emp.shiftGroupName || "–"}</td>
-                        <td>${emp.shift || "–"}</td>
-                        <td>${emp.shiftStart || "–"}</td>
-                        <td>${emp.shiftEnd || "–"}</td>
-                        <td>${emp.location || "–"}</td>
-                    </tr>
-                `;
-            }
-
-            if (isStaffList || isWorkerList) {
-                if (log === null) {
+                if (isDashboardMode) {
+                    if (isJoinExitRelated) {
+                        return `
+        <tr>
+            <td>${sr}</td>
+            <td><b>${emp.code || "–"}</b></td>
+            <td>${emp.name || "–"}</td>
+            <td>${emp.dept || "–"}</td>
+            <td>${emp.company || "–"}</td>
+            <td>${emp.designation || "–"}</td>
+            <td>${emp.shiftGroupName || "–"}</td>
+            <td>${emp.location || "–"}</td>
+        </tr>
+    `;
+                    }
                     return `
+    <tr>
+        <td>${sr}</td>
+        <td><b>${emp.code || "–"}</b></td>
+        <td>${emp.name || "–"}</td>
+        <td>${emp.dept || "–"}</td>
+        <td>${emp.company || "–"}</td>
+        <td>${emp.designation || "–"}</td>
+        <td>${emp.shiftGroupName || "–"}</td>
+        <td>${emp.shift || "–"}</td>
+        <td>${emp.shiftStart || "–"}</td>
+        <td>${emp.shiftEnd || "–"}</td>
+        <td>${emp.location || "–"}</td>
+    </tr>
+`;
+                }
+
+                if (isTotalHeadcount) {
+                    return `
+                    <tr>
+                        <td>${sr}</td>
+                        <td><b>${emp.code || "–"}</b></td>
+                        <td>${emp.name || "–"}</td>
+                        <td>${emp.dept || "–"}</td>
+                        <td>${emp.company || "–"}</td>
+                        <td>${emp.designation || "–"}</td>
+                        <td>${emp.shiftGroupName || "–"}</td>
+                        <td>${emp.shift || "–"}</td>
+                        <td>${emp.shiftStart || "–"}</td>
+                        <td>${emp.shiftEnd || "–"}</td>
+                        <td>${emp.location || "–"}</td>
+                    </tr>
+                `;
+                }
+
+                if (isStaffList || isWorkerList) {
+                    if (log === null) {
+                        return `
                         <tr>
                             <td>${sr}</td>
                             <td><b>${emp.code || "–"}</b></td>
@@ -3722,8 +5938,8 @@ class AttendanceView {
                             <td>${emp.location || "–"}</td>
                         </tr>
                     `;
-                }
-                return `
+                    }
+                    return `
                     <tr>
                         <td>${sr}</td>
                         <td><b>${emp.code || "–"}</b></td>
@@ -3743,10 +5959,10 @@ class AttendanceView {
                         <td>${emp.location || "–"}</td>
                     </tr>
                 `;
-            }
+                }
 
-            if (isResignedOnly) {
-                return `
+                if (isResignedOnly) {
+                    return `
                     <tr>
                         <td>${sr}</td>
                         <td><b>${emp.code || "–"}</b></td>
@@ -3760,10 +5976,13 @@ class AttendanceView {
                         <td><span class="badge badge-danger">${emp.status || "Resigned"}</span></td>
                     </tr>
                 `;
-            }
-            if (isNewJoinedOnly) {
-                const badgeClass = emp.status === "Resigned" ? "badge-danger" : "badge-success";
-                return `
+                }
+                if (isNewJoinedOnly) {
+                    const badgeClass =
+                        emp.status === "Resigned"
+                            ? "badge-danger"
+                            : "badge-success";
+                    return `
                     <tr>
                         <td>${sr}</td>
                         <td><b>${emp.code || "–"}</b></td>
@@ -3776,14 +5995,18 @@ class AttendanceView {
                         <td><span class="badge ${badgeClass}">${emp.status || "Working"}</span></td>
                     </tr>
                 `;
-            }
+                }
 
-            const lastCol = key === "lateIn"
-                ? `<td>${this._fmtMins(log?.lateBy)}</td>` : key === "earlyOut"
-                ? `<td>${this._fmtMins(log?.earlyBy)}</td>` : key === "weeklyOff"
-                ? `<td><span class="badge badge-info">Weekly Off</span></td>` : `<td>${log?.status || "–"}</td>`;
+                const lastCol =
+                    key === "lateIn"
+                        ? `<td>${this._fmtMins(log?.lateBy)}</td>`
+                        : key === "earlyOut"
+                          ? `<td>${this._fmtMins(log?.earlyBy)}</td>`
+                          : key === "weeklyOff"
+                            ? `<td><span class="badge badge-info">Weekly Off</span></td>`
+                            : `<td>${log?.status || "–"}</td>`;
 
-            return `
+                return `
                 <tr>
                     <td>${sr}</td>
                     <td><b>${emp.code || "–"}</b></td>
@@ -3802,7 +6025,8 @@ class AttendanceView {
                     ${lastCol}
                 </tr>
             `;
-        }).join("");
+            })
+            .join("");
 
         let pageButtons = "";
         const startP = Math.max(1, currentPage - 2);
@@ -3883,7 +6107,11 @@ class AttendanceView {
                 };
             }
 
-            if (key === "staffList" || key === "workerList" || key === "totalHeadcount") {
+            if (
+                key === "staffList" ||
+                key === "workerList" ||
+                key === "totalHeadcount"
+            ) {
                 return {
                     Code: emp?.code,
                     Name: emp?.name,
@@ -3973,7 +6201,9 @@ class AttendanceView {
             panel.style.display = "none";
             panel.innerHTML = "";
         }
-        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
+        document
+            .querySelectorAll(".stat-card-clickable")
+            .forEach((c) => c.classList.remove("active"));
     }
 
     async _initDesignationOrderTab(model) {
@@ -4298,25 +6528,28 @@ class AttendanceView {
 
             detailsContainer.innerHTML = cardHtml;
 
-            detailsContainer.querySelectorAll(".desig-order-item").forEach((item) => {
-                const decBtn = item.querySelector(".btn-dec");
-                const incBtn = item.querySelector(".btn-inc");
-                const input = item.querySelector(".desig-order-input");
+            detailsContainer
+                .querySelectorAll(".desig-order-item")
+                .forEach((item) => {
+                    const decBtn = item.querySelector(".btn-dec");
+                    const incBtn = item.querySelector(".btn-inc");
+                    const input = item.querySelector(".desig-order-input");
 
-                decBtn.addEventListener("click", () => {
-                    let val = parseInt(input.value) || 0;
-                    input.value = Math.max(0, val - 1);
-                });
+                    decBtn.addEventListener("click", () => {
+                        let val = parseInt(input.value) || 0;
+                        input.value = Math.max(0, val - 1);
+                    });
 
-                incBtn.addEventListener("click", () => {
-                    let val = parseInt(input.value) || 0;
-                    input.value = val + 1;
+                    incBtn.addEventListener("click", () => {
+                        let val = parseInt(input.value) || 0;
+                        input.value = val + 1;
+                    });
                 });
-            });
         });
 
         saveBtn.addEventListener("click", async () => {
-            const inputs = detailsContainer.querySelectorAll(".desig-order-input");
+            const inputs =
+                detailsContainer.querySelectorAll(".desig-order-input");
             const items = [];
             inputs.forEach((input) => {
                 items.push({
@@ -4336,7 +6569,10 @@ class AttendanceView {
                 await model.fetchData();
                 this.hideOverlay();
             } else {
-                alert("Failed to save designation orders: " + (saveRes ? saveRes.message : "Unknown error"));
+                alert(
+                    "Failed to save designation orders: " +
+                        (saveRes ? saveRes.message : "Unknown error"),
+                );
             }
         });
     }
@@ -4512,7 +6748,9 @@ class AttendanceView {
                         </button>
                     </div>
                     <div id="companies-list">
-                        ${companies.map((c) => `
+                        ${companies
+                            .map(
+                                (c) => `
                             <div class="sort-order-item">
                                 <div style="display:flex;align-items:center;">
                                     <i class="ph ph-buildings" style="color:#6366f1;margin-right:10px;font-size:16px;"></i>
@@ -4533,7 +6771,9 @@ class AttendanceView {
                                     </button>
                                 </div>
                             </div>
-                        `,).join("")}
+                        `,
+                            )
+                            .join("")}
                     </div>
                 </div>
             </div>
@@ -4551,7 +6791,9 @@ class AttendanceView {
                         </button>
                     </div>
                     <div id="departments-list">
-                        ${departments.map((d) => `
+                        ${departments
+                            .map(
+                                (d) => `
                             <div class="sort-order-item">
                                 <div style="display:flex;align-items:center;">
                                     <i class="ph ph-briefcase" style="color:#6366f1;margin-right:10px;font-size:16px;"></i>
@@ -4572,7 +6814,9 @@ class AttendanceView {
                                     </button>
                                 </div>
                             </div>
-                        `,).join("")}
+                        `,
+                            )
+                            .join("")}
                     </div>
                 </div>
             </div>
@@ -4580,10 +6824,16 @@ class AttendanceView {
 
         contentEl.querySelectorAll(".sort-order-tab-btn").forEach((btn) => {
             btn.addEventListener("click", () => {
-                contentEl.querySelectorAll(".sort-order-tab-btn").forEach((b) => b.classList.remove("active"));
-                contentEl.querySelectorAll(".sort-order-panel").forEach((p) => p.classList.remove("active"));
+                contentEl
+                    .querySelectorAll(".sort-order-tab-btn")
+                    .forEach((b) => b.classList.remove("active"));
+                contentEl
+                    .querySelectorAll(".sort-order-panel")
+                    .forEach((p) => p.classList.remove("active"));
                 btn.classList.add("active");
-                contentEl.querySelector(`#sort-panel-${btn.dataset.panel}`).classList.add("active");
+                contentEl
+                    .querySelector(`#sort-panel-${btn.dataset.panel}`)
+                    .classList.add("active");
             });
         });
 
@@ -4613,63 +6863,86 @@ class AttendanceView {
             });
         });
 
-        document.getElementById("btn-save-companies").addEventListener("click", async () => {
-            const inputs = contentEl.querySelectorAll(".company-order-input",);
-            const items = [];
-            inputs.forEach((input) => {
-                items.push({
-                    id: parseInt(input.dataset.id),
-                    sortOrder: input.value !== "" ? parseInt(input.value) : null,
+        document
+            .getElementById("btn-save-companies")
+            .addEventListener("click", async () => {
+                const inputs = contentEl.querySelectorAll(
+                    ".company-order-input",
+                );
+                const items = [];
+                inputs.forEach((input) => {
+                    items.push({
+                        id: parseInt(input.dataset.id),
+                        sortOrder:
+                            input.value !== "" ? parseInt(input.value) : null,
+                    });
                 });
+
+                this.showOverlay("Saving company order...");
+                const res = await model.saveCompaniesOrder(items);
+                this.hideOverlay();
+
+                if (res && res.success) {
+                    alert("Company sort order saved successfully!");
+                    model.state.filterLists = null;
+                } else {
+                    alert("Failed: " + (res ? res.message : "Unknown error"));
+                }
             });
 
-            this.showOverlay("Saving company order...");
-            const res = await model.saveCompaniesOrder(items);
-            this.hideOverlay();
-
-            if (res && res.success) {
-                alert("Company sort order saved successfully!");
-                model.state.filterLists = null;
-            } else {
-                alert("Failed: " + (res ? res.message : "Unknown error"));
-            }
-        });
-
-        document.getElementById("btn-save-departments").addEventListener("click", async () => {
-            const inputs = contentEl.querySelectorAll(".dept-order-input");
-            const items = [];
-            inputs.forEach((input) => {
-                items.push({
-                    id: parseInt(input.dataset.id),
-                    sortOrder:
-                        input.value !== "" ? parseInt(input.value) : null,
+        document
+            .getElementById("btn-save-departments")
+            .addEventListener("click", async () => {
+                const inputs = contentEl.querySelectorAll(".dept-order-input");
+                const items = [];
+                inputs.forEach((input) => {
+                    items.push({
+                        id: parseInt(input.dataset.id),
+                        sortOrder:
+                            input.value !== "" ? parseInt(input.value) : null,
+                    });
                 });
+
+                this.showOverlay("Saving department order...");
+                const res = await model.saveDepartmentsOrder(items);
+                this.hideOverlay();
+
+                if (res && res.success) {
+                    alert("Department sort order saved successfully!");
+                    model.state.filterLists = null;
+                } else {
+                    alert("Failed: " + (res ? res.message : "Unknown error"));
+                }
             });
-
-            this.showOverlay("Saving department order...");
-            const res = await model.saveDepartmentsOrder(items);
-            this.hideOverlay();
-
-            if (res && res.success) {
-                alert("Department sort order saved successfully!");
-                model.state.filterLists = null;
-            } else {
-                alert("Failed: " + (res ? res.message : "Unknown error"));
-            }
-        });
     }
 
     _renderStaff(logs, emps, empMap, model) {
         const staffCategoryIds = [58];
         const { dateFrom, dateTo } = model.state.filters;
 
-        const staffEmps = emps.filter((e) => staffCategoryIds.includes(e.categoryId),);
-        const staffGroups = this._computeGroupedDayStats(staffEmps, logs, dateFrom, dateTo, (e) => e.dept);
+        const staffEmps = emps.filter((e) =>
+            staffCategoryIds.includes(e.categoryId),
+        );
+        const staffGroups = this._computeGroupedDayStats(
+            staffEmps,
+            logs,
+            dateFrom,
+            dateTo,
+            (e) => e.dept,
+        );
         const staffDepts = [...new Set(staffEmps.map((e) => e.dept))].sort();
 
         const staffRows = staffDepts.map((d) => {
             const g = staffGroups[d] || {};
-            return [d, g.total || 0, g.present || 0, g.halfPresent || 0, g.weeklyOff || 0, g.absent || 0, g.total ? Math.round((g.present / g.total) * 100) + "%" : "0%"];
+            return [
+                d,
+                g.total || 0,
+                g.present || 0,
+                g.halfPresent || 0,
+                g.weeklyOff || 0,
+                g.absent || 0,
+                g.total ? Math.round((g.present / g.total) * 100) + "%" : "0%",
+            ];
         });
 
         this._lastData["staff-wise"] = staffRows.map((r) => ({
@@ -4699,8 +6972,14 @@ class AttendanceView {
                     staffDepts,
                     [
                         { name: "Present", data: staffRows.map((r) => r[2]) },
-                        { name: "Half Present", data: staffRows.map((r) => r[3]), },
-                        { name: "Weekly Off", data: staffRows.map((r) => r[4]), },
+                        {
+                            name: "Half Present",
+                            data: staffRows.map((r) => r[3]),
+                        },
+                        {
+                            name: "Weekly Off",
+                            data: staffRows.map((r) => r[4]),
+                        },
                         { name: "Absent", data: staffRows.map((r) => r[5]) },
                     ],
                     "Staff by Department",
@@ -4715,7 +6994,11 @@ class AttendanceView {
                             }
                             return this._matchesStatus(l, seriesName);
                         });
-                        this._renderDrillDown(filtered, `Staff – ${dept} – ${seriesName}`, empMap);
+                        this._renderDrillDown(
+                            filtered,
+                            `Staff – ${dept} – ${seriesName}`,
+                            empMap,
+                        );
                     },
                 );
             },
@@ -4726,13 +7009,29 @@ class AttendanceView {
         const workerCategoryIds = [51, 59, 60];
         const { dateFrom, dateTo } = model.state.filters;
 
-        const workerEmps = emps.filter((e) => workerCategoryIds.includes(e.categoryId),);
-        const workerGroups = this._computeGroupedDayStats(workerEmps, logs, dateFrom, dateTo, (e) => e.dept);
+        const workerEmps = emps.filter((e) =>
+            workerCategoryIds.includes(e.categoryId),
+        );
+        const workerGroups = this._computeGroupedDayStats(
+            workerEmps,
+            logs,
+            dateFrom,
+            dateTo,
+            (e) => e.dept,
+        );
         const workerDepts = [...new Set(workerEmps.map((e) => e.dept))].sort();
 
         const workerRows = workerDepts.map((d) => {
             const g = workerGroups[d] || {};
-            return [d, g.total || 0, g.present || 0, g.halfPresent || 0, g.weeklyOff || 0, g.absent || 0, g.total ? Math.round((g.present / g.total) * 100) + "%" : "0%"];
+            return [
+                d,
+                g.total || 0,
+                g.present || 0,
+                g.halfPresent || 0,
+                g.weeklyOff || 0,
+                g.absent || 0,
+                g.total ? Math.round((g.present / g.total) * 100) + "%" : "0%",
+            ];
         });
 
         this._lastData["worker-wise"] = workerRows.map((r) => ({
@@ -4762,8 +7061,14 @@ class AttendanceView {
                     workerDepts,
                     [
                         { name: "Present", data: workerRows.map((r) => r[2]) },
-                        { name: "Half Present", data: workerRows.map((r) => r[3]), },
-                        { name: "Weekly Off", data: workerRows.map((r) => r[4]), },
+                        {
+                            name: "Half Present",
+                            data: workerRows.map((r) => r[3]),
+                        },
+                        {
+                            name: "Weekly Off",
+                            data: workerRows.map((r) => r[4]),
+                        },
                         { name: "Absent", data: workerRows.map((r) => r[5]) },
                     ],
                     "Workmen by Department",
@@ -4778,7 +7083,11 @@ class AttendanceView {
                             }
                             return this._matchesStatus(l, seriesName);
                         });
-                        this._renderDrillDown(filtered, `Workmen – ${dept} – ${seriesName}`, empMap,);
+                        this._renderDrillDown(
+                            filtered,
+                            `Workmen – ${dept} – ${seriesName}`,
+                            empMap,
+                        );
                     },
                 );
             },
@@ -4792,7 +7101,9 @@ class AttendanceView {
         let items, dates, dateField, empMap;
 
         if (model) {
-            items = isResigned ? model.getResignedEmployees() : model.getNewJoinedEmployees();
+            items = isResigned
+                ? model.getResignedEmployees()
+                : model.getNewJoinedEmployees();
             dateField = isResigned ? "dor" : "doj";
             const { dateFrom, dateTo } = model.state.filters;
             dates = this._getDateRange(dateFrom, dateTo);
@@ -4817,55 +7128,65 @@ class AttendanceView {
             }
         });
         const series = [
-            { name: isResigned ? "Resigned" : "Joined", data: dates.map((d) => countByDate[d] || 0), },
+            {
+                name: isResigned ? "Resigned" : "Joined",
+                data: dates.map((d) => countByDate[d] || 0),
+            },
         ];
 
         const pageSize = 25;
         const currentPage = page;
         const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
-        const pageItems = items.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+        const pageItems = items.slice(
+            (currentPage - 1) * pageSize,
+            currentPage * pageSize,
+        );
 
         const rows = pageItems.map(({ emp }) =>
-            isResigned ? [
-                emp.code || "-",
-                emp.name || "-",
-                emp.dept || "-",
-                emp.company || "-",
-                emp.designation || "-",
-                this._formatDate(emp.doj),
-                this._formatDate(emp.dor),
-                `<span class="badge badge-danger">${emp.status || "Resigned"}</span>`,
-            ] : [
-                emp.code || "-",
-                emp.name || "-",
-                emp.dept || "-",
-                emp.company || "-",
-                emp.designation || "-",
-                this._formatDate(emp.doj),
-                `<span class="badge badge-success">${emp.status || "Working"}</span>`,
-            ],
+            isResigned
+                ? [
+                      emp.code || "-",
+                      emp.name || "-",
+                      emp.dept || "-",
+                      emp.company || "-",
+                      emp.designation || "-",
+                      this._formatDate(emp.doj),
+                      this._formatDate(emp.dor),
+                      `<span class="badge badge-danger">${emp.status || "Resigned"}</span>`,
+                  ]
+                : [
+                      emp.code || "-",
+                      emp.name || "-",
+                      emp.dept || "-",
+                      emp.company || "-",
+                      emp.designation || "-",
+                      this._formatDate(emp.doj),
+                      `<span class="badge badge-success">${emp.status || "Working"}</span>`,
+                  ],
         );
 
         const exportKey = isResigned ? "resigned-tab" : "newjoined-tab";
         this._lastData[exportKey] = items.map(({ emp }) =>
-            isResigned ? {
-                Code: emp.code,
-                Name: emp.name,
-                Dept: emp.dept,
-                Company: emp.company,
-                Designation: emp.designation,
-                DOJ: emp.doj,
-                DOR: emp.dor,
-                Status: emp.status,
-            } : {
-                Code: emp.code,
-                Name: emp.name,
-                Dept: emp.dept,
-                Company: emp.company,
-                Designation: emp.designation,
-                DOJ: emp.doj,
-                Status: emp.status,
-            },
+            isResigned
+                ? {
+                      Code: emp.code,
+                      Name: emp.name,
+                      Dept: emp.dept,
+                      Company: emp.company,
+                      Designation: emp.designation,
+                      DOJ: emp.doj,
+                      DOR: emp.dor,
+                      Status: emp.status,
+                  }
+                : {
+                      Code: emp.code,
+                      Name: emp.name,
+                      Dept: emp.dept,
+                      Company: emp.company,
+                      Designation: emp.designation,
+                      DOJ: emp.doj,
+                      Status: emp.status,
+                  },
         );
 
         let pageButtons = "";
@@ -4876,13 +7197,36 @@ class AttendanceView {
                 onclick="AppController.view._reRenderJoinExitPage('${mode}', ${i})">${i}</button>`;
         }
 
-        const headers = isResigned ? ["Code", "Name", "Dept", "Company", "Designation", "DOJ", "DOR", "Status"] : ["Code", "Name", "Dept", "Company", "Designation", "DOJ", "Status"];
+        const headers = isResigned
+            ? [
+                  "Code",
+                  "Name",
+                  "Dept",
+                  "Company",
+                  "Designation",
+                  "DOJ",
+                  "DOR",
+                  "Status",
+              ]
+            : [
+                  "Code",
+                  "Name",
+                  "Dept",
+                  "Company",
+                  "Designation",
+                  "DOJ",
+                  "Status",
+              ];
 
         const chartId = isResigned ? "ch-resigned-date" : "ch-newjoined-date";
         const tableId = isResigned ? "tbl-resigned" : "tbl-newjoined";
-        const title = isResigned ? "Resigned Employees" : "New Joined Employees";
+        const title = isResigned
+            ? "Resigned Employees"
+            : "New Joined Employees";
         const icon = isResigned ? "ph-user-minus" : "ph-user-plus";
-        const chartTitle = isResigned ? "Resignations by Date (Dept-wise)" : "New Joins by Date (Dept-wise)";
+        const chartTitle = isResigned
+            ? "Resignations by Date (Dept-wise)"
+            : "New Joins by Date (Dept-wise)";
 
         return {
             html: `
@@ -4927,8 +7271,14 @@ class AttendanceView {
                     chartTitle,
                     (category, index) => {
                         const dateVal = dates[index];
-                        const filteredEmps = items.filter(({ emp }) => emp[dateField] === dateVal).map(({ emp }) => emp);
-                        this._renderJoinExitDrillDown(filteredEmps, `${isResigned ? "Resigned" : "Joined"} on ${this._formatDate(dateVal)}`, isResigned,);
+                        const filteredEmps = items
+                            .filter(({ emp }) => emp[dateField] === dateVal)
+                            .map(({ emp }) => emp);
+                        this._renderJoinExitDrillDown(
+                            filteredEmps,
+                            `${isResigned ? "Resigned" : "Joined"} on ${this._formatDate(dateVal)}`,
+                            isResigned,
+                        );
                     },
                 );
             },
@@ -4965,14 +7315,39 @@ class AttendanceView {
         const pageSize = 25;
         const currentPage = page;
         const totalPages = Math.max(1, Math.ceil(emps.length / pageSize));
-        const pageEmps = emps.slice((currentPage - 1) * pageSize, currentPage * pageSize,);
+        const pageEmps = emps.slice(
+            (currentPage - 1) * pageSize,
+            currentPage * pageSize,
+        );
 
-        const headers = isResigned ? ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "DOJ", "DOR", "Status"] : ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "DOJ", "Status"];
+        const headers = isResigned
+            ? [
+                  "Sr.No",
+                  "Code",
+                  "Name",
+                  "Dept",
+                  "Company",
+                  "Designation",
+                  "DOJ",
+                  "DOR",
+                  "Status",
+              ]
+            : [
+                  "Sr.No",
+                  "Code",
+                  "Name",
+                  "Dept",
+                  "Company",
+                  "Designation",
+                  "DOJ",
+                  "Status",
+              ];
 
-        const rows = pageEmps.map((emp, i) => {
-            const sr = (currentPage - 1) * pageSize + i + 1;
-            if (isResigned) {
-                return `
+        const rows = pageEmps
+            .map((emp, i) => {
+                const sr = (currentPage - 1) * pageSize + i + 1;
+                if (isResigned) {
+                    return `
                     <tr>
                         <td>${sr}</td>
                         <td><b>${emp.code || "–"}</b></td>
@@ -4985,8 +7360,8 @@ class AttendanceView {
                         <td><span class="badge badge-danger">${emp.status || "Resigned"}</span></td>
                     </tr>
                 `;
-            } else {
-                return `
+                } else {
+                    return `
                     <tr>
                         <td>${sr}</td>
                         <td><b>${emp.code || "–"}</b></td>
@@ -4998,28 +7373,31 @@ class AttendanceView {
                         <td><span class="badge badge-success">${emp.status || "Working"}</span></td>
                     </tr>
                 `;
-            }
-        }).join("");
+                }
+            })
+            .join("");
 
-        const exportData = emps.map((emp) => isResigned 
-            ? {
-                Code: emp.code,
-                Name: emp.name,
-                Dept: emp.dept,
-                Company: emp.company,
-                Designation: emp.designation,
-                DOJ: emp.doj,
-                DOR: emp.dor,
-                Status: emp.status,
-            } : {
-                Code: emp.code,
-                Name: emp.name,
-                Dept: emp.dept,
-                Company: emp.company,
-                Designation: emp.designation,
-                DOJ: emp.doj,
-                Status: emp.status,
-            },
+        const exportData = emps.map((emp) =>
+            isResigned
+                ? {
+                      Code: emp.code,
+                      Name: emp.name,
+                      Dept: emp.dept,
+                      Company: emp.company,
+                      Designation: emp.designation,
+                      DOJ: emp.doj,
+                      DOR: emp.dor,
+                      Status: emp.status,
+                  }
+                : {
+                      Code: emp.code,
+                      Name: emp.name,
+                      Dept: emp.dept,
+                      Company: emp.company,
+                      Designation: emp.designation,
+                      DOJ: emp.doj,
+                      Status: emp.status,
+                  },
         );
         this._joinExitDrillExportData = exportData;
 
@@ -5092,9 +7470,13 @@ class AttendanceView {
     }
 
     _showPresentHeadcountDrilldown() {
-        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector('.stat-card-clickable[data-card-key="presentHeadcount"]');
-        if (card) card.classList.add("active");       
+        document
+            .querySelectorAll(".stat-card-clickable")
+            .forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(
+            '.stat-card-clickable[data-card-key="presentHeadcount"]',
+        );
+        if (card) card.classList.add("active");
         const items = this._currentTabPresentHeadcountItems;
         if (!items) return;
         this._renderStatCardDrilldown("presentHeadcount", items, 1);
