@@ -582,7 +582,7 @@ function handleDashboardData($input, $returnData = false) {
     $resignedEmployees = [];
     $newJoinedEmployees = [];
 
-    $sqlResigned = "SELECT E.EmployeeId, E.EmployeeName, E.EmployeeCode, E.Gender, E.DOB, E.Designation, DG.DesignationsName as DesignationName, C.CompanyFName as company, L.LocationName as location, D.DepartmentFName as dept, E.DOJ, E.DOR, E.Status FROM Employees E WITH (NOLOCK) LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Resigned' AND E.DOR >= ? AND E.DOR <= ?";
+    $sqlResigned = "SELECT E.EmployeeId, E.CategoryId, E.EmployeeName, E.ShiftGroupId, E.EmployeeCode, E.Gender, E.DOB, E.Designation, DG.DesignationsName as DesignationName, C.CompanyFName as company, L.LocationName as location, D.DepartmentFName as dept, E.DOJ, E.DOR, E.Status FROM Employees E WITH (NOLOCK) LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Resigned' AND E.DOR >= ? AND E.DOR <= ?";
 
     $paramsResigned = [$dayFrom, $dayTo];
     if ($deptName) { 
@@ -610,7 +610,9 @@ function handleDashboardData($input, $returnData = false) {
                 'gender' => in_array(strtoupper(trim($row['Gender'])), ['MALE', 'M']) ? 'Male' : 'Female',
                 'dept' => $row['dept'] ?: 'Dept ' . $row['DepartmentId'],
                 'company' => $row['company'] ?: 'Unknown',
+                'categoryId' => intval($row['CategoryId']),
                 'designation' => $row['DesignationName'] ?: 'Staff',
+                'shiftGroupName' => $shiftGroupNameMap[intval($row['ShiftGroupId'])] ?? 'No Shift Group',
                 'location' => $row['location'] ?: 'Head Office',
                 'status' => 'Resigned',
                 'doj' => $row['DOJ'] ? $row['DOJ']->format('Y-m-d') : null,
@@ -619,7 +621,7 @@ function handleDashboardData($input, $returnData = false) {
         }
     }
 
-    $sqlNewJoined = "SELECT E.EmployeeId, E.EmployeeName, E.EmployeeCode, E.Gender, E.DOB, E.Designation, DG.DesignationsName as DesignationName, C.CompanyFName as company, L.LocationName as location, D.DepartmentFName as dept, E.DOJ, E.DOR, E.Status FROM Employees E WITH (NOLOCK) LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.DOJ >= ? AND E.DOJ <= ?";
+    $sqlNewJoined = "SELECT E.EmployeeId, E.CategoryId, E.ShiftGroupId, E.EmployeeName, E.EmployeeCode, E.Gender, E.DOB, E.Designation, DG.DesignationsName as DesignationName, C.CompanyFName as company, L.LocationName as location, D.DepartmentFName as dept, E.DOJ, E.DOR, E.Status FROM Employees E WITH (NOLOCK) LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.DOJ >= ? AND E.DOJ <= ?";
 
     $paramsNewJoined = [$dayFrom, $dayTo];
     if ($deptName) { 
@@ -647,7 +649,9 @@ function handleDashboardData($input, $returnData = false) {
                 'gender' => in_array(strtoupper(trim($row['Gender'])), ['MALE', 'M']) ? 'Male' : 'Female',
                 'dept' => $row['dept'] ?: 'Dept ' . $row['DepartmentId'],
                 'company' => $row['company'] ?: 'Unknown',
+                'categoryId' => intval($row['CategoryId']),
                 'designation' => $row['DesignationName'] ?: 'Staff',
+                'shiftGroupName' => $shiftGroupNameMap[intval($row['ShiftGroupId'])] ?? 'No Shift Group',
                 'location' => $row['location'] ?: 'Head Office',
                 'status' => $row['Status'] ?: 'Working',
                 'doj' => $row['DOJ'] ? $row['DOJ']->format('Y-m-d') : null,
