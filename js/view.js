@@ -753,17 +753,17 @@ class AttendanceView {
                 ${cards.map((c) => {
                         if (c.type === "company") {
                             return `
-                            <div class="stat-card ${c.cls} stat-card-clickable"
-                                data-company="${this._escapeAttr(c.company)}"
-                                onclick="AppController.view._showCompanyDrilldown('${this._escapeAttr(c.company)}')">
-                                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                                <div class="stat-content">
-                                    <span class="stat-label">${c.label}</span>
-                                    <span class="stat-value">${c.val}</span>
-                                    <span class="stat-card-hint">↓ click to view</span>
+                                <div class="stat-card ${c.cls} stat-card-clickable"
+                                    data-company="${this._escapeAttr(c.company)}"
+                                    onclick="AppController.view._showCompanyDrilldown('${this._escapeAttr(c.company)}')">
+                                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                                    <div class="stat-content">
+                                        <span class="stat-label">${c.label}</span>
+                                        <span class="stat-value">${c.val}</span>
+                                        <span class="stat-card-hint">↓ click to view</span>
+                                    </div>
                                 </div>
-                            </div>
-                        `;
+                            `;
                         }
                         if (c.type === "avgHours") {
                             return `
@@ -1930,10 +1930,7 @@ class AttendanceView {
         logs.forEach((l) => {
             const key = l.empId + "_" + l.date;
             const existing = logMap[key];
-            if (
-                !existing ||
-                parseFloat(l.present) > parseFloat(existing.present)
-            ) {
+            if (!existing || parseFloat(l.present) > parseFloat(existing.present)) {
                 logMap[key] = l;
             }
         });

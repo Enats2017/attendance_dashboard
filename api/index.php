@@ -1638,16 +1638,7 @@ function handleSetupDB() {
     $db->query("CREATE DATABASE IF NOT EXISTS `" . MYSQL_DB . "` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
     $db->select_db(MYSQL_DB);
 
-    $db->query("CREATE TABLE IF NOT EXISTS `users` (
-        `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        `username` VARCHAR(50) NOT NULL UNIQUE,
-        `name` VARCHAR(120) NOT NULL,
-        `password_hash` VARCHAR(255) NOT NULL,
-        `role` ENUM('admin','hr','viewer') DEFAULT 'viewer',
-        `is_active` TINYINT(1) DEFAULT 1,
-        `last_login` DATETIME,
-        `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
-    )");
+    $db->query("CREATE TABLE IF NOT EXISTS `users` (`id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `username` VARCHAR(50) NOT NULL UNIQUE, `name` VARCHAR(120) NOT NULL, `password_hash` VARCHAR(255) NOT NULL, `role` ENUM('admin','hr','viewer') DEFAULT 'viewer', `is_active` TINYINT(1) DEFAULT 1, `last_login` DATETIME, `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP)");
 
     // Add default admin if not exists
     $hash = password_hash('Admin@1234', PASSWORD_BCRYPT);
