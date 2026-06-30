@@ -79,7 +79,7 @@ class AttendanceController {
                     items = this.model.getEarlyOutEmployees();    
                     break;
                 case "staffList": {
-                    const data = view._currentStaffSummaryData;
+                    const data = this.view._currentStaffSummaryData;
                     if (data && data.isDashboard) {
                         items = data.emps.map(emp => ({ log: null, emp, date: null }));
                     } else {
@@ -88,7 +88,7 @@ class AttendanceController {
                     break;
                 }
                 case "workerList": {
-                    const data = view._currentWorkerSummaryData;
+                    const data = this.view._currentWorkerSummaryData;
                     if (data && data.isDashboard) {
                         items = data.emps.map(emp => ({ log: null, emp, date: null }));
                     } else {
@@ -97,10 +97,10 @@ class AttendanceController {
                     break;
                 }
                 case 'weeklyOffPresent':
-                    items = model.getWeeklyOffPresentEmployees();
+                    items = this.model.getWeeklyOffPresentEmployees();
                     break;
                 case 'weeklyOffHalfPresent':
-                    items = model.getWeeklyOffHalfPresentEmployees();
+                    items = this.model.getWeeklyOffHalfPresentEmployees();
                     break;
             }
             this.view._renderStatCardDrilldown(key, items);

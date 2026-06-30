@@ -415,24 +415,8 @@ class AttendanceModel {
         const { filters } = this.state;
         const { logs, emps } = this.getFilteredData();
 
-        const presentKeySet = {};
-
-        logs.forEach(l => {
-            if (parseFloat(l.present) == 1 && l.absent == 0 && l.missedInPunch == 0 && l.missedOutPunch == 0) {
-                presentKeySet[l.empId + '_' + l.date] = true;
-            }
-        });
-
-        const logMap = {};
-
-        logs.forEach(l => {
-            const key = l.empId + '_' + l.date;
-            const existing = logMap[key];
-
-            if (!existing || parseFloat(l.present) > parseFloat(existing.present)) {
-                logMap[key] = l;
-            }
-        });
+        const statusKeyMap = this._buildStatusKeyMap(logs);
+        const logMap = this._buildLogMap(logs);
 
         const fromStr = filters.dateFrom;
         const toStr = filters.dateTo;
@@ -444,13 +428,8 @@ class AttendanceModel {
             for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
                 const dateStr = d.toISOString().slice(0, 10);
                 const key = emp.id + '_' + dateStr;
-
-                if (presentKeySet[key]) {
-                    result.push({
-                        log: logMap[key] || null,
-                        emp,
-                        date: dateStr
-                    });
+                if (statusKeyMap[key] === 'present') {
+                    result.push({ log: logMap[key] || null, emp, date: dateStr });
                 }
             }
         });
@@ -547,7 +526,10 @@ class AttendanceModel {
 
     getSinglePunchEmployees() {
         const { filters } = this.state;
-        const { emps } = this.getFilteredData();
+        const { logs, emps } = this.getFilteredData();
+
+        const statusKeyMap = this._buildStatusKeyMap(logs);
+        const logMap = this._buildLogMap(logs);
         const singlePunchKeys = this.state.data.singlePunchKeys || new Set();
         const singlePunchData = this.state.data.singlePunchData || {};
 
@@ -562,13 +544,16 @@ class AttendanceModel {
                 const dateStr = d.toISOString().slice(0, 10);
                 const key = emp.id + '_' + dateStr;
 
+                if (statusKeyMap[key] !== 'singlePunch') continue;
+
                 if (singlePunchKeys.has(key)) {
+                    // no real log row exists — build a synthetic one from singlePunchData
                     const punchInfo = singlePunchData[key] || {};
                     result.push({
                         log: {
                             empId: emp.id,
                             date: dateStr,
-                            inTime: punchInfo.direction === 'in'  ? punchInfo.time : null,
+                            inTime: punchInfo.direction === 'in' ? punchInfo.time : null,
                             outTime: punchInfo.direction === 'out' ? punchInfo.time : null,
                             status: 'Single Punch',
                             present: 0,
@@ -578,8 +563,12 @@ class AttendanceModel {
                             earlyBy: 0,
                             shiftStart: punchInfo.shiftStart || null,
                             shiftEnd: punchInfo.shiftEnd || null
-                        }, emp, date: dateStr
+                        },
+                        emp,
+                        date: dateStr
                     });
+                } else {
+                    result.push({ log: logMap[key] || null, emp, date: dateStr });
                 }
             }
         });
@@ -856,7 +845,7 @@ class AttendanceModel {
             if (present == 1 && absent == 0) {
                 if (l.missedInPunch == 1 || l.missedOutPunch == 1) {
                     map[key] = 'singlePunch';
-                } else if (intval(l.weeklyOff) == 1) {
+                } else if (parseInt(l.weeklyOff) == 1) {
                     map[key] = 'weeklyOffPresent';
                 } else {
                     map[key] = 'present';
