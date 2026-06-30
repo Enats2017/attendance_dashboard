@@ -1,3 +1,4 @@
+console.log('MODEL VERSION CHECK: v2-with-commit-fix', Date.now());
 class AttendanceModel {
     constructor() {
         this.state = {
@@ -84,12 +85,14 @@ class AttendanceModel {
             };
 
             console.log('Filter lists loaded:', this.state.filterLists);
+            this._commit();              // ← ADD THIS LINE
             return { success: true };
 
         } catch (error) {
             console.error('Fetch Filter Options Error:', error);
             // Don't crash the app - just use empty lists
             this.state.filterLists = { depts: [], companies: [], shifts: [] };
+            this._commit();              // ← ADD THIS LINE
             return { success: false, error: error.message };
         }
     }

@@ -552,19 +552,19 @@ class AttendanceView {
         const ageGroupIcons = {
             "Under 18": "ph-baby",
             "Under 25": "ph-student",
-            "25–34": "ph-person-simple",
-            "35–44": "ph-user-circle",
-            "45–54": "ph-user-circle-gear",
+            "25–34": "ph-person-simple-walk",
+            "35–44": "ph-user",
+            "45–54": "ph-user-gear",
             "55–59": "ph-user-focus",
-            "60+": "ph-person-simple-tai-chi",
+            "60+": "ph-wheelchair",
         };
         const ageGroupCls = {
-            "Under 18": "",
-            "Under 25": "info",
-            "25–34": "success",
-            "35–44": "warning",
-            "45–54": "accent",
-            "55-59": "danger",
+            "Under 18": "info",
+            "Under 25": "success",
+            "25–34": "warning",
+            "35–44": "accent",
+            "45–54": "danger",
+            "55–59": "info",
             "60+": "accent",
         };
         const ageCounts = {};
@@ -655,18 +655,19 @@ class AttendanceView {
         const ageGroupIcons = {
             "Under 18": "ph-baby",
             "Under 25": "ph-student",
-            "25–34": "ph-person-simple",
-            "35–44": "ph-user-circle",
-            "45–54": "ph-user-circle-gear",
+            "25–34": "ph-person-simple-walk",
+            "35–44": "ph-user",
+            "45–54": "ph-user-gear",
             "55–59": "ph-user-focus",
-            "60+": "ph-person-simple-tai-chi",
+            "60+": "ph-wheelchair",
         };
-        const groupCls = {
-            "Under 25": "info",
-            "25–34": "success",
-            "35–44": "warning",
-            "45–54": "accent",
-            "55–59": "danger",
+        const ageGroupCls = {
+            "Under 18": "info",
+            "Under 25": "success",
+            "25–34": "warning",
+            "35–44": "accent",
+            "45–54": "danger",
+            "55–59": "info",
             "60+": "accent",
         };
 
@@ -694,7 +695,7 @@ class AttendanceView {
 
         const cards = [
             { key: "presentHeadcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", ageGroup: null, },
-            ...groups.map((g) => ({ key: "ageGroup", label: g, val: counts[g], icon: ageGroupIcons[g], cls: groupCls[g], ageGroup: g, })),
+            ...groups.map((g) => ({ key: "ageGroup", label: g, val: counts[g], icon: ageGroupIcons[g], cls: ageGroupCls[g], ageGroup: g, })),
             { key: null, label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", ageGroup: null, },
         ];
 
