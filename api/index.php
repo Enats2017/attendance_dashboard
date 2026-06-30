@@ -7,8 +7,8 @@
  */
 
 // Suppress errors for clean JSON output
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
+ini_set('display_errors', 0);
+error_reporting(0);
 ini_set('memory_limit', '512M');
 ini_set('max_execution_time', 120);
 
@@ -1546,9 +1546,16 @@ function handleGetDepts() {
     $locationList = implode(',', array_map('intval', $_SESSION['locations']));
     $departmentList = implode(',', array_map('intval', $_SESSION['departments']));
 
-    $sql = "SELECT DISTINCT D.DepartmentId, D.DepartmentFName as DepartmentName, D.std_hc FROM Departments D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON D.DepartmentId = E.DepartmentId WHERE E.Location IN ($locationList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working' ORDER BY CASE WHEN D.SortOrder IS NULL THEN 1 ELSE 0 END,D.SortOrder ASC,D.DepartmentFName ASC";
+    $sql = "SELECT D.DepartmentId, D.DepartmentFName AS DepartmentName, D.std_hc, D.SortOrder FROM Departments D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON D.DepartmentId = E.DepartmentId WHERE E.Location IN ($locationList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working' GROUP BY D.DepartmentId, D.DepartmentFName, D.std_hc, D.SortOrder ORDER BY CASE WHEN D.SortOrder IS NULL THEN 1 ELSE 0 END, D.SortOrder ASC, D.DepartmentFName ASC;";
 
     $stmt = sqlsrv_query($conn, $sql);
+
+    if ($stmt === false) {
+        $errors = sqlsrv_errors();
+        error_log('handleGetDepts SQL error: ' . print_r($errors, true));
+        echo json_encode(['success' => false, 'message' => 'Database query failed', 'sql_error' => $errors]);
+        return;
+    }
 
     $data = [];
     while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
@@ -1571,9 +1578,16 @@ function handleGetCompanies() {
     $locationList = implode(',', array_map('intval', $_SESSION['locations']));
     $companyList = implode(',', array_map('intval', $_SESSION['companies']));
 
-    $sql = "SELECT DISTINCT C.CompanyId, C.CompanyFName as CompanyName FROM Companies C WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON C.CompanyId = E.CompanyId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.Status = 'Working' ORDER BY CASE WHEN C.SortOrder IS NULL THEN 1 ELSE 0 END,C.SortOrder ASC,C.CompanyFName ASC";
+    $sql = "SELECT C.CompanyId, C.CompanyFName AS CompanyName, C.SortOrder FROM Companies C WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON C.CompanyId = E.CompanyId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.Status = 'Working' GROUP BY C.CompanyId, C.CompanyFName, C.SortOrder ORDER BY CASE WHEN C.SortOrder IS NULL THEN 1 ELSE 0 END, C.SortOrder ASC, C.CompanyFName ASC;";
 
     $stmt = sqlsrv_query($conn, $sql);
+
+    if ($stmt === false) {
+        $errors = sqlsrv_errors();
+        error_log('handleGetCompanies SQL error: ' . print_r($errors, true));
+        echo json_encode(['success' => false, 'message' => 'Database query failed', 'sql_error' => $errors]);
+        return;
+    }
 
     $data = [];
     while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
