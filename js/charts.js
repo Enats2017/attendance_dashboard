@@ -209,34 +209,47 @@ var Charts = (function () {
 							label +
 							"</div>" +
 
-							// Present Count (Green Dot)
+							// Present
 							'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">' +
 							'<span style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block;"></span>' +
 							' Present: <b style="margin-left:auto;">' +
 							(d.present ?? 0) +
 							"</b></div>" +
 
-							// Half Present Count (Orange Dot)
+							// Half Present
 							'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">' +
 							'<span style="width:8px;height:8px;border-radius:50%;background:#f59e0b;display:inline-block;"></span>' +
 							' Half Present: <b style="margin-left:auto;">' +
 							(d.halfPresent ?? 0) +
 							"</b></div>" +
 
-							// Weekly Off Count (Blue Dot)
+							// Weekly Off Present
+							'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">' +
+							'<span style="width:8px;height:8px;border-radius:50%;background:#8b5cf6;display:inline-block;"></span>' +
+							' WO Present: <b style="margin-left:auto;">' +
+							(d.weeklyOffPresent ?? 0) +
+							"</b></div>" +
+
+							// Weekly Off Half Present
+							'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">' +
+							'<span style="width:8px;height:8px;border-radius:50%;background:#eab308;display:inline-block;"></span>' +
+							' WO Half Present: <b style="margin-left:auto;">' +
+							(d.weeklyOffHalfPresent ?? 0) +
+							"</b></div>" +
+
+							// Weekly Off
 							'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">' +
 							'<span style="width:8px;height:8px;border-radius:50%;background:#3b82f6;display:inline-block;"></span>' +
 							' Weekly Off: <b style="margin-left:auto;">' +
 							(d.weeklyOff ?? 0) +
 							"</b></div>" +
 
-							// Absent Count (Red Dot)
+							// Absent
 							'<div style="display:flex;align-items:center;gap:6px;">' +
 							'<span style="width:8px;height:8px;border-radius:50%;background:#f43f5e;display:inline-block;"></span>' +
 							' Absent: <b style="margin-left:auto;">' +
 							(d.absent ?? 0) +
 							"</b></div>" +
-
 							"</div>"
 						);
 					},
@@ -539,26 +552,28 @@ var Charts = (function () {
 
 		var stackColors = seriesArr.map(function (s, i) {
 			var n = (s.name || "").toLowerCase();
+			if (n.indexOf("weekly off half present") !== -1) {
+				return "#eab308";
+			}
+
+			if (n.indexOf("weekly off present") !== -1) {
+				return "#8b5cf6";
+			}
+
 			if (n.indexOf("half present") !== -1) {
 				return "#f59e0b";
 			}
+
 			if (n.indexOf("weekly off") !== -1) {
 				return "#3b82f6";
 			}
+
 			if (n.indexOf("present") !== -1) {
 				return "#10b981";
 			}
+
 			if (n.indexOf("absent") !== -1) {
 				return "#f43f5e";
-			}
-			if (n.indexOf("late") !== -1) {
-				return "#f59e0b";
-			}
-			if (n.indexOf("early") !== -1) {
-				return "#f97316";
-			}
-			if (n.indexOf("single") !== -1) {
-				return "#0ea5e9";
 			}
 			return palette[i % palette.length];
 		});

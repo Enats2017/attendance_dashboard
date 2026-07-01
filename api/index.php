@@ -1005,39 +1005,6 @@ function handleDashboardData($input, $returnData = false) {
         if (isset($weeklyOffKeySet[$key])) continue;
         if (isset($singlePunchData[$key])) continue;
 
-        $missedIn  = intval($log['missedInPunch']);
-        $missedOut = intval($log['missedOutPunch']);
-
-        if ($missedOut === 1 && $missedIn === 0) {
-            $inTime = $log['inTime'];
-            if ($inTime && $inTime !== '00:00' && $inTime !== '00:00:00') {
-                $singlePunch++;
-                $singlePunchKeys[] = $key;
-                $singlePunchData[$key] = [
-                    'time' => $inTime,
-                    'direction' => 'in',
-                    'shiftStart' => $log['shiftStart'] ?? null,
-                    'shiftEnd' => $log['shiftEnd']   ?? null
-                ];
-                continue;
-            }
-        }
-
-        if ($missedIn === 1 && $missedOut === 0) {
-            $outTime = $log['outTime'];
-            if ($outTime && $outTime !== '00:00' && $outTime !== '00:00:00') {
-                $singlePunch++;
-                $singlePunchKeys[] = $key;
-                $singlePunchData[$key] = [
-                    'time' => $outTime,
-                    'direction' => 'out',
-                    'shiftStart' => $log['shiftStart'] ?? null,
-                    'shiftEnd' => $log['shiftEnd']   ?? null
-                ];
-                continue;
-            }
-        }
-
         $hasInTime = !empty($log['inTime']) && $log['inTime'] !== '00:00' && $log['inTime'] !== '00:00:00';
         $hasOutTime = !empty($log['outTime']) && $log['outTime'] !== '00:00' && $log['outTime'] !== '00:00:00';
 
@@ -1045,35 +1012,64 @@ function handleDashboardData($input, $returnData = false) {
             continue;
         }
 
-        $punchRecords = trim($log['punchRecords'] ?? '');
+        $punchRecords = trim($log['reportPunchRecords'] ?? '');
         if (empty($punchRecords)) {
             continue;
         }
 
-        $inCount = substr_count(strtolower($punchRecords), '(in)');
-        $outCount = substr_count(strtolower($punchRecords), '(out)');
-        
-        if ($inCount === 0 && $outCount === 0) {
-            continue;
-        }
-        if ($inCount > 0 && $outCount > 0) {
+        $punchRecordsLower = strtolower($punchRecords);
+
+        $inCount = substr_count($punchRecordsLower, '(in)');
+        $outCount = substr_count($punchRecordsLower, '(out)');
+        $totalPunches = $inCount + $outCount;
+
+        if ($totalPunches == 0) {
             continue;
         }
 
-        if ($inCount > 0 && $outCount === 0) {
+        if ($totalPunches > 1) {
+            continue;
+        }
+
+        if ($totalPunches == 1 && $inCount == 1) {
             preg_match('/(\d{2}:\d{2}:\d{2})\(in\)/i', $punchRecords, $matches);
             $punchTime = $matches[1] ?? null;
+
             if (!$punchTime) {
                 continue;
             }
+
             $singlePunch++;
             $singlePunchKeys[] = $key;
+
             $singlePunchData[$key] = [
                 'time' => $punchTime,
                 'direction' => 'in',
-                'shiftStart' => $log['shiftStart'] ?? $shiftTimes['start'],
-                'shiftEnd' => $log['shiftEnd'] ?? $shiftTimes['end']
+                'shiftStart' => $log['shiftStart'] ?? null,
+                'shiftEnd' => $log['shiftEnd'] ?? null
             ];
+
+            continue;
+        }
+
+        if ($totalPunches == 1 && $outCount == 1) {
+            preg_match('/(\d{2}:\d{2}:\d{2})\(out\)/i', $punchRecords, $matches);
+            $punchTime = $matches[1] ?? null;
+
+            if (!$punchTime) {
+                continue;
+            }
+
+            $singlePunch++;
+            $singlePunchKeys[] = $key;
+
+            $singlePunchData[$key] = [
+                'time' => $punchTime,
+                'direction' => 'out',
+                'shiftStart' => $log['shiftStart'] ?? null,
+                'shiftEnd'   => $log['shiftEnd'] ?? null
+            ];
+            
             continue;
         }
     }

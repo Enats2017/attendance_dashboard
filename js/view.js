@@ -633,21 +633,29 @@ class AttendanceView {
 
         this._currentAgeData = { emps, model, dayLogs, empMap };
 
-        this._currentTabPresentHeadcountItems = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present")).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
+        this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
+            this._matchesStatus(l, "Present") ||
+            this._matchesStatus(l, "Half Present") ||
+            this._matchesStatus(l, "WO Present") ||
+            this._matchesStatus(l, "WO Half Present")
+        ).map((l) => ({
+            log: l,
+            emp: empMap[l.empId],
+            date: l.date
+        }));
 
         const counts = {};
         groups.forEach((g) => (counts[g] = 0));
         dayLogs.forEach((l) => {
             const e = empMap[l.empId];
             if (!e) return;
-            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present");
+            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present");
             if (!isPresentOrHalf) return;
             const g = model.getAgeGroup(e.dob);
             if (counts[g] !== undefined) counts[g]++;
         });
 
-        // const totalPresentHalf = groups.reduce((sum, g) => sum + counts[g], 0);
-        const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) + (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0);
+        const totalPresentHalf = groups.reduce((sum, g) => sum + counts[g], 0);
 
         const cards = [
             { key: "presentHeadcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", ageGroup: null, },
@@ -692,14 +700,25 @@ class AttendanceView {
         dayLogs.forEach((l) => {
             const e = empMap[l.empId];
             if (!e) return;
-            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present");
+            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present");
             if (!isPresentOrHalf) return;
             if (counts[e.company] !== undefined) counts[e.company]++;
         });
 
         // const totalPresentHalf = companies.reduce((sum, c) => sum + counts[c], 0,);
         const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) + (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0);
-        this._currentTabPresentHeadcountItems = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present")).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
+        
+        this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
+            this._matchesStatus(l, "Present") ||
+            this._matchesStatus(l, "Half Present") ||
+            this._matchesStatus(l, "WO Present") ||
+            this._matchesStatus(l, "WO Half Present")
+        ).map((l) => ({
+            log: l,
+            emp: empMap[l.empId],
+            date: l.date
+        }));
+
         const cards = [
             { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
             ...companies.map((c, i) => ({ type: "company", label: c, val: counts[c], icon: "ph-buildings", cls: colorCls[i % colorCls.length], company: c, })),
@@ -763,14 +782,24 @@ class AttendanceView {
         dayLogs.forEach((l) => {
             const e = empMap[l.empId];
             if (!e) return;
-            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present");
+            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present");
             if (!isPresentOrHalf) return;
             if (counts[e.dept] !== undefined) counts[e.dept]++;
         });
 
         // const totalPresentHalf = depts.reduce((sum, d) => sum + counts[d], 0);
         const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) + (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0);
-        this._currentTabPresentHeadcountItems = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present"),).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
+        
+        this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
+            this._matchesStatus(l, "Present") ||
+            this._matchesStatus(l, "Half Present") ||
+            this._matchesStatus(l, "WO Present") ||
+            this._matchesStatus(l, "WO Half Present")
+        ).map((l) => ({
+            log: l,
+            emp: empMap[l.empId],
+            date: l.date
+        }));
 
         const cards = [
             { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
@@ -836,12 +865,12 @@ class AttendanceView {
         dayLogs.forEach((l) => {
             const e = empMap[l.empId];
             if (!e) return;
-            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present");
+            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present");
             if (!isPresentOrHalf) return;
             if (counts[e.gender] !== undefined)  counts[e.gender]++;
         });
 
-        this._currentTabPresentHeadcountItems = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present"),).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
+        this._currentTabPresentHeadcountItems = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present"),).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
         // const totalPresentHalf = this._currentTabPresentHeadcountItems.length;
         const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) + (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0);
 
@@ -897,7 +926,18 @@ class AttendanceView {
     _renderLateInSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
         const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo,);
-        this._currentTabPresentHeadcountItems = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present")).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
+        
+        this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
+            this._matchesStatus(l, "Present") ||
+            this._matchesStatus(l, "Half Present") ||
+            this._matchesStatus(l, "WO Present") ||
+            this._matchesStatus(l, "WO Half Present")
+        ).map((l) => ({
+            log: l,
+            emp: empMap[l.empId],
+            date: l.date,
+        }));
+
         const totalPresentHalf = this._currentTabPresentHeadcountItems.length;
 
         const cards = [
@@ -926,7 +966,7 @@ class AttendanceView {
     _renderEarlyOutSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
         const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
-        const totalPresentHalf = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present"),).length;
+        const totalPresentHalf = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present")).length;
 
         const cards = [
             { key: "presentHeadcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
@@ -1391,9 +1431,18 @@ class AttendanceView {
         const shiftStats = model.state.data.shiftStats || [];
         const colorCls = ["info", "success", "warning", "accent", "danger"];
 
-        this._currentTabPresentHeadcountItems = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present"),).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
-        // const totalPresentHalf = this._currentTabPresentHeadcountItems.length;
-        const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) + (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0);
+        this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
+            this._matchesStatus(l, "Present") ||
+            this._matchesStatus(l, "Half Present") ||
+            this._matchesStatus(l, "WO Present") ||
+            this._matchesStatus(l, "WO Half Present")
+        ).map((l) => ({
+            log: l,
+            emp: empMap[l.empId],
+            date: l.date,
+        }));
+
+        const totalPresentHalf = this._currentTabPresentHeadcountItems.length;
 
         const cards = [
             { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
@@ -1460,7 +1509,7 @@ class AttendanceView {
         dayLogs.forEach((l) => {
             const e = empMap[l.empId];
             if (!e) return;
-            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present");
+            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present");
             if (!isPresentOrHalf) return;
             if (counts[e.dept] !== undefined) {
                 counts[e.dept]++;
@@ -1468,7 +1517,18 @@ class AttendanceView {
         });
 
         const totalPresentHalf = depts.reduce((sum, d) => sum + counts[d], 0);
-        this._currentTabPresentHeadcountItems = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present"),).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
+       
+        this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
+            this._matchesStatus(l, "Present") ||
+            this._matchesStatus(l, "Half Present") ||
+            this._matchesStatus(l, "WO Present") ||
+            this._matchesStatus(l, "WO Half Present")
+        ).map((l) => ({
+            log: l,
+            emp: empMap[l.empId],
+            date: l.date,
+        }));
+
         const cards = [
             { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
             ...depts.map((d, i) => ({ type: "dept", label: d, val: counts[d], icon: "ph-briefcase", cls: colorCls[i % colorCls.length], dept: d, })),
@@ -1534,16 +1594,25 @@ class AttendanceView {
         dayLogs.forEach((l) => {
             const e = empMap[l.empId];
             if (!e) return;
-            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present");
+            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present");
             if (!isPresentOrHalf) return;
             if (counts[e.dept] !== undefined) {
                 counts[e.dept]++;
             }
         });
 
-        this._currentTabPresentHeadcountItems = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present"),).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
-        // const totalPresentHalf = this._currentTabPresentHeadcountItems.length;
-        const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) + (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0);
+        this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
+            this._matchesStatus(l, "Present") ||
+            this._matchesStatus(l, "Half Present") ||
+            this._matchesStatus(l, "WO Present") ||
+            this._matchesStatus(l, "WO Half Present")
+        ).map((l) => ({
+            log: l,
+            emp: empMap[l.empId],
+            date: l.date,
+        }));
+
+        const totalPresentHalf = this._currentTabPresentHeadcountItems.length;
 
         const cards = [
             { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
@@ -2551,21 +2620,6 @@ class AttendanceView {
             statusCounts[status] = (statusCounts[status] || 0) + 1;
         });
 
-        
-        // Print every present record
-        console.table(
-            presentRecords.map(r => ({
-                empId: r.empId,
-                date: r.date,
-                status: r.status,
-                present: r.present,
-                weeklyOff: r.weeklyOff,
-                absent: r.absent
-            }))
-        );
-
-        // ===== ADD TILL HERE =====
-
         return result;
     }
 
@@ -2581,24 +2635,24 @@ class AttendanceView {
         emps.forEach((e) => {
             const g = groupKeyFn(e);
             if (!groups[g]) {
-                groups[g] = { total: 0, present: 0, halfPresent: 0, weeklyOff: 0, holiday: 0, leave: 0, absent: 0, };
+                groups[g] = { total: 0, present: 0, halfPresent: 0, weeklyOffPresent: 0,
+                            weeklyOffHalfPresent: 0, weeklyOff: 0, holiday: 0, leave: 0, absent: 0 };
             }
         });
 
         dayLogs.forEach((log) => {
             const g = empGroupMap[log.empId];
-            if (g === undefined) {
-                return;
-            }
+            if (g === undefined) return;
             groups[g].total++;
 
             const present = parseFloat(log.present);
             const absent = parseFloat(log.absent ?? 0);
+            const isWeeklyOff = parseInt(log.weeklyOff ?? 0) === 1;
 
             if (present == 1 && absent == 0) {
-                groups[g].present++;
-            } else if (present == 0.5 && absent == 0.5) {
-                groups[g].halfPresent++;
+                isWeeklyOff ? groups[g].weeklyOffPresent++ : groups[g].present++;
+            } else if (present == 0.5) {
+                isWeeklyOff ? groups[g].weeklyOffHalfPresent++ : groups[g].halfPresent++;
             } else if (present == 0 && absent == 0) {
                 groups[g].weeklyOff++;
             } else {
@@ -3364,19 +3418,19 @@ class AttendanceView {
     _matchesStatus(log, seriesName) {
         const present = parseFloat(log.present);
         const absent = parseFloat(log.absent ?? 0);
-        const isWeeklyOff = parseInt(log.weeklyOff ?? 0) === 1;  
+        const isWeeklyOff = parseInt(log.weeklyOff ?? 0) === 1;
 
         if (log.status === "Single Punch") {
             return seriesName === "Single Punch";
         }
 
-        if (present == 1 && absent == 0 && (log.missedInPunch == 1 || log.missedOutPunch == 1)) {
-            return seriesName === "Single Punch";
+        if (present == 1 && absent == 0) {
+            return isWeeklyOff ? seriesName === "WO Present" : seriesName === "Present";
         }
 
-        if (present == 1 && absent == 0) return seriesName === "Present";
-
-        if (present == 0.5) return seriesName === "Half Present";
+        if (present == 0.5) {
+            return isWeeklyOff ? seriesName === "WO Half Present" : seriesName === "Half Present";
+        }
 
         if (present == 0 && absent == 0) {
             return isWeeklyOff ? seriesName === "Weekly Off" : seriesName === "Absent";
@@ -5626,19 +5680,6 @@ class AttendanceView {
 
         const items = this._currentTabPresentHeadcountItems;
         if (!items) return;
-
-        // ===== DEBUG =====
-        console.log("Present Headcount Drilldown");
-        console.log("Total Items:", items.length);
-        console.table(items.map(i => ({
-            empId: i.emp?.empId,
-            employee: i.emp?.name,
-            status: i.log?.status,
-            present: i.log?.present,
-            absent: i.log?.absent,
-            date: i.date
-        })));
-        // =================
 
         this._renderStatCardDrilldown("presentHeadcount", items, 1);
     }
