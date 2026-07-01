@@ -84,7 +84,6 @@ class AttendanceModel {
                 shifts:    Array.isArray(shiftRes) ? shiftRes.map(s => s.ShiftName).filter(Boolean)       : []
             };
 
-            console.log('Filter lists loaded:', this.state.filterLists);
             this._commit();              // ← ADD THIS LINE
             return { success: true };
 
