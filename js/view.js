@@ -28,6 +28,7 @@ class AttendanceView {
         this._renderToken = 0;
     }
 
+
     render(state, model) {
         this._renderToken++;
         const myToken = this._renderToken;
@@ -86,6 +87,7 @@ class AttendanceView {
         this._initChartRendering(state.activeTab, logs, emps, empMap, state.filters, state.data.counts, model, myToken);
     }
 
+
     _handleDeptAccordionClick(e) {
         const seg = e.target.closest(".dept-acc-seg");
         if (seg) {
@@ -130,6 +132,7 @@ class AttendanceView {
         }
     }
 
+
     _handleDeptAccordionHover(e) {
         const header = e.target.closest(".dept-acc-header");
         const subRow = e.target.closest(".dept-acc-sub-row");
@@ -154,6 +157,7 @@ class AttendanceView {
         const label = header ? header.dataset.dept : subRow.dataset.designation;
         this._showDeptAccTooltip(e, label, stats);
     }
+
 
     _showDeptAccTooltip(e, label, stats) {
         let tip = document.getElementById("dept-acc-tooltip");
@@ -205,7 +209,7 @@ class AttendanceView {
             </div>
             
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
-                <span style="width:8px;height:8px;border-radius:50%;background:#EC4899;display:inline-block;"></span> Single Punch: 
+                <span style="width:8px;height:8px;border-radius:50%;background:#8B4513;display:inline-block;"></span> Single Punch: 
                 <b style="margin-left:auto;">${stats.singlePunch}</b>
             </div>
             
@@ -225,10 +229,12 @@ class AttendanceView {
         tip.style.top = e.clientY + 16 + "px";
     }
 
+
     _hideDeptAccTooltip() {
         const tip = document.getElementById("dept-acc-tooltip");
         if (tip) tip.style.display = "none";
     }
+
 
     _renderSidebar(activeTab) {
         return `
@@ -264,6 +270,7 @@ class AttendanceView {
 		`;
     }
 
+
     _renderTopbar(state) {
         const user = window.HRMS_USER || {};
         const displayName = user.name || user.username || "Admin User";
@@ -291,6 +298,7 @@ class AttendanceView {
 			</header>
 		`;
     }
+
 
     _renderFilters(filters, opts) {
         const selectOpts = (arr) => {
@@ -339,6 +347,7 @@ class AttendanceView {
             </div>
 		`;
     }
+
 
     _renderSummaryCards(stats, emps, logs, empMap, model) {
         const staffWorkerStats = this._staffWorkerStats || {};
@@ -3347,7 +3356,7 @@ class AttendanceView {
 					.dept-acc-legend .dot.wopresent { background:#8b5cf6; }
 					.dept-acc-legend .dot.wohalfpresent { background:#eab308; }
 					.dept-acc-legend .dot.weeklyoff { background:#3b82f6; }
-                    .dept-acc-legend .dot.single { background:#EC4899; }
+                    .dept-acc-legend .dot.single { background:#8B4513; }
                     .dept-acc-legend .dot.absent { background:#f43f5e; }
 					.dept-acc-row { border-bottom: 1px solid #f1f5f9; }
 					.dept-acc-header { display:flex; align-items:center; gap:12px; padding:10px 0; cursor:pointer; }
@@ -3364,7 +3373,7 @@ class AttendanceView {
 					.dept-acc-seg.wohalfpresent { background:#eab308; }
 					.dept-acc-seg.weeklyoff { background:#3b82f6; }
 					.dept-acc-seg.absent { background:#f43f5e; }
-                    .dept-acc-seg.single { background:#EC4899; }
+                    .dept-acc-seg.single { background:#8B4513; }
 					.dept-acc-caret { color:#94a3b8; font-size:14px; flex-shrink:0; }
 					.dept-acc-expand { padding: 6px 0 14px 172px; }
 					.dept-acc-sub-title { font-size:12px; font-weight:700; color:#7c3aed; margin-bottom:10px; }

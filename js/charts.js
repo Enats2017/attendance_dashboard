@@ -554,7 +554,7 @@ var Charts = (function () {
             var n = (s.name || "").toLowerCase();
             
             if (n.indexOf("single punch") !== -1) {
-                return "#EC4899"; 
+                return "#8B4513"; 
             }
 
             // WO Half Present - Gold
