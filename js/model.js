@@ -564,7 +564,9 @@ class AttendanceModel {
                             lateBy: 0,
                             earlyBy: 0,
                             shiftStart: punchInfo.shiftStart || null,
-                            shiftEnd: punchInfo.shiftEnd || null
+                            shiftEnd: punchInfo.shiftEnd || null,
+                            detailedStatus: 'Single Punch',
+                            detailedStatusCode: 'SP'
                         },
                         emp,
                         date: dateStr
@@ -836,34 +838,47 @@ class AttendanceModel {
         const singlePunchKeys = this.state.data.singlePunchKeys || new Set();
         const map = {};
 
-        // Seed single-punch keys first — independent of whether a log row exists
         singlePunchKeys.forEach(key => {
             map[key] = 'singlePunch';
         });
 
         logs.forEach(l => {
             const key = l.empId + '_' + l.date;
-            if (map[key] === 'singlePunch') return;   // don't overwrite
+            if (map[key] === 'singlePunch') return;
 
-            const present = parseFloat(l.present ?? 0);
-            const absent  = parseFloat(l.absent  ?? 0);
+            const code = (l.detailedStatusCode || '').toUpperCase().trim();
+            const isWeeklyOff = parseInt(l.weeklyOff ?? 0) === 1;
 
-            if (present == 1 && absent == 0) {
-                if (parseInt(l.weeklyOff) == 1) {
-                    map[key] = 'weeklyOffPresent';
-                } else {
+            switch (code) {
+                case 'P':
                     map[key] = 'present';
-                }
-            } else if (present == 0.5) {
-                if (parseInt(l.weeklyOff) == 1) {
-                    map[key] = 'weeklyOffHalfPresent';
-                } else {
+                    break;
+
+                case '½PLD':
+                case 'L_CL':
+                case '½PCL':
+                case '½PLD(HO)':
                     map[key] = 'halfPresent';
-                }
-            } else if (present == 0 && absent == 0) {
-                map[key] = 'weeklyOff';
-            } else {
-                map[key] = 'absent';
+                    break;
+
+                case 'WO':
+                    map[key] = 'weeklyOff';
+                    break;
+
+                case 'WOP':
+                    map[key] = isWeeklyOff ? 'weeklyOffPresent' : 'present';
+                    break;
+
+                case '½PLD(WO)':
+                    map[key] = isWeeklyOff ? 'weeklyOffHalfPresent' : 'halfPresent';
+                    break;
+                    
+                case 'A':
+                case 'ALD':
+                case 'WOA':
+                default:
+                    map[key] = 'absent';
+                    break;
             }
         });
         return map;

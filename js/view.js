@@ -345,14 +345,8 @@ class AttendanceView {
             dayLogs.forEach((l) => {
                 const e = empMap[l.empId];
                 if (!e) return;
-                const present = parseFloat(l.present);
-                const absent = parseFloat(l.absent ?? 0);
-                const isPresent = present == 1 && absent == 0;
-                const isHalf = present == 0.5 && absent == 0.5;
-
-                if (isPresent || isHalf);
-                
-                totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) + (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0); 
+                const isPresent = this._matchesStatus(l, "Present") || this._matchesStatus(l, "WO Present");
+                const isHalf = this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Half Present");
 
                 if ([58].includes(e.categoryId)) {
                     if (isPresent) staffPresent++;
@@ -2627,6 +2621,8 @@ class AttendanceView {
                         inTime: punchInfo.direction === "in" ? punchInfo.time : (log ? log.inTime : null),
                         outTime: punchInfo.direction === "out" ? punchInfo.time : (log ? log.outTime : null),
                         status: "Single Punch",
+                        detailedStatus: "Single Punch",
+                        detailedStatusCode: "SP",
                         present: 0,
                         absent: 0,
                         weeklyOff: 0,
@@ -2645,6 +2641,8 @@ class AttendanceView {
                         inTime: null,
                         outTime: null,
                         status: "Absent",
+                        detailedStatus: "Absent",
+                        detailedStatusCode: "A",
                         present: 0,
                         absent: 1,
                         weeklyOff: 0,
@@ -2716,24 +2714,44 @@ class AttendanceView {
             if (g === undefined) return;
             groups[g].total++;
 
-            // ← ADD: check this BEFORE the present/absent math
             if (log.status === "Single Punch") {
                 groups[g].singlePunch++;
                 return;
             }
 
-            const present = parseFloat(log.present);
-            const absent = parseFloat(log.absent ?? 0);
+            const code = (log.detailedStatusCode || "").toUpperCase().trim();
             const isWeeklyOff = parseInt(log.weeklyOff ?? 0) === 1;
 
-            if (present == 1 && absent == 0) {
-                isWeeklyOff ? groups[g].weeklyOffPresent++ : groups[g].present++;
-            } else if (present == 0.5) {
-                isWeeklyOff ? groups[g].weeklyOffHalfPresent++ : groups[g].halfPresent++;
-            } else if (present == 0 && absent == 0) {
-                groups[g].weeklyOff++;
-            } else {
-                groups[g].absent++;
+            switch (code) {
+                case "P":
+                    groups[g].present++;
+                    break;
+
+                case "½PLD":
+                case "L_CL":
+                case "½PCL":
+                case "½PLD(HO)":
+                    groups[g].halfPresent++;
+                    break;
+
+                case "WO":
+                    groups[g].weeklyOff++;
+                    break;
+
+                case "WOP":
+                    isWeeklyOff ? groups[g].weeklyOffPresent++ : groups[g].present++;
+                    break;
+
+                case "½PLD(WO)":
+                    isWeeklyOff ? groups[g].weeklyOffHalfPresent++ : groups[g].halfPresent++;
+                    break;
+
+                case "A":
+                case "ALD":
+                case "WOA":
+                default:
+                    groups[g].absent++;
+                    break;
             }
         });
 
@@ -2846,6 +2864,7 @@ class AttendanceView {
                 l.lateIn ? '<span class="badge badge-warning">Yes</span>' : "No",
                 l.earlyOut ? '<span class="badge badge-warning">Yes</span>' : "No",
                 `<span class="badge ${l.status === "Present" ? "badge-success" : "badge-danger"}">${l.status}</span>`,
+                l.detailedStatus || "-",
             ];
         });
 
@@ -2863,6 +2882,7 @@ class AttendanceView {
                 LateIn: l.lateIn,
                 EarlyOut: l.earlyOut,
                 Status: l.status,
+                DetailedStatus: l.detailedStatus,
             };
         });
 
@@ -2967,7 +2987,7 @@ class AttendanceView {
                 </div>
 
                 <div id="main-table-wrap">
-                    ${this._tableHTML("tbl-all", ["Code", "Name", "Dept", "Company", "Date", "In", "Out", "Hours", "Late In", "Early Out", "Status"], rows, "all-attendance")}
+                    ${this._tableHTML("tbl-all", ["Code", "Name", "Dept", "Company", "Date", "In", "Out", "Hours", "Late In", "Early Out", "Status", "Detailed Status"], rows, "all-attendance")}
                     <div class="pagination-bar">
                         <div class="pagination-text">
                             Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, logs.length)} of ${logs.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
@@ -3096,6 +3116,7 @@ class AttendanceView {
                     <td>${(l.earlyBy || 0) > 0 ? "Yes" : "No"}</td>
                     <td>${(l.earlyBy || 0) > 0 ? this._fmtMins(l.earlyBy) : "-"}</td>
                     <td>${l.status}</td>
+                    <td>${l.detailedStatus || "–"}</td>
                 </tr>
             `;
         }).join("");
@@ -3117,6 +3138,7 @@ class AttendanceView {
                 Late: (l.lateBy || 0) > 0 ? "Yes" : "No",
                 Early: (l.earlyBy || 0) > 0 ? "Yes" : "No",
                 Status: l.status,
+                DetailedStatus: l.detailedStatus,
             };
         });
 
@@ -3177,6 +3199,7 @@ class AttendanceView {
 								<th>Early</th>
 								<th>Early By</th>
 								<th>Status</th>
+                                <th>Detailed Status</th>
 	                        </tr>
 	                    </thead>
 	                    <tbody>${rows}</tbody>
@@ -3569,27 +3592,47 @@ class AttendanceView {
 
 
     _matchesStatus(log, seriesName) {
-        const present = parseFloat(log.present);
-        const absent = parseFloat(log.absent ?? 0);
-        const isWeeklyOff = parseInt(log.weeklyOff ?? 0) === 1;
-
         if (log.status === "Single Punch") {
             return seriesName === "Single Punch";
         }
 
-        if (present == 1 && absent == 0) {
-            return isWeeklyOff ? seriesName === "WO Present" : seriesName === "Present";
+        const code = (log.detailedStatusCode || "").toUpperCase().trim();
+        const isWeeklyOff = parseInt(log.weeklyOff ?? 0) === 1;
+        let bucket;
+
+        switch (code) {
+            case "P":
+                bucket = "Present";
+                break;
+            
+            case "½PLD":
+            case "L_CL":
+            case "½PCL":
+            case "½PLD(HO)":
+                bucket = "Half Present";
+                break;
+            
+            case "WO":
+                bucket = "Weekly Off";
+                break;
+
+            case "WOP":
+                bucket = isWeeklyOff ? "WO Present" : "Present";
+                break;
+
+            case "½PLD(WO)":
+                bucket = isWeeklyOff ? "WO Half Present" : "Half Present";
+                break;
+
+            case "A":
+            case "ALD":
+            case "WOA":
+            default:
+                bucket = "Absent";
+                break;
         }
 
-        if (present == 0.5) {
-            return isWeeklyOff ? seriesName === "WO Half Present" : seriesName === "Half Present";
-        }
-
-        if (present == 0 && absent == 0) {
-            return isWeeklyOff ? seriesName === "Weekly Off" : seriesName === "Absent";
-        }
-
-        return seriesName === "Absent";
+        return seriesName === bucket;
     }
 
    
@@ -4460,14 +4503,14 @@ class AttendanceView {
             if (isDashboardStaffWorker) {
                 headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Shift", "Shift Start", "Shift End", "Location"];
             } else {
-                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Shift", "Shift Start", "Shift End", "Date", "In Time", "Out Time", "Hours Worked", "Status", "Location"];
+                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Shift", "Shift Start", "Shift End", "Date", "In Time", "Out Time", "Hours Worked", "Status", "Detailed Status", "Location"];
             }
         } else if (key === "lateIn") {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Late By"];
+            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Late By", "Detailed Status"];
         } else if (key === "earlyOut") {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Early By"];
+            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Early By", "Detailed Status"];
         } else {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Status"];
+            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Status", "Detailed Status"];
         }
         ths = headers.map((h) => `<th>${h}</th>`).join("");
 
@@ -4561,6 +4604,7 @@ class AttendanceView {
                         <td>${log?.outTime || "–"}</td>
                         <td>${log?.hoursWorked != null ? log.hoursWorked : "–"}</td>
                         <td>${log?.status || "–"}</td>
+                        <td>${log?.detailedStatus || "–"}</td>
                         <td>${emp.location || "–"}</td>
                     </tr>
                 `;
@@ -4605,6 +4649,8 @@ class AttendanceView {
                     ? `<td>${this._fmtMins(log?.earlyBy)}</td>` : key === "weeklyOff"
                     ? `<td><span class="badge badge-info">Weekly Off</span></td>` : `<td>${log?.status || "–"}</td>`;
 
+            const detailedStatusCol = `<td>${log?.detailedStatus || "–"}</td>`;
+
             return `
                 <tr>
                     <td>${sr}</td>
@@ -4622,6 +4668,7 @@ class AttendanceView {
                     <td>${log?.outTime || "–"}</td>
                     <td>${log?.hoursWorked != null ? log.hoursWorked : "–"}</td>
                     ${lastCol}
+                    ${detailedStatusCol}
                 </tr>
             `;
         }).join("");
@@ -4735,6 +4782,7 @@ class AttendanceView {
                 LateBy: log?.lateBy ?? "",
                 EarlyBy: log?.earlyBy ?? "",
                 Status: key === "weeklyOff" ? "Weekly Off" : log?.status || "",
+                DetailedStatus: log?.detailedStatus || "",
             };
         });
 

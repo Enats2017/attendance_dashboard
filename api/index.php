@@ -694,7 +694,7 @@ function handleDashboardData($input, $returnData = false) {
         $tableExists = isset($allTableNames[$logTable]);
 
         if ($tableExists) {
-            $sqlLogs = "SELECT A.EmployeeId, A.AttendanceDate, A.InTime, A.OutTime, A.Status, A.Duration, A.LateBy, A.EarlyBy, A.ComplinFreeLateBy, A.ComplinFreeEarlyBy, A.Present, A.Absent, A.WeeklyOff, A.Holiday, A.IsOnLeave, A.IsPartialDay, A.MissedInPunch, A.MissedOutPunch, A.PunchRecords, A.ReportPunchRecords, A.PunchDirections, A.ShiftId, S.ShiftCode, S.ShiftName, S.BeginTime, S.EndTime FROM $logTable A WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON A.EmployeeId = E.EmployeeId LEFT JOIN Shifts S WITH (NOLOCK) ON A.ShiftId = S.ShiftId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND A.AttendanceDate >= '$dayFrom' AND A.AttendanceDate <= '$dayTo 23:59:59' AND E.Status = 'Working'";
+            $sqlLogs = "SELECT A.EmployeeId, A.AttendanceDate, A.InTime, A.OutTime, A.Status, A.DetailedStatus, A.DetailedStatusCode, A.Duration, A.LateBy, A.EarlyBy, A.ComplinFreeLateBy, A.ComplinFreeEarlyBy, A.Present, A.Absent, A.WeeklyOff, A.Holiday, A.IsOnLeave, A.IsPartialDay, A.MissedInPunch, A.MissedOutPunch, A.PunchRecords, A.ReportPunchRecords, A.PunchDirections, A.ShiftId, S.ShiftCode, S.ShiftName, S.BeginTime, S.EndTime FROM $logTable A WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON A.EmployeeId = E.EmployeeId LEFT JOIN Shifts S WITH (NOLOCK) ON A.ShiftId = S.ShiftId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND A.AttendanceDate >= '$dayFrom' AND A.AttendanceDate <= '$dayTo 23:59:59' AND E.Status = 'Working'";
 
             $paramsLogs = [];
             
@@ -725,6 +725,8 @@ function handleDashboardData($input, $returnData = false) {
                         'inTime' => $row['InTime'] ? (is_object($row['InTime']) ? $row['InTime']->format('H:i:s') : $row['InTime']) : null,
                         'outTime' => $row['OutTime'] ? (is_object($row['OutTime']) ? $row['OutTime']->format('H:i:s') : $row['OutTime']) : null,
                         'status' => $status,
+                        'detailedStatus' => trim($row['DetailedStatus'] ?? ''),
+                        'detailedStatusCode' => strtoupper(trim($row['DetailedStatusCode'] ?? '')),
                         'present' => floatval($row['Present']),
                         'absent' => floatval($row['Absent']),
                         'weeklyOff' => intval($row['WeeklyOff']),
@@ -875,19 +877,19 @@ function handleDashboardData($input, $returnData = false) {
     foreach ($logs as $log) {
         if (!empty($log['shiftId']) && !isset($empShiftFromLogs[$log['empId']])) {
             $empShiftFromLogs[$log['empId']] = [
-                'shiftId'    => $log['shiftId'],
-                'shift'      => $log['shiftName'],
+                'shiftId' => $log['shiftId'],
+                'shift' => $log['shiftName'],
                 'shiftStart' => $log['shiftStart'],
-                'shiftEnd'   => $log['shiftEnd'],
+                'shiftEnd' => $log['shiftEnd'],
             ];
         }
     }
     foreach ($employees as &$emp) {
         if (isset($empShiftFromLogs[$emp['id']])) {
-            $emp['shiftId']    = $empShiftFromLogs[$emp['id']]['shiftId'];
-            $emp['shift']      = $empShiftFromLogs[$emp['id']]['shift'];
+            $emp['shiftId'] = $empShiftFromLogs[$emp['id']]['shiftId'];
+            $emp['shift'] = $empShiftFromLogs[$emp['id']]['shift'];
             $emp['shiftStart'] = $empShiftFromLogs[$emp['id']]['shiftStart'];
-            $emp['shiftEnd']   = $empShiftFromLogs[$emp['id']]['shiftEnd'];
+            $emp['shiftEnd'] = $empShiftFromLogs[$emp['id']]['shiftEnd'];
         }
     }
     unset($emp);
@@ -942,6 +944,8 @@ function handleDashboardData($input, $returnData = false) {
             'inTime' => $devInTime,
             'outTime' => $hasOut ? $stat['lastOut']->format('H:i') : null,
             'status' => 'Present',
+            'detailedStatus' => 'Present',
+            'detailedStatusCode' => 'P',
             'present' => 1,
             'weeklyOff' => 0,
             'holiday' => 0,
@@ -1096,30 +1100,54 @@ function handleDashboardData($input, $returnData = false) {
     $avgHours = $hoursCount > 0 ? round($totalHours / $hoursCount, 2) : 0;
 
     $statusKeyMap = [];
+
     foreach ($logs as $log) {
+
         $key = $log['empId'] . '_' . $log['date'];
-        $present = floatval($log['present']);
-        $absent = floatval($log['absent']);
-        $isWeeklyOff = intval($log['weeklyOff']) == 1;
 
         if (isset($singlePunchData[$key])) {
             $statusKeyMap[$key] = 'singlePunch';
-        } elseif ($present == 1 && $absent == 0) {
-            if ($isWeeklyOff) {
-                $statusKeyMap[$key] = 'weeklyOffPresent';
-            } else {
+            continue;
+        }
+
+        $code = strtoupper(trim($log['detailedStatusCode'] ?? ''));
+        $isWeeklyOff = intval($log['weeklyOff']) === 1;
+
+        switch ($code) {
+
+            case 'P':
                 $statusKeyMap[$key] = 'present';
-            }
-        } elseif ($present == 0.5) {
-            if ($isWeeklyOff) {
-                $statusKeyMap[$key] = 'weeklyOffHalfPresent';
-            } else {
+                break;
+
+            case '½PLD':
+            case 'L_CL':
+            case '½PCL':
+            case '½PLD(HO)':
                 $statusKeyMap[$key] = 'halfPresent';
-            }
-        } elseif ($present == 0 && $absent == 0 && $isWeeklyOff) {
-            $statusKeyMap[$key] = 'weeklyOff';
-        } else {
-            $statusKeyMap[$key] = 'absent';
+                break;
+
+            case 'WO':
+                $statusKeyMap[$key] = 'weeklyOff';
+                break;
+
+            case 'WOP':
+                $statusKeyMap[$key] = $isWeeklyOff
+                    ? 'weeklyOffPresent'
+                    : 'present';
+                break;
+
+            case '½PLD(WO)':
+                $statusKeyMap[$key] = $isWeeklyOff
+                    ? 'weeklyOffHalfPresent'
+                    : 'halfPresent';
+                break;
+
+            case 'A':
+            case 'ALD':
+            case 'WOA':
+            default:
+                $statusKeyMap[$key] = 'absent';
+                break;
         }
     }
 
