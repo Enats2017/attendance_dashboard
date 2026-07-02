@@ -551,32 +551,44 @@ var Charts = (function () {
         }
 
 		var stackColors = seriesArr.map(function (s, i) {
-			var n = (s.name || "").toLowerCase();
-			if (n.indexOf("weekly off half present") !== -1) {
-				return "#eab308";
-			}
+            var n = (s.name || "").toLowerCase();
+            
+            if (n.indexOf("single punch") !== -1) {
+                return "#EC4899"; 
+            }
 
-			if (n.indexOf("weekly off present") !== -1) {
-				return "#8b5cf6";
-			}
+            // WO Half Present - Gold
+            if (n.indexOf("wo half present") !== -1 || n.indexOf("weekly off half present") !== -1) {
+                return "#FFD700";
+            }
 
-			if (n.indexOf("half present") !== -1) {
-				return "#f59e0b";
-			}
+            // WO Present - Purple
+            if (n.indexOf("wo present") !== -1 || n.indexOf("weekly off present") !== -1) {
+                return "#8A2BE2";
+            }
 
-			if (n.indexOf("weekly off") !== -1) {
-				return "#3b82f6";
-			}
+            // Half Present - Orange
+            if (n.indexOf("half present") !== -1) {
+                return "#FF8C00";
+            }
 
-			if (n.indexOf("present") !== -1) {
-				return "#10b981";
-			}
+            // Weekly Off - Blue
+            if (n.indexOf("weekly off") !== -1) {
+                return "#1E90FF";
+            }
 
-			if (n.indexOf("absent") !== -1) {
-				return "#f43f5e";
-			}
-			return palette[i % palette.length];
-		});
+            // Present - Green
+            if (n.indexOf("present") !== -1) {
+                return "#22C55E";
+            }
+
+            // Absent - Red
+            if (n.indexOf("absent") !== -1) {
+                return "#EF4444";
+            }
+
+            return palette[i % palette.length];
+        });
 
 		var opts = {
 			chart: Object.assign({}, baseChart, {

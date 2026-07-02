@@ -143,10 +143,13 @@ class AttendanceView {
         const stats = {
             present: target.dataset.present || 0,
             half: target.dataset.half || 0,
+            woPresent: target.dataset.wopresent || 0,
+            woHalfPresent: target.dataset.wohalfpresent || 0,
             weeklyOff: target.dataset.weeklyoff || 0,
             absent: target.dataset.absent || 0,
             total: target.dataset.total || 0,
         };
+        
         const label = header ? header.dataset.dept : subRow.dataset.designation;
         this._showDeptAccTooltip(e, label, stats);
     }
@@ -181,6 +184,14 @@ class AttendanceView {
 			<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
 				<span style="width:8px;height:8px;border-radius:50%;background:#f59e0b;display:inline-block;"></span> Half Present: 
 				<b style="margin-left:auto;">${stats.half}</b>
+			</div>
+			<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+				<span style="width:8px;height:8px;border-radius:50%;background:#8b5cf6;display:inline-block;"></span> WO Present: 
+				<b style="margin-left:auto;">${stats.woPresent}</b>
+			</div>
+			<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+				<span style="width:8px;height:8px;border-radius:50%;background:#eab308;display:inline-block;"></span> WO Half Present: 
+				<b style="margin-left:auto;">${stats.woHalfPresent}</b>
 			</div>
 			<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
 				<span style="width:8px;height:8px;border-radius:50%;background:#3b82f6;display:inline-block;"></span> Weekly Off: 
@@ -631,6 +642,18 @@ class AttendanceView {
         const { dateFrom, dateTo } = model.state.filters;
         const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
 
+        console.log("========== AGE DEBUG ==========");
+        console.log("Employees :", emps.length);
+        console.log("Raw Logs :", logs.length);
+        console.log("Day Logs :", dayLogs.length);
+
+        const uniqueEmpDate = new Set(
+            dayLogs.map(l => `${l.empId}_${l.date}`)
+        );
+
+        console.log("Unique Employee-Date :", uniqueEmpDate.size);
+        console.log("Duplicate Employee-Date :", dayLogs.length - uniqueEmpDate.size);
+
         this._currentAgeData = { emps, model, dayLogs, empMap };
 
         this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
@@ -646,14 +669,61 @@ class AttendanceView {
 
         const counts = {};
         groups.forEach((g) => (counts[g] = 0));
+
+        const debugStatusCounts = {
+            present: 0,
+            halfPresent: 0,
+            woPresent: 0,
+            woHalfPresent: 0,
+            weeklyOff: 0,
+            absent: 0
+        };
+
         dayLogs.forEach((l) => {
             const e = empMap[l.empId];
             if (!e) return;
-            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present");
+
+            if (this._matchesStatus(l, "Present")) {
+                debugStatusCounts.present++;
+            } else if (this._matchesStatus(l, "Half Present")) {
+                debugStatusCounts.halfPresent++;
+            } else if (this._matchesStatus(l, "WO Present")) {
+                debugStatusCounts.woPresent++;
+            } else if (this._matchesStatus(l, "WO Half Present")) {
+                debugStatusCounts.woHalfPresent++;
+            } else if (this._matchesStatus(l, "Weekly Off")) {
+                debugStatusCounts.weeklyOff++;
+            } else {
+                debugStatusCounts.absent++;
+            }
+
+            const isPresentOrHalf =
+                this._matchesStatus(l, "Present") ||
+                this._matchesStatus(l, "Half Present") ||
+                this._matchesStatus(l, "WO Present") ||
+                this._matchesStatus(l, "WO Half Present");
+
             if (!isPresentOrHalf) return;
+
             const g = model.getAgeGroup(e.dob);
-            if (counts[g] !== undefined) counts[g]++;
+
+            if (counts[g] !== undefined) {
+                counts[g]++;
+            }
+
         });
+
+        console.table(debugStatusCounts);
+
+        console.log(
+            "Status Total :",
+            debugStatusCounts.present +
+            debugStatusCounts.halfPresent +
+            debugStatusCounts.woPresent +
+            debugStatusCounts.woHalfPresent +
+            debugStatusCounts.weeklyOff +
+            debugStatusCounts.absent
+        );
 
         const totalPresentHalf = groups.reduce((sum, g) => sum + counts[g], 0);
 
@@ -2549,25 +2619,25 @@ class AttendanceView {
             dates.forEach((date) => {
                 const key = e.id + "_" + date;
                 const log = logMap[key];
-                if (log) {
-                    result.push(log);
-                } else if (singlePunchKeys.has(key)) {
+                if (singlePunchKeys.has(key)) {
                     const punchInfo = singlePunchData[key] || {};
                     result.push({
                         empId: e.id,
                         date: date,
-                        inTime: punchInfo.direction === "in" ? punchInfo.time : null,
-                        outTime: punchInfo.direction === "out" ? punchInfo.time : null,
+                        inTime: punchInfo.direction === "in" ? punchInfo.time : (log ? log.inTime : null),
+                        outTime: punchInfo.direction === "out" ? punchInfo.time : (log ? log.outTime : null),
                         status: "Single Punch",
                         present: 0,
                         absent: 0,
                         weeklyOff: 0,
-                        hoursWorked: 0,
+                        hoursWorked: log ? (log.hoursWorked || 0) : 0,
                         lateBy: 0,
                         earlyBy: 0,
-                        shiftStart: punchInfo.shiftStart || null,
-                        shiftEnd: punchInfo.shiftEnd || null,
+                        shiftStart: punchInfo.shiftStart || (log ? log.shiftStart : null),
+                        shiftEnd: punchInfo.shiftEnd || (log ? log.shiftEnd : null),
                     });
+                } else if (log) {
+                    result.push(log);
                 } else {
                     result.push({
                         empId: e.id,
@@ -2627,16 +2697,17 @@ class AttendanceView {
     _computeGroupedDayStats(emps, logs, dateFrom, dateTo, groupKeyFn) {
         const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
         const empGroupMap = {};
-        emps.forEach((e) => {
-            empGroupMap[e.id] = groupKeyFn(e);
-        });
+        emps.forEach((e) => { empGroupMap[e.id] = groupKeyFn(e); });
 
         const groups = {};
         emps.forEach((e) => {
             const g = groupKeyFn(e);
             if (!groups[g]) {
-                groups[g] = { total: 0, present: 0, halfPresent: 0, weeklyOffPresent: 0,
-                            weeklyOffHalfPresent: 0, weeklyOff: 0, holiday: 0, leave: 0, absent: 0 };
+                groups[g] = {
+                    total: 0, present: 0, halfPresent: 0, weeklyOffPresent: 0,
+                    weeklyOffHalfPresent: 0, weeklyOff: 0, holiday: 0, leave: 0,
+                    absent: 0, singlePunch: 0   // ← ADD
+                };
             }
         });
 
@@ -2644,6 +2715,12 @@ class AttendanceView {
             const g = empGroupMap[log.empId];
             if (g === undefined) return;
             groups[g].total++;
+
+            // ← ADD: check this BEFORE the present/absent math
+            if (log.status === "Single Punch") {
+                groups[g].singlePunch++;
+                return;
+            }
 
             const present = parseFloat(log.present);
             const absent = parseFloat(log.absent ?? 0);
@@ -2662,6 +2739,7 @@ class AttendanceView {
 
         return groups;
     }
+
 
     _chartCard(id, icon, iconClass, title, hint) {
         return `
@@ -2795,18 +2873,45 @@ class AttendanceView {
         const { dateFrom, dateTo } = filters;
         const dayLogsForChart = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
 
-        const presentByDate = {}, halfByDate = {}, woByDate = {}, absentByDate = {};
+        const presentByDate = {};
+        const halfByDate = {};
+        const woPresentByDate = {};
+        const woHalfPresentByDate = {};
+        const woByDate = {};
+        const singlePunchByDate = {};
+        const absentByDate = {};
+
         dates.forEach((d) => {
             presentByDate[d] = 0;
             halfByDate[d] = 0;
+            woPresentByDate[d] = 0;
+            woHalfPresentByDate[d] = 0;
             woByDate[d] = 0;
+            singlePunchByDate[d] = 0;
             absentByDate[d] = 0;
         });
+
         dayLogsForChart.forEach((l) => {
-            if (this._matchesStatus(l, "Present")) presentByDate[l.date]++;
-            else if (this._matchesStatus(l, "Half Present")) halfByDate[l.date]++;
-            else if (this._matchesStatus(l, "Weekly Off")) woByDate[l.date]++;
-            else absentByDate[l.date]++;
+            if (this._matchesStatus(l, "Present"))
+                presentByDate[l.date]++;
+
+            else if (this._matchesStatus(l, "Half Present"))
+                halfByDate[l.date]++;
+
+            else if (this._matchesStatus(l, "WO Present"))
+                woPresentByDate[l.date]++;
+
+            else if (this._matchesStatus(l, "WO Half Present"))
+                woHalfPresentByDate[l.date]++;
+
+            else if (this._matchesStatus(l, "Weekly Off"))
+                woByDate[l.date]++;
+
+            else if (this._matchesStatus(l, "Single Punch"))
+                singlePunchByDate[l.date]++;
+
+            else
+                absentByDate[l.date]++;
         });
 
         const byDept = this._countBy(logs, (l) => (empMap[l.empId] || {}).dept || "Unknown",);
@@ -2885,10 +2990,13 @@ class AttendanceView {
                     "ch-all-trend",
                     formattedDates,
                     [
-                        { name: "Present", data: dates.map((d) => presentByDate[d]), },
-                        { name: "Half Present", data: dates.map((d) => halfByDate[d]), },
-                        { name: "Weekly Off", data: dates.map((d) => woByDate[d]), },
-                        { name: "Absent", data: dates.map((d) => absentByDate[d]), },
+                        { name: "Present", data: dates.map((d) => presentByDate[d]) },
+                        { name: "Half Present", data: dates.map((d) => halfByDate[d]) },
+                        { name: "WO Present", data: dates.map((d) => woPresentByDate[d]) },
+                        { name: "WO Half Present", data: dates.map((d) => woHalfPresentByDate[d]) },
+                        { name: "Weekly Off", data: dates.map((d) => woByDate[d]) },
+                        { name: "Single Punch", data: dates.map((d) => singlePunchByDate[d]) },
+                        { name: "Absent", data: dates.map((d) => absentByDate[d]) },
                     ],
                     "Daily Attendance",
                     (category, index, seriesIndex, seriesName) => {
@@ -3157,16 +3265,19 @@ class AttendanceView {
         const rowsHtml = depts.map((d, i) => {
             const r = rows[i];
             const total = r[1] || 1;
-            const present = r[2], half = r[3], wo = r[4], absent = r[5];
+            const present = r[2], half = r[3], woPresent = r[4], woHalfPresent = r[5], wo = r[6], singlePunch = r[7], absent = r[8];
             const scale = (r[1] / niceMax) * 100;
             const pPct = (present / total) * 100;
             const hPct = (half / total) * 100;
+            const wpPct = (woPresent / total) * 100;
+            const whPct = (woHalfPresent / total) * 100;
             const wPct = (wo / total) * 100;
+            const spPct = (singlePunch / total) * 100;
             const aPct = (absent / total) * 100;
 
             return `
                 <div class="dept-acc-row">
-                    <div class="dept-acc-header" data-dept="${this._escapeAttr(d)}" data-present="${present}" data-half="${half}" data-weeklyoff="${wo}" data-absent="${absent}" data-total="${total}">
+                    <div class="dept-acc-header" data-dept="${this._escapeAttr(d)}" data-present="${present}" data-half="${half}" data-wopresent="${woPresent}" data-wohalfpresent="${woHalfPresent}" data-weeklyoff="${wo}" data-absent="${absent}" data-total="${total}">
                         <div class="dept-acc-label">${d}</div>
                         <div class="dept-acc-track">
                             ${ticks.map((t) => `<div class="dept-acc-gridline" style="left:${(t / niceMax) * 100}%"></div>`).join("")}
@@ -3174,7 +3285,10 @@ class AttendanceView {
                                 <div class="dept-acc-bar">
                                     ${present > 0 ? `<div class="dept-acc-seg present" data-status="Present" style="width:${pPct}%">${present}</div>` : ""}
                                     ${half > 0 ? `<div class="dept-acc-seg half" data-status="Half Present" style="width:${hPct}%">${half}</div>` : ""}
+                                    ${woPresent > 0 ? `<div class="dept-acc-seg wopresent" data-status="WO Present" style="width:${wpPct}%">${woPresent}</div>` : ""}
+                                    ${woHalfPresent > 0 ? `<div class="dept-acc-seg wohalfpresent" data-status="WO Half Present" style="width:${whPct}%">${woHalfPresent}</div>` : ""}
                                     ${wo > 0 ? `<div class="dept-acc-seg weeklyoff" data-status="Weekly Off" style="width:${wPct}%">${wo}</div>` : ""}
+                                    ${singlePunch > 0 ? `<div class="dept-acc-seg single" data-status="Single Punch" style="width:${spPct}%">${singlePunch}</div>` : ""}
                                     ${absent > 0 ? `<div class="dept-acc-seg absent" data-status="Absent" style="width:${aPct}%">${absent}</div>` : ""}
                                 </div>
                             </div>
@@ -3194,8 +3308,11 @@ class AttendanceView {
 					.dept-acc-legend .dot { width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:5px; }
 					.dept-acc-legend .dot.present { background:#10b981; }
 					.dept-acc-legend .dot.half { background:#f59e0b; }
+					.dept-acc-legend .dot.wopresent { background:#8b5cf6; }
+					.dept-acc-legend .dot.wohalfpresent { background:#eab308; }
 					.dept-acc-legend .dot.weeklyoff { background:#3b82f6; }
-					.dept-acc-legend .dot.absent { background:#f43f5e; }
+                    .dept-acc-legend .dot.single { background:#EC4899; }
+                    .dept-acc-legend .dot.absent { background:#f43f5e; }
 					.dept-acc-row { border-bottom: 1px solid #f1f5f9; }
 					.dept-acc-header { display:flex; align-items:center; gap:12px; padding:10px 0; cursor:pointer; }
 					.dept-acc-label { width:160px; flex-shrink:0; font-size:12px; font-weight:700; color:#475569; }
@@ -3207,8 +3324,11 @@ class AttendanceView {
 					.dept-acc-seg { display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px; font-weight:700; min-width: 18px; cursor:pointer; }
 					.dept-acc-seg.present { background:#10b981; }
 					.dept-acc-seg.half { background:#f59e0b; }
+					.dept-acc-seg.wopresent { background:#8b5cf6; }
+					.dept-acc-seg.wohalfpresent { background:#eab308; }
 					.dept-acc-seg.weeklyoff { background:#3b82f6; }
 					.dept-acc-seg.absent { background:#f43f5e; }
+                    .dept-acc-seg.single { background:#EC4899; }
 					.dept-acc-caret { color:#94a3b8; font-size:14px; flex-shrink:0; }
 					.dept-acc-expand { padding: 6px 0 14px 172px; }
 					.dept-acc-sub-title { font-size:12px; font-weight:700; color:#7c3aed; margin-bottom:10px; }
@@ -3220,12 +3340,17 @@ class AttendanceView {
 					.dept-accordion.dimmed .dept-acc-seg { opacity: 0.15; }
 					.dept-accordion.dimmed .dept-acc-seg.active-highlight { opacity: 1; }
 				</style>
-				<div class="dept-acc-legend">
+				
+                <div class="dept-acc-legend">
 					<span data-legend="present"><i class="dot present"></i>Present</span>
 					<span data-legend="half"><i class="dot half"></i>Half Present</span>
+					<span data-legend="wopresent"><i class="dot wopresent"></i>WO Present</span>
+					<span data-legend="wohalfpresent"><i class="dot wohalfpresent"></i>WO Half Present</span>
 					<span data-legend="weeklyoff"><i class="dot weeklyoff"></i>Weekly Off</span>
-					<span data-legend="absent"><i class="dot absent"></i>Absent</span>
+                    <span data-legend="single"><i class="dot single"></i>Single Punch</span>
+                    <span data-legend="absent"><i class="dot absent"></i>Absent</span>
 				</div>
+
 				${rowsHtml}
 				<div class="dept-acc-axis">
 					${ticks.map((t) => `<span>${t}</span>`).join("")}
@@ -3272,10 +3397,14 @@ class AttendanceView {
             const scale = (g.total / niceMax) * 100;
             const pPct = (g.present / total) * 100;
             const hPct = (g.halfPresent / total) * 100;
+            const wpPct = (g.weeklyOffPresent / total) * 100;
+            const whPct = (g.weeklyOffHalfPresent / total) * 100;
             const wPct = (g.weeklyOff / total) * 100;
+            const spPct = (g.singlePunch / total) * 100;
             const aPct = (g.absent / total) * 100;
+           
             return `
-                <div class="dept-acc-sub-row" data-designation="${this._escapeAttr(d)}" data-present="${g.present}" data-half="${g.halfPresent}" data-weeklyoff="${g.weeklyOff}" data-absent="${g.absent}" data-total="${g.total}">
+                <div class="dept-acc-sub-row" data-designation="${this._escapeAttr(d)}" data-present="${g.present}" data-half="${g.halfPresent}" data-wopresent="${g.weeklyOffPresent}" data-wohalfpresent="${g.weeklyOffHalfPresent}" data-weeklyoff="${g.weeklyOff}" data-absent="${g.absent}" data-total="${g.total}">
                 <div class="dept-acc-sub-label">${d}</div>
                 <div class="dept-acc-track">
                     ${ticks.map((t) => `<div class="dept-acc-gridline" style="left:${(t / niceMax) * 100}%"></div>`).join("")}
@@ -3283,7 +3412,10 @@ class AttendanceView {
                     <div class="dept-acc-bar small">
                         ${g.present > 0 ? `<div class="dept-acc-seg present" data-status="Present" style="width:${pPct}%">${g.present}</div>` : ""}
                         ${g.halfPresent > 0 ? `<div class="dept-acc-seg half" data-status="Half Present" style="width:${hPct}%">${g.halfPresent}</div>` : ""}
+                        ${g.weeklyOffPresent > 0 ? `<div class="dept-acc-seg wopresent" data-status="WO Present" style="width:${wpPct}%">${g.weeklyOffPresent}</div>` : ""}
+                        ${g.weeklyOffHalfPresent > 0 ? `<div class="dept-acc-seg wohalfpresent" data-status="WO Half Present" style="width:${whPct}%">${g.weeklyOffHalfPresent}</div>` : ""}
                         ${g.weeklyOff > 0 ? `<div class="dept-acc-seg weeklyoff" data-status="Weekly Off" style="width:${wPct}%">${g.weeklyOff}</div>` : ""}
+                        ${g.singlePunch > 0 ? `<div class="dept-acc-seg single" data-status="Single Punch" style="width:${spPct}%">${g.singlePunch}</div>` : ""}
                         ${g.absent > 0 ? `<div class="dept-acc-seg absent" data-status="Absent" style="width:${aPct}%">${g.absent}</div>` : ""}
                     </div>
                     </div>
@@ -3302,19 +3434,27 @@ class AttendanceView {
         expandEl.style.display = "block";
     }
 
+    
     _renderAgeWise(logs, emps, empMap, model) {
         const groups = ["Under 18", "Under 25", "25–34", "35–44", "45–54", "55–59", "60+"];
+        
         const gTotal = {};
         const gPresent = {};
         const gHalfPresent = {};
+        const gWoPresent = {};
+        const gWoHalfPresent = {};
         const gWeeklyOff = {};
+        const gSinglePunch = {};
         const gAbsent = {};
 
         groups.forEach((g) => {
             gTotal[g] = 0;
             gPresent[g] = 0;
             gHalfPresent[g] = 0;
+            gWoPresent[g] = 0;
+            gWoHalfPresent[g] = 0;
             gWeeklyOff[g] = 0;
+            gSinglePunch[g] = 0;
             gAbsent[g] = 0;
         });
 
@@ -3332,15 +3472,18 @@ class AttendanceView {
             }
             const g = model.getAgeGroup(e.dob);
 
-            const lPresent = parseFloat(l.present);
-            const lAbsent = parseFloat(l.absent ?? 0);
-
-            if (lPresent == 1 && lAbsent == 0) {
+            if (this._matchesStatus(l, "Present")) {
                 gPresent[g]++;
-            } else if (lPresent == 0.5 && lAbsent == 0.5) {
+            } else if (this._matchesStatus(l, "Half Present")) {
                 gHalfPresent[g]++;
-            } else if (lPresent == 0 && lAbsent == 0) {
+            } else if (this._matchesStatus(l, "WO Present")) {
+                gWoPresent[g]++;
+            } else if (this._matchesStatus(l, "WO Half Present")) {
+                gWoHalfPresent[g]++;
+            } else if (this._matchesStatus(l, "Weekly Off")) {
                 gWeeklyOff[g]++;
+            } else if (this._matchesStatus(l, "Single Punch")) {
+                gSinglePunch[g]++;
             } else {
                 gAbsent[g]++;
             }
@@ -3353,7 +3496,10 @@ class AttendanceView {
                 gTotal[g],
                 gPresent[g],
                 gHalfPresent[g],
+                gWoPresent[g],
+                gWoHalfPresent[g],
                 gWeeklyOff[g],
+                gSinglePunch[g],
                 gAbsent[g],
                 attendancePercent.toFixed(2) + "%",
             ];
@@ -3364,9 +3510,12 @@ class AttendanceView {
             Total: r[1],
             Present: r[2],
             HalfPresent: r[3],
-            WeeklyOff: r[4],
-            Absent: r[5],
-            Rate: r[6],
+            WOPresent: r[4],
+            WOHalfPresent: r[5],
+            WeeklyOff: r[6],
+            SinglePunch: r[7],
+            Absent: r[8],
+            Rate: r[9],
         }));
 
         return {
@@ -3380,7 +3529,7 @@ class AttendanceView {
 					${this._chartCard("ch-age-bar", '<i class="ph-fill ph-chart-bar"></i>', "amber", "Attendance by Age Group")}
 				</div>
 
-				${this._tableHTML("tbl-age", ["Age Group", "Total Emp", "Present", "Half Present", "Weekly Off", "Absent", "Attendance %"], rows, "age-wise")}
+                ${this._tableHTML("tbl-age", ["Age Group", "Total Emp", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Single Punch", "Absent", "Attendance %"], rows, "age-wise")}
 
 				<div id="drilldown-table" style="margin-top:16px"></div>
 			`,
@@ -3392,12 +3541,15 @@ class AttendanceView {
                     [
                         { name: "Present", data: groups.map((g) => gPresent[g]), },
                         { name: "Half Present", data: groups.map((g) => gHalfPresent[g]), },
+                        { name: "WO Present", data: groups.map((g) => gWoPresent[g]), },
+                        { name: "WO Half Present", data: groups.map((g) => gWoHalfPresent[g]), },
                         { name: "Weekly Off", data: groups.map((g) => gWeeklyOff[g]), },
+                        { name: "Single Punch", data: groups.map((g) => gSinglePunch[g]), },
                         { name: "Absent", data: groups.map((g) => gAbsent[g]) },
                     ],
                     "Age-wise",
                     (g, index, seriesIndex, seriesName) => {
-                        const filteredLogs = logs.filter((l) => {
+                        const filteredLogs = dayLogs.filter((l) => {
                             const e = empMap[l.empId];
                             if (!e) {
                                 return false;
@@ -3414,6 +3566,7 @@ class AttendanceView {
             },
         };
     }
+
 
     _matchesStatus(log, seriesName) {
         const present = parseFloat(log.present);
@@ -3439,15 +3592,17 @@ class AttendanceView {
         return seriesName === "Absent";
     }
 
+   
     _renderCompanyWise(logs, emps, empMap, model) {
         const comps = [...new Set(emps.map((e) => e.company))];
         const { dateFrom, dateTo } = model.state.filters;
         const groups = this._computeGroupedDayStats(emps, logs, dateFrom, dateTo, (e) => e.company);
+        const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
 
         const rows = comps.map((c) => {
-            const g = groups[c] || { total: 0, present: 0, halfPresent: 0, weeklyOff: 0, absent: 0, };
+            const g = groups[c] || { total: 0, present: 0, halfPresent: 0, weeklyOffPresent: 0, weeklyOffHalfPresent: 0, weeklyOff: 0, absent: 0, singlePunch: 0 };
             const rate = g.total ? Math.round((g.present / g.total) * 100) + "%" : "0%";
-            return [c, g.total, g.present, g.halfPresent, g.weeklyOff, g.absent, rate];
+            return [c, g.total, g.present, g.halfPresent, g.weeklyOffPresent, g.weeklyOffHalfPresent, g.weeklyOff, g.singlePunch, g.absent, rate]; // ← inserted singlePunch before absent
         });
 
         this._lastData["company-wise"] = rows.map((r) => ({
@@ -3455,9 +3610,11 @@ class AttendanceView {
             Total: r[1],
             Present: r[2],
             HalfPresent: r[3],
-            WeeklyOff: r[4],
-            Absent: r[5],
-            Rate: r[6],
+            WOPresent: r[4],
+            WOHalfPresent: r[5],
+            WeeklyOff: r[6],
+            Absent: r[7],
+            Rate: r[8],
         }));
 
         return {
@@ -3466,9 +3623,12 @@ class AttendanceView {
 				<div class="charts-grid">
 					${this._chartCard("ch-comp-bar", '<i class="ph-fill ph-chart-bar"></i>', "violet", "Company Breakdown")}
 				</div>
-				${this._tableHTML("tbl-comp", ["Company", "Total", "Present", "Half Present", "Weekly Off", "Absent", "Rate"], rows, "company-wise")}
-				<div id="drilldown-table" style="margin-top:16px"></div>
+
+                ${this._tableHTML("tbl-comp", ["Company", "Total", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Single Punch", "Absent", "Rate"], rows, "company-wise")}
+				
+                <div id="drilldown-table" style="margin-top:16px"></div>
 			`,
+            
             renderCharts: () => {
                 Charts.stacked(
                     "ch-comp-bar",
@@ -3476,12 +3636,15 @@ class AttendanceView {
                     [
                         { name: "Present", data: rows.map((r) => r[2]) },
                         { name: "Half Present", data: rows.map((r) => r[3]) },
-                        { name: "Weekly Off", data: rows.map((r) => r[4]) },
-                        { name: "Absent", data: rows.map((r) => r[5]) },
+                        { name: "WO Present", data: rows.map((r) => r[4]) },
+                        { name: "WO Half Present", data: rows.map((r) => r[5]) },
+                        { name: "Weekly Off", data: rows.map((r) => r[6]) },
+                        { name: "Single Punch", data: rows.map((r) => r[7]) },
+                        { name: "Absent", data: rows.map((r) => r[8]) },
                     ],
                     "Company Attendance",
                     (company, index, seriesIndex, seriesName) => {
-                        const filteredLogs = logs.filter((l) => {
+                        const filteredLogs = dayLogs.filter((l) => {
                             const e = empMap[l.empId];
                             if (!e || e.company !== company) {
                                 return false;
@@ -3495,6 +3658,7 @@ class AttendanceView {
         };
     }
 
+   
     _renderDeptWise(logs, emps, empMap, model) {
         this._currentDeptData = { emps, logs, empMap, model };
         const depts = [...new Set(emps.map((e) => e.dept))];
@@ -3503,11 +3667,11 @@ class AttendanceView {
         const lBD = model.groupBy(logs, (l) => (empMap[l.empId] || {}).dept);
 
         const rows = depts.map((d) => {
-            const g = groups[d] || { total: 0, present: 0, halfPresent: 0, weeklyOff: 0, absent: 0, };
+            const g = groups[d] || { total: 0, present: 0, halfPresent: 0, weeklyOffPresent: 0, weeklyOffHalfPresent: 0, weeklyOff: 0, singlePunch: 0, absent: 0, };
             const ls = lBD[d] || [];
             const avg = ls.length ? (ls.reduce((s, l) => s + (l.hoursWorked || 0), 0) / ls.length).toFixed(1) : 0;
             const rate = g.total ? Math.round((g.present / g.total) * 100) + "%" : "0%";
-            return [d, g.total, g.present, g.halfPresent, g.weeklyOff, g.absent, avg, rate];
+            return [d, g.total, g.present, g.halfPresent, g.weeklyOffPresent, g.weeklyOffHalfPresent, g.weeklyOff, g.singlePunch || 0, g.absent, avg, rate];
         });
 
         this._lastData["dept-wise"] = rows.map((r) => ({
@@ -3515,10 +3679,13 @@ class AttendanceView {
             Total: r[1],
             Present: r[2],
             HalfPresent: r[3],
-            WeeklyOff: r[4],
-            Absent: r[5],
-            AvgHours: r[6],
-            Rate: r[7],
+            WOPresent: r[4],
+            WOHalfPresent: r[5],
+            WeeklyOff: r[6],
+            SinglePunch: r[7],
+            Absent: r[8],
+            AvgHours: r[9],
+            Rate: r[10],
         }));
 
         return {
@@ -3540,7 +3707,9 @@ class AttendanceView {
                         </div>
                     </div>
                 </div>
-                ${this._tableHTML("tbl-dept", ["Dept", "Total", "Present", "Half Present", "Weekly Off", "Absent", "Avg Hours", "Rate"], rows, "dept-wise")}
+
+                ${this._tableHTML("tbl-dept", ["Dept", "Total", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Single Punch", "Absent", "Avg Hours", "Rate"], rows, "dept-wise")}
+                
                 <div id="drilldown-table" style="margin-top:16px"></div>
             `,
 
@@ -3567,6 +3736,7 @@ class AttendanceView {
             },
         };
     }
+    
 
     _renderDeptDesignationDrilldown(dept, emps, logs, model, anchorEl) {
         const deptEmps = emps.filter((e) => e.dept === dept);
@@ -3633,18 +3803,18 @@ class AttendanceView {
         }, 50);
     }
 
+    
     _renderGenderWise(logs, emps, empMap, model) {
         const genders = ["Male", "Female"];
         const { dateFrom, dateTo } = model.state.filters;
 
         const groups = this._computeGroupedDayStats(emps, logs, dateFrom, dateTo, (e) => e.gender);
+        const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
 
         const rows = genders.map((g) => {
-            const grp = groups[g] || { total: 0, present: 0, halfPresent: 0, weeklyOff: 0, absent: 0, };
-            const rate = grp.total
-                ? Math.round((grp.present / grp.total) * 100) + "%"
-                : "0%";
-            return [g, grp.total, grp.present, grp.halfPresent, grp.weeklyOff, grp.absent, rate];
+            const grp = groups[g] || { total: 0, present: 0, halfPresent: 0, weeklyOffPresent: 0, weeklyOffHalfPresent: 0, weeklyOff: 0, singlePunch: 0, absent: 0, };
+            const rate = grp.total ? Math.round((grp.present / grp.total) * 100) + "%" : "0%";
+            return [g, grp.total, grp.present, grp.halfPresent, grp.weeklyOffPresent, grp.weeklyOffHalfPresent, grp.weeklyOff, grp.singlePunch || 0, grp.absent, rate];
         });
 
         this._lastData["gender-wise"] = rows.map((r) => ({
@@ -3652,9 +3822,12 @@ class AttendanceView {
             Total: r[1],
             Present: r[2],
             HalfPresent: r[3],
-            WeeklyOff: r[4],
-            Absent: r[5],
-            Rate: r[6],
+            WOPresent: r[4],
+            WOHalfPresent: r[5],
+            WeeklyOff: r[6],
+            SinglePunch: r[7],
+            Absent: r[8],
+            Rate: r[9],
         }));
 
         return {
@@ -3667,7 +3840,8 @@ class AttendanceView {
                     ${this._chartCard("ch-gender-bar", '<i class="ph-fill ph-chart-bar"></i>', "violet", "Attendance by Gender", "Click bar for detail")}
                 </div>
 
-                ${this._tableHTML("tbl-gen", ["Gender", "Total", "Present", "Half Present", "Weekly Off", "Absent", "Rate"], rows, "gender-wise")}
+                ${this._tableHTML("tbl-gen", ["Gender", "Total", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Single Punch", "Absent", "Rate"], rows, "gender-wise")}
+                
                 <div id="drilldown-table" style="margin-top:16px"></div>
             `,
 
@@ -3678,12 +3852,15 @@ class AttendanceView {
                     [
                         { name: "Present", data: genders.map((g) => (groups[g] || {}).present || 0), },
                         { name: "Half Present", data: genders.map((g) => (groups[g] || {}).halfPresent || 0), },
+                        { name: "WO Present", data: genders.map((g) => (groups[g] || {}).weeklyOffPresent || 0), },
+                        { name: "WO Half Present", data: genders.map((g) => (groups[g] || {}).weeklyOffHalfPresent || 0), },
                         { name: "Weekly Off", data: genders.map((g) => (groups[g] || {}).weeklyOff || 0), },
+                        { name: "Single Punch", data: genders.map((g) => (groups[g] || {}).singlePunch || 0), },
                         { name: "Absent", data: genders.map((g) => (groups[g] || {}).absent || 0), },
                     ],
                     "Gender Attendance",
                     (gender, index, seriesIndex, seriesName) => {
-                        const filteredLogs = logs.filter((l) => {
+                        const filteredLogs = dayLogs.filter((l) => {
                             const e = empMap[l.empId];
                             if (!e || e.gender !== gender) {
                                 return false;
@@ -3700,6 +3877,7 @@ class AttendanceView {
             },
         };
     }
+
 
     _fmtMins(mins) {
         const m = parseInt(mins) || 0;
@@ -3994,19 +4172,22 @@ class AttendanceView {
         };
     }
 
+
     _renderShiftWise(logs, emps, empMap, model) {
         const shiftStats = model.state.data.shiftStats || [];
         const { dateFrom, dateTo } = model.state.filters;
-        const rows = shiftStats.map((s) => [s.shiftName, s.total, s.present, s.halfPresent, s.weeklyOff, s.absent, s.rate + "%"]);
+        const rows = shiftStats.map((s) => [s.shiftName, s.total, s.present, s.halfPresent, s.weeklyOffPresent || 0, s.weeklyOffHalfPresent || 0, s.weeklyOff, s.absent, s.rate + "%"]);
 
         this._lastData["shift-wise"] = rows.map((r) => ({
             Shift: r[0],
             Total: r[1],
             Present: r[2],
             HalfPresent: r[3],
-            WeeklyOff: r[4],
-            Absent: r[5],
-            Rate: r[6],
+            WOPresent: r[4],
+            WOHalfPresent: r[5],
+            WeeklyOff: r[6],
+            Absent: r[7],
+            Rate: r[8],
         }));
 
         const fullLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
@@ -4020,7 +4201,7 @@ class AttendanceView {
 				<div class="charts-grid">
 					${this._chartCard("ch-shift-bar", '<i class="ph-fill ph-chart-bar"></i>', "amber", "Present by Shift", "Click to view records")}
 				</div>
-				${this._tableHTML("tbl-shift", ["Shift", "Total", "Present", "Half Present", "Weekly Off", "Absent", "Rate"], rows, "shift-wise")}
+				${this._tableHTML("tbl-shift", ["Shift", "Total", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Absent", "Rate"], rows, "shift-wise")}
 				<div id="drilldown-table" style="margin-top:16px"></div>
 			`,
 
@@ -4031,6 +4212,8 @@ class AttendanceView {
                     [
                         { name: "Present", data: shiftStats.map((s) => s.present), },
                         { name: "Half Present", data: shiftStats.map((s) => s.halfPresent), },
+                        { name: "WO Present", data: shiftStats.map((s) => s.weeklyOffPresent || 0), },
+                        { name: "WO Half Present", data: shiftStats.map((s) => s.weeklyOffHalfPresent || 0), },
                         { name: "Weekly Off", data: shiftStats.map((s) => s.weeklyOff), },
                         { name: "Absent", data: shiftStats.map((s) => s.absent), },
                     ],
@@ -4049,6 +4232,7 @@ class AttendanceView {
             },
         };
     }
+
 
     _buildPaginatedTable(rows, headers, page, pageSize, tableId, reRenderFnName) {
         const currentPage = page;
@@ -5290,6 +5474,7 @@ class AttendanceView {
             });
     }
 
+    
     _renderStaff(logs, emps, empMap, model) {
         const staffCategoryIds = [58];
         const { dateFrom, dateTo } = model.state.filters;
@@ -5297,10 +5482,11 @@ class AttendanceView {
         const staffEmps = emps.filter((e) => staffCategoryIds.includes(e.categoryId),);
         const staffGroups = this._computeGroupedDayStats(staffEmps, logs, dateFrom, dateTo, (e) => e.dept);
         const staffDepts = [...new Set(staffEmps.map((e) => e.dept))].sort();
+        const dayLogs = this._buildEmployeeDayLogs(staffEmps, logs, dateFrom, dateTo);
 
         const staffRows = staffDepts.map((d) => {
             const g = staffGroups[d] || {};
-            return [d, g.total || 0, g.present || 0, g.halfPresent || 0, g.weeklyOff || 0, g.absent || 0, g.total ? Math.round((g.present / g.total) * 100) + "%" : "0%"];
+            return [d, g.total || 0, g.present || 0, g.halfPresent || 0, g.weeklyOffPresent || 0, g.weeklyOffHalfPresent || 0, g.weeklyOff || 0, g.singlePunch || 0, g.absent || 0, g.total ? Math.round((g.present / g.total) * 100) + "%" : "0%"];
         });
 
         this._lastData["staff-wise"] = staffRows.map((r) => ({
@@ -5308,9 +5494,11 @@ class AttendanceView {
             Total: r[1],
             Present: r[2],
             Half: r[3],
-            WeeklyOff: r[4],
-            Absent: r[5],
-            Rate: r[6],
+            WOPresent: r[4],
+            WOHalfPresent: r[5],
+            WeeklyOff: r[6],
+            Absent: r[7],
+            Rate: r[8],
         }));
 
         return {
@@ -5318,12 +5506,16 @@ class AttendanceView {
 				<h2 class="section-title">
 					<i class="ph-fill ph-identification-badge"></i> Staff Statistics
 				</h2>
-				<div class="charts-grid">
+				
+                <div class="charts-grid">
 					${this._chartCard("ch-staff-dept", '<i class="ph-fill ph-chart-bar"></i>', "violet", "Staff Attendance by Department", "Click bar for detail")}
 				</div>
-				${this._tableHTML("tbl-staff", ["Dept", "Total", "Present", "Half Present", "Weekly Off", "Absent", "Rate"], staffRows, "staff-wise")}
-				<div id="drilldown-table" style="margin-top:16px"></div>
+				
+                ${this._tableHTML("tbl-staff", ["Dept", "Total", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Single Punch", "Absent", "Rate"], staffRows, "staff-wise")}
+				
+                <div id="drilldown-table" style="margin-top:16px"></div>
 			`,
+
             renderCharts: () => {
                 Charts.stacked(
                     "ch-staff-dept",
@@ -5331,12 +5523,15 @@ class AttendanceView {
                     [
                         { name: "Present", data: staffRows.map((r) => r[2]) },
                         { name: "Half Present", data: staffRows.map((r) => r[3]), },
-                        { name: "Weekly Off", data: staffRows.map((r) => r[4]), },
-                        { name: "Absent", data: staffRows.map((r) => r[5]) },
+                        { name: "WO Present", data: staffRows.map((r) => r[4]), },
+                        { name: "WO Half Present", data: staffRows.map((r) => r[5]), },
+                        { name: "Weekly Off", data: staffRows.map((r) => r[6]), },
+                        { name: "Single Punch", data: staffRows.map((r) => r[7]), },
+                        { name: "Absent", data: staffRows.map((r) => r[8]) },
                     ],
                     "Staff by Department",
                     (dept, index, seriesIndex, seriesName) => {
-                        const filtered = logs.filter((l) => {
+                        const filtered = dayLogs.filter((l) => {
                             const e = empMap[l.empId];
                             if (!e || e.dept !== dept) return false;
                             if (!staffCategoryIds.includes(e.categoryId)) return false;
@@ -5349,6 +5544,7 @@ class AttendanceView {
         };
     }
 
+
     _renderWorker(logs, emps, empMap, model) {
         const workerCategoryIds = [51, 59, 60];
         const { dateFrom, dateTo } = model.state.filters;
@@ -5359,7 +5555,7 @@ class AttendanceView {
 
         const workerRows = workerDepts.map((d) => {
             const g = workerGroups[d] || {};
-            return [d, g.total || 0, g.present || 0, g.halfPresent || 0, g.weeklyOff || 0, g.absent || 0, g.total ? Math.round((g.present / g.total) * 100) + "%" : "0%"];
+            return [d, g.total || 0, g.present || 0, g.halfPresent || 0, g.weeklyOffPresent || 0, g.weeklyOffHalfPresent || 0, g.weeklyOff || 0, g.absent || 0, g.total ? Math.round((g.present / g.total) * 100) + "%" : "0%"];
         });
 
         this._lastData["worker-wise"] = workerRows.map((r) => ({
@@ -5367,9 +5563,11 @@ class AttendanceView {
             Total: r[1],
             Present: r[2],
             Half: r[3],
-            WeeklyOff: r[4],
-            Absent: r[5],
-            Rate: r[6],
+            WOPresent: r[4],
+            WOHalfPresent: r[5],
+            WeeklyOff: r[6],
+            Absent: r[7],
+            Rate: r[8],
         }));
 
         return {
@@ -5380,7 +5578,7 @@ class AttendanceView {
 				<div class="charts-grid">
 					${this._chartCard("ch-worker-dept", '<i class="ph-fill ph-chart-bar"></i>', "amber", "Workmen Attendance by Department", "Click bar for detail")}
 				</div>
-				${this._tableHTML("tbl-worker", ["Dept", "Total", "Present", "Half Present", "Weekly Off", "Absent", "Rate"], workerRows, "worker-wise")}
+				${this._tableHTML("tbl-worker", ["Dept", "Total", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Absent", "Rate"], workerRows, "worker-wise")}
 				<div id="drilldown-table" style="margin-top:16px"></div>
 			`,
             renderCharts: () => {
@@ -5390,8 +5588,10 @@ class AttendanceView {
                     [
                         { name: "Present", data: workerRows.map((r) => r[2]) },
                         { name: "Half Present", data: workerRows.map((r) => r[3]), },
-                        { name: "Weekly Off", data: workerRows.map((r) => r[4]), },
-                        { name: "Absent", data: workerRows.map((r) => r[5]) },
+                        { name: "WO Present", data: workerRows.map((r) => r[4]), },
+                        { name: "WO Half Present", data: workerRows.map((r) => r[5]), },
+                        { name: "Weekly Off", data: workerRows.map((r) => r[6]), },
+                        { name: "Absent", data: workerRows.map((r) => r[7]) },
                     ],
                     "Workmen by Department",
                     (dept, index, seriesIndex, seriesName) => {
@@ -5407,6 +5607,7 @@ class AttendanceView {
             },
         };
     }
+
 
     _renderJoinExitTab(model, mode, page = 1) {
         const isResigned = mode === "resigned";

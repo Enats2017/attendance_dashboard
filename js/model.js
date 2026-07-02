@@ -835,19 +835,21 @@ class AttendanceModel {
     _buildStatusKeyMap(logs) {
         const singlePunchKeys = this.state.data.singlePunchKeys || new Set();
         const map = {};
+
+        // Seed single-punch keys first — independent of whether a log row exists
+        singlePunchKeys.forEach(key => {
+            map[key] = 'singlePunch';
+        });
+
         logs.forEach(l => {
             const key = l.empId + '_' + l.date;
+            if (map[key] === 'singlePunch') return;   // don't overwrite
+
             const present = parseFloat(l.present ?? 0);
             const absent  = parseFloat(l.absent  ?? 0);
 
-            if (singlePunchKeys.has(key)) {
-                map[key] = 'singlePunch';
-                return;
-            }
             if (present == 1 && absent == 0) {
-                if (l.missedInPunch == 1 || l.missedOutPunch == 1) {
-                    map[key] = 'singlePunch';
-                } else if (parseInt(l.weeklyOff) == 1) {
+                if (parseInt(l.weeklyOff) == 1) {
                     map[key] = 'weeklyOffPresent';
                 } else {
                     map[key] = 'present';

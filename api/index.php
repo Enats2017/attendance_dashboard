@@ -1105,9 +1105,7 @@ function handleDashboardData($input, $returnData = false) {
         if (isset($singlePunchData[$key])) {
             $statusKeyMap[$key] = 'singlePunch';
         } elseif ($present == 1 && $absent == 0) {
-            if ($log['missedInPunch'] == 1 || $log['missedOutPunch'] == 1) {
-                $statusKeyMap[$key] = 'singlePunch';
-            } elseif ($isWeeklyOff) {
+            if ($isWeeklyOff) {
                 $statusKeyMap[$key] = 'weeklyOffPresent';
             } else {
                 $statusKeyMap[$key] = 'present';
