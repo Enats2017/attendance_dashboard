@@ -146,6 +146,7 @@ class AttendanceView {
             woPresent: target.dataset.wopresent || 0,
             woHalfPresent: target.dataset.wohalfpresent || 0,
             weeklyOff: target.dataset.weeklyoff || 0,
+            singlePunch: target.dataset.single || 0,
             absent: target.dataset.absent || 0,
             total: target.dataset.total || 0,
         };
@@ -177,31 +178,43 @@ class AttendanceView {
 			<div style="font-weight:700;margin-bottom:8px;">
 				${label}
 			</div>
+
 			<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
 				<span style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block;"></span> Present: 
 				<b style="margin-left:auto;">${stats.present}</b>
 			</div>
-			<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+			
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
 				<span style="width:8px;height:8px;border-radius:50%;background:#f59e0b;display:inline-block;"></span> Half Present: 
 				<b style="margin-left:auto;">${stats.half}</b>
 			</div>
-			<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+			
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
 				<span style="width:8px;height:8px;border-radius:50%;background:#8b5cf6;display:inline-block;"></span> WO Present: 
 				<b style="margin-left:auto;">${stats.woPresent}</b>
 			</div>
-			<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+			
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
 				<span style="width:8px;height:8px;border-radius:50%;background:#eab308;display:inline-block;"></span> WO Half Present: 
 				<b style="margin-left:auto;">${stats.woHalfPresent}</b>
 			</div>
-			<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
-				<span style="width:8px;height:8px;border-radius:50%;background:#3b82f6;display:inline-block;"></span> Weekly Off: 
-				<b style="margin-left:auto;">${stats.weeklyOff}</b>
-			</div>
-			<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-				<span style="width:8px;height:8px;border-radius:50%;background:#f43f5e;display:inline-block;"></span> Absent: 
-				<b style="margin-left:auto;">${stats.absent}</b>
-			</div>
-			<div style="display:flex;align-items:center;gap:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.15);">
+			
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+                <span style="width:8px;height:8px;border-radius:50%;background:#3b82f6;display:inline-block;"></span> Weekly Off: 
+                <b style="margin-left:auto;">${stats.weeklyOff}</b>
+            </div>
+            
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+                <span style="width:8px;height:8px;border-radius:50%;background:#EC4899;display:inline-block;"></span> Single Punch: 
+                <b style="margin-left:auto;">${stats.singlePunch}</b>
+            </div>
+            
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+                <span style="width:8px;height:8px;border-radius:50%;background:#f43f5e;display:inline-block;"></span> Absent: 
+                <b style="margin-left:auto;">${stats.absent}</b>
+            </div>
+			
+            <div style="display:flex;align-items:center;gap:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.15);">
 				<span style="width:8px;height:8px;border-radius:50%;background:#94a3b8;display:inline-block;"></span> Total: 
 				<b style="margin-left:auto;">${stats.total}</b>
 			</div>
@@ -3300,7 +3313,7 @@ class AttendanceView {
 
             return `
                 <div class="dept-acc-row">
-                    <div class="dept-acc-header" data-dept="${this._escapeAttr(d)}" data-present="${present}" data-half="${half}" data-wopresent="${woPresent}" data-wohalfpresent="${woHalfPresent}" data-weeklyoff="${wo}" data-absent="${absent}" data-total="${total}">
+                    <div class="dept-acc-header" data-dept="${this._escapeAttr(d)}" data-present="${present}" data-half="${half}" data-wopresent="${woPresent}" data-wohalfpresent="${woHalfPresent}" data-weeklyoff="${wo}" data-single="${singlePunch}" data-absent="${absent}" data-total="${total}">
                         <div class="dept-acc-label">${d}</div>
                         <div class="dept-acc-track">
                             ${ticks.map((t) => `<div class="dept-acc-gridline" style="left:${(t / niceMax) * 100}%"></div>`).join("")}
@@ -3427,24 +3440,24 @@ class AttendanceView {
             const aPct = (g.absent / total) * 100;
            
             return `
-                <div class="dept-acc-sub-row" data-designation="${this._escapeAttr(d)}" data-present="${g.present}" data-half="${g.halfPresent}" data-wopresent="${g.weeklyOffPresent}" data-wohalfpresent="${g.weeklyOffHalfPresent}" data-weeklyoff="${g.weeklyOff}" data-absent="${g.absent}" data-total="${g.total}">
-                <div class="dept-acc-sub-label">${d}</div>
-                <div class="dept-acc-track">
-                    ${ticks.map((t) => `<div class="dept-acc-gridline" style="left:${(t / niceMax) * 100}%"></div>`).join("")}
-                    <div class="dept-acc-bar-wrap" style="width:${scale.toFixed(2)}%">
-                    <div class="dept-acc-bar small">
-                        ${g.present > 0 ? `<div class="dept-acc-seg present" data-status="Present" style="width:${pPct}%">${g.present}</div>` : ""}
-                        ${g.halfPresent > 0 ? `<div class="dept-acc-seg half" data-status="Half Present" style="width:${hPct}%">${g.halfPresent}</div>` : ""}
-                        ${g.weeklyOffPresent > 0 ? `<div class="dept-acc-seg wopresent" data-status="WO Present" style="width:${wpPct}%">${g.weeklyOffPresent}</div>` : ""}
-                        ${g.weeklyOffHalfPresent > 0 ? `<div class="dept-acc-seg wohalfpresent" data-status="WO Half Present" style="width:${whPct}%">${g.weeklyOffHalfPresent}</div>` : ""}
-                        ${g.weeklyOff > 0 ? `<div class="dept-acc-seg weeklyoff" data-status="Weekly Off" style="width:${wPct}%">${g.weeklyOff}</div>` : ""}
-                        ${g.singlePunch > 0 ? `<div class="dept-acc-seg single" data-status="Single Punch" style="width:${spPct}%">${g.singlePunch}</div>` : ""}
-                        ${g.absent > 0 ? `<div class="dept-acc-seg absent" data-status="Absent" style="width:${aPct}%">${g.absent}</div>` : ""}
-                    </div>
+                <div class="dept-acc-sub-row" data-designation="${this._escapeAttr(d)}" data-present="${g.present}" data-half="${g.halfPresent}" data-wopresent="${g.weeklyOffPresent}" data-wohalfpresent="${g.weeklyOffHalfPresent}" data-weeklyoff="${g.weeklyOff}" data-single="${g.singlePunch}" data-absent="${g.absent}" data-total="${g.total}">
+                    <div class="dept-acc-sub-label">${d}</div>
+                    <div class="dept-acc-track">
+                        ${ticks.map((t) => `<div class="dept-acc-gridline" style="left:${(t / niceMax) * 100}%"></div>`).join("")}
+                        <div class="dept-acc-bar-wrap" style="width:${scale.toFixed(2)}%">
+                        <div class="dept-acc-bar small">
+                            ${g.present > 0 ? `<div class="dept-acc-seg present" data-status="Present" style="width:${pPct}%">${g.present}</div>` : ""}
+                            ${g.halfPresent > 0 ? `<div class="dept-acc-seg half" data-status="Half Present" style="width:${hPct}%">${g.halfPresent}</div>` : ""}
+                            ${g.weeklyOffPresent > 0 ? `<div class="dept-acc-seg wopresent" data-status="WO Present" style="width:${wpPct}%">${g.weeklyOffPresent}</div>` : ""}
+                            ${g.weeklyOffHalfPresent > 0 ? `<div class="dept-acc-seg wohalfpresent" data-status="WO Half Present" style="width:${whPct}%">${g.weeklyOffHalfPresent}</div>` : ""}
+                            ${g.weeklyOff > 0 ? `<div class="dept-acc-seg weeklyoff" data-status="Weekly Off" style="width:${wPct}%">${g.weeklyOff}</div>` : ""}
+                            ${g.singlePunch > 0 ? `<div class="dept-acc-seg single" data-status="Single Punch" style="width:${spPct}%">${g.singlePunch}</div>` : ""}
+                            ${g.absent > 0 ? `<div class="dept-acc-seg absent" data-status="Absent" style="width:${aPct}%">${g.absent}</div>` : ""}
+                        </div>
+                        </div>
                     </div>
                 </div>
-                </div>
-            `;
+             `;
         }).join("");
 
         expandEl.innerHTML = `
@@ -4219,7 +4232,7 @@ class AttendanceView {
     _renderShiftWise(logs, emps, empMap, model) {
         const shiftStats = model.state.data.shiftStats || [];
         const { dateFrom, dateTo } = model.state.filters;
-        const rows = shiftStats.map((s) => [s.shiftName, s.total, s.present, s.halfPresent, s.weeklyOffPresent || 0, s.weeklyOffHalfPresent || 0, s.weeklyOff, s.absent, s.rate + "%"]);
+        const rows = shiftStats.map((s) => [s.shiftName, s.total, s.present, s.halfPresent, s.weeklyOffPresent || 0, s.weeklyOffHalfPresent || 0, s.weeklyOff, s.singlePunch || 0, s.absent, s.rate + "%"]);
 
         this._lastData["shift-wise"] = rows.map((r) => ({
             Shift: r[0],
@@ -4229,8 +4242,9 @@ class AttendanceView {
             WOPresent: r[4],
             WOHalfPresent: r[5],
             WeeklyOff: r[6],
-            Absent: r[7],
-            Rate: r[8],
+            SinglePunch: r[7],
+            Absent: r[8],
+            Rate: r[9],
         }));
 
         const fullLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
@@ -4241,10 +4255,13 @@ class AttendanceView {
 					<i class="ph-fill ph-clock-clockwise"></i>
 					Shift Statistics
 				</h2>
-				<div class="charts-grid">
+				
+                <div class="charts-grid">
 					${this._chartCard("ch-shift-bar", '<i class="ph-fill ph-chart-bar"></i>', "amber", "Present by Shift", "Click to view records")}
 				</div>
-				${this._tableHTML("tbl-shift", ["Shift", "Total", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Absent", "Rate"], rows, "shift-wise")}
+				
+                ${this._tableHTML("tbl-shift", ["Shift", "Total", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Single Punch", "Absent", "Rate"], rows, "shift-wise")}
+
 				<div id="drilldown-table" style="margin-top:16px"></div>
 			`,
 
@@ -4258,6 +4275,7 @@ class AttendanceView {
                         { name: "WO Present", data: shiftStats.map((s) => s.weeklyOffPresent || 0), },
                         { name: "WO Half Present", data: shiftStats.map((s) => s.weeklyOffHalfPresent || 0), },
                         { name: "Weekly Off", data: shiftStats.map((s) => s.weeklyOff), },
+                        { name: "Single Punch", data: shiftStats.map((s) => s.singlePunch || 0), },
                         { name: "Absent", data: shiftStats.map((s) => s.absent), },
                     ],
                     "Shift Attendance",

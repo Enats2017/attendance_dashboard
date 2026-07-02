@@ -357,23 +357,23 @@ function setupPassword($data) {
 }
 
 
-function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesInAttendanceLogs, $dayFrom, $dayTo, $conn) {
-    $shiftStats = [];    
+function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesInAttendanceLogs, $dayFrom, $dayTo, $conn, $singlePunchData = []) {
+    $shiftStats = [];
     $logKeyMap = [];
+
     foreach ($logs as $log) {
         $key = $log['empId'] . '_' . $log['date'];
+
         if (!isset($logKeyMap[$key])) {
             $logKeyMap[$key] = $log;
-        } else {
-            if (floatval($log['present']) > floatval($logKeyMap[$key]['present'])) {
-                $logKeyMap[$key] = $log;
-            }
         }
     }
 
     $shiftLookup = [];
+
     foreach ($logs as $log) {
         $key = $log['empId'] . '_' . $log['date'];
+
         $shiftLookup[$key] = [
             'shiftId' => $log['shiftId'],
             'shiftCode' => $log['shiftCode'],
@@ -386,20 +386,24 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
                 'shiftName' => $log['shiftName'],
                 'total' => 0,
                 'present' => 0,
+                'weeklyOffPresent' => 0,
                 'halfPresent' => 0,
+                'weeklyOffHalfPresent' => 0,
                 'weeklyOff' => 0,
-                'holiday' => 0,
-                'leave' => 0,
+                // 'holiday' => 0,
+                // 'leave' => 0,
+                'singlePunch' => 0,
                 'absent' => 0
             ];
         }
     }
 
     $rangeStart = new DateTime($dayFrom);
-    $rangeEnd = new DateTime($dayTo);
+    $rangeEnd   = new DateTime($dayTo);
 
     for ($d = clone $rangeStart; $d <= $rangeEnd; $d->modify('+1 day')) {
         $dateStr = $d->format('Y-m-d');
+
         foreach ($employees as $e) {
             $empId = $e['id'];
             $key = $empId . '_' . $dateStr;
@@ -410,49 +414,95 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
 
             $shiftName = $shiftLookup[$key]['shiftName'];
             $shiftStats[$shiftName]['total']++;
-            
+
+            if (isset($singlePunchData[$key])) {
+                $shiftStats[$shiftName]['singlePunch']++;
+                continue;
+            }
+
             if (isset($logKeyMap[$key])) {
                 $log = $logKeyMap[$key];
-                $present = floatval($log['present']);
-                $absent = floatval($log['absent']);
+                $code = strtoupper(trim($log['detailedStatusCode'] ?? ''));
+                $isWeeklyOff = intval($log['weeklyOff']) === 1;
 
-                if ($present == 1 && $absent == 0) {
-                    $shiftStats[$shiftName]['present']++;
-                } elseif ($present == 0.5 && $absent == 0.5) {
-                    $shiftStats[$shiftName]['halfPresent']++;
-                } elseif ($present == 0 && $absent == 0) {
-                    $shiftStats[$shiftName]['weeklyOff']++;
-                } else {
-                    $shiftStats[$shiftName]['absent']++;
+                switch ($code) {
+                    case 'P':
+                        $shiftStats[$shiftName]['present']++;
+                        break;
+
+                    case '½PLD':
+                    case 'L_CL':
+                    case '½PCL':
+                    case '½PLD(HO)':
+                        $shiftStats[$shiftName]['halfPresent']++;
+                        break;
+
+                    case 'WO':
+                        $shiftStats[$shiftName]['weeklyOff']++;
+                        break;
+
+                    case 'WOP':
+                        if ($isWeeklyOff) {
+                            $shiftStats[$shiftName]['weeklyOffPresent']++;
+                        } else {
+                            $shiftStats[$shiftName]['present']++;
+                        }
+                        break;
+
+                    case '½PLD(WO)':
+                        if ($isWeeklyOff) {
+                            $shiftStats[$shiftName]['weeklyOffHalfPresent']++;
+                        } else {
+                            $shiftStats[$shiftName]['halfPresent']++;
+                        }
+                        break;
+
+                    case 'A':
+                    case 'ALD':
+                    case 'WOA':
+                        $shiftStats[$shiftName]['absent']++;
+                        break;
+
+                    default:
+                        $shiftStats[$shiftName]['absent']++;
+                        break;
                 }
-            } elseif (isset($deviceEmployeeStats[$key])) {
+            }
+            elseif (isset($deviceEmployeeStats[$key])) {
                 $stat = $deviceEmployeeStats[$key];
+
                 if (($stat['inCount'] ?? 0) >= 1 && ($stat['outCount'] ?? 0) >= 1) {
                     $shiftStats[$shiftName]['present']++;
                 } else {
                     $shiftStats[$shiftName]['absent']++;
                 }
-            } else {
+            }
+            else {
                 $shiftStats[$shiftName]['absent']++;
             }
         }
     }
 
     $result = [];
+
     foreach ($shiftStats as $row) {
         $result[] = [
             'shiftCode' => $row['shiftCode'],
             'shiftName' => $row['shiftName'],
             'total' => $row['total'],
             'present' => $row['present'],
+            'weeklyOffPresent' => $row['weeklyOffPresent'],
             'halfPresent' => $row['halfPresent'],
+            'weeklyOffHalfPresent' => $row['weeklyOffHalfPresent'],
             'weeklyOff' => $row['weeklyOff'],
-            'holiday' => $row['holiday'],
-            'leave' => $row['leave'],
+            // 'holiday' => $row['holiday'],
+            // 'leave' => $row['leave'],
+            'singlePunch' => $row['singlePunch'],
             'absent' => $row['absent'],
             'rate' => $row['total'] > 0 ? round(($row['present'] / $row['total']) * 100) : 0
         ];
     }
+
     return $result;
 }
 
@@ -1248,7 +1298,7 @@ function handleDashboardData($input, $returnData = false) {
     $halfPresentTotal = $halfPresentEmployeeDays;
     $weeklyOffTotal = $weeklyOffEmployeeDays;
 
-    $shiftStats = computeShiftStats($employees,  $logs,  $deviceEmployeeStats,  $employeesInAttendanceLogs,  $dayFrom, $dayTo, $conn);
+    $shiftStats = computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesInAttendanceLogs, $dayFrom, $dayTo, $conn, $singlePunchData);
 
     if ($returnData) {
         return [
