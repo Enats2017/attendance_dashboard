@@ -22,6 +22,7 @@ class AttendanceView {
             { id: "newjoined", label: "New Joined", icon: "ph-user-plus" },
             { id: "special", label: "Critical Alerts", icon: "ph-warning-circle", },
             { id: "designation_order", label: "Designations Order", icon: "ph-sliders", },
+            { id: "designation_families", label: "Designation Families", icon: "ph-cards", },
             { id: "sort_order", label: "Sort Order Settings", icon: "ph-sort-ascending", },
         ];
         this._lastData = {};
@@ -56,7 +57,8 @@ class AttendanceView {
 					<div class="content-body">
 						${state.activeTab !== "feature" ? this._renderFilters(state.filters, filterOpts) : ""}
                         ${
-                            state.activeTab === "age"
+                            state.activeTab === "designation"
+                                ? this._renderDesignationFamilySummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "age"
                                 ? this._renderAgeSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "company"
                                 ? this._renderCompanySummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "dept"
                                 ? this._renderDeptSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "gender"
@@ -70,6 +72,7 @@ class AttendanceView {
                                 ? this._renderNewJoinedSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "special"
                                 ? "" : state.activeTab === "designation_order"
                                 ? "" : state.activeTab === "sort_order"
+                                ? "" : state.activeTab === "designation_families"
                                 ? "" : state.activeTab === "feature"
                                 ? this._renderDashboardSummaryCards(emps, stats, model, logs, empMap) : this._renderSummaryCards(stats, emps, logs, empMap, model)
                         }
@@ -713,20 +716,13 @@ class AttendanceView {
                 debugStatusCounts.absent++;
             }
 
-            const isPresentOrHalf =
-                this._matchesStatus(l, "Present") ||
-                this._matchesStatus(l, "Half Present") ||
-                this._matchesStatus(l, "WO Present") ||
-                this._matchesStatus(l, "WO Half Present");
+            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present");
 
             if (!isPresentOrHalf) return;
 
             const g = model.getAgeGroup(e.dob);
 
-            if (counts[g] !== undefined) {
-                counts[g]++;
-            }
-
+            if (counts[g] !== undefined) counts[g]++;
         });
 
         console.table(debugStatusCounts);
@@ -771,6 +767,111 @@ class AttendanceView {
             </div>
         `;
     }
+
+
+    _renderDesignationFamilySummaryCards(emps, stats, model, logs, empMap) {
+        const families = model.state.data.designationFamilies || [];
+        const famMap = model.state.data.designationToFamilyMap || {};
+
+        const { dateFrom, dateTo } = model.state.filters;
+        const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
+
+        this._currentDesigFamilySummaryData = { emps, model, dayLogs, empMap, famMap, families };
+
+        this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
+            this._matchesStatus(l, "Present") ||
+            this._matchesStatus(l, "Half Present") ||
+            this._matchesStatus(l, "WO Present") ||
+            this._matchesStatus(l, "WO Half Present")
+        ).map((l) => ({
+            log: l,
+            emp: empMap[l.empId],
+            date: l.date,
+        }));
+
+        const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) + (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0);
+
+        if (!families.length) {
+            return `
+                <div class="summary-grid">
+                    <div class="stat-card stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
+                        <div class="stat-icon"><i class="ph ph-users"></i></div>
+                        <div class="stat-content">
+                            <span class="stat-label">Total Presentcount</span>
+                            <span class="stat-value">${totalPresentHalf}</span>
+                            <span class="stat-card-hint">↓ click to view</span>
+                        </div>
+                    </div>
+                </div>
+                <p style="padding:16px;color:#94a3b8;">No designation families created yet. Go to "Designation Families" tab to create some.</p>
+            `;
+        }
+
+        const colorCls = ["info", "success", "warning", "accent", "danger"];
+        const counts = {};
+        families.forEach((f) => (counts[f.id] = 0));
+
+        dayLogs.forEach((l) => {
+            const e = empMap[l.empId];
+            if (!e) return;
+            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present");
+            if (!isPresentOrHalf) return;
+
+            const famInfo = famMap[e.designationId];
+            if (famInfo && counts[famInfo.familyId] !== undefined) {
+                counts[famInfo.familyId]++;
+            }
+        });
+
+        const cards = [
+            { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
+            ...families.map((f, i) => ({ type: "family", label: f.name, val: counts[f.id], icon: "ph-cards", cls: colorCls[i % colorCls.length], familyId: f.id, })),
+            { type: "avgHours", label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", },
+        ];
+
+        return `
+            <div class="summary-grid">
+                ${cards.map((c) => {
+                    if (c.type === "family") {
+                        return `
+                            <div class="stat-card ${c.cls} stat-card-clickable"
+                                data-family-id="${c.familyId}"
+                                onclick="AppController.view._showDesignationFamilyDrilldown(${c.familyId})">
+                                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                                <div class="stat-content">
+                                    <span class="stat-label">${c.label}</span>
+                                    <span class="stat-value">${c.val}</span>
+                                    <span class="stat-card-hint">↓ click to view</span>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    if (c.type === "avgHours") {
+                        return `
+                            <div class="stat-card">
+                                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                                <div class="stat-content">
+                                    <span class="stat-label">${c.label}</span>
+                                    <span class="stat-value">${c.val}</span>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    return `
+                        <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
+                            <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                            <div class="stat-content">
+                                <span class="stat-label">${c.label}</span>
+                                <span class="stat-value">${c.val}</span>
+                                <span class="stat-card-hint">↓ click to view</span>
+                            </div>
+                        </div>
+                    `;
+                }).join("")}
+            </div>
+        `;
+    }
+
 
 
     _renderCompanySummaryCards(emps, stats, model, logs, empMap) {
@@ -1963,6 +2064,33 @@ class AttendanceView {
         this._renderStatCardDrilldown("avgHoursDept", items, 1);
     }
 
+
+    _showDesignationFamilyDrilldown(familyId) {
+        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(`.stat-card-clickable[data-family-id="${familyId}"]`,);
+        if (card) card.classList.add("active");
+
+        const data = this._currentDesigFamilySummaryData;
+        if (!data) return;
+
+        const { dayLogs, empMap, famMap } = data;
+
+        const items = dayLogs.filter((l) => {
+            const e = empMap[l.empId];
+            if (!e) return false;
+            const famInfo = famMap[e.designationId];
+            if (!famInfo || famInfo.familyId !== familyId) return false;
+            return this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present");
+        }).map((l) => ({
+            log: l,
+            emp: empMap[l.empId],
+            date: l.date,
+        }));
+
+        this._renderStatCardDrilldown("desigFamily_" + familyId, items, 1);
+    }
+
+
     _showCompanyDrilldown(company) {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
         const card = this.app.querySelector(`.stat-card-clickable[data-company="${company}"]`,);
@@ -2438,6 +2566,21 @@ class AttendanceView {
                     `,
                 };
                 break;
+            case "designation_families":                                    
+                content = {
+                    html: `
+                        <div class="designation-order-container">
+                            <h2 class="section-title"><i class="ph-fill ph-cards"></i> Designation Families</h2>
+                            <div id="designation-families-content">
+                                <div style="display:flex; align-items:center; gap:12px; padding:32px; color:#64748b;">
+                                    <div class="auth-spinner" style="width:24px; height:24px; border-width:2px; border-top-color:#6366f1;"></div>
+                                    <span>Loading designation families...</span>
+                                </div>
+                            </div>
+                        </div>
+                    `,
+                };
+                break;
             default:
                 content = { html: "<p>Tab not found</p>" };
         }
@@ -2451,9 +2594,12 @@ class AttendanceView {
             this._initDesignationOrderTab(model);
             return;
         }
-
         if (tabId === "sort_order") {
             setTimeout(() => this._initSortOrderTab(model), 50);
+            return;
+        }
+        if (tabId === "designation_families") {                     
+            this._initDesignationFamiliesTab(model);
             return;
         }
 
@@ -3807,7 +3953,15 @@ class AttendanceView {
         const deptEmps = emps.filter((e) => e.dept === dept);
         const { dateFrom, dateTo } = model.state.filters;
         const groups = this._computeGroupedDayStats(deptEmps, logs, dateFrom, dateTo, (e) => e.designation || "Staff");
-        const desigs = Object.keys(groups).sort();
+        const desigs = [...new Map(
+            deptEmps.map(e => [
+                e.designation,
+                { name: e.designation || "Staff", sortOrder: e.designationSortOrder ?? 9999 }
+            ])
+        ).values()].sort((a, b) => {
+            if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+            return a.name.localeCompare(b.name);
+        }).map(x => x.name);
 
         const old = document.getElementById("dept-desig-popover");
         if (old) old.remove();
@@ -4178,60 +4332,78 @@ class AttendanceView {
         };
     }
 
+
     _renderDesignationWise(logs, emps, empMap, model) {
         const desigMap = {};
+        
         emps.forEach((e) => {
             const name = e.designation || "Staff";
             const order = e.designationSortOrder || 0;
             if (!desigMap[name] || order < desigMap[name].order) desigMap[name] = { name, order };
         });
+        
         const desigs = Object.values(desigMap).sort((a, b) => {
-            if (a.order !== b.order) {
-                return a.order - b.order;
-            }
+            if (a.order !== b.order) return a.order - b.order;
             return a.name.localeCompare(b.name);
         }).map((d) => d.name);
-        const eBD = model.groupBy(emps, (e) => e.designation || "Staff");
-        const lBD = model.groupBy(logs, (l) => (empMap[l.empId] || {}).designation || "Staff",);
+
+        const { dateFrom, dateTo } = model.state.filters;
+        const groups = this._computeGroupedDayStats(emps, logs, dateFrom, dateTo, (e) => e.designation || "Staff");
+        const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
+
         const rows = desigs.map((d) => {
-            const t = (eBD[d] || []).length;
-            const ls = lBD[d] || [];
-            const p = new Set(ls.filter((l) => l.present === 1).map((l) => l.empId),).size;
-            return [d, t, p, t - p, t ? Math.round((p / t) * 100) + "%" : "0%"];
+            const g = groups[d] || { total: 0, present: 0, halfPresent: 0, weeklyOffPresent: 0, weeklyOffHalfPresent: 0, weeklyOff: 0, singlePunch: 0, absent: 0 };
+            const rate = g.total ? Math.round((g.present / g.total) * 100) + "%" : "0%";
+            return [d, g.total, g.present, g.halfPresent, g.weeklyOffPresent, g.weeklyOffHalfPresent, g.weeklyOff, g.singlePunch, g.absent, rate];
         });
+
         this._lastData["designation-wise"] = rows.map((r) => ({
             Designation: r[0],
             Total: r[1],
             Present: r[2],
-            Absent: r[3],
-            Rate: r[4],
+            HalfPresent: r[3],
+            WOPresent: r[4],
+            WOHalfPresent: r[5],
+            WeeklyOff: r[6],
+            SinglePunch: r[7],
+            Absent: r[8],
+            Rate: r[9],
         }));
+
         return {
             html: `
-				<h2 class="section-title"><i class="ph-fill ph-identification-badge">
-					</i> Designation Statistics
-				</h2>
-				<div class="charts-grid">
-					${this._chartCard("ch-desig-bar", '<i class="ph-fill ph-chart-bar"></i>', "teal", "Present by Designation", "Click for detail")}
-				</div>
-				${this._tableHTML("tbl-desig", ["Designation", "Total", "Present", "Absent", "Rate"], rows, "designation-wise")}
-				<div id="drilldown-table" style="margin-top:16px"></div>
-			`,
+                <h2 class="section-title"><i class="ph-fill ph-identification-badge"></i> Designation Statistics</h2>
+                <div class="charts-grid">
+                    ${this._chartCard("ch-desig-bar", '<i class="ph-fill ph-chart-bar"></i>', "teal", "Present by Designation", "Click a segment for detail")}
+                </div>
+                ${this._tableHTML("tbl-desig", ["Designation", "Total", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Single Punch", "Absent", "Rate"], rows, "designation-wise")}
+                <div id="drilldown-table" style="margin-top:16px"></div>
+            `,
 
             renderCharts: () => {
-                Charts.bar(
+                Charts.stacked(
                     "ch-desig-bar",
                     desigs,
-                    rows.map((r) => r[2]),
+                    [
+                        { name: "Present", data: rows.map((r) => r[2]) },
+                        { name: "Half Present", data: rows.map((r) => r[3]) },
+                        { name: "WO Present", data: rows.map((r) => r[4]) },
+                        { name: "WO Half Present", data: rows.map((r) => r[5]) },
+                        { name: "Weekly Off", data: rows.map((r) => r[6]) },
+                        { name: "Single Punch", data: rows.map((r) => r[7]) },
+                        { name: "Absent", data: rows.map((r) => r[8]) },
+                    ],
                     "Designation Attendance",
-                    true,
-                    (d) => {
-                        this._renderDrillDown(
-                            logs.filter((l) => (empMap[l.empId] || {}).designation === d,),
-                            `Designation: ${d}`,
-                            empMap,
-                        );
+                    (designation, index, seriesIndex, seriesName) => {
+                        const filteredLogs = dayLogs.filter((l) => {
+                            const e = empMap[l.empId];
+                            if (!e) return false;
+                            if ((e.designation || "Staff") !== designation) return false;
+                            return this._matchesStatus(l, seriesName);
+                        });
+                        this._renderDrillDown(filteredLogs, `Designation: ${designation} - ${seriesName}`, empMap);
                     },
+                    true 
                 );
             },
         };
@@ -4873,6 +5045,7 @@ class AttendanceView {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
     }
 
+
     async _initDesignationOrderTab(model) {
         const contentEl = document.getElementById("designation-order-content");
         if (!contentEl) return;
@@ -5232,6 +5405,7 @@ class AttendanceView {
         });
     }
 
+
     async _initSortOrderTab(model) {
         const contentEl = document.getElementById("sort-order-content");
         if (!contentEl) return;
@@ -5549,6 +5723,282 @@ class AttendanceView {
             });
     }
 
+
+    async _initDesignationFamiliesTab(model) {
+        const contentEl = document.getElementById("designation-families-content");
+        if (!contentEl) return;
+
+        const [famRes, unmappedRes] = await Promise.all([
+            model.fetchDesignationFamilies(),
+            model.fetchUnmappedDesignations()
+        ]);
+
+        if (!famRes || !famRes.success) {
+            contentEl.innerHTML = `
+                <div class="alert-error-panel" style="padding:24px;background:rgba(244,63,94,0.05);border:1px solid rgba(244,63,94,0.2);color:#f43f5e;border-radius:var(--radius-md);display:flex;align-items:center;gap:12px;font-weight:500;">
+                    <i class="ph-fill ph-warning-circle" style="font-size:24px;"></i>
+                    <span><strong>Error loading families:</strong> ${famRes ? famRes.message : "Unknown error"}</span>
+                </div>
+            `;
+            return;
+        }
+
+        const families = famRes.data || [];
+        const unmapped = (unmappedRes && unmappedRes.success) ? (unmappedRes.data || []) : [];
+
+        this._currentDesigFamiliesData = { families, unmapped };
+
+        const colorCls = ["info", "success", "warning", "accent", "danger"];
+
+        contentEl.innerHTML = `
+            <style>
+                .desig-fam-header {
+                    display:flex; justify-content:space-between; align-items:center;
+                    margin-bottom:20px; background:var(--white); padding:20px 24px;
+                    border-radius:var(--radius-md); box-shadow:var(--shadow-sm);
+                    border:1px solid var(--border-color); gap:16px; flex-wrap:wrap;
+                }
+                .desig-fam-new-input {
+                    min-width:220px; padding:10px 16px; border:1px solid var(--border-color);
+                    border-radius:10px; font-size:14px; outline:none;
+                }
+                .desig-fam-unmapped-banner {
+                    padding:14px 20px; background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25);
+                    color:#b45309; border-radius:var(--radius-md); margin-bottom:20px; font-weight:600; font-size:13px;
+                    display:flex; align-items:center; gap:10px;
+                }
+                .desig-fam-card {
+                    background:var(--white); border:1px solid var(--border-color); border-radius:var(--radius-md);
+                    box-shadow:var(--shadow-sm); padding:16px 20px; margin-bottom:12px;
+                }
+                .desig-fam-card-top { display:flex; justify-content:space-between; align-items:center; cursor:pointer; }
+                .desig-fam-card-title { display:flex; align-items:center; gap:10px; font-weight:700; font-size:15px; color:var(--text-main); }
+                .desig-fam-count-badge { font-size:12px; font-weight:600; background:#f1f5f9; color:#475569; padding:3px 10px; border-radius:9999px; }
+                .desig-fam-card-actions { display:flex; gap:8px; }
+                .desig-fam-btn-icon { background:none; border:1px solid var(--border-color); border-radius:8px; padding:6px 10px; cursor:pointer; color:#64748b; }
+                .desig-fam-btn-icon:hover { background:#f1f5f9; }
+                .desig-fam-detail { margin-top:14px; padding-top:14px; border-top:1px solid #f1f5f9; display:none; }
+                .desig-fam-chip-list { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+                .desig-fam-chip {
+                    display:flex; align-items:center; gap:6px; background:#eef2ff; color:#4338ca;
+                    padding:6px 10px; border-radius:8px; font-size:12px; font-weight:600;
+                }
+                .desig-fam-chip button { background:none; border:none; color:#4338ca; cursor:pointer; font-weight:700; padding:0; }
+                .desig-fam-add-panel { background:#f8fafc; border:1px solid #f1f5f9; border-radius:10px; padding:14px; }
+                .desig-fam-add-panel-title { font-size:12px; font-weight:700; color:#64748b; margin-bottom:10px; text-transform:uppercase; letter-spacing:0.05em; }
+                .desig-fam-search-input {
+                    width:100%; padding:8px 12px; margin-bottom:10px; border:1px solid var(--border-color);
+                    border-radius:8px; font-size:13px; outline:none; box-sizing:border-box;
+                }
+                .desig-fam-search-input:focus { border-color:#6366f1; }
+                .desig-fam-checkbox-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:8px; max-height:220px; overflow-y:auto; margin-bottom:12px; }
+                .desig-fam-checkbox-item { display:flex; align-items:center; gap:6px; font-size:13px; color:#334155; }
+                .desig-fam-no-results { color:#94a3b8; font-size:13px; padding:8px 0; display:none; }
+            </style>
+
+            <div class="desig-fam-header">
+                <div>
+                    <h3 style="font-size:16px;font-weight:700;color:var(--text-main);margin-bottom:4px;">Family Cards</h3>
+                    <p style="font-size:13px;color:var(--text-muted);">Create family groups (e.g. Top Management, Workmen Family) and assign designations to each.</p>
+                </div>
+                <div style="display:flex;gap:10px;">
+                    <input type="text" id="new-family-name-input" class="desig-fam-new-input" placeholder="New family name (e.g. Top Management)">
+                    <button class="btn-order-save" id="btn-create-family">
+                        <i class="ph-bold ph-plus"></i> Create
+                    </button>
+                </div>
+            </div>
+
+            ${unmapped.length > 0 ? `
+                <div class="desig-fam-unmapped-banner">
+                    <i class="ph-fill ph-warning-circle" style="font-size:18px;"></i>
+                    ${unmapped.length} designation${unmapped.length === 1 ? "" : "s"} not yet assigned to any family.
+                </div>
+            ` : ""}
+
+            <div id="desig-fam-list">
+                ${families.length === 0 ? `
+                    <div class="empty-state-panel" style="padding:48px;text-align:center;color:var(--text-muted);background:var(--white);border-radius:var(--radius-md);box-shadow:var(--shadow-sm);">
+                        <i class="ph ph-cards" style="font-size:40px;color:#cbd5e1;margin-bottom:10px;display:block;"></i>
+                        <span>No families created yet. Create one above.</span>
+                    </div>
+                ` : families.map((fam, i) => `
+                    <div class="desig-fam-card" data-family-id="${fam.id}">
+                        <div class="desig-fam-card-top" onclick="AppController.view._toggleDesigFamilyDetail(${fam.id})">
+                            <div class="desig-fam-card-title">
+                                <i class="ph ph-cards" style="color:#6366f1;"></i>
+                                ${this._escapeAttr(fam.name)}
+                                <span class="desig-fam-count-badge">${fam.designations.length} designations</span>
+                            </div>
+                            <div class="desig-fam-card-actions">
+                                <button class="desig-fam-btn-icon" onclick="event.stopPropagation(); AppController.view._deleteDesigFamilyConfirm(${fam.id})" title="Delete family">
+                                    <i class="ph ph-trash"></i>
+                                </button>
+                                <i class="ph ph-caret-down"></i>
+                            </div>
+                        </div>
+                        <div class="desig-fam-detail" id="desig-fam-detail-${fam.id}">
+                            <div class="desig-fam-chip-list">
+                                ${fam.designations.length === 0
+                                    ? '<span style="color:#94a3b8;font-size:13px;">No designations assigned yet.</span>'
+                                    : fam.designations.map(d => `
+                                        <div class="desig-fam-chip">
+                                            ${this._escapeAttr(d.name)}
+                                            <button onclick="AppController.view._removeDesigFromFamily(${fam.id}, ${d.id})" title="Remove">✕</button>
+                                        </div>
+                                    `).join("")
+                                }
+                            </div>
+                            <div class="desig-fam-add-panel">
+                                <div class="desig-fam-add-panel-title">Add designations to this family</div>
+                                ${unmapped.length === 0
+                                    ? '<span style="color:#94a3b8;font-size:13px;">No unmapped designations available.</span>'
+                                    : `
+                                        <input type="text"
+                                               class="desig-fam-search-input"
+                                               data-family-id="${fam.id}"
+                                               placeholder="Search designations..."
+                                               oninput="AppController.view._filterDesigFamilyCheckboxes(${fam.id}, this.value)">
+                                        <div class="desig-fam-checkbox-grid" id="desig-fam-checkbox-grid-${fam.id}">
+                                            ${unmapped.map(d => `
+                                                <label class="desig-fam-checkbox-item" data-search-text="${this._escapeAttr(d.name.toLowerCase())}">
+                                                    <input type="checkbox" class="desig-fam-add-checkbox" data-family-id="${fam.id}" value="${d.id}">
+                                                    ${this._escapeAttr(d.name)}
+                                                </label>
+                                            `).join("")}
+                                        </div>
+                                        <div class="desig-fam-no-results" id="desig-fam-no-results-${fam.id}">
+                                            No matching designations.
+                                        </div>
+                                        <button class="btn-order-save" onclick="AppController.view._addDesigsToFamily(${fam.id})">
+                                            <i class="ph-bold ph-plus"></i> Add Selected
+                                        </button>
+                                    `
+                                }
+                            </div>
+                        </div>
+                    </div>
+                `).join("")}
+            </div>
+        `;
+
+        const createBtn = document.getElementById("btn-create-family");
+        const nameInput = document.getElementById("new-family-name-input");
+        createBtn.addEventListener("click", () => this._createNewDesigFamily(nameInput.value));
+        nameInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") this._createNewDesigFamily(nameInput.value);
+        });
+    }
+
+    _toggleDesigFamilyDetail(familyId) {
+        const el = document.getElementById(`desig-fam-detail-${familyId}`);
+        if (!el) return;
+        const isOpen = el.style.display === "block";
+        document.querySelectorAll(".desig-fam-detail").forEach(d => (d.style.display = "none"));
+        el.style.display = isOpen ? "none" : "block";
+    }
+
+    _filterDesigFamilyCheckboxes(familyId, query) {
+        const grid = document.getElementById(`desig-fam-checkbox-grid-${familyId}`);
+        const noResultsEl = document.getElementById(`desig-fam-no-results-${familyId}`);
+        if (!grid) return;
+
+        const q = (query || "").trim().toLowerCase();
+        const items = grid.querySelectorAll(".desig-fam-checkbox-item");
+        let visibleCount = 0;
+
+        items.forEach(item => {
+            const text = item.getAttribute("data-search-text") || "";
+            const matches = text.includes(q);
+            item.style.display = matches ? "flex" : "none";
+            if (matches) visibleCount++;
+        });
+
+        if (noResultsEl) {
+            noResultsEl.style.display = (visibleCount === 0 && q !== "") ? "block" : "none";
+        }
+    }
+
+    async _createNewDesigFamily(name) {
+        const trimmed = (name || "").trim();
+        if (!trimmed) {
+            alert("Please enter a family name.");
+            return;
+        }
+        this.showOverlay("Creating family...");
+        const res = await AppController.model.saveDesignationFamily(trimmed);
+        this.hideOverlay();
+
+        if (res && res.success) {
+            await this._initDesignationFamiliesTab(AppController.model);
+        } else {
+            alert("Failed to create family: " + (res ? res.message : "Unknown error"));
+        }
+    }
+
+    async _deleteDesigFamilyConfirm(familyId) {
+        if (!confirm("Delete this family? Its designations will become unmapped.")) return;
+
+        this.showOverlay("Deleting family...");
+        const res = await AppController.model.deleteDesignationFamily(familyId);
+        this.hideOverlay();
+
+        if (res && res.success) {
+            await this._initDesignationFamiliesTab(AppController.model);
+        } else {
+            alert("Failed to delete family: " + (res ? res.message : "Unknown error"));
+        }
+    }
+
+    async _addDesigsToFamily(familyId) {
+        const data = this._currentDesigFamiliesData;
+        if (!data) return;
+
+        const fam = data.families.find(f => f.id === familyId);
+        if (!fam) return;
+
+        const checked = Array.from(
+            document.querySelectorAll(`.desig-fam-add-checkbox[data-family-id="${familyId}"]:checked`)
+        ).map(cb => parseInt(cb.value));
+
+        if (checked.length === 0) {
+            alert("Please select at least one designation to add.");
+            return;
+        }
+
+        const existingIds = fam.designations.map(d => d.id);
+        const newIds = [...existingIds, ...checked];
+
+        this.showOverlay("Saving...");
+        const res = await AppController.model.saveDesignationFamilyMapping(familyId, newIds);
+        this.hideOverlay();
+
+        if (res && res.success) {
+            await this._initDesignationFamiliesTab(AppController.model);
+        } else {
+            alert("Failed to save: " + (res ? res.message : "Unknown error"));
+        }
+    }
+
+    async _removeDesigFromFamily(familyId, designationId) {
+        const data = this._currentDesigFamiliesData;
+        if (!data) return;
+
+        const fam = data.families.find(f => f.id === familyId);
+        if (!fam) return;
+
+        const remainingIds = fam.designations.filter(d => d.id !== designationId).map(d => d.id);
+
+        this.showOverlay("Removing...");
+        const res = await AppController.model.saveDesignationFamilyMapping(familyId, remainingIds);
+        this.hideOverlay();
+
+        if (res && res.success) {
+            await this._initDesignationFamiliesTab(AppController.model);
+        } else {
+            alert("Failed to remove: " + (res ? res.message : "Unknown error"));
+        }
+    }
     
     _renderStaff(logs, emps, empMap, model) {
         const staffCategoryIds = [58];

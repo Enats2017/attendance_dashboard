@@ -60,6 +60,7 @@ function getMySQL() {
     return $mysqlConn;
 }
 
+
 function getSQLServer() {
     global $sqlServerConn, $sqlConfig;
     if ($sqlServerConn) return $sqlServerConn;
@@ -81,6 +82,7 @@ function getSQLServer() {
     }
     return $sqlServerConn;
 }
+
 
 // --- Input Handling ---
 $input = json_decode(file_get_contents('php://input'), true);
@@ -139,6 +141,21 @@ switch ($action) {
         break;
     case 'setup_db':
         handleSetupDB();
+        break;
+    case 'get_designation_families':
+        handleGetDesignationFamilies();
+        break;
+    case 'save_designation_family':
+        handleSaveDesignationFamily($input);
+        break;
+    case 'delete_designation_family':
+        handleDeleteDesignationFamily($input);
+        break;
+    case 'save_designation_family_mapping':
+        handleSaveDesignationFamilyMapping($input);
+        break;
+    case 'get_unmapped_designations':
+        handleGetUnmappedDesignations();
         break;
     case 'logout':
         handleLogout();
@@ -399,7 +416,7 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
     }
 
     $rangeStart = new DateTime($dayFrom);
-    $rangeEnd   = new DateTime($dayTo);
+    $rangeEnd = new DateTime($dayTo);
 
     for ($d = clone $rangeStart; $d <= $rangeEnd; $d->modify('+1 day')) {
         $dateStr = $d->format('Y-m-d');
@@ -600,6 +617,7 @@ function handleDashboardData($input, $returnData = false) {
                 'std_hc' => intval($row['std_hc']),
                 'company' => $row['company'] ?: 'Unknown',
                 'categoryId' => intval($row['CategoryId']),
+                'designationId' => intval($row['Designation']),
                 'designation' => $row['DesignationName'] ?: 'Staff',
                 'designationSortOrder' => isset($row['designationSortOrder']) ? intval($row['designationSortOrder']) : 0,
                 'shiftGroupId' => intval($row['ShiftGroupId']),
@@ -670,6 +688,7 @@ function handleDashboardData($input, $returnData = false) {
                 'dept' => $row['dept'] ?: 'Dept ' . $row['DepartmentId'],
                 'company' => $row['company'] ?: 'Unknown',
                 'categoryId' => intval($row['CategoryId']),
+                'designationId' => intval($row['Designation']),
                 'designation' => $row['DesignationName'] ?: 'Staff',
                 'shiftGroupName' => $shiftGroupNameMap[intval($row['ShiftGroupId'])] ?? 'No Shift Group',
                 'location' => $row['location'] ?: 'Head Office',
@@ -709,6 +728,7 @@ function handleDashboardData($input, $returnData = false) {
                 'dept' => $row['dept'] ?: 'Dept ' . $row['DepartmentId'],
                 'company' => $row['company'] ?: 'Unknown',
                 'categoryId' => intval($row['CategoryId']),
+                'designationId' => intval($row['Designation']),
                 'designation' => $row['DesignationName'] ?: 'Staff',
                 'shiftGroupName' => $shiftGroupNameMap[intval($row['ShiftGroupId'])] ?? 'No Shift Group',
                 'location' => $row['location'] ?: 'Head Office',
@@ -1932,6 +1952,158 @@ function handleSaveDepartmentsOrder($input) {
         'success' => $success,
         'message' => $success ? 'Department order saved successfully' : 'Some updates failed'
     ]);
+}
+
+
+function handleGetDesignationFamilies() {
+    $conn = getSQLServer();
+
+    $sql = "SELECT F.Id AS FamilyId, F.FamilyName, F.SortOrder, D.DesignationId, D.DesignationsName FROM DesignationFamily F WITH (NOLOCK) LEFT JOIN DesignationFamilyMapping M WITH (NOLOCK) ON M.FamilyId = F.Id LEFT JOIN Designations D WITH (NOLOCK) ON D.DesignationId = M.DesignationId ORDER BY CASE WHEN F.SortOrder IS NULL THEN 1 ELSE 0 END, F.SortOrder ASC, F.FamilyName ASC, D.DesignationsName ASC";
+
+    $stmt = sqlsrv_query($conn, $sql);
+
+    if (!$stmt) {
+        echo json_encode(['success' => false, 'message' => 'Query failed', 'errors' => sqlsrv_errors()]);
+        return;
+    }
+
+    $data = [];
+    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+        $famId = $row['FamilyId'];
+        if (!isset($data[$famId])) {
+            $data[$famId] = [
+                'id' => $famId,
+                'name' => $row['FamilyName'],
+                'sortOrder' => intval($row['SortOrder']),
+                'designations' => []
+            ];
+        }
+        if ($row['DesignationId']) {
+            $data[$famId]['designations'][] = [
+                'id' => $row['DesignationId'],
+                'name' => $row['DesignationsName']
+            ];
+        }
+    }
+
+    echo json_encode(['success' => true, 'data' => array_values($data)]);
+}
+
+
+function handleSaveDesignationFamily($input) {
+    $conn = getSQLServer();
+
+    $id = isset($input['id']) ? intval($input['id']) : 0;
+    $name = isset($input['familyName']) ? trim($input['familyName']) : '';
+    $sortOrder = isset($input['sortOrder']) && $input['sortOrder'] !== '' ? intval($input['sortOrder']) : 0;
+
+    if (empty($name)) {
+        echo json_encode(['success' => false, 'message' => 'Family name is required']);
+        return;
+    }
+
+    if ($id > 0) {
+        $sql = "UPDATE DesignationFamily SET FamilyName = ?, SortOrder = ? WHERE Id = ?";
+        $stmt = sqlsrv_query($conn, $sql, [$name, $sortOrder, $id]);
+    } else {
+        $sql = "INSERT INTO DesignationFamily (FamilyName, SortOrder) VALUES (?, ?)";
+        $stmt = sqlsrv_query($conn, $sql, [$name, $sortOrder]);
+
+        if ($stmt) {
+            $idStmt = sqlsrv_query($conn, "SELECT SCOPE_IDENTITY() AS NewId");
+            $idRow = sqlsrv_fetch_array($idStmt, SQLSRV_FETCH_ASSOC);
+            $id = intval($idRow['NewId']);
+        }
+    }
+
+    if (!$stmt) {
+        echo json_encode(['success' => false, 'message' => 'Save failed', 'errors' => sqlsrv_errors()]);
+        return;
+    }
+
+    echo json_encode(['success' => true, 'id' => $id, 'message' => 'Family saved successfully']);
+}
+
+
+function handleDeleteDesignationFamily($input) {
+    $conn = getSQLServer();
+    $id = isset($input['id']) ? intval($input['id']) : 0;
+
+    if ($id <= 0) {
+        echo json_encode(['success' => false, 'message' => 'Invalid family id']);
+        return;
+    }
+
+    $sql = "DELETE FROM DesignationFamily WHERE Id = ?";
+    $stmt = sqlsrv_query($conn, $sql, [$id]);
+
+    if (!$stmt) {
+        echo json_encode(['success' => false, 'message' => 'Delete failed', 'errors' => sqlsrv_errors()]);
+        return;
+    }
+
+    echo json_encode(['success' => true, 'message' => 'Family deleted successfully']);
+}
+
+
+function handleSaveDesignationFamilyMapping($input) {
+    $conn = getSQLServer();
+
+    $familyId = isset($input['familyId']) ? intval($input['familyId']) : 0;
+    $designationIds = isset($input['designationIds']) ? $input['designationIds'] : [];
+
+    if ($familyId <= 0) {
+        echo json_encode(['success' => false, 'message' => 'Invalid family id']);
+        return;
+    }
+
+    $sqlDelete = "DELETE FROM DesignationFamilyMapping WHERE FamilyId = ?";
+    sqlsrv_query($conn, $sqlDelete, [$familyId]);
+
+    $success = true;
+    foreach ($designationIds as $desigId) {
+        $desigId = intval($desigId);
+        if ($desigId <= 0) continue;
+
+        sqlsrv_query($conn, "DELETE FROM DesignationFamilyMapping WHERE DesignationId = ?", [$desigId]);
+
+        $sqlInsert = "INSERT INTO DesignationFamilyMapping (FamilyId, DesignationId) VALUES (?, ?)";
+        $stmtInsert = sqlsrv_query($conn, $sqlInsert, [$familyId, $desigId]);
+
+        if (!$stmtInsert) {
+            $success = false;
+        }
+    }
+
+    echo json_encode([
+        'success' => $success,
+        'message' => $success ? 'Designations assigned successfully' : 'Some assignments failed'
+    ]);
+}
+
+
+
+function handleGetUnmappedDesignations() {
+    $conn = getSQLServer();
+
+    $sql = "SELECT D.DesignationId, D.DesignationsName FROM Designations D WITH (NOLOCK) WHERE D.DesignationId NOT IN (SELECT DesignationId FROM DesignationFamilyMapping) ORDER BY D.DesignationsName ASC";
+
+    $stmt = sqlsrv_query($conn, $sql);
+
+    if (!$stmt) {
+        echo json_encode(['success' => false, 'message' => 'Query failed', 'errors' => sqlsrv_errors()]);
+        return;
+    }
+
+    $data = [];
+    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+        $data[] = [
+            'id' => $row['DesignationId'],
+            'name' => $row['DesignationsName']
+        ];
+    }
+
+    echo json_encode(['success' => true, 'data' => $data]);
 }
 
 

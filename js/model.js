@@ -7,7 +7,9 @@ class AttendanceModel {
             data: {
                 employees: [],
                 attendanceLogs: [],
-                counts: { In: 0, Out: 0 }
+                counts: { In: 0, Out: 0 },
+                designationFamilies: [],
+                designationToFamilyMap: {}
             },
             filterLists: null,
             filters: {
@@ -169,6 +171,7 @@ class AttendanceModel {
                 window.ATTENDANCE_LOGS = data.attendanceLogs;
 
                 this._commit();
+                this.loadDesignationFamiliesForStats();
                 return { success: true };
             } else {
                 throw new Error(data.message || 'API Error');
@@ -727,6 +730,106 @@ class AttendanceModel {
     }
 
 
+    async fetchDesignationFamilies() {
+        try {
+            const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
+            url.searchParams.set('action', 'get_designation_families');
+            const response = await fetch(url.toString(), { credentials: 'include' });
+            return await response.json();
+        } catch (error) {
+            console.error('Fetch Designation Families Error:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+
+    async loadDesignationFamiliesForStats() {
+        if (this.state.data.designationFamilies && this.state.data.designationFamilies.length) {
+            return { success: true };
+        }
+        const res = await this.fetchDesignationFamilies();
+        if (res && res.success) {
+            this.state.data.designationFamilies = res.data || [];
+            const map = {};
+            (res.data || []).forEach(fam => {
+                (fam.designations || []).forEach(d => {
+                    map[d.id] = { familyId: fam.id, familyName: fam.name };
+                });
+            });
+            this.state.data.designationToFamilyMap = map;
+            this._commit();
+        }
+        return res;
+    }
+
+
+    async saveDesignationFamily(familyName, sortOrder = 0, id = 0) {
+        try {
+            const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
+            url.searchParams.set('action', 'save_designation_family');
+            const response = await fetch(url.toString(), {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'save_designation_family', id, familyName, sortOrder })
+            });
+            return await response.json();
+        } catch (error) {
+            console.error('Save Designation Family Error:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+
+    async deleteDesignationFamily(id) {
+        try {
+            const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
+            url.searchParams.set('action', 'delete_designation_family');
+            const response = await fetch(url.toString(), {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'delete_designation_family', id })
+            });
+            return await response.json();
+        } catch (error) {
+            console.error('Delete Designation Family Error:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+
+    async saveDesignationFamilyMapping(familyId, designationIds) {
+        try {
+            const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
+            url.searchParams.set('action', 'save_designation_family_mapping');
+            const response = await fetch(url.toString(), {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'save_designation_family_mapping', familyId, designationIds })
+            });
+            return await response.json();
+        } catch (error) {
+            console.error('Save Designation Family Mapping Error:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+
+    async fetchUnmappedDesignations() {
+        try {
+            const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
+            url.searchParams.set('action', 'get_unmapped_designations');
+            const response = await fetch(url.toString(), { credentials: 'include' });
+            return await response.json();
+        } catch (error) {
+            console.error('Fetch Unmapped Designations Error:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    
     getStaffEmployees() {
         const staffCategoryIds = [58];
         const { logs, emps } = this.getFilteredData();
@@ -881,6 +984,7 @@ class AttendanceModel {
                     break;
             }
         });
+        
         return map;
     }
 
