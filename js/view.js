@@ -3493,45 +3493,6 @@ class AttendanceView {
 
         return `
 			<div class="dept-accordion">
-				<style>
-					.dept-accordion { width:100%; }
-					.dept-acc-legend { display:flex; gap:16px; font-size:12px; font-weight:600; color:#64748b; margin-bottom:14px; }
-					.dept-acc-legend .dot { width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:5px; }
-					.dept-acc-legend .dot.present { background:#10b981; }
-					.dept-acc-legend .dot.half { background:#f59e0b; }
-					.dept-acc-legend .dot.wopresent { background:#8b5cf6; }
-					.dept-acc-legend .dot.wohalfpresent { background:#eab308; }
-					.dept-acc-legend .dot.weeklyoff { background:#3b82f6; }
-                    .dept-acc-legend .dot.single { background:#8B4513; }
-                    .dept-acc-legend .dot.absent { background:#f43f5e; }
-					.dept-acc-row { border-bottom: 1px solid #f1f5f9; }
-					.dept-acc-header { display:flex; align-items:center; gap:12px; padding:10px 0; cursor:pointer; }
-					.dept-acc-label { width:160px; flex-shrink:0; font-size:12px; font-weight:700; color:#475569; }
-					.dept-acc-track { position:relative; flex:1; }
-					.dept-acc-gridline { position:absolute; top:-4px; bottom:-4px; width:1px; background:rgba(99,102,241,0.10); }
-					.dept-acc-bar-wrap { position:relative; z-index:1; max-width: 100%; }
-					.dept-acc-bar { display:flex; height:30px; border-radius:6px; overflow:hidden; background:#f8fafc; }
-					.dept-acc-bar.small { height:24px; }
-					.dept-acc-seg { display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px; font-weight:700; min-width: 18px; cursor:pointer; }
-					.dept-acc-seg.present { background:#10b981; }
-					.dept-acc-seg.half { background:#f59e0b; }
-					.dept-acc-seg.wopresent { background:#8b5cf6; }
-					.dept-acc-seg.wohalfpresent { background:#eab308; }
-					.dept-acc-seg.weeklyoff { background:#3b82f6; }
-					.dept-acc-seg.absent { background:#f43f5e; }
-                    .dept-acc-seg.single { background:#8B4513; }
-					.dept-acc-caret { color:#94a3b8; font-size:14px; flex-shrink:0; }
-					.dept-acc-expand { padding: 6px 0 14px 172px; }
-					.dept-acc-sub-title { font-size:12px; font-weight:700; color:#7c3aed; margin-bottom:10px; }
-					.dept-acc-sub-row { display:flex; align-items:center; gap:12px; margin-bottom:8px; }
-					.dept-acc-sub-label { width:140px; flex-shrink:0; font-size:11px; font-weight:600; color:#64748b; }
-					.dept-acc-axis { display:flex; justify-content:space-between; font-size:10px; font-weight:700; color:#94a3b8; margin-left:172px; margin-top:6px; padding-top:8px; border-top:1px solid #f1f5f9; }
-					.dept-acc-sub-axis { display:flex; justify-content:space-between; font-size:10px; font-weight:700; color:#94a3b8; margin-left:152px; margin-top:4px; }
-					.dept-acc-legend span { cursor: pointer; }
-					.dept-accordion.dimmed .dept-acc-seg { opacity: 0.15; }
-					.dept-accordion.dimmed .dept-acc-seg.active-highlight { opacity: 1; }
-				</style>
-				
                 <div class="dept-acc-legend">
 					<span data-legend="present"><i class="dot present"></i>Present</span>
 					<span data-legend="half"><i class="dot half"></i>Half Present</span>
@@ -5752,58 +5713,43 @@ class AttendanceView {
 
         contentEl.innerHTML = `
             <style>
-                .desig-fam-header {
-                    display:flex; justify-content:space-between; align-items:center;
-                    margin-bottom:20px; background:var(--white); padding:20px 24px;
-                    border-radius:var(--radius-md); box-shadow:var(--shadow-sm);
-                    border:1px solid var(--border-color); gap:16px; flex-wrap:wrap;
-                }
-                .desig-fam-new-input {
-                    min-width:220px; padding:10px 16px; border:1px solid var(--border-color);
-                    border-radius:10px; font-size:14px; outline:none;
-                }
-                .desig-fam-unmapped-banner {
-                    padding:14px 20px; background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25);
-                    color:#b45309; border-radius:var(--radius-md); margin-bottom:20px; font-weight:600; font-size:13px;
-                    display:flex; align-items:center; gap:10px;
-                }
-                .desig-fam-card {
-                    background:var(--white); border:1px solid var(--border-color); border-radius:var(--radius-md);
-                    box-shadow:var(--shadow-sm); padding:16px 20px; margin-bottom:12px;
-                }
-                .desig-fam-card-top { display:flex; justify-content:space-between; align-items:center; cursor:pointer; }
-                .desig-fam-card-title { display:flex; align-items:center; gap:10px; font-weight:700; font-size:15px; color:var(--text-main); }
-                .desig-fam-count-badge { font-size:12px; font-weight:600; background:#f1f5f9; color:#475569; padding:3px 10px; border-radius:9999px; }
-                .desig-fam-card-actions { display:flex; gap:8px; }
-                .desig-fam-btn-icon { background:none; border:1px solid var(--border-color); border-radius:8px; padding:6px 10px; cursor:pointer; color:#64748b; }
-                .desig-fam-btn-icon:hover { background:#f1f5f9; }
-                .desig-fam-detail { margin-top:14px; padding-top:14px; border-top:1px solid #f1f5f9; display:none; }
+                .desig-fam-header{ display:flex; justify-content:space-between; align-items:center; gap:12px; padding:24px; margin-bottom:24px; background:#fff; border:1px solid #e2e8f0; border-radius:16px; box-shadow:0 6px 18px rgba(15,23,42,.06);}
+                .desig-fam-new-input{ width:250px; height:35px;  padding:0 14px; border:1px solid var(--border-color); border-radius:10px; font-size:12px; outline:none; box-sizing:border-box;}
+                .desig-fam-unmapped-banner{ display:flex; align-items:center; gap:12px; padding:16px 20px; margin-bottom:20px; border-radius:14px; background:#fffbeb; border:1px solid #fde68a; color:#92400e; font-weight:600;}
+                .desig-fam-card{ background:#fff; border:1px solid #e5e7eb; border-radius:16px; padding:20px; margin-bottom:16px; transition:.25s; box-shadow:0 3px 10px rgba(15,23,42,.05);}
+                .desig-fam-card:hover{ transform:translateY(-2px); box-shadow:0 10px 25px rgba(15,23,42,.10);}
+                .desig-fam-card-top{ display:flex; justify-content:space-between; align-items:center; gap:20px;}
+                .desig-fam-card-title{ display:flex; align-items:center; gap:12px; font-size:16px; font-weight:700; color:#1e293b;}
+                .desig-fam-count-badge{ background:#eef2ff; color:#4f46e5; padding:5px 12px; border-radius:999px; font-size:12px; font-weight:700;}
+                .desig-fam-card-actions{ display:flex; align-items:center; justify-content:center; gap:10px;}
+                .desig-fam-btn-icon{ width:36px; height:36px; display:flex; align-items:center; justify-content:center; border-radius:10px; border:1px solid #e2e8f0; background:#fff; cursor:pointer; transition:.2s;}
+                .desig-fam-btn-icon:hover{ background:#fef2f2; color:#dc2626; border-color:#fecaca;}
+                .desig-fam-toggle-btn:hover{ background:#eef2ff; color:#4f46e5; border-color:#c7d2fe;}
+                .desig-fam-detail{ margin-top:18px; padding-top:18px; border-top:1px solid #edf2f7;}
                 .desig-fam-chip-list { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
-                .desig-fam-chip {
-                    display:flex; align-items:center; gap:6px; background:#eef2ff; color:#4338ca;
-                    padding:6px 10px; border-radius:8px; font-size:12px; font-weight:600;
-                }
-                .desig-fam-chip button { background:none; border:none; color:#4338ca; cursor:pointer; font-weight:700; padding:0; }
-                .desig-fam-add-panel { background:#f8fafc; border:1px solid #f1f5f9; border-radius:10px; padding:14px; }
+                .desig-fam-chip{ display:flex; align-items:center; gap:8px; padding:8px 14px; background:#eef2ff; color:#4338ca; border-radius:999px; font-size:13px; font-weight:600;}
+                .desig-fam-chip button{ width:18px; height:18px; border:none; border-radius:50%; background:#4338ca; color:#fff; cursor:pointer;}
+                .desig-fam-add-panel{ margin-top:18px; padding:18px 18px 10px 18px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px;}
                 .desig-fam-add-panel-title { font-size:12px; font-weight:700; color:#64748b; margin-bottom:10px; text-transform:uppercase; letter-spacing:0.05em; }
-                .desig-fam-search-input {
-                    width:100%; padding:8px 12px; margin-bottom:10px; border:1px solid var(--border-color);
-                    border-radius:8px; font-size:13px; outline:none; box-sizing:border-box;
-                }
-                .desig-fam-search-input:focus { border-color:#6366f1; }
-                .desig-fam-checkbox-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:8px; max-height:220px; overflow-y:auto; margin-bottom:12px; }
-                .desig-fam-checkbox-item { display:flex; align-items:center; gap:6px; font-size:13px; color:#334155; }
+                .desig-fam-search-input{ width:100%; height:42px; padding:0 14px; border:1px solid #dbe4ee; border-radius:10px; margin-bottom:16px; transition:.2s;}
+                .desig-fam-search-input:focus{ border-color:#6366f1; box-shadow:0 0 0 4px rgba(99,102,241,.10);}
+                .desig-fam-checkbox-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px; max-height:220px; overflow:auto; padding-right:4px;}
+                .desig-fam-checkbox-item{ display:flex; align-items:center; gap:10px; padding:10px 12px; background:#fff; border:1px solid #e2e8f0; border-radius:10px; transition:.2s; cursor:pointer;}
+                .desig-fam-checkbox-item:hover{ background:#eef2ff; border-color:#6366f1;}
+                .desig-fam-add-btn{ display:inline-flex; align-items:center; justify-content:center; flex-direction:row; gap:6px; white-space:nowrap; height:35px; padding:0 18px; margin-top:10px; background:#4f46e5; color:#fff; border:none; border-radius:10px; font-size:14px; font-weight:600; cursor:pointer; line-height:1; transition:.25s;}
+                .desig-fam-add-btn i{ display:flex; align-items:center; justify-content:center; font-size:16px; line-height:1; flex-shrink:0;}
+                .desig-fam-add-btn:hover{ background:#4338ca;}
                 .desig-fam-no-results { color:#94a3b8; font-size:13px; padding:8px 0; display:none; }
             </style>
 
             <div class="desig-fam-header">
-                <div>
+                    <div style="flex:1;">
                     <h3 style="font-size:16px;font-weight:700;color:var(--text-main);margin-bottom:4px;">Family Cards</h3>
                     <p style="font-size:13px;color:var(--text-muted);">Create family groups (e.g. Top Management, Workmen Family) and assign designations to each.</p>
                 </div>
-                <div style="display:flex;gap:10px;">
+                <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;height:35px;">
                     <input type="text" id="new-family-name-input" class="desig-fam-new-input" placeholder="New family name (e.g. Top Management)">
-                    <button class="btn-order-save" id="btn-create-family">
+                    <button class="btn-order-save desig-fam-add-btn" id="btn-create-family">
                         <i class="ph-bold ph-plus"></i> Create
                     </button>
                 </div>
@@ -5830,12 +5776,18 @@ class AttendanceView {
                                 ${this._escapeAttr(fam.name)}
                                 <span class="desig-fam-count-badge">${fam.designations.length} designations</span>
                             </div>
-                            <div class="desig-fam-card-actions">
-                                <button class="desig-fam-btn-icon" onclick="event.stopPropagation(); AppController.view._deleteDesigFamilyConfirm(${fam.id})" title="Delete family">
-                                    <i class="ph ph-trash"></i>
-                                </button>
+                          <div class="desig-fam-card-actions">
+                            <button class="desig-fam-btn-icon"
+                                onclick="event.stopPropagation(); AppController.view._deleteDesigFamilyConfirm(${fam.id})"
+                                title="Delete family">
+                                <i class="ph ph-trash"></i>
+                            </button>
+
+                            <button class="desig-fam-btn-icon desig-fam-toggle-btn"
+                                onclick="event.stopPropagation(); AppController.view._toggleDesigFamilyDetail(${fam.id})">
                                 <i class="ph ph-caret-down"></i>
-                            </div>
+                            </button>
+                        </div>
                         </div>
                         <div class="desig-fam-detail" id="desig-fam-detail-${fam.id}">
                             <div class="desig-fam-chip-list">
@@ -5870,9 +5822,9 @@ class AttendanceView {
                                         <div class="desig-fam-no-results" id="desig-fam-no-results-${fam.id}">
                                             No matching designations.
                                         </div>
-                                        <button class="btn-order-save" onclick="AppController.view._addDesigsToFamily(${fam.id})">
+                                     <button class="btn-order-save desig-fam-add-btn" onclick="AppController.view._addDesigsToFamily(${fam.id})">
                                             <i class="ph-bold ph-plus"></i> Add Selected
-                                        </button>
+                                    </button>
                                     `
                                 }
                             </div>
