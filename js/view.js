@@ -88,6 +88,7 @@ class AttendanceView {
 
         this._restoreFilterValues(state.filters);
         this._initChartRendering(state.activeTab, logs, emps, empMap, state.filters, state.data.counts, model, myToken);
+        this._scrollActiveSidebarItem();
     }
 
 
@@ -272,7 +273,11 @@ class AttendanceView {
 			</aside>
 		`;
     }
-
+    _scrollActiveSidebarItem() {
+        const activeItem = document.querySelector(".sidebar-nav .nav-item.active");
+        if (!activeItem) return;
+        activeItem.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+    }
 
     _renderTopbar(state) {
         const user = window.HRMS_USER || {};
