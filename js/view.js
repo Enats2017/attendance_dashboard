@@ -27,6 +27,7 @@ class AttendanceView {
         ];
         this._lastData = {};
         this._renderToken = 0;
+        this.LATE_THRESHOLD = 3; 
     }
 
 
@@ -450,13 +451,37 @@ class AttendanceView {
             isDashboard: true,
         };
 
-        // --- Headcount ---
+        // --- Headcount: Required / Available / Gap ---
+        const requiredCount = model.getRequiredHeadcount();
+        const availableCount = stats.total;
+        const gapCount = model.getGapHeadcount();
+
         const headcountCard = `
-            <div class="stat-card stat-card-clickable" data-card-key="totalHeadcount">
+            <div class="stat-card info stat-card-clickable"
+                data-headcount="required"
+                onclick="AppController.view._showHeadcountBreakdownDrilldown('required')">
+                <div class="stat-icon"><i class="ph ph-target"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">Required</span>
+                    <span class="stat-value">${requiredCount}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+            <div class="stat-card success stat-card-clickable" data-card-key="totalHeadcount">
                 <div class="stat-icon"><i class="ph ph-users"></i></div>
                 <div class="stat-content">
-                    <span class="stat-label">Total Headcount</span>
-                    <span class="stat-value">${stats.total}</span>
+                    <span class="stat-label">Available</span>
+                    <span class="stat-value">${availableCount}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+            <div class="stat-card ${gapCount > 0 ? "danger" : "success"} stat-card-clickable"
+                data-headcount="gap"
+                onclick="AppController.view._showHeadcountBreakdownDrilldown('gap')">
+                <div class="stat-icon"><i class="ph ${gapCount > 0 ? "ph-warning" : "ph-check-circle"}"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">Gap</span>
+                    <span class="stat-value">${gapCount}</span>
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
             </div>
@@ -4085,45 +4110,49 @@ class AttendanceView {
         }
     }
 
+    _getSeverityStyle(count) {
+        if (count < this.LATE_THRESHOLD) return "";
+        const intensity = Math.min((count - this.LATE_THRESHOLD + 1) / 8, 1); 
+        const alpha = (0.12 + intensity * 0.6).toFixed(2); 
+        return `background: rgba(244,63,94,${alpha});`;
+    }
+
     _renderLateIn(logs, emps, empMap, model, page = 1) {
-        const items = model ? model.getLateInEmployees() : this._currentLateInItems;
-        this._currentLateInItems = items;
+        const groups = model ? model.getLateInEmployeesGrouped() : this._currentLateInGroups;
+        this._currentLateInGroups = groups;
         this._currentLateInEmpMap = empMap || this._currentLateInEmpMap;
 
         const pageSize = 25;
         const currentPage = page;
-        const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
-        const pageItems = items.slice((currentPage - 1) * pageSize, currentPage * pageSize,);
+        const totalPages = Math.max(1, Math.ceil(groups.length / pageSize));
+        const pageGroups = groups.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-        const rows = pageItems.map(({ log, emp, date }) => [
-            emp.code || "-",
-            emp.name || "-",
-            emp.dept || "-",
-            emp.company || "-",
-            emp.shift || "-",
-            log?.shiftStart || "-",
-            log?.shiftEnd || "-",
-            this._formatDate(date),
-            log?.inTime || "-",
-            log?.outTime || "-",
-            log?.hoursWorked || 0,
-            this._fmtMins(log?.lateBy),
-        ]);
+        const rowsHtml = pageGroups.map((g) => {
+            const isRepeat = g.count >= this.LATE_THRESHOLD;
+            const severityStyle = this._getSeverityStyle(g.count);
+            return `
+                <tr style="cursor:pointer;${severityStyle}"
+                    onclick="AppController.view._showLateInEmployeeDrilldown('${g.emp.id}')">
+                    <td><b>${g.emp.code || "-"}</b></td>
+                    <td>${g.emp.name || "-"}</td>
+                    <td>${g.emp.dept || "-"}</td>
+                    <td>${g.emp.company || "-"}</td>
+                    <td>${g.emp.shift || "-"}</td>
+                    <td><span class="badge ${isRepeat ? "badge-danger" : "badge-info"}">${g.count} Late Day${g.count > 1 ? "s" : ""}</span></td>
+                </tr>
+            `;
+        }).join("");
 
-        this._lastData["late-in"] = items.map(({ log, emp, date }) => ({
-            Code: emp.code,
-            Name: emp.name,
-            Dept: emp.dept,
-            Company: emp.company,
-            Shift: emp.shift,
-            Date: this._formatDate(date),
-            In: log?.inTime,
-            Out: log?.outTime,
-            Hours: log?.hoursWorked,
+        const flatItems = [];
+        groups.forEach((g) => g.logs.forEach((log) => flatItems.push({ log, emp: g.emp, date: log.date })));
+
+        this._lastData["late-in"] = flatItems.map(({ log, emp, date }) => ({
+            Code: emp.code, Name: emp.name, Dept: emp.dept, Company: emp.company, Shift: emp.shift,
+            Date: this._formatDate(date), In: log?.inTime, Out: log?.outTime, Hours: log?.hoursWorked,
             LateByMins: log?.lateBy,
         }));
 
-        const byShift = this._countBy(items, (it) => it.emp.shift || "No Shift",);
+        const byShift = this._countBy(flatItems, (it) => it.emp.shift || "No Shift");
         const shifts = Object.keys(byShift);
 
         let pageButtons = "";
@@ -4131,49 +4160,66 @@ class AttendanceView {
         const endPage = Math.min(totalPages, currentPage + 2);
         for (let i = startPage; i <= endPage; i++) {
             pageButtons += `
-				<button class="btn-page ${i === currentPage ? "btn-page-active" : ""}"
-					onclick="AppController.view._reRenderLateInPage(${i})">
-					${i}
-				</button>
-			`;
+                <button class="btn-page ${i === currentPage ? "btn-page-active" : ""}" onclick="AppController.view._reRenderLateInPage(${i})">
+                    ${i}
+                </button>
+            `;
         }
 
         return {
             html: `
-				<h2 class="section-title"><i class="ph-fill ph-clock-afternoon"></i> Late In Records</h2>
-				<div class="charts-grid">
-					${this._chartCard("ch-latein-shift", '<i class="ph ph-clock-clockwise"></i>', "amber", "Late-In Count by Shift", "Click for detail")}
-				</div>
-				${this._tableHTML("tbl-latein", ["Code", "Name", "Dept", "Company", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Late By"], rows, "late-in")}
-				<div class="pagination-bar">
-					<div class="pagination-text">
-						Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, items.length)} of ${items.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
-					</div>
-					<div class="pagination-buttons">
-						<button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderLateInPage(1)">«</button>
-						<button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderLateInPage(${currentPage - 1})">‹</button>
-						${pageButtons}
-						<button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderLateInPage(${currentPage + 1})">›</button>
-						<button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderLateInPage(${totalPages})">»</button>
-					</div>
-				</div>
-				<div id="drilldown-table" style="margin-top:16px"></div>
-			`,
+                <style>.row-danger td { background: #fef2f2; }</style>
+                <h2 class="section-title"><i class="ph-fill ph-clock-afternoon"></i> Late In Records</h2>
+                <div class="charts-grid">
+                    ${this._chartCard("ch-latein-shift", '<i class="ph ph-clock-clockwise"></i>', "amber", "Late-In Count by Shift", "Click for detail")}
+                </div>
+                <div id="main-table-wrap">
+                    <div class="table-wrap">
+                        <div class="table-header">
+                            <h3>📄 Employees with Late-In Records (click a row for detail)</h3>
+                        </div>
+                        <div style="overflow-x:auto">
+                            <table class="data-table">
+                                <thead>
+                                    <tr><th>Code</th><th>Name</th><th>Dept</th><th>Company</th><th>Shift</th><th>Total Late Days</th></tr>
+                                </thead>
+                                <tbody>${rowsHtml}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="pagination-bar">
+                        <div class="pagination-text">
+                            Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, groups.length)} of ${groups.length} employees &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
+                        </div>
+                        <div class="pagination-buttons">
+                            <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderLateInPage(1)">«</button>
+                            <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderLateInPage(${currentPage - 1})">‹</button>
+                            ${pageButtons}
+                            <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderLateInPage(${currentPage + 1})">›</button>
+                            <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderLateInPage(${totalPages})">»</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="drilldown-table" style="margin-top:16px"></div>
+            `,
             renderCharts: () => {
                 Charts.stacked(
-                    "ch-latein-shift",
-                    shifts,
-                    [
-                        { name: "Late In Count", data: shifts.map((s) => byShift[s]), },
-                    ],
+                    "ch-latein-shift", shifts,
+                    [{ name: "Late In Count", data: shifts.map((s) => byShift[s]) }],
                     "Late-In by Shift",
                     (shiftName) => {
-                        const shiftLogs = items.filter((it) =>(it.emp.shift || "No Shift") === shiftName,).map((it) => it.log);
-                        this._renderDrillDown(shiftLogs, `Late In - Shift: ${shiftName}`, empMap || this._currentLateInEmpMap,);
+                        const shiftLogs = flatItems.filter((it) => (it.emp.shift || "No Shift") === shiftName).map((it) => it.log);
+                        this._renderDrillDown(shiftLogs, `Late In - Shift: ${shiftName}`, empMap || this._currentLateInEmpMap);
                     },
                 );
             },
         };
+    }
+
+    _showLateInEmployeeDrilldown(empId) {
+        const group = (this._currentLateInGroups || []).find((g) => String(g.emp.id) === String(empId));
+        if (!group) return;
+        this._renderDrillDown(group.logs, `Late In - ${group.emp.name} (${group.emp.code})`, this._currentLateInEmpMap);
     }
 
     _reRenderLateInPage(page) {
@@ -4183,31 +4229,35 @@ class AttendanceView {
     }
 
     _renderEarlyOut(logs, emps, empMap, model, page = 1) {
-        const items = model ? model.getEarlyOutEmployees() : this._currentEarlyOutItems;
-        this._currentEarlyOutItems = items;
+        const groups = model ? model.getEarlyOutEmployeesGrouped() : this._currentEarlyOutGroups;
+        this._currentEarlyOutGroups = groups;
         this._currentEarlyOutEmpMap = empMap || this._currentEarlyOutEmpMap;
 
         const pageSize = 25;
         const currentPage = page;
-        const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
-        const pageItems = items.slice((currentPage - 1) * pageSize, currentPage * pageSize,);
+        const totalPages = Math.max(1, Math.ceil(groups.length / pageSize));
+        const pageGroups = groups.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-        const rows = pageItems.map(({ log, emp, date }) => [
-            emp.code || "-",
-            emp.name || "-",
-            emp.dept || "-",
-            emp.company || "-",
-            emp.shift || "-",
-            log?.shiftStart || "-",
-            log?.shiftEnd || "-",
-            this._formatDate(date),
-            log?.inTime || "-",
-            log?.outTime || "-",
-            log?.hoursWorked || 0,
-            this._fmtMins(log?.earlyBy),
-        ]);
+        const rowsHtml = pageGroups.map((g) => {
+            const isRepeat = g.count >= this.LATE_THRESHOLD;
+            const severityStyle = this._getSeverityStyle(g.count);
+            return `
+                <tr style="cursor:pointer;${severityStyle}"
+                    onclick="AppController.view._showEarlyOutEmployeeDrilldown('${g.emp.id}')">
+                    <td><b>${g.emp.code || "-"}</b></td>
+                    <td>${g.emp.name || "-"}</td>
+                    <td>${g.emp.dept || "-"}</td>
+                    <td>${g.emp.company || "-"}</td>
+                    <td>${g.emp.shift || "-"}</td>
+                    <td><span class="badge ${isRepeat ? "badge-danger" : "badge-info"}">${g.count} Early Day${g.count > 1 ? "s" : ""}</span></td>
+                </tr>
+            `;
+        }).join("");
 
-        this._lastData["early-out"] = items.map(({ log, emp, date }) => ({
+        const flatItems = [];
+        groups.forEach((g) => g.logs.forEach((log) => flatItems.push({ log, emp: g.emp, date: log.date })));
+
+        this._lastData["early-out"] = flatItems.map(({ log, emp, date }) => ({
             Code: emp.code,
             Name: emp.name,
             Dept: emp.dept,
@@ -4222,7 +4272,7 @@ class AttendanceView {
             EarlyByMins: log?.earlyBy,
         }));
 
-        const byShift = this._countBy(items, (it) => it.emp.shift || "No Shift",);
+        const byShift = this._countBy(flatItems, (it) => it.emp.shift || "No Shift");
         const shifts = Object.keys(byShift);
 
         let pageButtons = "";
@@ -4230,34 +4280,49 @@ class AttendanceView {
         const endPage = Math.min(totalPages, currentPage + 2);
         for (let i = startPage; i <= endPage; i++) {
             pageButtons += `
-				<button class="btn-page ${i === currentPage ? "btn-page-active" : ""}"
-					onclick="AppController.view._reRenderEarlyOutPage(${i})">
-					${i}
-				</button>
-			`;
+                <button class="btn-page ${i === currentPage ? "btn-page-active" : ""}"
+                    onclick="AppController.view._reRenderEarlyOutPage(${i})">
+                    ${i}
+                </button>
+            `;
         }
 
         return {
             html: `
-				<h2 class="section-title"><i class="ph-fill ph-sign-out"></i> Early Out Records</h2>
-				<div class="charts-grid">
-					${this._chartCard("ch-earlyout-shift", '<i class="ph ph-clock-clockwise"></i>', "sky", "Early-Out Count by Shift", "Click for detail")}
-				</div>
-				${this._tableHTML("tbl-earlyout", ["Code", "Name", "Dept", "Company", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Early By"], rows, "early-out")}
-				<div class="pagination-bar">
-					<div class="pagination-text">
-						Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, items.length)} of ${items.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
-					</div>
-					<div class="pagination-buttons">
-						<button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderEarlyOutPage(1)">«</button>
-						<button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderEarlyOutPage(${currentPage - 1})">‹</button>
-						${pageButtons}
-						<button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderEarlyOutPage(${currentPage + 1})">›</button>
-						<button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderEarlyOutPage(${totalPages})">»</button>
-					</div>
-				</div>
-				<div id="drilldown-table" style="margin-top:16px"></div>
-			`,
+                <style>.row-danger td { background: #fef2f2; }</style>
+                <h2 class="section-title"><i class="ph-fill ph-sign-out"></i> Early Out Records</h2>
+                <div class="charts-grid">
+                    ${this._chartCard("ch-earlyout-shift", '<i class="ph ph-clock-clockwise"></i>', "sky", "Early-Out Count by Shift", "Click for detail")}
+                </div>
+                <div id="main-table-wrap">
+                    <div class="table-wrap">
+                        <div class="table-header">
+                            <h3>📄 Employees with Early-Out Records (click a row for detail)</h3>
+                        </div>
+                        <div style="overflow-x:auto">
+                            <table class="data-table">
+                                <thead>
+                                    <tr><th>Code</th><th>Name</th><th>Dept</th><th>Company</th><th>Shift</th><th>Total Early Days</th></tr>
+                                </thead>
+                                <tbody>${rowsHtml}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="pagination-bar">
+                        <div class="pagination-text">
+                            Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, groups.length)} of ${groups.length} employees &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
+                        </div>
+                        <div class="pagination-buttons">
+                            <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderEarlyOutPage(1)">«</button>
+                            <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderEarlyOutPage(${currentPage - 1})">‹</button>
+                            ${pageButtons}
+                            <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderEarlyOutPage(${currentPage + 1})">›</button>
+                            <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderEarlyOutPage(${totalPages})">»</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="drilldown-table" style="margin-top:16px"></div>
+            `,
             renderCharts: () => {
                 Charts.stacked(
                     "ch-earlyout-shift",
@@ -4267,12 +4332,18 @@ class AttendanceView {
                     ],
                     "Early-Out by Shift",
                     (shiftName) => {
-                        const shiftLogs = items.filter((it) =>(it.emp.shift || "No Shift") === shiftName,).map((it) => it.log);
-                        this._renderDrillDown(shiftLogs, `Early Out - Shift: ${shiftName}`, empMap || this._currentEarlyOutEmpMap,);
+                        const shiftLogs = flatItems.filter((it) => (it.emp.shift || "No Shift") === shiftName).map((it) => it.log);
+                        this._renderDrillDown(shiftLogs, `Early Out - Shift: ${shiftName}`, empMap || this._currentEarlyOutEmpMap);
                     },
                 );
             },
         };
+    }
+
+    _showEarlyOutEmployeeDrilldown(empId) {
+        const group = (this._currentEarlyOutGroups || []).find((g) => String(g.emp.id) === String(empId));
+        if (!group) return;
+        this._renderDrillDown(group.logs, `Early Out - ${group.emp.name} (${group.emp.code})`, this._currentEarlyOutEmpMap);
     }
 
     _reRenderEarlyOutPage(page) {
@@ -6365,6 +6436,98 @@ class AttendanceView {
         if (!items) return;
 
         this._renderStatCardDrilldown("presentHeadcount", items, 1);
+    }
+
+
+    _showHeadcountBreakdownDrilldown(type) {
+        document.querySelectorAll("[data-headcount]").forEach((c) => c.classList.remove("active"));
+
+        const card = this.app.querySelector(`[data-headcount="${type}"]`);
+        if (card) card.classList.add("active");
+
+        const byDept = AppController.model.state.requiredHeadcountByDept || {};
+        const depts = Object.keys(byDept).sort();
+
+        let totalRequired = 0;
+        let totalAvailable = 0;
+        let totalGap = 0;
+
+        const rows = depts.map((d) => {
+            const info = byDept[d];
+            const required = Number(info.required || 0);
+            const available = Number(info.available || 0);
+            const gap = Number(info.gap || 0);
+
+            totalRequired += required;
+            totalAvailable += available;
+            totalGap += gap;
+
+            return `
+                <tr>
+                    <td><b>${this._escapeAttr(d)}</b></td>
+                    <td>${required}</td>
+                    <td>${available}</td>
+                    <td style="color:${gap > 0 ? "#f43f5e" : "#10b981"};font-weight:700;">${gap}</td>
+                </tr>
+            `;
+        }).join("");
+
+        const panel = document.getElementById("stat-card-drilldown");
+        if (!panel) return;
+
+        panel.style.display = "block";
+
+        panel.innerHTML = `
+            <div class="drilldown-box">
+                <div class="drilldown-header">
+                    <div class="drilldown-title">
+                        ${ type === "required" ? "🎯 Required Headcount" : "⚖️ Headcount Gap" } — By Department
+                        <small>${depts.length} departments</small>
+                    </div>
+                    <div class="drilldown-btn-group">
+                        <button class="btn-drill btn-drill-back"
+                            onclick="AppController.view._closeStatCardDrilldown()">
+                            ✕ Close
+                        </button>
+                    </div>
+                </div>
+
+                <div style="overflow-x:auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Department</th>
+                                <th>Required</th>
+                                <th>Available</th>
+                                <th>Gap</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            ${ rows ||
+                                `<tr>
+                                    <td colspan="4" style="text-align:center;padding:32px;color:#94a3b8;">
+                                        No department data found
+                                    </td>
+                                </tr>`
+                            }
+
+                            <tr style=" background:#f8fafc; border-top:2px solid #cbd5e1; font-weight:700;">
+                                <td><b>Total</b></td>
+                                <td><b>${totalRequired}</b></td>
+                                <td><b>${totalAvailable}</b></td>
+                                <td style="color:${totalGap > 0 ? "#f43f5e" : "#10b981"}; font-weight:700;"><b>${totalGap}</b></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        panel.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+        });
     }
 }
 

@@ -165,6 +165,11 @@ class AttendanceModel {
                     earlyOut: 0,
                     avgHours: 0
                 };
+                
+                this.state.requiredHeadcount = data.requiredHeadcount ?? 0;
+                this.state.gapHeadcount = data.gapHeadcount ?? 0;
+                this.state.requiredHeadcountByDept = data.requiredHeadcountByDept || {};
+
                 this.state.lastUpdated = new Date().toLocaleTimeString();
                 
                 window.EMPLOYEES = data.employees;
@@ -397,6 +402,19 @@ class AttendanceModel {
         };
     }
 
+ 
+    getRequiredHeadcount() {
+        return this.state.requiredHeadcount || 0;
+    }
+
+    getGapHeadcount() {
+        return this.state.gapHeadcount || 0;
+    }
+
+    getRequiredHeadcountByDept(dept) {
+        return (this.state.requiredHeadcountByDept || {})[dept] || { required: 0, available: 0, gap: 0 };
+    }
+
 
     getFilterOptions() {
         const emps = this.state.data.employees || [];
@@ -619,6 +637,16 @@ class AttendanceModel {
         return result;
     }
 
+    getLateInEmployeesGrouped() {
+        const items = this.getLateInEmployees();
+        const grouped = {};
+        items.forEach(({ log, emp, date }) => {
+            if (!grouped[emp.id]) grouped[emp.id] = { emp, count: 0, logs: [] };
+            grouped[emp.id].count++;
+            grouped[emp.id].logs.push(log);
+        });
+        return Object.values(grouped).sort((a, b) => b.count - a.count);
+    }
 
     getEarlyOutEmployees() {
         const { filters } = this.state;
@@ -654,6 +682,16 @@ class AttendanceModel {
         return result;
     }
 
+    getEarlyOutEmployeesGrouped() {
+        const items = this.getEarlyOutEmployees();
+        const grouped = {};
+        items.forEach(({ log, emp, date }) => {
+            if (!grouped[emp.id]) grouped[emp.id] = { emp, count: 0, logs: [] };
+            grouped[emp.id].count++;
+            grouped[emp.id].logs.push(log);
+        });
+        return Object.values(grouped).sort((a, b) => b.count - a.count);
+    }
 
     getResignedEmployees() {
         const resigned = this.state.data.resignedEmployees || [];

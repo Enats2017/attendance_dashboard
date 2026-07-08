@@ -580,7 +580,7 @@ function handleDashboardData($input, $returnData = false) {
         }
     }
 
-    $sqlEmp = "SELECT E.EmployeeId, E.ShiftGroupId, E.EmployeeName, E.EmployeeCode, E.Gender, E.DOB, E.CategoryId, E.Designation, DG.DesignationsName as DesignationName, ISNULL(DSO.SortOrder, 0) as designationSortOrder, C.CompanyFName as company, L.LocationName as location, D.DepartmentFName as dept, D.std_hc FROM Employees E WITH (NOLOCK) LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId LEFT JOIN departmentDeginationSortOrder DSO WITH (NOLOCK) ON E.DepartmentId = DSO.DepartmentId AND E.Designation = DSO.DesignationId WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working'";
+    $sqlEmp = "SELECT E.EmployeeId, E.DepartmentId, E.ShiftGroupId, E.EmployeeName, E.EmployeeCode, E.Gender, E.DOB, E.CategoryId, E.Designation, DG.DesignationsName as DesignationName, ISNULL(DSO.SortOrder, 0) as designationSortOrder, C.CompanyFName as company, L.LocationName as location, D.DepartmentFName as dept, D.std_hc FROM Employees E WITH (NOLOCK) LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId LEFT JOIN departmentDeginationSortOrder DSO WITH (NOLOCK) ON E.DepartmentId = DSO.DepartmentId AND E.Designation = DSO.DesignationId WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working'";
 
     $paramsEmp = [];
     
@@ -614,6 +614,7 @@ function handleDashboardData($input, $returnData = false) {
                 'dob' => $row['DOB'] ? $row['DOB']->format('Y-m-d') : '1990-01-01',
                 'gender' => in_array(strtoupper(trim($row['Gender'])), ['MALE', 'M']) ? 'Male' : 'Female',
                 'dept' => $row['dept'] ?: 'Dept ' . $row['DepartmentId'],
+                'deptId' => intval($row['DepartmentId']),
                 'std_hc' => intval($row['std_hc']),
                 'company' => $row['company'] ?: 'Unknown',
                 'categoryId' => intval($row['CategoryId']),
@@ -981,6 +982,32 @@ function handleDashboardData($input, $returnData = false) {
     }
 
     $totalEmployees = count($employees);
+
+    $deptHeadcountMap = [];
+    foreach ($employees as $emp) {
+        $deptId = $emp['deptId'];
+        if (!isset($deptHeadcountMap[$deptId])) {
+            $deptHeadcountMap[$deptId] = [
+                'name' => $emp['dept'],
+                'required' => $emp['std_hc'],
+                'available' => 0
+            ];
+        }
+        $deptHeadcountMap[$deptId]['available']++;
+    }
+
+    $totalRequiredHeadcount = 0;
+    $requiredHeadcountByDept = [];
+    foreach ($deptHeadcountMap as $deptId => $info) {
+        $totalRequiredHeadcount += $info['required'];
+        $requiredHeadcountByDept[$info['name']] = [
+            'required' => $info['required'],
+            'available' => $info['available'],
+            'gap' => $info['required'] - $info['available']
+        ];
+    }
+
+    $totalGapHeadcount = $totalRequiredHeadcount - $totalEmployees;
 
     $employeesInAttendanceLogs = [];
     $presentRecordCount = 0;
@@ -1351,6 +1378,9 @@ function handleDashboardData($input, $returnData = false) {
             'resigned' => count($resignedEmployees),
             'newJoined' => count($newJoinedEmployees)
         ],
+        'requiredHeadcount' => $totalRequiredHeadcount,
+        'gapHeadcount' => $totalGapHeadcount,
+        'requiredHeadcountByDept' => $requiredHeadcountByDept,
 		'singlePunchKeys' => $singlePunchKeys,
 		'singlePunchData' => $singlePunchData,
         'staffWorkerStats' => [
