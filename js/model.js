@@ -169,6 +169,7 @@ class AttendanceModel {
                 this.state.requiredHeadcount = data.requiredHeadcount ?? 0;
                 this.state.gapHeadcount = data.gapHeadcount ?? 0;
                 this.state.requiredHeadcountByDept = data.requiredHeadcountByDept || {};
+                this.state.teamConfig = data.teamConfig || { staffTeamId: 7, workerTeamId: 6 };
 
                 this.state.lastUpdated = new Date().toLocaleTimeString();
                 
@@ -358,6 +359,45 @@ class AttendanceModel {
         return result;
     }
 
+
+    findMissingDataEmployees() {
+        const { emps } = this.getFilteredData();
+        const result = [];
+
+        emps.forEach(emp => {
+            const missingFields = [];
+
+            if (!emp.code) missingFields.push('Employee Code');
+            if (!emp.name) missingFields.push('Name');
+            if (!emp.dobRaw) missingFields.push('DOB');
+            if (!emp.genderRaw) missingFields.push('Gender');
+            if (emp.categoryIdRaw === null || emp.categoryIdRaw === undefined || emp.categoryIdRaw === '') {
+                missingFields.push('Category');
+            }
+            if (emp.team === null || emp.team === undefined) missingFields.push('Team');
+            if (!emp.designationRaw) {
+                missingFields.push('Designation');
+            } else if (!emp.designationNameRaw) {
+                missingFields.push('Designation Name (invalid link)');
+            }
+            if (!emp.doj) missingFields.push('DOJ');
+
+            if (missingFields.length > 0) {
+                result.push({ emp, missingFields });
+            }
+        });
+
+        return result;
+    }
+
+
+    findUncountedStaffWorkmenEmployees() {
+        const { emps } = this.getFilteredData();
+        const staffTeamId = this.state.teamConfig?.staffTeamId ?? 7;
+        const workerTeamId = this.state.teamConfig?.workerTeamId ?? 6;
+
+        return emps.filter(emp => emp.team !== staffTeamId && emp.team !== workerTeamId);
+    }
 
     groupBy(arr, keyFn) {
         const out = {};
@@ -869,9 +909,9 @@ class AttendanceModel {
 
     
     getStaffEmployees() {
-        const staffCategoryIds = [58];
+        const staffTeamId = this.state.teamConfig?.staffTeamId ?? 7;
         const { logs, emps } = this.getFilteredData();
-        const staffEmps = emps.filter(emp => staffCategoryIds.includes(emp.categoryId));
+        const staffEmps = emps.filter(emp => emp.team === staffTeamId);
         const logMap = this._buildLogMap(logs);
         const statusMap = this._buildStatusKeyMap(logs);       
         const { dateFrom, dateTo } = this.state.filters;
@@ -897,9 +937,9 @@ class AttendanceModel {
 
 
     getWorkerEmployees() {
-        const workerCategoryIds = [51, 59, 60];
+        const workerTeamId = this.state.teamConfig?.workerTeamId ?? 6;
         const { logs, emps } = this.getFilteredData();
-        const workerEmps = emps.filter(emp => workerCategoryIds.includes(emp.categoryId));
+        const workerEmps = emps.filter(emp => emp.team === workerTeamId);
         const logMap = this._buildLogMap(logs);
         const statusMap = this._buildStatusKeyMap(logs);
         const { dateFrom, dateTo } = this.state.filters;
@@ -921,6 +961,11 @@ class AttendanceModel {
         
         result.sort((a, b) => b.date.localeCompare(a.date));
         return result;
+    }
+
+
+    getUnassignedEmployees() {
+        return this.findUncountedStaffWorkmenEmployees().map(emp => ({ log: null, emp, date: null }));
     }
 
 

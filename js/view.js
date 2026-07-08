@@ -21,6 +21,7 @@ class AttendanceView {
             { id: "resigned", label: "Resigned Employees", icon: "ph-user-minus", },
             { id: "newjoined", label: "New Joined", icon: "ph-user-plus" },
             { id: "special", label: "Critical Alerts", icon: "ph-warning-circle", },
+            { id: "data_quality", label: "Employee Data Alerts", icon: "ph-database", },
             { id: "designation_order", label: "Designations Order", icon: "ph-sliders", },
             { id: "designation_families", label: "Designation Families", icon: "ph-cards", },
             { id: "sort_order", label: "Sort Order Settings", icon: "ph-sort-ascending", },
@@ -71,6 +72,7 @@ class AttendanceView {
                                 ? this._renderWorkerSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "resigned"
                                 ? this._renderResignedSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "newjoined"
                                 ? this._renderNewJoinedSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "special"
+                                ? "" : state.activeTab === "data_quality"
                                 ? "" : state.activeTab === "designation_order"
                                 ? "" : state.activeTab === "sort_order"
                                 ? "" : state.activeTab === "designation_families"
@@ -365,8 +367,10 @@ class AttendanceView {
         if (emps && logs && empMap && model) {
             const { dateFrom, dateTo } = model.state.filters;
             const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
-            const staffEmps = emps.filter((e) => [58].includes(e.categoryId));
-            const workerEmps = emps.filter((e) => [51, 59, 60].includes(e.categoryId));
+            const staffTeamId = model.state.teamConfig?.staffTeamId ?? 7;
+            const workerTeamId = model.state.teamConfig?.workerTeamId ?? 6;
+            const staffEmps = emps.filter((e) => e.team === staffTeamId);
+            const workerEmps = emps.filter((e) => e.team === workerTeamId);
 
             this._currentStaffSummaryData = { emps: staffEmps, model, dayLogs, empMap, isDashboard: false, };
             this._currentWorkerSummaryData = { emps: workerEmps, model, dayLogs, empMap, isDashboard: false, };
@@ -379,11 +383,11 @@ class AttendanceView {
                 const isPresent = this._matchesStatus(l, "Present") || this._matchesStatus(l, "WO Present");
                 const isHalf = this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Half Present");
 
-                if ([58].includes(e.categoryId)) {
+                if (e.team === staffTeamId) {
                     if (isPresent) staffPresent++;
                     if (isHalf) staffHalf++;
                 }
-                if ([51, 59, 60].includes(e.categoryId)) {
+                if (e.team === workerTeamId) {
                     if (isPresent) workerPresent++;
                     if (isHalf) workerHalf++;
                 }
@@ -435,16 +439,25 @@ class AttendanceView {
         const { dateFrom, dateTo } = model.state.filters;
         const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
         const staffWorkerStats = this._staffWorkerStats || {};
-
+        const staffTeamId = model.state.teamConfig?.staffTeamId ?? 7;
+        const workerTeamId = model.state.teamConfig?.workerTeamId ?? 6;
+        
         this._currentStaffSummaryData = {
-            emps: emps.filter((e) => [58].includes(e.categoryId)),
+            emps: emps.filter((e) => e.team === staffTeamId),
             model,
             dayLogs,
             empMap,
             isDashboard: true,
         };
         this._currentWorkerSummaryData = {
-            emps: emps.filter((e) => [51, 59, 60].includes(e.categoryId)),
+            emps: emps.filter((e) => e.team === workerTeamId),
+            model,
+            dayLogs,
+            empMap,
+            isDashboard: true,
+        };
+        this._currentUnassignedSummaryData = {
+            emps: emps.filter(e => e.team !== staffTeamId && e.team !== workerTeamId),
             model,
             dayLogs,
             empMap,
@@ -515,6 +528,7 @@ class AttendanceView {
         emps.forEach((e) => {
             if (genderCounts[e.gender] !== undefined) genderCounts[e.gender]++;
         });
+        
         const genderCards = `
             <div class="stat-card info stat-card-clickable"
                 data-gender="Male"
@@ -538,6 +552,10 @@ class AttendanceView {
             </div>
         `;
 
+        const staffTotal = staffWorkerStats.staffTotal || 0;
+        const workerTotal = staffWorkerStats.workerTotal || 0;
+        const unassignedTotal = availableCount - staffTotal - workerTotal;
+
         // --- Staff / Workmen ---
         const swCards = `
             <div class="stat-card info stat-card-clickable" data-card-key="staffList">
@@ -553,6 +571,17 @@ class AttendanceView {
                 <div class="stat-content">
                     <span class="stat-label">Workmen</span>
                     <span class="stat-value">${staffWorkerStats.workerTotal || 0}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+            <div class="stat-card danger stat-card-clickable"
+                data-card-key="unassignedList">
+                <div class="stat-icon">
+                    <i class="ph ph-warning-circle"></i>
+                </div>
+                <div class="stat-content">
+                    <span class="stat-label">Unassigned</span>
+                    <span class="stat-value">${unassignedTotal}</span>
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
             </div>
@@ -1307,8 +1336,11 @@ class AttendanceView {
         `;
 
         // --- Staff / Workmen ---
-        const staffCount = resEmps.filter((e) => [58].includes(e.categoryId),).length;
-        const workerCount = resEmps.filter((e) => [51, 59, 60].includes(e.categoryId),).length;
+        const staffTeamId = model.state.teamConfig?.staffTeamId ?? 7;
+        const workerTeamId = model.state.teamConfig?.workerTeamId ?? 6;
+        const staffCount = resEmps.filter((e) => e.team === staffTeamId).length;
+        const workerCount = resEmps.filter((e) => e.team === workerTeamId).length;
+        
         const swCards = `
             <div class="stat-card info stat-card-clickable"
                 data-res-workforce="Staff"
@@ -1522,9 +1554,13 @@ class AttendanceView {
                 </div>
             </div>
         `;
+
         // --- Staff / Workmen (Workforce Type) ---
-        const staffCount = njEmps.filter((e) => [58].includes(e.categoryId),).length;
-        const workerCount = njEmps.filter((e) => [51, 59, 60].includes(e.categoryId),).length;
+        const staffTeamId = model.state.teamConfig?.staffTeamId ?? 7;
+        const workerTeamId = model.state.teamConfig?.workerTeamId ?? 6;
+        const staffCount = njEmps.filter((e) => e.team === staffTeamId).length;
+        const workerCount = njEmps.filter((e) => e.team === workerTeamId).length;
+        
         const swCards = `
             <div class="stat-card info stat-card-clickable"
                 data-nj-workforce="Staff"
@@ -1711,8 +1747,8 @@ class AttendanceView {
     }
 
     _renderStaffSummaryCards(emps, stats, model, logs, empMap) {
-        const staffCategoryIds = [58];
-        const staffEmps = emps.filter((e) => staffCategoryIds.includes(e.categoryId),);
+        const staffTeamId = model.state.teamConfig?.staffTeamId ?? 7;
+        const staffEmps = emps.filter((e) => e.team === staffTeamId);
 
         const { dateFrom, dateTo } = model.state.filters;
         const dayLogs = this._buildEmployeeDayLogs(staffEmps, logs, dateFrom, dateTo);
@@ -1796,8 +1832,8 @@ class AttendanceView {
     }
 
     _renderWorkerSummaryCards(emps, stats, model, logs, empMap) {
-        const workerCategoryIds = [51, 59, 60];
-        const workerEmps = emps.filter((e) => workerCategoryIds.includes(e.categoryId),);
+        const workerTeamId = model.state.teamConfig?.workerTeamId ?? 6;
+        const workerEmps = emps.filter((e) => e.team === workerTeamId);
 
         const { dateFrom, dateTo } = model.state.filters;
         const dayLogs = this._buildEmployeeDayLogs(workerEmps, logs, dateFrom, dateTo);
@@ -2289,7 +2325,9 @@ class AttendanceView {
         } else if (type === "gender") {
             filtered = emps.filter((e) => e.gender === value);
         } else if (type === "workforce") {
-            filtered = value === "Staff" ? emps.filter((e) => [58].includes(e.categoryId)) : emps.filter((e) => [51, 59, 60].includes(e.categoryId));
+            const staffTeamId = AppController.model.state.teamConfig?.staffTeamId ?? 7;
+            const workerTeamId = AppController.model.state.teamConfig?.workerTeamId ?? 6;
+            filtered = value === "Staff" ? emps.filter((e) => e.team === staffTeamId) : emps.filter((e) => e.team === workerTeamId);
         } else if (type === "age") {
             filtered = emps.filter((e) => AppController.model.getAgeGroup(e.dob) === value,);
         }
@@ -2565,6 +2603,9 @@ class AttendanceView {
                 break;
             case "special":
                 content = this._renderSpecial(logs, emps, empMap, filters, model);
+                break;
+            case "data_quality":
+                content = this._renderDataQuality(logs, emps, empMap, filters, model);
                 break;
             case "designation_order":
                 content = {
@@ -4631,6 +4672,48 @@ class AttendanceView {
         }
     }
 
+
+    _renderDataQuality(logs, emps, empMap, filters, model, dqPage = 1) {
+        const missingDataItems = model.findMissingDataEmployees();
+
+        const dqRows = missingDataItems.map((x) => [
+            x.emp.code || "-",
+            x.emp.name || "-",
+            x.emp.dept || "-",
+            x.emp.company || "-",
+            x.emp.designation || "-",
+            x.missingFields.join(", "),
+        ]);
+
+        this._currentDataQualityRows = dqRows;
+
+        const dqHeaders = ["Code", "Name", "Dept", "Company", "Designation", "Missing Fields"];
+        const pageSize = 10;
+
+        return {
+            html: `
+                <h2 class="section-title"><i class="ph-fill ph-database"></i> Data Quality Alerts</h2>
+                <div class="table-wrap">
+                    <div class="table-header"><h3>⚠️ Employees with Missing Critical Data</h3></div>
+                    <div id="dq-table-wrap" style="overflow-x:auto">
+                        ${this._buildPaginatedTable(dqRows, dqHeaders, dqPage, pageSize, "tbl-dq", "_reRenderDataQualityPage")}
+                    </div>
+                </div>
+            `,
+            renderCharts: () => {},
+        };
+    }
+
+    _reRenderDataQualityPage(page) {
+        const rows = this._currentDataQualityRows || [];
+        const headers = ["Code", "Name", "Dept", "Company", "Designation", "Missing Fields"];
+        const wrap = document.getElementById("dq-table-wrap");
+        if (wrap) {
+            wrap.innerHTML = this._buildPaginatedTable(rows, headers, page, 10, "tbl-dq", "_reRenderDataQualityPage");
+        }
+    }
+
+
     exportPDF(tableId, filename) {
         const el = document.getElementById(tableId);
         if (!el || !window.html2canvas) return;
@@ -6027,12 +6110,12 @@ class AttendanceView {
             alert("Failed to remove: " + (res ? res.message : "Unknown error"));
         }
     }
-    
+
     _renderStaff(logs, emps, empMap, model) {
-        const staffCategoryIds = [58];
+        const staffTeamId = model.state.teamConfig?.staffTeamId ?? 7;
         const { dateFrom, dateTo } = model.state.filters;
 
-        const staffEmps = emps.filter((e) => staffCategoryIds.includes(e.categoryId),);
+        const staffEmps = emps.filter((e) => e.team === staffTeamId);
         const staffGroups = this._computeGroupedDayStats(staffEmps, logs, dateFrom, dateTo, (e) => e.dept);
         const staffDepts = [...new Set(staffEmps.map((e) => e.dept))].sort();
         const dayLogs = this._buildEmployeeDayLogs(staffEmps, logs, dateFrom, dateTo);
@@ -6087,7 +6170,7 @@ class AttendanceView {
                         const filtered = dayLogs.filter((l) => {
                             const e = empMap[l.empId];
                             if (!e || e.dept !== dept) return false;
-                            if (!staffCategoryIds.includes(e.categoryId)) return false;
+                            if (e.team !== staffTeamId) return false;
                             return this._matchesStatus(l, seriesName);
                         });
                         this._renderDrillDown(filtered, `Staff – ${dept} – ${seriesName}`, empMap,);
@@ -6099,10 +6182,10 @@ class AttendanceView {
 
 
     _renderWorker(logs, emps, empMap, model) {
-        const workerCategoryIds = [51, 59, 60];
+        const workerTeamId = model.state.teamConfig?.workerTeamId ?? 6;
         const { dateFrom, dateTo } = model.state.filters;
 
-        const workerEmps = emps.filter((e) => workerCategoryIds.includes(e.categoryId),);
+        const workerEmps = emps.filter((e) => e.team === workerTeamId);
         const workerGroups = this._computeGroupedDayStats(workerEmps, logs, dateFrom, dateTo, (e) => e.dept);
         const workerDepts = [...new Set(workerEmps.map((e) => e.dept))].sort();
 
@@ -6151,7 +6234,7 @@ class AttendanceView {
                         const filtered = logs.filter((l) => {
                             const e = empMap[l.empId];
                             if (!e || e.dept !== dept) return false;
-                            if (!workerCategoryIds.includes(e.categoryId)) return false;
+                            if (e.team !== workerTeamId) return false;
                             return this._matchesStatus(l, seriesName);
                         });
                         this._renderDrillDown(filtered, `Workmen – ${dept} – ${seriesName}`, empMap,);

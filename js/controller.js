@@ -96,6 +96,10 @@ class AttendanceController {
                     }
                     break;
                 }
+                case "unassignedList": {
+                    items = this.model.getUnassignedEmployees();
+                    break;
+                }
                 case 'weeklyOffPresent':
                     items = this.model.getWeeklyOffPresentEmployees();
                     break;
