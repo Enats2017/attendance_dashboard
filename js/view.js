@@ -2991,7 +2991,7 @@ class AttendanceView {
                             <button class="btn-tbl btn-tbl-excel" onclick="AppController.view.exportExcel(AppController.view._lastData['${exportName}'], '${exportName}')">
                                 ↓ Excel
                             </button>
-                            <button class="btn-tbl btn-tbl-pdf" onclick="AppController.view.exportPDF('${id}', '${exportName}')">
+                         <button class="btn-tbl btn-tbl-pdf" onclick="AppController.view.exportPDF('${exportName}')">
                                 ↓ PDF
                             </button>
                         </div>
@@ -3077,8 +3077,8 @@ class AttendanceView {
                 In: l.inTime,
                 Out: l.outTime,
                 Hours: l.hoursWorked,
-                LateIn: l.lateIn,
-                EarlyOut: l.earlyOut,
+                LateIn: Number(l.lateBy) > 0 ? "Yes" : "No",
+                EarlyOut: Number(l.earlyBy) > 0 ? "Yes" : "No",
                 Status: l.status,
                 DetailedStatus: l.detailedStatus,
             };
@@ -4631,18 +4631,28 @@ class AttendanceView {
         }
     }
 
-    exportPDF(tableId, filename) {
-        const el = document.getElementById(tableId);
-        if (!el || !window.html2canvas) return;
-
-        html2canvas(el).then((canvas) => {
-            const imgData = canvas.toDataURL("image/png");
-            const pdf = new jspdf.jsPDF({ orientation: "landscape" });
-            const w = pdf.internal.pageSize.getWidth();
-            const h = (canvas.height * w) / canvas.width;
-            pdf.addImage(imgData, "PNG", 0, 0, w, h);
-            pdf.save(`${filename}.pdf`);
+    exportPDF(exportName) {
+        const data = this._lastData[exportName];
+        if (!data || !data.length) { alert("No data found"); return;}
+        const pdf = new jspdf.jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+        const headers = [ "Sr No", ...Object.keys(data[0])];
+        const rows = data.map((row, index) => [
+            index + 1,
+            ...Object.values(row).map(value => {
+                if (value === null || value === undefined)
+                    return "";
+                return String(value)
+                    .replace(/<[^>]*>/g, "")
+                    .replace(/&nbsp;/g, " ");
+            })
+        ]);
+        pdf.autoTable({ head: [headers], body: rows, startY: 15,
+            styles: { fontSize: 8, cellPadding: 2, overflow: "linebreak"},
+            headStyles: { fillColor: [52, 73, 94], textColor: 255},
+            theme: "grid",
+            margin: { left: 5, right: 5}
         });
+        pdf.save(`${exportName}.pdf`);
     }
 
     bindStatCardClick(handler) {
