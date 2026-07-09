@@ -3082,7 +3082,9 @@ class AttendanceView {
 
     _renderAll(logs, emps, empMap, filters, page = 1) {
         this._currentAllLogs = logs;
+        this._currentAllEmps = emps;
         this._currentAllEmpMap = empMap;
+        this._currentAllFilters = filters;    
 
         const pageSize = 25;
         const currentPage = page;
@@ -3290,7 +3292,13 @@ class AttendanceView {
     }
 
     _reRenderAllPage(page) {
-        const content = this._renderAll(this._currentAllLogs, null, this._currentAllEmpMap, null, page);
+        const content = this._renderAll(
+            this._currentAllLogs,
+            this._currentAllEmps,      
+            this._currentAllEmpMap,
+            this._currentAllFilters,    
+            page
+        );
         document.querySelector(".tab-pane-container").innerHTML = content.html;
         content.renderCharts();
     }
