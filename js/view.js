@@ -28,7 +28,7 @@ class AttendanceView {
         ];
         this._lastData = {};
         this._renderToken = 0;
-        this.LATE_THRESHOLD = 3; 
+        this.LATE_THRESHOLD = 3;
     }
 
 
@@ -58,27 +58,26 @@ class AttendanceView {
 					${this._renderTopbar(state)}
 					<div class="content-body">
 						${state.activeTab !== "feature" ? this._renderFilters(state.filters, filterOpts) : ""}
-                        ${
-                            state.activeTab === "designation"
-                                ? this._renderDesignationFamilySummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "age"
-                                ? this._renderAgeSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "company"
-                                ? this._renderCompanySummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "dept"
-                                ? this._renderDeptSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "gender"
+                        ${state.activeTab === "designation"
+                ? this._renderDesignationFamilySummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "age"
+                    ? this._renderAgeSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "company"
+                        ? this._renderCompanySummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "dept"
+                            ? this._renderDeptSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "gender"
                                 ? this._renderGenderSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "latein"
-                                ? this._renderLateInSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "earlyout"
-                                ? this._renderEarlyOutSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "shift"
-                                ? this._renderShiftSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "staff"
-                                ? this._renderStaffSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "worker"
-                                ? this._renderWorkerSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "resigned"
-                                ? this._renderResignedSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "newjoined"
-                                ? this._renderNewJoinedSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "special"
-                                ? "" : state.activeTab === "data_quality"
-                                ? "" : state.activeTab === "designation_order"
-                                ? "" : state.activeTab === "sort_order"
-                                ? "" : state.activeTab === "designation_families"
-                                ? "" : state.activeTab === "feature"
-                                ? this._renderDashboardSummaryCards(emps, stats, model, logs, empMap) : this._renderSummaryCards(stats, emps, logs, empMap, model)
-                        }
+                                    ? this._renderLateInSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "earlyout"
+                                        ? this._renderEarlyOutSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "shift"
+                                            ? this._renderShiftSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "staff"
+                                                ? this._renderStaffSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "worker"
+                                                    ? this._renderWorkerSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "resigned"
+                                                        ? this._renderResignedSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "newjoined"
+                                                            ? this._renderNewJoinedSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "special"
+                                                                ? "" : state.activeTab === "data_quality"
+                                                                    ? "" : state.activeTab === "designation_order"
+                                                                        ? "" : state.activeTab === "sort_order"
+                                                                            ? "" : state.activeTab === "designation_families"
+                                                                                ? "" : state.activeTab === "feature"
+                                                                                    ? this._renderDashboardSummaryCards(emps, stats, model, logs, empMap) : this._renderSummaryCards(stats, emps, logs, empMap, model)
+            }
 						<div id="stat-card-drilldown" class="stat-drilldown-panel" style="display:none;"></div>
 						<div class="tab-pane-container">
 							${this._renderTabContent(state.activeTab, logs, emps, empMap, state.filters, state.data.counts, model)}
@@ -160,7 +159,7 @@ class AttendanceView {
             absent: target.dataset.absent || 0,
             total: target.dataset.total || 0,
         };
-        
+
         const label = header ? header.dataset.dept : subRow.dataset.designation;
         this._showDeptAccTooltip(e, label, stats);
     }
@@ -835,9 +834,8 @@ class AttendanceView {
                         ${c.key === "presentHeadcount" ? `data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()"` : ""}
                         ${c.ageGroup ? `data-age-group="${this._escapeAttr(c.ageGroup)}" onclick="AppController.view._showAgeGroupDrilldown('${this._escapeAttr(c.ageGroup)}')"` : ""}>
                         <div class="stat-icon">
-                            ${
-                                c.ageGroup ? `<span class="material-symbols-outlined">${c.icon}</span>` : `<i class="ph ${c.icon}"></i>`
-                            }
+                            ${c.ageGroup ? `<span class="material-symbols-outlined">${c.icon}</span>` : `<i class="ph ${c.icon}"></i>`
+            }
                         </div>
                         <div class="stat-content" style="align-items:center; text-align:center;">
                             <span class="stat-label">${c.label}</span>
@@ -914,8 +912,8 @@ class AttendanceView {
         return `
             <div class="summary-grid">
                 ${cards.map((c) => {
-                    if (c.type === "family") {
-                        return `
+            if (c.type === "family") {
+                return `
                             <div class="stat-card ${c.cls} stat-card-clickable"
                                 data-family-id="${c.familyId}"
                                 onclick="AppController.view._showDesignationFamilyDrilldown(${c.familyId})">
@@ -927,9 +925,9 @@ class AttendanceView {
                                 </div>
                             </div>
                         `;
-                    }
-                    if (c.type === "avgHours") {
-                        return `
+            }
+            if (c.type === "avgHours") {
+                return `
                             <div class="stat-card">
                                 <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                                 <div class="stat-content">
@@ -938,8 +936,8 @@ class AttendanceView {
                                 </div>
                             </div>
                         `;
-                    }
-                    return `
+            }
+            return `
                         <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
                             <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                             <div class="stat-content">
@@ -949,7 +947,7 @@ class AttendanceView {
                             </div>
                         </div>
                     `;
-                }).join("")}
+        }).join("")}
             </div>
         `;
     }
@@ -976,7 +974,7 @@ class AttendanceView {
 
         // const totalPresentHalf = companies.reduce((sum, c) => sum + counts[c], 0,);
         const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) + (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0);
-        
+
         this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
             this._matchesStatus(l, "Present") ||
             this._matchesStatus(l, "Half Present") ||
@@ -997,8 +995,8 @@ class AttendanceView {
         return `
             <div class="summary-grid">
                 ${cards.map((c) => {
-                    if (c.type === "company") {
-                        return `
+            if (c.type === "company") {
+                return `
                             <div class="stat-card ${c.cls} stat-card-clickable"
                                 data-company="${this._escapeAttr(c.company)}"
                                 onclick="AppController.view._showCompanyDrilldown('${this._escapeAttr(c.company)}')">
@@ -1010,9 +1008,9 @@ class AttendanceView {
                                 </div>
                             </div>
                         `;
-                    }
-                    if (c.type === "avgHours") {
-                        return `
+            }
+            if (c.type === "avgHours") {
+                return `
                             <div class="stat-card">
                                 <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                                 <div class="stat-content">
@@ -1021,8 +1019,8 @@ class AttendanceView {
                                 </div>
                             </div>
                         `;
-                    }
-                    return `
+            }
+            return `
                         <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
                             <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                             <div class="stat-content">
@@ -1032,7 +1030,7 @@ class AttendanceView {
                             </div>
                         </div>
                     `;
-                }).join("")}
+        }).join("")}
             </div>
         `;
     }
@@ -1058,7 +1056,7 @@ class AttendanceView {
 
         // const totalPresentHalf = depts.reduce((sum, d) => sum + counts[d], 0);
         const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) + (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0);
-        
+
         this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
             this._matchesStatus(l, "Present") ||
             this._matchesStatus(l, "Half Present") ||
@@ -1079,8 +1077,8 @@ class AttendanceView {
         return `
             <div class="summary-grid">
                 ${cards.map((c) => {
-                        if (c.type === "dept") {
-                            return `
+            if (c.type === "dept") {
+                return `
                                 <div class="stat-card ${c.cls} stat-card-clickable"
                                     data-dept="${this._escapeAttr(c.dept)}"
                                     onclick="AppController.view._showDeptSummaryDrilldown('${this._escapeAttr(c.dept)}')">
@@ -1092,9 +1090,9 @@ class AttendanceView {
                                     </div>
                                 </div>
                             `;
-                        }
-                        if (c.type === "avgHours") {
-                            return `
+            }
+            if (c.type === "avgHours") {
+                return `
                                 <div class="stat-card">
                                     <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                                     <div class="stat-content">
@@ -1103,9 +1101,9 @@ class AttendanceView {
                                     </div>
                                 </div>
                             `;
-                        }
-                        // headcount
-                        return `
+            }
+            // headcount
+            return `
                             <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
                                 <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                                 <div class="stat-content">
@@ -1115,7 +1113,7 @@ class AttendanceView {
                                 </div>
                             </div>
                         `;
-                    }).join("")}
+        }).join("")}
             </div>
         `;
     }
@@ -1136,7 +1134,7 @@ class AttendanceView {
             if (!e) return;
             const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present");
             if (!isPresentOrHalf) return;
-            if (counts[e.gender] !== undefined)  counts[e.gender]++;
+            if (counts[e.gender] !== undefined) counts[e.gender]++;
         });
 
         this._currentTabPresentHeadcountItems = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present"),).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
@@ -1152,8 +1150,8 @@ class AttendanceView {
         return `
             <div class="summary-grid">
                 ${cards.map((c) => {
-                    if (c.type === "gender") {
-                        return `
+            if (c.type === "gender") {
+                return `
                             <div class="stat-card ${c.cls} stat-card-clickable"
                                 data-gender="${this._escapeAttr(c.gender)}"
                                 onclick="AppController.view._showGenderSummaryDrilldown('${this._escapeAttr(c.gender)}')">
@@ -1165,9 +1163,9 @@ class AttendanceView {
                                 </div>
                             </div>
                         `;
-                    }
-                    if (c.type === "avgHours") {
-                        return `
+            }
+            if (c.type === "avgHours") {
+                return `
                             <div class="stat-card">
                                 <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                                 <div class="stat-content">
@@ -1176,8 +1174,8 @@ class AttendanceView {
                                 </div>
                             </div>
                         `;
-                    }
-                    return `
+            }
+            return `
                         <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
                             <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                             <div class="stat-content">
@@ -1187,7 +1185,7 @@ class AttendanceView {
                             </div>
                         </div>
                     `;
-                }).join("")}
+        }).join("")}
             </div>
         `;
     }
@@ -1195,7 +1193,7 @@ class AttendanceView {
     _renderLateInSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
         const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo,);
-        
+
         this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
             this._matchesStatus(l, "Present") ||
             this._matchesStatus(l, "Half Present") ||
@@ -1363,7 +1361,7 @@ class AttendanceView {
         const workerTeamId = model.state.teamConfig?.workerTeamId ?? 6;
         const staffCount = resEmps.filter((e) => e.team === staffTeamId).length;
         const workerCount = resEmps.filter((e) => e.team === workerTeamId).length;
-        
+
         const swCards = `
             <div class="stat-card info stat-card-clickable"
                 data-res-workforce="Staff"
@@ -1583,7 +1581,7 @@ class AttendanceView {
         const workerTeamId = model.state.teamConfig?.workerTeamId ?? 6;
         const staffCount = njEmps.filter((e) => e.team === staffTeamId).length;
         const workerCount = njEmps.filter((e) => e.team === workerTeamId).length;
-        
+
         const swCards = `
             <div class="stat-card info stat-card-clickable"
                 data-nj-workforce="Staff"
@@ -1729,8 +1727,8 @@ class AttendanceView {
         return `
             <div class="summary-grid">
                 ${cards.map((c) => {
-                    if (c.type === "shift") {
-                        return `
+            if (c.type === "shift") {
+                return `
                             <div class="stat-card ${c.cls} stat-card-clickable"
                                 data-shift="${this._escapeAttr(c.shift)}"
                                 onclick="AppController.view._showShiftSummaryDrilldown('${this._escapeAttr(c.shift)}')">
@@ -1742,9 +1740,9 @@ class AttendanceView {
                                 </div>
                             </div>
                         `;
-                    }
-                    if (c.type === "avgHours") {
-                        return `
+            }
+            if (c.type === "avgHours") {
+                return `
                             <div class="stat-card">
                                 <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                                 <div class="stat-content">
@@ -1753,8 +1751,8 @@ class AttendanceView {
                                 </div>
                             </div>
                         `;
-                    }
-                    return `
+            }
+            return `
                         <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
                             <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                             <div class="stat-content">
@@ -1764,7 +1762,7 @@ class AttendanceView {
                             </div>
                         </div>
                     `;
-                }).join("")}
+        }).join("")}
             </div>
         `;
     }
@@ -1793,7 +1791,7 @@ class AttendanceView {
         });
 
         const totalPresentHalf = depts.reduce((sum, d) => sum + counts[d], 0);
-       
+
         this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
             this._matchesStatus(l, "Present") ||
             this._matchesStatus(l, "Half Present") ||
@@ -1814,8 +1812,8 @@ class AttendanceView {
         return `
             <div class="summary-grid">
                 ${cards.map((c) => {
-                    if (c.type === "dept") {
-                        return `
+            if (c.type === "dept") {
+                return `
                             <div class="stat-card ${c.cls} stat-card-clickable"
                                 data-staff-dept="${this._escapeAttr(c.dept)}"
                                 onclick="AppController.view._showStaffSummaryDrilldown('${this._escapeAttr(c.dept)}')">
@@ -1827,9 +1825,9 @@ class AttendanceView {
                                 </div>
                             </div>
                         `;
-                    }
-                    if (c.type === "avgHours") {
-                        return `
+            }
+            if (c.type === "avgHours") {
+                return `
                             <div class="stat-card">
                                 <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                                 <div class="stat-content">
@@ -1838,8 +1836,8 @@ class AttendanceView {
                                 </div>
                             </div>
                         `;
-                    }
-                    return `
+            }
+            return `
                         <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
                             <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                             <div class="stat-content">
@@ -1849,7 +1847,7 @@ class AttendanceView {
                             </div>
                         </div>
                     `;
-                }).join("")}
+        }).join("")}
             </div>
         `;
     }
@@ -1899,8 +1897,8 @@ class AttendanceView {
         return `
             <div class="summary-grid">
                 ${cards.map((c) => {
-                    if (c.type === "dept") {
-                        return `
+            if (c.type === "dept") {
+                return `
                             <div class="stat-card ${c.cls} stat-card-clickable"
                                 data-worker-dept="${this._escapeAttr(c.dept)}"
                                 onclick="AppController.view._showWorkerSummaryDrilldown('${this._escapeAttr(c.dept)}')">
@@ -1912,9 +1910,9 @@ class AttendanceView {
                                 </div>
                             </div>
                         `;
-                    }
-                    if (c.type === "avgHours") {
-                        return `
+            }
+            if (c.type === "avgHours") {
+                return `
                             <div class="stat-card">
                                 <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                                 <div class="stat-content">
@@ -1923,8 +1921,8 @@ class AttendanceView {
                                 </div>
                             </div>
                         `;
-                    }
-                    return `
+            }
+            return `
                         <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
                             <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                             <div class="stat-content">
@@ -1934,7 +1932,7 @@ class AttendanceView {
                             </div>
                         </div>
                     `;
-                }).join("")}
+        }).join("")}
             </div>
         `;
     }
@@ -2660,7 +2658,7 @@ class AttendanceView {
                     `,
                 };
                 break;
-            case "designation_families":                                    
+            case "designation_families":
                 content = {
                     html: `
                         <div class="designation-order-container">
@@ -2692,7 +2690,7 @@ class AttendanceView {
             setTimeout(() => this._initSortOrderTab(model), 50);
             return;
         }
-        if (tabId === "designation_families") {                     
+        if (tabId === "designation_families") {
             this._initDesignationFamiliesTab(model);
             return;
         }
@@ -2854,7 +2852,7 @@ class AttendanceView {
         return dates;
     }
 
-    
+
     _buildEmployeeDayLogs(emps, logs, dateFrom, dateTo) {
         const logMap = {};
         logs.forEach((l) => {
@@ -2939,7 +2937,7 @@ class AttendanceView {
         // Count Present/Half Present records
         const presentRecords = result.filter(r => this._matchesStatus(r, "Present") || this._matchesStatus(r, "Half Present"));
 
-        
+
         // ===== ADD FROM HERE =====
 
         // Count each status separately
@@ -3036,12 +3034,12 @@ class AttendanceView {
 		`;
     }
 
-    _tableHTML(id, headers, rows, exportName) {
+    _tableHTML(id, headers, rows, exportName, startIndex = 0) {
         const ths = `<th class="sr-col">Sr No</th>` + headers.map((h) => `<th>${h}</th>`).join("");
 
         const trs = rows.map((r, index) => `
             <tr>
-                <td class="sr-col">${index + 1}</td>
+                <td class="sr-col">${startIndex + index + 1}</td>
                 ${r.map((c) => `<td>${c}</td>`).join("")}
             </tr>
         `,).join("");
@@ -3107,7 +3105,7 @@ class AttendanceView {
         this._currentAllLogs = logs;
         this._currentAllEmps = emps;
         this._currentAllEmpMap = empMap;
-        this._currentAllFilters = filters;    
+        this._currentAllFilters = filters;
 
         const pageSize = 25;
         const currentPage = page;
@@ -3251,7 +3249,7 @@ class AttendanceView {
                 </div>
 
                 <div id="main-table-wrap">
-                    ${this._tableHTML("tbl-all", ["Code", "Name", "Dept", "Company", "Date", "In", "Out", "Hours", "Late In", "Early Out", "Status", "Detailed Status"], rows, "all-attendance")}
+                    ${this._tableHTML("tbl-all", ["Code", "Name", "Dept", "Company", "Date", "In", "Out", "Hours", "Late In", "Early Out", "Status", "Detailed Status"], rows, "all-attendance", (currentPage - 1) * pageSize)}
                     <div class="pagination-bar">
                         <div class="pagination-text">
                             Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, logs.length)} of ${logs.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
@@ -3317,15 +3315,15 @@ class AttendanceView {
     _reRenderAllPage(page) {
         const content = this._renderAll(
             this._currentAllLogs,
-            this._currentAllEmps,      
+            this._currentAllEmps,
             this._currentAllEmpMap,
-            this._currentAllFilters,    
+            this._currentAllFilters,
             page
         );
         document.querySelector(".tab-pane-container").innerHTML = content.html;
         content.renderCharts();
     }
-    
+
 
     _renderDrillDown(logs, title, empMap, page = 1) {
         this._currentDrillLogs = logs;
@@ -3656,7 +3654,7 @@ class AttendanceView {
             const wPct = (g.weeklyOff / total) * 100;
             const spPct = (g.singlePunch / total) * 100;
             const aPct = (g.absent / total) * 100;
-           
+
             return `
                 <div class="dept-acc-sub-row" data-designation="${this._escapeAttr(d)}" data-present="${g.present}" data-half="${g.halfPresent}" data-wopresent="${g.weeklyOffPresent}" data-wohalfpresent="${g.weeklyOffHalfPresent}" data-weeklyoff="${g.weeklyOff}" data-single="${g.singlePunch}" data-absent="${g.absent}" data-total="${g.total}">
                     <div class="dept-acc-sub-label">${d}</div>
@@ -3688,10 +3686,15 @@ class AttendanceView {
         expandEl.style.display = "block";
     }
 
-    
-    _renderAgeWise(logs, emps, empMap, model) {
+
+    _renderAgeWise(logs, emps, empMap, model, page = 1) {
+        // cache rakh liya re-pagination ke liye
+        this._currentAgeWiseLogs = logs;
+        this._currentAgeWiseEmps = emps;
+        this._currentAgeWiseEmpMap = empMap;
+        this._currentAgeWiseModel = model;
         const groups = ["Under 18", "Under 25", "25–34", "35–44", "45–54", "55–59", "60+"];
-        
+
         const gTotal = {};
         const gPresent = {};
         const gHalfPresent = {};
@@ -3771,7 +3774,22 @@ class AttendanceView {
             Absent: r[8],
             Rate: r[9],
         }));
+        // ---- Pagination ----
+        const pageSize = 25;
+        const currentPage = page;
+        const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+        const pageRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
+        let pageButtons = "";
+        const startPage = Math.max(1, currentPage - 2);
+        const endPage = Math.min(totalPages, currentPage + 2);
+        for (let i = startPage; i <= endPage; i++) {
+            pageButtons += `
+        <button class="btn-page ${i === currentPage ? "btn-page-active" : ""}" onclick="AppController.view._reRenderAgeWisePage(${i})">
+            ${i}
+        </button>
+    `;
+        }
         return {
             html: `
 				<h2 class="section-title">
@@ -3783,9 +3801,23 @@ class AttendanceView {
 					${this._chartCard("ch-age-bar", '<i class="ph-fill ph-chart-bar"></i>', "amber", "Attendance by Age Group")}
 				</div>
 
-                ${this._tableHTML("tbl-age", ["Age Group", "Total Emp", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Single Punch", "Absent", "Attendance %"], rows, "age-wise")}
+              <div id="main-table-wrap">
+${this._tableHTML("tbl-age", ["Age Group", "Total Emp", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Single Punch", "Absent", "Attendance %"], pageRows, "age-wise", (currentPage - 1) * pageSize)}
+    <div class="pagination-bar">
+        <div class="pagination-text">
+            Showing ${rows.length ? (currentPage - 1) * pageSize + 1 : 0}–${Math.min(currentPage * pageSize, rows.length)} of ${rows.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
+        </div>
+        <div class="pagination-buttons">
+            <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderAgeWisePage(1)">«</button>
+            <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderAgeWisePage(${currentPage - 1})">‹</button>
+            ${pageButtons}
+            <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderAgeWisePage(${currentPage + 1})">›</button>
+            <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderAgeWisePage(${totalPages})">»</button>
+        </div>
+    </div>
+</div>
 
-				<div id="drilldown-table" style="margin-top:16px"></div>
+<div id="drilldown-table" style="margin-top:16px"></div>
 			`,
 
             renderCharts: () => {
@@ -3820,7 +3852,17 @@ class AttendanceView {
             },
         };
     }
-
+    _reRenderAgeWisePage(page) {
+        const content = this._renderAgeWise(
+            this._currentAgeWiseLogs,
+            this._currentAgeWiseEmps,
+            this._currentAgeWiseEmpMap,
+            this._currentAgeWiseModel,
+            page
+        );
+        document.querySelector(".tab-pane-container").innerHTML = content.html;
+        content.renderCharts();
+    }
 
     _matchesStatus(log, seriesName) {
         if (log.status === "Single Punch") {
@@ -3835,14 +3877,14 @@ class AttendanceView {
             case "P":
                 bucket = "Present";
                 break;
-            
+
             case "½PLD":
             case "L_CL":
             case "½PCL":
             case "½PLD(HO)":
                 bucket = "Half Present";
                 break;
-            
+
             case "WO":
                 bucket = "Weekly Off";
                 break;
@@ -3866,8 +3908,12 @@ class AttendanceView {
         return seriesName === bucket;
     }
 
-   
-    _renderCompanyWise(logs, emps, empMap, model) {
+
+    _renderCompanyWise(logs, emps, empMap, model, page = 1) {
+        this._currentCompanyWiseLogs = logs;
+        this._currentCompanyWiseEmps = emps;
+        this._currentCompanyWiseEmpMap = empMap;
+        this._currentCompanyWiseModel = model;
         const comps = [...new Set(emps.map((e) => e.company))];
         const { dateFrom, dateTo } = model.state.filters;
         const groups = this._computeGroupedDayStats(emps, logs, dateFrom, dateTo, (e) => e.company);
@@ -3890,7 +3936,22 @@ class AttendanceView {
             Absent: r[7],
             Rate: r[8],
         }));
+        // ---- Pagination ----
+        const pageSize = 25;
+        const currentPage = page;
+        const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+        const pageRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
+        let pageButtons = "";
+        const startPage = Math.max(1, currentPage - 2);
+        const endPage = Math.min(totalPages, currentPage + 2);
+        for (let i = startPage; i <= endPage; i++) {
+            pageButtons += `
+                <button class="btn-page ${i === currentPage ? "btn-page-active" : ""}" onclick="AppController.view._reRenderCompanyWisePage(${i})">
+                    ${i}
+                </button>
+            `;
+        }
         return {
             html: `
 				<h2 class="section-title"><i class="ph-fill ph-buildings"></i> Company Statistics</h2>
@@ -3898,11 +3959,25 @@ class AttendanceView {
 					${this._chartCard("ch-comp-bar", '<i class="ph-fill ph-chart-bar"></i>', "violet", "Company Breakdown")}
 				</div>
 
-                ${this._tableHTML("tbl-comp", ["Company", "Total", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Single Punch", "Absent", "Rate"], rows, "company-wise")}
+               <div id="main-table-wrap">
+                    ${this._tableHTML("tbl-comp", ["Company", "Total", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Single Punch", "Absent", "Rate"], pageRows, "company-wise", (currentPage - 1) * pageSize)}
+                    <div class="pagination-bar">
+                        <div class="pagination-text">
+                            Showing ${rows.length ? (currentPage - 1) * pageSize + 1 : 0}–${Math.min(currentPage * pageSize, rows.length)} of ${rows.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
+                        </div>
+                        <div class="pagination-buttons">
+                            <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderCompanyWisePage(1)">«</button>
+                            <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderCompanyWisePage(${currentPage - 1})">‹</button>
+                            ${pageButtons}
+                            <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderCompanyWisePage(${currentPage + 1})">›</button>
+                            <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderCompanyWisePage(${totalPages})">»</button>
+                        </div>
+                    </div>
+                </div>
 				
                 <div id="drilldown-table" style="margin-top:16px"></div>
 			`,
-            
+
             renderCharts: () => {
                 Charts.stacked(
                     "ch-comp-bar",
@@ -3931,9 +4006,23 @@ class AttendanceView {
             },
         };
     }
+    _reRenderCompanyWisePage(page) {
+        const content = this._renderCompanyWise(
+            this._currentCompanyWiseLogs,
+            this._currentCompanyWiseEmps,
+            this._currentCompanyWiseEmpMap,
+            this._currentCompanyWiseModel,
+            page
+        );
+        document.querySelector(".tab-pane-container").innerHTML = content.html;
+        content.renderCharts();
+    }
 
-   
-    _renderDeptWise(logs, emps, empMap, model) {
+    _renderDeptWise(logs, emps, empMap, model, page = 1) {
+        this._currentDeptWiseLogs = logs;
+        this._currentDeptWiseEmps = emps;
+        this._currentDeptWiseEmpMap = empMap;
+        this._currentDeptWiseModel = model;
         this._currentDeptData = { emps, logs, empMap, model };
         const depts = [...new Set(emps.map((e) => e.dept))];
         const { dateFrom, dateTo } = model.state.filters;
@@ -3961,7 +4050,22 @@ class AttendanceView {
             AvgHours: r[9],
             Rate: r[10],
         }));
+        // ---- Pagination ----
+        const pageSize = 25;
+        const currentPage = page;
+        const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+        const pageRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
+        let pageButtons = "";
+        const startPage = Math.max(1, currentPage - 2);
+        const endPage = Math.min(totalPages, currentPage + 2);
+        for (let i = startPage; i <= endPage; i++) {
+            pageButtons += `
+                <button class="btn-page ${i === currentPage ? "btn-page-active" : ""}" onclick="AppController.view._reRenderDeptWisePage(${i})">
+                    ${i}
+                </button>
+            `;
+        }
         return {
             html: `
                 <h2 class="section-title">
@@ -3982,7 +4086,21 @@ class AttendanceView {
                     </div>
                 </div>
 
-                ${this._tableHTML("tbl-dept", ["Dept", "Total", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Single Punch", "Absent", "Avg Hours", "Rate"], rows, "dept-wise")}
+         <div id="main-table-wrap">
+                    ${this._tableHTML("tbl-dept", ["Dept", "Total", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Single Punch", "Absent", "Avg Hours", "Rate"], pageRows, "dept-wise", (currentPage - 1) * pageSize)}
+                    <div class="pagination-bar">
+                        <div class="pagination-text">
+                            Showing ${rows.length ? (currentPage - 1) * pageSize + 1 : 0}–${Math.min(currentPage * pageSize, rows.length)} of ${rows.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
+                        </div>
+                        <div class="pagination-buttons">
+                            <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderDeptWisePage(1)">«</button>
+                            <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderDeptWisePage(${currentPage - 1})">‹</button>
+                            ${pageButtons}
+                            <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderDeptWisePage(${currentPage + 1})">›</button>
+                            <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderDeptWisePage(${totalPages})">»</button>
+                        </div>
+                    </div>
+                </div>
                 
                 <div id="drilldown-table" style="margin-top:16px"></div>
             `,
@@ -4010,7 +4128,17 @@ class AttendanceView {
             },
         };
     }
-    
+    _reRenderDeptWisePage(page) {
+        const content = this._renderDeptWise(
+            this._currentDeptWiseLogs,
+            this._currentDeptWiseEmps,
+            this._currentDeptWiseEmpMap,
+            this._currentDeptWiseModel,
+            page
+        );
+        document.querySelector(".tab-pane-container").innerHTML = content.html;
+        content.renderCharts();
+    }
 
     _renderDeptDesignationDrilldown(dept, emps, logs, model, anchorEl) {
         const deptEmps = emps.filter((e) => e.dept === dept);
@@ -4028,13 +4156,13 @@ class AttendanceView {
 
         const old = document.getElementById("dept-desig-popover");
         if (old) old.remove();
-        
+
 
         const chartEl = document.getElementById("ch-dept-bar");
         const chartCard = chartEl ? chartEl.closest(".chart-card") : null;
-        
+
         if (!chartCard) return;
-        
+
         chartCard.style.position = "relative";
 
         const cardRect = chartCard.getBoundingClientRect();
@@ -4085,8 +4213,12 @@ class AttendanceView {
         }, 50);
     }
 
-    
-    _renderGenderWise(logs, emps, empMap, model) {
+
+    _renderGenderWise(logs, emps, empMap, model, page = 1) {
+        this._currentGenderWiseLogs = logs;
+        this._currentGenderWiseEmps = emps;
+        this._currentGenderWiseEmpMap = empMap;
+        this._currentGenderWiseModel = model;
         const genders = ["Male", "Female"];
         const { dateFrom, dateTo } = model.state.filters;
 
@@ -4111,7 +4243,22 @@ class AttendanceView {
             Absent: r[8],
             Rate: r[9],
         }));
+        // ---- Pagination ----
+        const pageSize = 25;
+        const currentPage = page;
+        const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+        const pageRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
+        let pageButtons = "";
+        const startPage = Math.max(1, currentPage - 2);
+        const endPage = Math.min(totalPages, currentPage + 2);
+        for (let i = startPage; i <= endPage; i++) {
+            pageButtons += `
+                <button class="btn-page ${i === currentPage ? "btn-page-active" : ""}" onclick="AppController.view._reRenderGenderWisePage(${i})">
+                    ${i}
+                </button>
+            `;
+        }
         return {
             html: `
                 <h2 class="section-title">
@@ -4122,7 +4269,21 @@ class AttendanceView {
                     ${this._chartCard("ch-gender-bar", '<i class="ph-fill ph-chart-bar"></i>', "violet", "Attendance by Gender", "Click bar for detail")}
                 </div>
 
-                ${this._tableHTML("tbl-gen", ["Gender", "Total", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Single Punch", "Absent", "Rate"], rows, "gender-wise")}
+               <div id="main-table-wrap">
+                    ${this._tableHTML("tbl-gen", ["Gender", "Total", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Single Punch", "Absent", "Rate"], pageRows, "gender-wise", (currentPage - 1) * pageSize)}
+                    <div class="pagination-bar">
+                        <div class="pagination-text">
+                            Showing ${rows.length ? (currentPage - 1) * pageSize + 1 : 0}–${Math.min(currentPage * pageSize, rows.length)} of ${rows.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
+                        </div>
+                        <div class="pagination-buttons">
+                            <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderGenderWisePage(1)">«</button>
+                            <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderGenderWisePage(${currentPage - 1})">‹</button>
+                            ${pageButtons}
+                            <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderGenderWisePage(${currentPage + 1})">›</button>
+                            <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderGenderWisePage(${totalPages})">»</button>
+                        </div>
+                    </div>
+                </div>
                 
                 <div id="drilldown-table" style="margin-top:16px"></div>
             `,
@@ -4159,13 +4320,23 @@ class AttendanceView {
             },
         };
     }
-
+    _reRenderGenderWisePage(page) {
+        const content = this._renderGenderWise(
+            this._currentGenderWiseLogs,
+            this._currentGenderWiseEmps,
+            this._currentGenderWiseEmpMap,
+            this._currentGenderWiseModel,
+            page
+        );
+        document.querySelector(".tab-pane-container").innerHTML = content.html;
+        content.renderCharts();
+    }
 
     _fmtMins(mins) {
         const m = parseInt(mins) || 0;
         if (m <= 0) return "-";
         if (m < 60) return `${m}m`;
-        
+
         return `${Math.floor(m / 60)}h ${m % 60}m`;
     }
 
@@ -4184,8 +4355,8 @@ class AttendanceView {
 
     _getSeverityStyle(count) {
         if (count < this.LATE_THRESHOLD) return "";
-        const intensity = Math.min((count - this.LATE_THRESHOLD + 1) / 8, 1); 
-        const alpha = (0.12 + intensity * 0.6).toFixed(2); 
+        const intensity = Math.min((count - this.LATE_THRESHOLD + 1) / 8, 1);
+        const alpha = (0.12 + intensity * 0.6).toFixed(2);
         return `background: rgba(244,63,94,${alpha});`;
     }
 
@@ -4437,20 +4608,24 @@ class AttendanceView {
 				</h2>
 				${this._tableHTML("tbl-ns", ["Name", "Dept", "Date", "In", "Out", "Hours", "Status"], rows, "night-shift")}
 			`,
-            renderCharts: () => {},
+            renderCharts: () => { },
         };
     }
 
 
-    _renderDesignationWise(logs, emps, empMap, model) {
+    _renderDesignationWise(logs, emps, empMap, model, page = 1) {
+        this._currentDesignationWiseLogs = logs;
+        this._currentDesignationWiseEmps = emps;
+        this._currentDesignationWiseEmpMap = empMap;
+        this._currentDesignationWiseModel = model;
         const desigMap = {};
-        
+
         emps.forEach((e) => {
             const name = e.designation || "Staff";
             const order = e.designationSortOrder || 0;
             if (!desigMap[name] || order < desigMap[name].order) desigMap[name] = { name, order };
         });
-        
+
         const desigs = Object.values(desigMap).sort((a, b) => {
             if (a.order !== b.order) return a.order - b.order;
             return a.name.localeCompare(b.name);
@@ -4478,14 +4653,43 @@ class AttendanceView {
             Absent: r[8],
             Rate: r[9],
         }));
+        // ---- Pagination ----
+        const pageSize = 25;
+        const currentPage = page;
+        const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+        const pageRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
+        let pageButtons = "";
+        const startPage = Math.max(1, currentPage - 2);
+        const endPage = Math.min(totalPages, currentPage + 2);
+        for (let i = startPage; i <= endPage; i++) {
+            pageButtons += `
+                <button class="btn-page ${i === currentPage ? "btn-page-active" : ""}" onclick="AppController.view._reRenderDesignationWisePage(${i})">
+                    ${i}
+                </button>
+            `;
+        }
         return {
             html: `
                 <h2 class="section-title"><i class="ph-fill ph-identification-badge"></i> Designation Statistics</h2>
                 <div class="charts-grid">
                     ${this._chartCard("ch-desig-bar", '<i class="ph-fill ph-chart-bar"></i>', "teal", "Present by Designation", "Click a segment for detail")}
                 </div>
-                ${this._tableHTML("tbl-desig", ["Designation", "Total", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Single Punch", "Absent", "Rate"], rows, "designation-wise")}
+               <div id="main-table-wrap">
+                    ${this._tableHTML("tbl-desig", ["Designation", "Total", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Single Punch", "Absent", "Rate"], pageRows, "designation-wise", (currentPage - 1) * pageSize)}
+                    <div class="pagination-bar">
+                        <div class="pagination-text">
+                            Showing ${rows.length ? (currentPage - 1) * pageSize + 1 : 0}–${Math.min(currentPage * pageSize, rows.length)} of ${rows.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
+                        </div>
+                        <div class="pagination-buttons">
+                            <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderDesignationWisePage(1)">«</button>
+                            <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderDesignationWisePage(${currentPage - 1})">‹</button>
+                            ${pageButtons}
+                            <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderDesignationWisePage(${currentPage + 1})">›</button>
+                            <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderDesignationWisePage(${totalPages})">»</button>
+                        </div>
+                    </div>
+                </div>
                 <div id="drilldown-table" style="margin-top:16px"></div>
             `,
 
@@ -4512,14 +4716,28 @@ class AttendanceView {
                         });
                         this._renderDrillDown(filteredLogs, `Designation: ${designation} - ${seriesName}`, empMap);
                     },
-                    true 
+                    true
                 );
             },
         };
     }
+    _reRenderDesignationWisePage(page) {
+        const content = this._renderDesignationWise(
+            this._currentDesignationWiseLogs,
+            this._currentDesignationWiseEmps,
+            this._currentDesignationWiseEmpMap,
+            this._currentDesignationWiseModel,
+            page
+        );
+        document.querySelector(".tab-pane-container").innerHTML = content.html;
+        content.renderCharts();
+    }
 
-
-    _renderShiftWise(logs, emps, empMap, model) {
+    _renderShiftWise(logs, emps, empMap, model, page = 1) {
+        this._currentShiftWiseLogs = logs;
+        this._currentShiftWiseEmps = emps;
+        this._currentShiftWiseEmpMap = empMap;
+        this._currentShiftWiseModel = model;
         const shiftStats = model.state.data.shiftStats || [];
         const { dateFrom, dateTo } = model.state.filters;
         const rows = shiftStats.map((s) => [s.shiftName, s.total, s.present, s.halfPresent, s.weeklyOffPresent || 0, s.weeklyOffHalfPresent || 0, s.weeklyOff, s.singlePunch || 0, s.absent, s.rate + "%"]);
@@ -4536,7 +4754,22 @@ class AttendanceView {
             Absent: r[8],
             Rate: r[9],
         }));
+        // ---- Pagination ----
+        const pageSize = 25;
+        const currentPage = page;
+        const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+        const pageRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
+        let pageButtons = "";
+        const startPage = Math.max(1, currentPage - 2);
+        const endPage = Math.min(totalPages, currentPage + 2);
+        for (let i = startPage; i <= endPage; i++) {
+            pageButtons += `
+                <button class="btn-page ${i === currentPage ? "btn-page-active" : ""}" onclick="AppController.view._reRenderShiftWisePage(${i})">
+                    ${i}
+                </button>
+            `;
+        }
         const fullLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
 
         return {
@@ -4550,7 +4783,21 @@ class AttendanceView {
 					${this._chartCard("ch-shift-bar", '<i class="ph-fill ph-chart-bar"></i>', "amber", "Present by Shift", "Click to view records")}
 				</div>
 				
-                ${this._tableHTML("tbl-shift", ["Shift", "Total", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Single Punch", "Absent", "Rate"], rows, "shift-wise")}
+               <div id="main-table-wrap">
+                    ${this._tableHTML("tbl-shift", ["Shift", "Total", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Single Punch", "Absent", "Rate"], pageRows, "shift-wise", (currentPage - 1) * pageSize)}
+                    <div class="pagination-bar">
+                        <div class="pagination-text">
+                            Showing ${rows.length ? (currentPage - 1) * pageSize + 1 : 0}–${Math.min(currentPage * pageSize, rows.length)} of ${rows.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
+                        </div>
+                        <div class="pagination-buttons">
+                            <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderShiftWisePage(1)">«</button>
+                            <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderShiftWisePage(${currentPage - 1})">‹</button>
+                            ${pageButtons}
+                            <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderShiftWisePage(${currentPage + 1})">›</button>
+                            <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderShiftWisePage(${totalPages})">»</button>
+                        </div>
+                    </div>
+                </div>
 
 				<div id="drilldown-table" style="margin-top:16px"></div>
 			`,
@@ -4583,7 +4830,17 @@ class AttendanceView {
             },
         };
     }
-
+    _reRenderShiftWisePage(page) {
+        const content = this._renderShiftWise(
+            this._currentShiftWiseLogs,
+            this._currentShiftWiseEmps,
+            this._currentShiftWiseEmpMap,
+            this._currentShiftWiseModel,
+            page
+        );
+        document.querySelector(".tab-pane-container").innerHTML = content.html;
+        content.renderCharts();
+    }
 
     _buildPaginatedTable(rows, headers, page, pageSize, tableId, reRenderFnName) {
         const currentPage = page;
@@ -4592,9 +4849,9 @@ class AttendanceView {
         const colCount = headers.length;
 
         const trs = pageRows.map((r) => `
-            <tr>${r.map((c) => 
-                `<td>${c}</td>`,).join("")}
-            </tr>`,).join("") ||`
+            <tr>${r.map((c) =>
+            `<td>${c}</td>`,).join("")}
+            </tr>`,).join("") || `
             <tr>
                 <td colspan="${colCount}">None</td>
             </tr>
@@ -4681,7 +4938,7 @@ class AttendanceView {
 					</div>
 				</div>
 			`,
-            renderCharts: () => {},
+            renderCharts: () => { },
         };
     }
 
@@ -4703,7 +4960,7 @@ class AttendanceView {
         }
     }
 
-    
+
     _renderDataQuality(logs, emps, empMap, filters, model, dqPage = 1) {
         const missingDataItems = model.findMissingDataEmployees();
 
@@ -4731,7 +4988,7 @@ class AttendanceView {
                     </div>
                 </div>
             `,
-            renderCharts: () => {},
+            renderCharts: () => { },
         };
     }
 
@@ -4747,9 +5004,9 @@ class AttendanceView {
 
     exportPDF(exportName) {
         const data = this._lastData[exportName];
-        if (!data || !data.length) { alert("No data found"); return;}
+        if (!data || !data.length) { alert("No data found"); return; }
         const pdf = new jspdf.jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-        const headers = [ "Sr No", ...Object.keys(data[0])];
+        const headers = ["Sr No", ...Object.keys(data[0])];
         const rows = data.map((row, index) => [
             index + 1,
             ...Object.values(row).map(value => {
@@ -4760,11 +5017,12 @@ class AttendanceView {
                     .replace(/&nbsp;/g, " ");
             })
         ]);
-        pdf.autoTable({ head: [headers], body: rows, startY: 15,
-            styles: { fontSize: 8, cellPadding: 2, overflow: "linebreak"},
-            headStyles: { fillColor: [52, 73, 94], textColor: 255},
+        pdf.autoTable({
+            head: [headers], body: rows, startY: 15,
+            styles: { fontSize: 8, cellPadding: 2, overflow: "linebreak" },
+            headStyles: { fillColor: [52, 73, 94], textColor: 255 },
             theme: "grid",
-            margin: { left: 5, right: 5}
+            margin: { left: 5, right: 5 }
         });
         pdf.save(`${exportName}.pdf`);
     }
@@ -4849,8 +5107,8 @@ class AttendanceView {
         let headers, ths;
 
         if (isDashboardMode) {
-            headers = isJoinExitRelated 
-                ? ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Location",] 
+            headers = isJoinExitRelated
+                ? ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Location",]
                 : ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Shift", "Shift Start", "Shift End", "Location",];
         } else if (isResignedOnly) {
             headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "DOJ", "DOR", "Status",];
@@ -5007,8 +5265,8 @@ class AttendanceView {
             const lastCol =
                 key === "lateIn"
                     ? `<td>${this._fmtMins(log?.lateBy)}</td>` : key === "earlyOut"
-                    ? `<td>${this._fmtMins(log?.earlyBy)}</td>` : key === "weeklyOff"
-                    ? `<td><span class="badge badge-info">Weekly Off</span></td>` : `<td>${log?.status || "–"}</td>`;
+                        ? `<td>${this._fmtMins(log?.earlyBy)}</td>` : key === "weeklyOff"
+                            ? `<td><span class="badge badge-info">Weekly Off</span></td>` : `<td>${log?.status || "–"}</td>`;
 
             const detailedStatusCol = `<td>${log?.detailedStatus || "–"}</td>`;
 
@@ -5841,48 +6099,48 @@ class AttendanceView {
         });
 
         document.getElementById("btn-save-companies").addEventListener("click", async () => {
-                const inputs = contentEl.querySelectorAll(".company-order-input",);
-                const items = [];
-                inputs.forEach((input) => {
-                    items.push({
-                        id: parseInt(input.dataset.id),
-                        sortOrder: input.value !== "" ? parseInt(input.value) : null,
-                    });
+            const inputs = contentEl.querySelectorAll(".company-order-input",);
+            const items = [];
+            inputs.forEach((input) => {
+                items.push({
+                    id: parseInt(input.dataset.id),
+                    sortOrder: input.value !== "" ? parseInt(input.value) : null,
                 });
-
-                this.showOverlay("Saving company order...");
-                const res = await model.saveCompaniesOrder(items);
-                this.hideOverlay();
-
-                if (res && res.success) {
-                    alert("Company sort order saved successfully!");
-                    model.state.filterLists = null;
-                } else {
-                    alert("Failed: " + (res ? res.message : "Unknown error"));
-                }
             });
+
+            this.showOverlay("Saving company order...");
+            const res = await model.saveCompaniesOrder(items);
+            this.hideOverlay();
+
+            if (res && res.success) {
+                alert("Company sort order saved successfully!");
+                model.state.filterLists = null;
+            } else {
+                alert("Failed: " + (res ? res.message : "Unknown error"));
+            }
+        });
 
         document.getElementById("btn-save-departments").addEventListener("click", async () => {
-                const inputs = contentEl.querySelectorAll(".dept-order-input");
-                const items = [];
-                inputs.forEach((input) => {
-                    items.push({
-                        id: parseInt(input.dataset.id),
-                        sortOrder: input.value !== "" ? parseInt(input.value) : null,
-                    });
+            const inputs = contentEl.querySelectorAll(".dept-order-input");
+            const items = [];
+            inputs.forEach((input) => {
+                items.push({
+                    id: parseInt(input.dataset.id),
+                    sortOrder: input.value !== "" ? parseInt(input.value) : null,
                 });
-
-                this.showOverlay("Saving department order...");
-                const res = await model.saveDepartmentsOrder(items);
-                this.hideOverlay();
-
-                if (res && res.success) {
-                    alert("Department sort order saved successfully!");
-                    model.state.filterLists = null;
-                } else {
-                    alert("Failed: " + (res ? res.message : "Unknown error"));
-                }
             });
+
+            this.showOverlay("Saving department order...");
+            const res = await model.saveDepartmentsOrder(items);
+            this.hideOverlay();
+
+            if (res && res.success) {
+                alert("Department sort order saved successfully!");
+                model.state.filterLists = null;
+            } else {
+                alert("Failed: " + (res ? res.message : "Unknown error"));
+            }
+        });
     }
 
 
@@ -5993,20 +6251,20 @@ class AttendanceView {
                         <div class="desig-fam-detail" id="desig-fam-detail-${fam.id}">
                             <div class="desig-fam-chip-list">
                                 ${fam.designations.length === 0
-                                    ? '<span style="color:#94a3b8;font-size:13px;">No designations assigned yet.</span>'
-                                    : fam.designations.map(d => `
+                ? '<span style="color:#94a3b8;font-size:13px;">No designations assigned yet.</span>'
+                : fam.designations.map(d => `
                                         <div class="desig-fam-chip">
                                             ${this._escapeAttr(d.name)}
                                             <button onclick="AppController.view._removeDesigFromFamily(${fam.id}, ${d.id})" title="Remove">✕</button>
                                         </div>
                                     `).join("")
-                                }
+            }
                             </div>
                             <div class="desig-fam-add-panel">
                                 <div class="desig-fam-add-panel-title">Add designations to this family</div>
                                 ${unmapped.length === 0
-                                    ? '<span style="color:#94a3b8;font-size:13px;">No unmapped designations available.</span>'
-                                    : `
+                ? '<span style="color:#94a3b8;font-size:13px;">No unmapped designations available.</span>'
+                : `
                                         <input type="text"
                                                class="desig-fam-search-input"
                                                data-family-id="${fam.id}"
@@ -6027,7 +6285,7 @@ class AttendanceView {
                                             <i class="ph-bold ph-plus"></i> Add Selected
                                     </button>
                                     `
-                                }
+            }
                             </div>
                         </div>
                     </div>
@@ -6153,7 +6411,11 @@ class AttendanceView {
         }
     }
 
-    _renderStaff(logs, emps, empMap, model) {
+    _renderStaff(logs, emps, empMap, model, page = 1) {
+        this._currentStaffTabLogs = logs;
+        this._currentStaffTabEmps = emps;
+        this._currentStaffTabEmpMap = empMap;
+        this._currentStaffTabModel = model;
         const staffTeamId = model.state.teamConfig?.staffTeamId ?? 7;
         const { dateFrom, dateTo } = model.state.filters;
 
@@ -6178,7 +6440,22 @@ class AttendanceView {
             Absent: r[7],
             Rate: r[8],
         }));
+        // ---- Pagination ----
+        const pageSize = 25;
+        const currentPage = page;
+        const totalPages = Math.max(1, Math.ceil(staffRows.length / pageSize));
+        const pageRows = staffRows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
+        let pageButtons = "";
+        const startPage = Math.max(1, currentPage - 2);
+        const endPage = Math.min(totalPages, currentPage + 2);
+        for (let i = startPage; i <= endPage; i++) {
+            pageButtons += `
+                <button class="btn-page ${i === currentPage ? "btn-page-active" : ""}" onclick="AppController.view._reRenderStaffTabPage(${i})">
+                    ${i}
+                </button>
+            `;
+        }
         return {
             html: `
 				<h2 class="section-title">
@@ -6189,7 +6466,21 @@ class AttendanceView {
 					${this._chartCard("ch-staff-dept", '<i class="ph-fill ph-chart-bar"></i>', "violet", "Staff Attendance by Department", "Click bar for detail")}
 				</div>
 				
-                ${this._tableHTML("tbl-staff", ["Dept", "Total", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Single Punch", "Absent", "Rate"], staffRows, "staff-wise")}
+              <div id="main-table-wrap">
+                    ${this._tableHTML("tbl-staff", ["Dept", "Total", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Single Punch", "Absent", "Rate"], pageRows, "staff-wise", (currentPage - 1) * pageSize)}
+                    <div class="pagination-bar">
+                        <div class="pagination-text">
+                            Showing ${staffRows.length ? (currentPage - 1) * pageSize + 1 : 0}–${Math.min(currentPage * pageSize, staffRows.length)} of ${staffRows.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
+                        </div>
+                        <div class="pagination-buttons">
+                            <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderStaffTabPage(1)">«</button>
+                            <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderStaffTabPage(${currentPage - 1})">‹</button>
+                            ${pageButtons}
+                            <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderStaffTabPage(${currentPage + 1})">›</button>
+                            <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderStaffTabPage(${totalPages})">»</button>
+                        </div>
+                    </div>
+                </div>
 				
                 <div id="drilldown-table" style="margin-top:16px"></div>
 			`,
@@ -6221,9 +6512,23 @@ class AttendanceView {
             },
         };
     }
+    _reRenderStaffTabPage(page) {
+        const content = this._renderStaff(
+            this._currentStaffTabLogs,
+            this._currentStaffTabEmps,
+            this._currentStaffTabEmpMap,
+            this._currentStaffTabModel,
+            page
+        );
+        document.querySelector(".tab-pane-container").innerHTML = content.html;
+        content.renderCharts();
+    }
 
-
-    _renderWorker(logs, emps, empMap, model) {
+    _renderWorker(logs, emps, empMap, model, page = 1) {
+        this._currentWorkerTabLogs = logs;
+        this._currentWorkerTabEmps = emps;
+        this._currentWorkerTabEmpMap = empMap;
+        this._currentWorkerTabModel = model;
         const workerTeamId = model.state.teamConfig?.workerTeamId ?? 6;
         const { dateFrom, dateTo } = model.state.filters;
 
@@ -6247,7 +6552,22 @@ class AttendanceView {
             Absent: r[7],
             Rate: r[8],
         }));
+        // ---- Pagination ----
+        const pageSize = 25;
+        const currentPage = page;
+        const totalPages = Math.max(1, Math.ceil(workerRows.length / pageSize));
+        const pageRows = workerRows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
+        let pageButtons = "";
+        const startPage = Math.max(1, currentPage - 2);
+        const endPage = Math.min(totalPages, currentPage + 2);
+        for (let i = startPage; i <= endPage; i++) {
+            pageButtons += `
+                <button class="btn-page ${i === currentPage ? "btn-page-active" : ""}" onclick="AppController.view._reRenderWorkerTabPage(${i})">
+                    ${i}
+                </button>
+            `;
+        }
         return {
             html: `
 				<h2 class="section-title">
@@ -6256,7 +6576,21 @@ class AttendanceView {
 				<div class="charts-grid">
 					${this._chartCard("ch-worker-dept", '<i class="ph-fill ph-chart-bar"></i>', "amber", "Workmen Attendance by Department", "Click bar for detail")}
 				</div>
-				${this._tableHTML("tbl-worker", ["Dept", "Total", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Absent", "Rate"], workerRows, "worker-wise")}
+				<div id="main-table-wrap">
+                    ${this._tableHTML("tbl-worker", ["Dept", "Total", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Absent", "Rate"], pageRows, "worker-wise", (currentPage - 1) * pageSize)}
+                    <div class="pagination-bar">
+                        <div class="pagination-text">
+                            Showing ${workerRows.length ? (currentPage - 1) * pageSize + 1 : 0}–${Math.min(currentPage * pageSize, workerRows.length)} of ${workerRows.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
+                        </div>
+                        <div class="pagination-buttons">
+                            <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderWorkerTabPage(1)">«</button>
+                            <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderWorkerTabPage(${currentPage - 1})">‹</button>
+                            ${pageButtons}
+                            <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderWorkerTabPage(${currentPage + 1})">›</button>
+                            <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderWorkerTabPage(${totalPages})">»</button>
+                        </div>
+                    </div>
+                </div>
 				<div id="drilldown-table" style="margin-top:16px"></div>
 			`,
             renderCharts: () => {
@@ -6285,7 +6619,17 @@ class AttendanceView {
             },
         };
     }
-
+    _reRenderWorkerTabPage(page) {
+        const content = this._renderWorker(
+            this._currentWorkerTabLogs,
+            this._currentWorkerTabEmps,
+            this._currentWorkerTabEmpMap,
+            this._currentWorkerTabModel,
+            page
+        );
+        document.querySelector(".tab-pane-container").innerHTML = content.html;
+        content.renderCharts();
+    }
 
     _renderJoinExitTab(model, mode, page = 1) {
         const isResigned = mode === "resigned";
@@ -6360,7 +6704,7 @@ class AttendanceView {
                 <div class="charts-grid">
                     ${this._chartCard(chartId, `<i class="ph-fill ${icon}"></i>`, isResigned ? "danger" : "success", chartTitle, "Click a segment for detail")}
                 </div>
-                ${this._tableHTML(tableId, headers, rows, exportKey)}
+                ${this._tableHTML(tableId, headers, rows, exportKey, (currentPage - 1) * pageSize)}
                 <div class="pagination-bar">
                     <div class="pagination-text">
                         Showing ${items.length ? (currentPage - 1) * pageSize + 1 : 0}–${Math.min(currentPage * pageSize, items.length)} of ${items.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
@@ -6606,7 +6950,7 @@ class AttendanceView {
             <div class="drilldown-box">
                 <div class="drilldown-header">
                     <div class="drilldown-title">
-                        ${ type === "required" ? "🎯 Required Headcount" : "⚖️ Headcount Gap" } — By Department
+                        ${type === "required" ? "🎯 Required Headcount" : "⚖️ Headcount Gap"} — By Department
                         <small>${depts.length} departments</small>
                     </div>
                     <div class="drilldown-btn-group">
@@ -6629,13 +6973,13 @@ class AttendanceView {
                         </thead>
 
                         <tbody>
-                            ${ rows ||
-                                `<tr>
+                            ${rows ||
+            `<tr>
                                     <td colspan="4" style="text-align:center;padding:32px;color:#94a3b8;">
                                         No department data found
                                     </td>
                                 </tr>`
-                            }
+            }
 
                             <tr style=" background:#f8fafc; border-top:2px solid #cbd5e1; font-weight:700;">
                                 <td><b>Total</b></td>
