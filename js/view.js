@@ -441,7 +441,18 @@ class AttendanceView {
         const staffWorkerStats = this._staffWorkerStats || {};
         const staffTeamId = model.state.teamConfig?.staffTeamId ?? 7;
         const workerTeamId = model.state.teamConfig?.workerTeamId ?? 6;
-        
+
+        const sectionLabel = (text) => `
+            <div style="
+                font-size:10px;font-weight:700;text-transform:uppercase;
+                letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px;
+                display:flex;align-items:center;gap:8px;
+            ">
+                ${text}
+                <span style="flex:1;height:1px;background:#e5e7eb;display:block;"></span>
+            </div>
+        `;
+
         this._currentStaffSummaryData = {
             emps: emps.filter((e) => e.team === staffTeamId),
             model,
@@ -500,27 +511,52 @@ class AttendanceView {
             </div>
         `;
 
-        // --- Company cards ---
+        // --- Company cards, grouped into category sections (ON-ROLL, CONTRACTOR, CC, OUTSOURCE, OTHER) ---
         this._currentCompanyData = { emps, model, dayLogs, empMap, isDashboard: true, };
-        const companies = [...new Set(emps.map((e) => e.company))];
-        const companyCounts = {};
-        companies.forEach((c) => (companyCounts[c] = 0));
-        emps.forEach((e) => {
-            if (companyCounts[e.company] !== undefined) companyCounts[e.company]++;
-        });
+
+        const categoryOrder = ["ON-ROLL", "CONTRACTOR", "CC", "OUTSOURCE", "OTHER"];
+        const categoryLabels = {
+            "ON-ROLL": "On-Roll Companies",
+            "CONTRACTOR": "Contractor Companies",
+            "CC": "CC Companies",
+            "OUTSOURCE": "Outsource Companies",
+            "OTHER": "Other Companies",
+        };
         const compColorCls = ["info", "success", "warning", "accent", "danger"];
-        const companyCards = companies.map((c, i) => `
-            <div class="stat-card ${compColorCls[i % compColorCls.length]} stat-card-clickable"
-                data-company="${this._escapeAttr(c)}"
-                onclick="AppController.view._showCompanyDrilldown('${this._escapeAttr(c)}')">
-                <div class="stat-icon"><i class="ph ph-buildings"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">${c}</span>
-                    <span class="stat-value">${companyCounts[c]}</span>
-                    <span class="stat-card-hint">↓ click to view</span>
+
+        const companiesByCategory = {};
+        emps.forEach((e) => {
+            const cat = e.companyCategory || "OTHER";
+            if (!companiesByCategory[cat]) companiesByCategory[cat] = {};
+            if (!companiesByCategory[cat][e.company]) companiesByCategory[cat][e.company] = 0;
+            companiesByCategory[cat][e.company]++;
+        });
+
+        let companySectionsHtml = "";
+        categoryOrder.forEach((cat) => {
+            const companiesInCat = companiesByCategory[cat];
+            if (!companiesInCat) return;
+
+            const cards = Object.keys(companiesInCat).map((c, i) => `
+                <div class="stat-card ${compColorCls[i % compColorCls.length]} stat-card-clickable"
+                    data-company="${this._escapeAttr(c)}"
+                    onclick="AppController.view._showCompanyDrilldown('${this._escapeAttr(c)}')">
+                    <div class="stat-icon"><i class="ph ph-buildings"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">${c}</span>
+                        <span class="stat-value">${companiesInCat[c]}</span>
+                        <span class="stat-card-hint">↓ click to view</span>
+                    </div>
                 </div>
-            </div>
-        `,).join("");
+            `).join("");
+
+            companySectionsHtml += `
+                ${sectionLabel(categoryLabels[cat] || cat)}
+                <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                    ${cards}
+                </div>
+            `;
+        });
 
         // --- Gender ---
         this._currentGenderSummaryData = { emps, model, dayLogs, empMap, isDashboard: true, };
@@ -528,7 +564,7 @@ class AttendanceView {
         emps.forEach((e) => {
             if (genderCounts[e.gender] !== undefined) genderCounts[e.gender]++;
         });
-        
+
         const genderCards = `
             <div class="stat-card info stat-card-clickable"
                 data-gender="Male"
@@ -653,17 +689,6 @@ class AttendanceView {
             </div>
         `,).join("");
 
-        const sectionLabel = (text) => `
-            <div style="
-                font-size:10px;font-weight:700;text-transform:uppercase;
-                letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px;
-                display:flex;align-items:center;gap:8px;
-            ">
-                ${text}
-                <span style="flex:1;height:1px;background:#e5e7eb;display:block;"></span>
-            </div>
-        `;
-
         return `
             <div style="margin-bottom:28px;">
                 ${sectionLabel("Overview")}
@@ -671,10 +696,8 @@ class AttendanceView {
                     ${headcountCard}
                 </div>
 
-                ${sectionLabel("By Company")}
-                <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
-                    ${companyCards}
-                </div>
+                ${sectionLabel("By Companies")}
+                ${companySectionsHtml}
 
                 ${sectionLabel("Gender & Workforce Type")}
                 <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
