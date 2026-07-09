@@ -959,11 +959,21 @@ class AttendanceView {
         const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
         this._currentCompanyData = { emps, model, dayLogs, empMap };
 
-        const companies = [...new Set(emps.map((e) => e.company))];
+        const sectionLabel = (text) => `
+            <div style="
+                font-size:10px;font-weight:700;text-transform:uppercase;
+                letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px;
+                display:flex;align-items:center;gap:8px;
+            ">
+                ${text}
+                <span style="flex:1;height:1px;background:#e5e7eb;display:block;"></span>
+            </div>
+        `;
+
         const colorCls = ["info", "success", "warning", "accent", "danger"];
 
         const counts = {};
-        companies.forEach((c) => (counts[c] = 0));
+        emps.forEach((e) => { if (counts[e.company] === undefined) counts[e.company] = 0; });
         dayLogs.forEach((l) => {
             const e = empMap[l.empId];
             if (!e) return;
@@ -972,7 +982,6 @@ class AttendanceView {
             if (counts[e.company] !== undefined) counts[e.company]++;
         });
 
-        // const totalPresentHalf = companies.reduce((sum, c) => sum + counts[c], 0,);
         const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) + (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0);
 
         this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
@@ -986,52 +995,75 @@ class AttendanceView {
             date: l.date
         }));
 
-        const cards = [
-            { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
-            ...companies.map((c, i) => ({ type: "company", label: c, val: counts[c], icon: "ph-buildings", cls: colorCls[i % colorCls.length], company: c, })),
-            { type: "avgHours", label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", },
-        ];
+        const headcountCardHtml = `
+            <div class="stat-card stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
+                <div class="stat-icon"><i class="ph ph-users"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">Total Presentcount</span>
+                    <span class="stat-value">${totalPresentHalf}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+        `;
+
+        const avgHoursCardHtml = `
+            <div class="stat-card">
+                <div class="stat-icon"><i class="ph ph-timer"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">Avg Hours</span>
+                    <span class="stat-value">${stats.avgHours}h</span>
+                </div>
+            </div>
+        `;
+
+        const categoryOrder = ["ON-ROLL", "CONTRACTOR", "CC", "OUTSOURCE", "OTHER"];
+        const categoryLabels = {
+            "ON-ROLL": "On-Roll Companies",
+            "CONTRACTOR": "Contractor Companies",
+            "CC": "CC Companies",
+            "OUTSOURCE": "Outsource Companies",
+            "OTHER": "Other Companies",
+        };
+
+        const companiesByCategory = {};
+        emps.forEach((e) => {
+            const cat = e.companyCategory || "OTHER";
+            if (!companiesByCategory[cat]) companiesByCategory[cat] = new Set();
+            companiesByCategory[cat].add(e.company);
+        });
+
+        let companySectionsHtml = "";
+        categoryOrder.forEach((cat) => {
+            const companySet = companiesByCategory[cat];
+            if (!companySet || companySet.size === 0) return;
+
+            const cardsHtml = [...companySet].map((c, i) => `
+                <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
+                    data-company="${this._escapeAttr(c)}"
+                    onclick="AppController.view._showCompanyDrilldown('${this._escapeAttr(c)}')">
+                    <div class="stat-icon"><i class="ph ph-buildings"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">${c}</span>
+                        <span class="stat-value">${counts[c] || 0}</span>
+                        <span class="stat-card-hint">↓ click to view</span>
+                    </div>
+                </div>
+            `).join("");
+
+            companySectionsHtml += `
+                ${sectionLabel(categoryLabels[cat] || cat)}
+                <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                    ${cardsHtml}
+                </div>
+            `;
+        });
 
         return `
             <div class="summary-grid">
-                ${cards.map((c) => {
-            if (c.type === "company") {
-                return `
-                            <div class="stat-card ${c.cls} stat-card-clickable"
-                                data-company="${this._escapeAttr(c.company)}"
-                                onclick="AppController.view._showCompanyDrilldown('${this._escapeAttr(c.company)}')">
-                                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                                <div class="stat-content">
-                                    <span class="stat-label">${c.label}</span>
-                                    <span class="stat-value">${c.val}</span>
-                                    <span class="stat-card-hint">↓ click to view</span>
-                                </div>
-                            </div>
-                        `;
-            }
-            if (c.type === "avgHours") {
-                return `
-                            <div class="stat-card">
-                                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                                <div class="stat-content">
-                                    <span class="stat-label">${c.label}</span>
-                                    <span class="stat-value">${c.val}</span>
-                                </div>
-                            </div>
-                        `;
-            }
-            return `
-                        <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
-                            <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                            <div class="stat-content">
-                                <span class="stat-label">${c.label}</span>
-                                <span class="stat-value">${c.val}</span>
-                                <span class="stat-card-hint">↓ click to view</span>
-                            </div>
-                        </div>
-                    `;
-        }).join("")}
+                ${headcountCardHtml}
+                ${avgHoursCardHtml}
             </div>
+            ${companySectionsHtml}
         `;
     }
 
