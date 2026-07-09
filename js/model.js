@@ -360,9 +360,26 @@ class AttendanceModel {
     }
 
 
+    _isPlaceholderValue(name) {
+        if (!name) return true; // null/undefined/blank
+        const cleaned = String(name).trim().toLowerCase();
+        if (cleaned === '') return true;
+        if (cleaned === '0') return true;
+        if (cleaned === '.') return true;
+        if (cleaned === 'null') return true;
+        if (cleaned === 'none') return true;
+        if (cleaned === 'unknown') return true;
+        if (cleaned.startsWith('default')) return true;
+        return false;
+    }
+
+
     findMissingDataEmployees() {
         const { emps } = this.getFilteredData();
         const result = [];
+
+        const staffTeamId = this.state.teamConfig?.staffTeamId ?? 7;
+        const workerTeamId = this.state.teamConfig?.workerTeamId ?? 6;
 
         emps.forEach(emp => {
             const missingFields = [];
@@ -374,13 +391,26 @@ class AttendanceModel {
             if (emp.categoryIdRaw === null || emp.categoryIdRaw === undefined || emp.categoryIdRaw === '') {
                 missingFields.push('Category');
             }
-            if (emp.team === null || emp.team === undefined) missingFields.push('Team');
+            if (emp.team === null || emp.team === undefined || (emp.team !== staffTeamId && emp.team !== workerTeamId)) {
+                missingFields.push('Team');
+            }
             if (!emp.designationRaw) {
                 missingFields.push('Designation');
             } else if (!emp.designationNameRaw) {
                 missingFields.push('Designation Name (invalid link)');
+            } else if (this._isPlaceholderValue(emp.designationNameRaw)) {
+                missingFields.push('Designation (not set)');
             }
             if (!emp.doj) missingFields.push('DOJ');
+            if (this._isPlaceholderValue(emp.company)) {
+                missingFields.push('Company (not set)');
+            }
+            if (this._isPlaceholderValue(emp.dept)) {
+                missingFields.push('Department (not set)');
+            }
+            if (this._isPlaceholderValue(emp.location)) {
+                missingFields.push('Location (not set)');
+            }
 
             if (missingFields.length > 0) {
                 result.push({ emp, missingFields });
