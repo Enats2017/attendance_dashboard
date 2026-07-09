@@ -1,4 +1,3 @@
-// leaste code
 class AttendanceView {
     constructor() {
         this.app = document.getElementById("app");
