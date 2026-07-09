@@ -1,3 +1,4 @@
+// leaste code
 class AttendanceView {
     constructor() {
         this.app = document.getElementById("app");
@@ -58,26 +59,27 @@ class AttendanceView {
 					${this._renderTopbar(state)}
 					<div class="content-body">
 						${state.activeTab !== "feature" ? this._renderFilters(state.filters, filterOpts) : ""}
-                        ${state.activeTab === "designation"
-                ? this._renderDesignationFamilySummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "age"
-                    ? this._renderAgeSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "company"
-                        ? this._renderCompanySummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "dept"
-                            ? this._renderDeptSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "gender"
+                        ${
+                            state.activeTab === "designation"
+                                ? this._renderDesignationFamilySummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "age"
+                                ? this._renderAgeSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "company"
+                                ? this._renderCompanySummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "dept"
+                                ? this._renderDeptSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "gender"
                                 ? this._renderGenderSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "latein"
-                                    ? this._renderLateInSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "earlyout"
-                                        ? this._renderEarlyOutSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "shift"
-                                            ? this._renderShiftSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "staff"
-                                                ? this._renderStaffSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "worker"
-                                                    ? this._renderWorkerSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "resigned"
-                                                        ? this._renderResignedSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "newjoined"
-                                                            ? this._renderNewJoinedSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "special"
-                                                                ? "" : state.activeTab === "data_quality"
-                                                                    ? "" : state.activeTab === "designation_order"
-                                                                        ? "" : state.activeTab === "sort_order"
-                                                                            ? "" : state.activeTab === "designation_families"
-                                                                                ? "" : state.activeTab === "feature"
-                                                                                    ? this._renderDashboardSummaryCards(emps, stats, model, logs, empMap) : this._renderSummaryCards(stats, emps, logs, empMap, model)
-            }
+                                ? this._renderLateInSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "earlyout"
+                                ? this._renderEarlyOutSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "shift"
+                                ? this._renderShiftSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "staff"
+                                ? this._renderStaffSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "worker"
+                                ? this._renderWorkerSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "resigned"
+                                ? this._renderResignedSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "newjoined"
+                                ? this._renderNewJoinedSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "special"
+                                ? "" : state.activeTab === "data_quality"
+                                ? "" : state.activeTab === "designation_order"
+                                ? "" : state.activeTab === "sort_order"
+                                ? "" : state.activeTab === "designation_families"
+                                ? "" : state.activeTab === "feature"
+                                ? this._renderDashboardSummaryCards(emps, stats, model, logs, empMap) : this._renderSummaryCards(stats, emps, logs, empMap, model)
+                        }
 						<div id="stat-card-drilldown" class="stat-drilldown-panel" style="display:none;"></div>
 						<div class="tab-pane-container">
 							${this._renderTabContent(state.activeTab, logs, emps, empMap, state.filters, state.data.counts, model)}
@@ -1111,44 +1113,44 @@ class AttendanceView {
                 ${cards.map((c) => {
             if (c.type === "dept") {
                 return `
-                                <div class="stat-card ${c.cls} stat-card-clickable"
-                                    data-dept="${this._escapeAttr(c.dept)}"
-                                    onclick="AppController.view._showDeptSummaryDrilldown('${this._escapeAttr(c.dept)}')">
-                                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                                    <div class="stat-content">
-                                        <span class="stat-label">${c.label}</span>
-                                        <span class="stat-value">${c.val}</span>
-                                        <span class="stat-card-hint">↓ click to view</span>
-                                    </div>
-                                </div>
-                            `;
+                    <div class="stat-card ${c.cls} stat-card-clickable"
+                        data-dept="${this._escapeAttr(c.dept)}"
+                        onclick="AppController.view._showDeptSummaryDrilldown('${this._escapeAttr(c.dept)}')">
+                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                        <div class="stat-content">
+                            <span class="stat-label">${c.label}</span>
+                            <span class="stat-value">${c.val}</span>
+                            <span class="stat-card-hint">↓ click to view</span>
+                        </div>
+                    </div>
+                `;
             }
             if (c.type === "avgHours") {
                 return `
-                                <div class="stat-card">
-                                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                                    <div class="stat-content">
-                                        <span class="stat-label">${c.label}</span>
-                                        <span class="stat-value">${c.val}</span>
-                                    </div>
-                                </div>
-                            `;
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                        <div class="stat-content">
+                            <span class="stat-label">${c.label}</span>
+                            <span class="stat-value">${c.val}</span>
+                        </div>
+                    </div>
+                `;
             }
             // headcount
             return `
-                            <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
-                                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                                <div class="stat-content">
-                                    <span class="stat-label">${c.label}</span>
-                                    <span class="stat-value">${c.val}</span>
-                                    <span class="stat-card-hint">↓ click to view</span>
-                                </div>
-                            </div>
-                        `;
-        }).join("")}
-            </div>
-        `;
-    }
+                <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
+                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">${c.label}</span>
+                        <span class="stat-value">${c.val}</span>
+                        <span class="stat-card-hint">↓ click to view</span>
+                    </div>
+                </div>
+            `;
+            }).join("")}
+        </div>
+    `;
+}
 
     _renderGenderSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
