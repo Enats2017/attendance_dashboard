@@ -916,45 +916,43 @@ class AttendanceView {
                 ${cards.map((c) => {
             if (c.type === "family") {
                 return `
-                            <div class="stat-card ${c.cls} stat-card-clickable"
-                                data-family-id="${c.familyId}"
-                                onclick="AppController.view._showDesignationFamilyDrilldown(${c.familyId})">
-                                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                                <div class="stat-content">
-                                    <span class="stat-label">${c.label}</span>
-                                    <span class="stat-value">${c.val}</span>
-                                    <span class="stat-card-hint">↓ click to view</span>
-                                </div>
-                            </div>
-                        `;
+                    <div class="stat-card ${c.cls} stat-card-clickable"
+                        data-family-id="${c.familyId}"
+                        onclick="AppController.view._showDesignationFamilyDrilldown(${c.familyId})">
+                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                        <div class="stat-content">
+                            <span class="stat-label">${c.label}</span>
+                            <span class="stat-value">${c.val}</span>
+                            <span class="stat-card-hint">↓ click to view</span>
+                        </div>
+                    </div>
+                `;
             }
             if (c.type === "avgHours") {
                 return `
-                            <div class="stat-card">
-                                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                                <div class="stat-content">
-                                    <span class="stat-label">${c.label}</span>
-                                    <span class="stat-value">${c.val}</span>
-                                </div>
-                            </div>
-                        `;
-            }
-            return `
-                        <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
-                            <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                             <div class="stat-content">
                                 <span class="stat-label">${c.label}</span>
                                 <span class="stat-value">${c.val}</span>
-                                <span class="stat-card-hint">↓ click to view</span>
                             </div>
+                    </div>
+                `;
+            }
+            return `
+                <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
+                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                        <div class="stat-content">
+                            <span class="stat-label">${c.label}</span>
+                            <span class="stat-value">${c.val}</span>
+                            <span class="stat-card-hint">↓ click to view</span>
                         </div>
-                    `;
+                </div>
+            `;
         }).join("")}
             </div>
         `;
     }
-
-
 
     _renderCompanySummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
@@ -1186,39 +1184,39 @@ class AttendanceView {
                 ${cards.map((c) => {
             if (c.type === "gender") {
                 return `
-                            <div class="stat-card ${c.cls} stat-card-clickable"
-                                data-gender="${this._escapeAttr(c.gender)}"
-                                onclick="AppController.view._showGenderSummaryDrilldown('${this._escapeAttr(c.gender)}')">
-                                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                                <div class="stat-content">
-                                    <span class="stat-label">${c.label}</span>
-                                    <span class="stat-value">${c.val}</span>
-                                    <span class="stat-card-hint">↓ click to view</span>
-                                </div>
-                            </div>
-                        `;
+                    <div class="stat-card ${c.cls} stat-card-clickable"
+                        data-gender="${this._escapeAttr(c.gender)}"
+                        onclick="AppController.view._showGenderSummaryDrilldown('${this._escapeAttr(c.gender)}')">
+                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                        <div class="stat-content">
+                            <span class="stat-label">${c.label}</span>
+                            <span class="stat-value">${c.val}</span>
+                            <span class="stat-card-hint">↓ click to view</span>
+                        </div>
+                    </div>
+                `;
             }
             if (c.type === "avgHours") {
                 return `
-                            <div class="stat-card">
-                                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                                <div class="stat-content">
-                                    <span class="stat-label">${c.label}</span>
-                                    <span class="stat-value">${c.val}</span>
-                                </div>
-                            </div>
-                        `;
-            }
-            return `
-                        <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
-                            <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                             <div class="stat-content">
                                 <span class="stat-label">${c.label}</span>
                                 <span class="stat-value">${c.val}</span>
-                                <span class="stat-card-hint">↓ click to view</span>
-                            </div>
                         </div>
-                    `;
+                    </div>
+                `;
+            }
+            return `
+                <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
+                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                        <div class="stat-content">
+                            <span class="stat-label">${c.label}</span>
+                            <span class="stat-value">${c.val}</span>
+                            <span class="stat-card-hint">↓ click to view</span>
+                        </div>
+                </div>
+            `;
         }).join("")}
             </div>
         `;
@@ -1763,39 +1761,39 @@ class AttendanceView {
                 ${cards.map((c) => {
             if (c.type === "shift") {
                 return `
-                            <div class="stat-card ${c.cls} stat-card-clickable"
-                                data-shift="${this._escapeAttr(c.shift)}"
-                                onclick="AppController.view._showShiftSummaryDrilldown('${this._escapeAttr(c.shift)}')">
-                                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                                <div class="stat-content">
-                                    <span class="stat-label">${c.label}</span>
-                                    <span class="stat-value">${c.val}</span>
-                                    <span class="stat-card-hint">↓ click to view</span>
-                                </div>
-                            </div>
-                        `;
+                    <div class="stat-card ${c.cls} stat-card-clickable"
+                        data-shift="${this._escapeAttr(c.shift)}"
+                        onclick="AppController.view._showShiftSummaryDrilldown('${this._escapeAttr(c.shift)}')">
+                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                        <div class="stat-content">
+                            <span class="stat-label">${c.label}</span>
+                            <span class="stat-value">${c.val}</span>
+                            <span class="stat-card-hint">↓ click to view</span>
+                        </div>
+                    </div>
+                `;
             }
             if (c.type === "avgHours") {
                 return `
-                            <div class="stat-card">
-                                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                                <div class="stat-content">
-                                    <span class="stat-label">${c.label}</span>
-                                    <span class="stat-value">${c.val}</span>
-                                </div>
-                            </div>
-                        `;
-            }
-            return `
-                        <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
-                            <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                             <div class="stat-content">
                                 <span class="stat-label">${c.label}</span>
                                 <span class="stat-value">${c.val}</span>
-                                <span class="stat-card-hint">↓ click to view</span>
                             </div>
                         </div>
-                    `;
+                `;
+            }
+            return `
+                <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
+                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">${c.label}</span>
+                        <span class="stat-value">${c.val}</span>
+                        <span class="stat-card-hint">↓ click to view</span>
+                    </div>
+                </div>
+            `;
         }).join("")}
             </div>
         `;
@@ -1848,39 +1846,39 @@ class AttendanceView {
                 ${cards.map((c) => {
             if (c.type === "dept") {
                 return `
-                            <div class="stat-card ${c.cls} stat-card-clickable"
-                                data-staff-dept="${this._escapeAttr(c.dept)}"
-                                onclick="AppController.view._showStaffSummaryDrilldown('${this._escapeAttr(c.dept)}')">
-                                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                                <div class="stat-content">
-                                    <span class="stat-label">${c.label}</span>
-                                    <span class="stat-value">${c.val}</span>
-                                    <span class="stat-card-hint">↓ click to view</span>
-                                </div>
-                            </div>
-                        `;
+                    <div class="stat-card ${c.cls} stat-card-clickable"
+                        data-staff-dept="${this._escapeAttr(c.dept)}"
+                        onclick="AppController.view._showStaffSummaryDrilldown('${this._escapeAttr(c.dept)}')">
+                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                        <div class="stat-content">
+                            <span class="stat-label">${c.label}</span>
+                            <span class="stat-value">${c.val}</span>
+                            <span class="stat-card-hint">↓ click to view</span>
+                        </div>
+                    </div>
+                `;
             }
             if (c.type === "avgHours") {
                 return `
-                            <div class="stat-card">
-                                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                                <div class="stat-content">
-                                    <span class="stat-label">${c.label}</span>
-                                    <span class="stat-value">${c.val}</span>
-                                </div>
-                            </div>
-                        `;
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                        <div class="stat-content">
+                            <span class="stat-label">${c.label}</span>
+                            <span class="stat-value">${c.val}</span>
+                        </div>
+                    </div>
+                `;
             }
             return `
-                        <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
-                            <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                            <div class="stat-content">
-                                <span class="stat-label">${c.label}</span>
-                                <span class="stat-value">${c.val}</span>
-                                <span class="stat-card-hint">↓ click to view</span>
-                            </div>
-                        </div>
-                    `;
+                <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
+                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">${c.label}</span>
+                        <span class="stat-value">${c.val}</span>
+                        <span class="stat-card-hint">↓ click to view</span>
+                    </div>
+                </div>
+            `;
         }).join("")}
             </div>
         `;
@@ -1933,39 +1931,39 @@ class AttendanceView {
                 ${cards.map((c) => {
             if (c.type === "dept") {
                 return `
-                            <div class="stat-card ${c.cls} stat-card-clickable"
-                                data-worker-dept="${this._escapeAttr(c.dept)}"
-                                onclick="AppController.view._showWorkerSummaryDrilldown('${this._escapeAttr(c.dept)}')">
-                                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                                <div class="stat-content">
-                                    <span class="stat-label">${c.label}</span>
-                                    <span class="stat-value">${c.val}</span>
-                                    <span class="stat-card-hint">↓ click to view</span>
-                                </div>
-                            </div>
-                        `;
+                    <div class="stat-card ${c.cls} stat-card-clickable"
+                        data-worker-dept="${this._escapeAttr(c.dept)}"
+                        onclick="AppController.view._showWorkerSummaryDrilldown('${this._escapeAttr(c.dept)}')">
+                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                        <div class="stat-content">
+                            <span class="stat-label">${c.label}</span>
+                            <span class="stat-value">${c.val}</span>
+                            <span class="stat-card-hint">↓ click to view</span>
+                        </div>
+                    </div>
+                `;
             }
             if (c.type === "avgHours") {
                 return `
-                            <div class="stat-card">
-                                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                                <div class="stat-content">
-                                    <span class="stat-label">${c.label}</span>
-                                    <span class="stat-value">${c.val}</span>
-                                </div>
-                            </div>
-                        `;
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                        <div class="stat-content">
+                            <span class="stat-label">${c.label}</span>
+                            <span class="stat-value">${c.val}</span>
+                        </div>
+                    </div>
+                `;
             }
             return `
-                        <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
-                            <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                            <div class="stat-content">
-                                <span class="stat-label">${c.label}</span>
-                                <span class="stat-value">${c.val}</span>
-                                <span class="stat-card-hint">↓ click to view</span>
-                            </div>
-                        </div>
-                    `;
+                <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
+                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">${c.label}</span>
+                        <span class="stat-value">${c.val}</span>
+                        <span class="stat-card-hint">↓ click to view</span>
+                    </div>
+                </div>
+            `;
         }).join("")}
             </div>
         `;
@@ -3836,22 +3834,21 @@ class AttendanceView {
 				</div>
 
               <div id="main-table-wrap">
-${this._tableHTML("tbl-age", ["Age Group", "Total Emp", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Single Punch", "Absent", "Attendance %"], pageRows, "age-wise", (currentPage - 1) * pageSize)}
-    <div class="pagination-bar">
-        <div class="pagination-text">
-            Showing ${rows.length ? (currentPage - 1) * pageSize + 1 : 0}–${Math.min(currentPage * pageSize, rows.length)} of ${rows.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
-        </div>
-        <div class="pagination-buttons">
-            <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderAgeWisePage(1)">«</button>
-            <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderAgeWisePage(${currentPage - 1})">‹</button>
-            ${pageButtons}
-            <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderAgeWisePage(${currentPage + 1})">›</button>
-            <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderAgeWisePage(${totalPages})">»</button>
-        </div>
-    </div>
-</div>
-
-<div id="drilldown-table" style="margin-top:16px"></div>
+                    ${this._tableHTML("tbl-age", ["Age Group", "Total Emp", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Single Punch", "Absent", "Attendance %"], pageRows, "age-wise", (currentPage - 1) * pageSize)}
+                    <div class="pagination-bar">
+                        <div class="pagination-text">
+                            Showing ${rows.length ? (currentPage - 1) * pageSize + 1 : 0}–${Math.min(currentPage * pageSize, rows.length)} of ${rows.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
+                        </div>
+                        <div class="pagination-buttons">
+                            <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderAgeWisePage(1)">«</button>
+                            <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderAgeWisePage(${currentPage - 1})">‹</button>
+                            ${pageButtons}
+                            <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderAgeWisePage(${currentPage + 1})">›</button>
+                            <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderAgeWisePage(${totalPages})">»</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="drilldown-table" style="margin-top:16px"></div>
 			`,
 
             renderCharts: () => {
@@ -6285,20 +6282,20 @@ ${this._tableHTML("tbl-age", ["Age Group", "Total Emp", "Present", "Half Present
                         <div class="desig-fam-detail" id="desig-fam-detail-${fam.id}">
                             <div class="desig-fam-chip-list">
                                 ${fam.designations.length === 0
-                ? '<span style="color:#94a3b8;font-size:13px;">No designations assigned yet.</span>'
-                : fam.designations.map(d => `
+                                    ? '<span style="color:#94a3b8;font-size:13px;">No designations assigned yet.</span>'
+                                    : fam.designations.map(d => `
                                         <div class="desig-fam-chip">
                                             ${this._escapeAttr(d.name)}
                                             <button onclick="AppController.view._removeDesigFromFamily(${fam.id}, ${d.id})" title="Remove">✕</button>
                                         </div>
                                     `).join("")
-            }
+                                }
                             </div>
                             <div class="desig-fam-add-panel">
                                 <div class="desig-fam-add-panel-title">Add designations to this family</div>
                                 ${unmapped.length === 0
-                ? '<span style="color:#94a3b8;font-size:13px;">No unmapped designations available.</span>'
-                : `
+                                    ? '<span style="color:#94a3b8;font-size:13px;">No unmapped designations available.</span>'
+                                    : `
                                         <input type="text"
                                                class="desig-fam-search-input"
                                                data-family-id="${fam.id}"
@@ -6319,7 +6316,7 @@ ${this._tableHTML("tbl-age", ["Age Group", "Total Emp", "Present", "Half Present
                                             <i class="ph-bold ph-plus"></i> Add Selected
                                     </button>
                                     `
-            }
+                                }
                             </div>
                         </div>
                     </div>
@@ -7008,12 +7005,12 @@ ${this._tableHTML("tbl-age", ["Age Group", "Total Emp", "Present", "Half Present
 
                         <tbody>
                             ${rows ||
-            `<tr>
+                                `<tr>
                                     <td colspan="4" style="text-align:center;padding:32px;color:#94a3b8;">
                                         No department data found
                                     </td>
                                 </tr>`
-            }
+                            }
 
                             <tr style=" background:#f8fafc; border-top:2px solid #cbd5e1; font-weight:700;">
                                 <td><b>Total</b></td>
