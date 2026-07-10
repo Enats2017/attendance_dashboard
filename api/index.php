@@ -539,11 +539,17 @@ function getAllTeams($conn) {
 
 function categorizeCompanyEmail($email) {
     $e = strtolower(trim($email ?? ''));
-    if ($e === '') return 'OTHER';
-    if (str_contains($e, 'contractor')) return 'CONTRACTOR';
-    if (str_contains($e, 'on-roll') || str_contains($e, 'onroll')) return 'ON-ROLL';
-    if (str_contains($e, 'outsource')) return 'OUTSOURCE';
-    if ($e === 'cc@gmail.com') return 'CC';
+    if ($e === '') {
+        return 'OTHER';
+    } if (strpos($e, 'contractor') !== false) {
+        return 'CONTRACTOR';
+    } if (strpos($e, 'on-roll') !== false || strpos($e, 'onroll') !== false) {
+        return 'ON-ROLL';
+    } if (strpos($e, 'outsource') !== false) {
+        return 'OUTSOURCE';
+    } if ($e === 'cc@gmail.com') {
+        return 'CC';
+    }
     return 'OTHER';
 }
 
