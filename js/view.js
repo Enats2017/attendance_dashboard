@@ -277,6 +277,7 @@ class AttendanceView {
 			</aside>
 		`;
     }
+    
     _scrollActiveSidebarItem() {
         const activeItem = document.querySelector(".sidebar-nav .nav-item.active");
         if (!activeItem) return;
@@ -475,6 +476,42 @@ class AttendanceView {
             empMap,
             isDashboard: true,
         };
+
+        // --- Designation Family cards (headcount-based, not attendance-based) ---
+        const dashFamilies = model.state.data.designationFamilies || [];
+        const dashFamMap = model.state.data.designationToFamilyMap || {};
+
+        this._currentDashboardFamilyData = {
+            emps,
+            model,
+            empMap,
+            famMap: dashFamMap,
+            families: dashFamilies,
+            isDashboard: true,
+        };
+
+        const famColorCls = ["info", "success", "warning", "accent", "danger"];
+        const famCounts = {};
+        dashFamilies.forEach((f) => (famCounts[f.id] = 0));
+        emps.forEach((e) => {
+            const famInfo = dashFamMap[e.designationId];
+            if (famInfo && famCounts[famInfo.familyId] !== undefined) {
+                famCounts[famInfo.familyId]++;
+            }
+        });
+
+        const familyCardsHtml = dashFamilies.map((f, i) => `
+            <div class="stat-card ${famColorCls[i % famColorCls.length]} stat-card-clickable"
+                data-dashboard-family-id="${f.id}"
+                onclick="AppController.view._showDashboardFamilyDrilldown(${f.id})">
+                <div class="stat-icon"><i class="ph ph-cards"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">${this._escapeAttr(f.name)}</span>
+                    <span class="stat-value">${famCounts[f.id]}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+        `).join("");
 
         // --- Headcount: Required / Available / Gap ---
         const requiredCount = model.getRequiredHeadcount();
@@ -715,6 +752,14 @@ class AttendanceView {
                 <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
                     ${dashDeptCards}
                 </div>
+                <div id="dashboard-dept-drilldown" style="margin-top:8px;"></div>
+
+                ${dashFamilies.length ? `
+                    ${sectionLabel("By Designation Family")}
+                    <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                        ${familyCardsHtml}
+                    </div>
+                ` : ""}
             </div>
         `;
     }
@@ -2422,7 +2467,7 @@ class AttendanceView {
             </div>
         `,).join("");
 
-        const panel = document.getElementById("stat-card-drilldown");
+        const panel = document.getElementById("dashboard-dept-drilldown");
         if (!panel) return;
         panel.style.display = "block";
         panel.innerHTML = `
@@ -2442,6 +2487,24 @@ class AttendanceView {
         panel.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
+    _showDashboardFamilyDrilldown(familyId) {
+        document.querySelectorAll(".stat-card-clickable[data-dashboard-family-id]").forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(`.stat-card-clickable[data-dashboard-family-id="${familyId}"]`);
+        if (card) card.classList.add("active");
+
+        const data = this._currentDashboardFamilyData;
+        if (!data) return;
+
+        const { emps, famMap } = data;
+
+        const items = emps.filter((e) => {
+            const famInfo = famMap[e.designationId];
+            return famInfo && famInfo.familyId === familyId;
+        }).map((emp) => ({ log: null, emp, date: null }));
+
+        this._renderStatCardDrilldown("dashboardFamily_" + familyId, items, 1);
+    }
+
     _showDashboardDesigDrilldown(designation) {
         document.querySelectorAll(".stat-card-clickable[data-dashboard-desig]").forEach((c) => c.classList.remove("active"));
         const card = this.app.querySelector(`.stat-card-clickable[data-dashboard-desig="${designation}"]`,);
@@ -2453,7 +2516,7 @@ class AttendanceView {
 
         const items = deptEmps.filter((e) => (e.designation || "Staff") === designation).map((emp) => ({ log: null, emp, date: null }));
 
-        this._renderStatCardDrilldown("dashboardDesig_" + designation, items, 1, "dashboard-desig-table-container", "AppController.view._closeDashboardDesigTable()",);
+        this._renderStatCardDrilldown("dashboardDesig_" + designation, items, 1);
     }
 
     _showNewJoinedBreakdownDrilldown(type, value) {
@@ -4511,7 +4574,7 @@ class AttendanceView {
                     <td>${g.emp.name || "-"}</td>
                     <td>${g.emp.dept || "-"}</td>
                     <td>${g.emp.company || "-"}</td>
-                    <td>${g.emp.shift || "-"}</td>
+                    <td>${[...new Set(g.logs.map(l => l.shiftName).filter(Boolean))].join(", ") || g.emp.shift || "-"}</td>
                     <td><span class="badge ${isRepeat ? "badge-danger" : "badge-info"}">${g.count} Late Day${g.count > 1 ? "s" : ""}</span></td>
                 </tr>
             `;
@@ -4521,12 +4584,12 @@ class AttendanceView {
         groups.forEach((g) => g.logs.forEach((log) => flatItems.push({ log, emp: g.emp, date: log.date })));
 
         this._lastData["late-in"] = flatItems.map(({ log, emp, date }) => ({
-            Code: emp.code, Name: emp.name, Dept: emp.dept, Company: emp.company, Shift: emp.shift,
+            Code: emp.code, Name: emp.name, Dept: emp.dept, Company: emp.company, Shift: log?.shiftName || emp.shift,
             Date: this._formatDate(date), In: log?.inTime, Out: log?.outTime, Hours: log?.hoursWorked,
             LateByMins: log?.lateBy,
         }));
 
-        const byShift = this._countBy(flatItems, (it) => it.emp.shift || "No Shift");
+        const byShift = this._countBy(flatItems, (it) => (it.log && it.log.shiftName) || it.emp.shift || "No Shift");
         const shifts = Object.keys(byShift);
 
         let pageButtons = "";
@@ -4582,7 +4645,7 @@ class AttendanceView {
                     [{ name: "Late In Count", data: shifts.map((s) => byShift[s]) }],
                     "Late-In by Shift",
                     (shiftName) => {
-                        const shiftLogs = flatItems.filter((it) => (it.emp.shift || "No Shift") === shiftName).map((it) => it.log);
+                        const shiftLogs = flatItems.filter((it) => ((it.log && it.log.shiftName) || it.emp.shift || "No Shift") === shiftName).map((it) => it.log);
                         this._renderDrillDown(shiftLogs, `Late In - Shift: ${shiftName}`, empMap || this._currentLateInEmpMap);
                     },
                 );
@@ -4622,7 +4685,7 @@ class AttendanceView {
                     <td>${g.emp.name || "-"}</td>
                     <td>${g.emp.dept || "-"}</td>
                     <td>${g.emp.company || "-"}</td>
-                    <td>${g.emp.shift || "-"}</td>
+                    <td>${[...new Set(g.logs.map(l => l.shiftName).filter(Boolean))].join(", ") || g.emp.shift || "-"}</td>
                     <td><span class="badge ${isRepeat ? "badge-danger" : "badge-info"}">${g.count} Early Day${g.count > 1 ? "s" : ""}</span></td>
                 </tr>
             `;
@@ -4636,7 +4699,7 @@ class AttendanceView {
             Name: emp.name,
             Dept: emp.dept,
             Company: emp.company,
-            Shift: emp.shift,
+            Shift: log?.shiftName || emp.shift,
             ShiftStart: log?.shiftStart,
             ShiftEnd: log?.shiftEnd,
             Date: this._formatDate(date),
@@ -4646,7 +4709,7 @@ class AttendanceView {
             EarlyByMins: log?.earlyBy,
         }));
 
-        const byShift = this._countBy(flatItems, (it) => it.emp.shift || "No Shift");
+        const byShift = this._countBy(flatItems, (it) => (it.log && it.log.shiftName) || it.emp.shift || "No Shift");
         const shifts = Object.keys(byShift);
 
         let pageButtons = "";
@@ -4706,7 +4769,7 @@ class AttendanceView {
                     ],
                     "Early-Out by Shift",
                     (shiftName) => {
-                        const shiftLogs = flatItems.filter((it) => (it.emp.shift || "No Shift") === shiftName).map((it) => it.log);
+                        const shiftLogs = flatItems.filter((it) => ((it.log && it.log.shiftName) || it.emp.shift || "No Shift") === shiftName).map((it) => it.log);
                         this._renderDrillDown(shiftLogs, `Early Out - Shift: ${shiftName}`, empMap || this._currentEarlyOutEmpMap);
                     },
                 );

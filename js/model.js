@@ -230,7 +230,7 @@ class AttendanceModel {
             if (filters.gender !== 'All' && emp.gender !== filters.gender) {
                 return false;
             }
-            if (filters.shift !== 'All' && emp.shift !== filters.shift) {
+            if (filters.shift !== 'All' && emp.log !== filters.shift) {
                 return false;
             }
             if (filters.location !== 'All' && emp.location !== filters.location) {

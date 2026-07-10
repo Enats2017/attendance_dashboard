@@ -527,7 +527,6 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
 }
 
 
-
 function getAllTeams($conn) {
     $teamMap = [];
     $stmt = sqlsrv_query($conn, "SELECT TeamId, TeamName FROM Team");
