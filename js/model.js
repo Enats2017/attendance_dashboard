@@ -1230,6 +1230,37 @@ class AttendanceModel {
             return { success: false, error: error.message };
         }
     }
+
+
+    async fetchDesignationGlobalOrder() {
+        try {
+            const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
+            url.searchParams.set('action', 'get_designation_global_order');
+            const response = await fetch(url.toString(), { credentials: 'include' });
+            return await response.json();
+        } catch (error) {
+            console.error('Fetch Designation Global Order Error:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+
+    async saveDesignationGlobalOrder(items) {
+        try {
+            const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
+            url.searchParams.set('action', 'save_designation_global_order');
+            const response = await fetch(url.toString(), {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'save_designation_global_order', items })
+            });
+            return await response.json();
+        } catch (error) {
+            console.error('Save Designation Global Order Error:', error);
+            return { success: false, error: error.message };
+        }
+    }
 }
 
 window.AttendanceModel = AttendanceModel;

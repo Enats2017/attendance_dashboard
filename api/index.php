@@ -136,6 +136,12 @@ switch ($action) {
     case 'save_departments_order':
         handleSaveDepartmentsOrder($input);
         break;
+    case 'get_designation_global_order':
+        handleGetDesignationGlobalOrder();
+        break;
+    case 'save_designation_global_order':
+        handleSaveDesignationGlobalOrder($input);
+        break;
     case 'setup_db':
         handleSetupDB();
         break;
@@ -594,7 +600,7 @@ function handleDashboardData($input, $returnData = false) {
         }
     }
 
-    $sqlEmp = "SELECT E.EmployeeId, E.DepartmentId, E.ShiftGroupId, E.EmployeeName, E.EmployeeCode, E.Gender, E.DOB, E.CategoryId, E.Designation, E.DOJ, E.Team, DG.DesignationsName as DesignationName, ISNULL(DSO.SortOrder, 0) as designationSortOrder, C.CompanyFName as company, C.CompanyeMail as companyEmail, L.LocationName as location, D.DepartmentFName as dept, D.std_hc FROM Employees E WITH (NOLOCK) LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId LEFT JOIN departmentDeginationSortOrder DSO WITH (NOLOCK) ON E.DepartmentId = DSO.DepartmentId AND E.Designation = DSO.DesignationId WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working'";
+    $sqlEmp = "SELECT E.EmployeeId, E.DepartmentId, E.ShiftGroupId, E.EmployeeName, E.EmployeeCode, E.Gender, E.DOB, E.CategoryId, E.Designation, E.DOJ, E.Team, DG.DesignationsName as DesignationName, ISNULL(DSO.SortOrder, 0) as designationSortOrder, ISNULL(DG.SortOrder, 0) as designationGlobalSortOrder, C.CompanyFName as company, C.CompanyeMail as companyEmail, L.LocationName as location, D.DepartmentFName as dept, D.std_hc FROM Employees E WITH (NOLOCK) LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId LEFT JOIN departmentDeginationSortOrder DSO WITH (NOLOCK) ON E.DepartmentId = DSO.DepartmentId AND E.Designation = DSO.DesignationId WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working'";
 
     $paramsEmp = [];
     
@@ -642,6 +648,7 @@ function handleDashboardData($input, $returnData = false) {
                 'designation' => $row['DesignationName'] ?: 'Staff',
                 'designationNameRaw' => $row['DesignationName'],                        
                 'designationSortOrder' => isset($row['designationSortOrder']) ? intval($row['designationSortOrder']) : 0,
+                'designationGlobalSortOrder' => isset($row['designationGlobalSortOrder']) ? intval($row['designationGlobalSortOrder']) : 0,
                 'shiftGroupId' => intval($row['ShiftGroupId']),
                 'shiftGroupName' => $shiftGroupNameMap[intval($row['ShiftGroupId'])] ?? 'No Shift Group',
                 'shiftId' => null,
@@ -1907,6 +1914,57 @@ function handleSaveDepartmentsOrder($input) {
     echo json_encode([
         'success' => $success,
         'message' => $success ? 'Department order saved successfully' : 'Some updates failed'
+    ]);
+}
+
+
+function handleGetDesignationGlobalOrder() {
+    $conn = getSQLServer();
+    $sql = "SELECT DesignationId, DesignationsName, SortOrder FROM Designations WITH (NOLOCK) ORDER BY CASE WHEN SortOrder IS NULL THEN 1 ELSE 0 END, SortOrder ASC, DesignationsName ASC";
+    $stmt = sqlsrv_query($conn, $sql);
+
+    if (!$stmt) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Query failed',
+            'errors' => sqlsrv_errors()
+        ]);
+        return;
+    }
+
+    $data = [];
+    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+        $data[] = [
+            'id' => $row['DesignationId'],
+            'name' => $row['DesignationsName'],
+            'sortOrder' => $row['SortOrder'] !== null ? intval($row['SortOrder']) : null
+        ];
+    }
+    echo json_encode(['success' => true, 'data' => $data]);
+}
+
+function handleSaveDesignationGlobalOrder($input) {
+    $conn = getSQLServer();
+    $items = isset($input['items']) ? $input['items'] : [];
+    $success = true;
+    $errorLog = [];
+
+    foreach ($items as $item) {
+        $id = intval($item['id']);
+        $sortOrder = isset($item['sortOrder']) && $item['sortOrder'] !== '' ? intval($item['sortOrder']) : null;
+
+        $stmt = sqlsrv_query($conn, "UPDATE Designations SET SortOrder = ? WHERE DesignationId = ?", [$sortOrder, $id]);
+
+        if (!$stmt) {
+            $success = false;
+            $errorLog[] = ['id' => $id, 'errors' => sqlsrv_errors()];
+        }
+    }
+
+    echo json_encode([
+        'success' => $success,
+        'message' => $success ? 'Designation order saved successfully' : 'Some updates failed',
+        'errors' => $errorLog
     ]);
 }
 

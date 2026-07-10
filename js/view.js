@@ -4836,7 +4836,8 @@ class AttendanceView {
 
         emps.forEach((e) => {
             const name = e.designation || "Staff";
-            const order = e.designationSortOrder || 0;
+            const raw = e.designationGlobalSortOrder;
+            const order = (raw === null || raw === undefined || raw === "") ? Infinity : raw;
             if (!desigMap[name] || order < desigMap[name].order) desigMap[name] = { name, order };
         });
 
@@ -6044,12 +6045,13 @@ class AttendanceView {
         const contentEl = document.getElementById("sort-order-content");
         if (!contentEl) return;
 
-        const [compRes, deptRes] = await Promise.all([
+        const [compRes, deptRes, desigRes] = await Promise.all([
             model.fetchCompaniesOrder(),
             model.fetchDepartmentsOrder(),
+            model.fetchDesignationGlobalOrder(),
         ]);
 
-        if (!compRes.success || !deptRes.success) {
+        if (!compRes.success || !deptRes.success || !desigRes.success) {
             contentEl.innerHTML = `
                 <div style="padding:24px;background:rgba(244,63,94,0.05);border:1px solid rgba(244,63,94,0.2);color:#f43f5e;border-radius:var(--radius-md);font-weight:500;">
                     <i class="ph-fill ph-warning-circle" style="font-size:20px;"></i>
@@ -6061,6 +6063,8 @@ class AttendanceView {
 
         const companies = compRes.data || [];
         const departments = deptRes.data || [];
+        
+        const designations = desigRes.data || [];
 
         contentEl.innerHTML = `
             <style>
@@ -6196,6 +6200,9 @@ class AttendanceView {
                 <button class="sort-order-tab-btn" data-panel="departments">
                     <i class="ph ph-briefcase"></i> Departments
                 </button>
+                <button class="sort-order-tab-btn" data-panel="designations">
+                    <i class="ph ph-identification-badge"></i> Designations
+                </button>
             </div>
 
             <!-- Companies Panel -->
@@ -6267,6 +6274,45 @@ class AttendanceView {
                                         <button class="sort-order-btn btn-inc" type="button"><i class="ph ph-plus"></i></button>
                                     </div>
                                     <button class="sort-order-clear-btn" data-target="dept" data-id="${d.id}" title="Clear (reset to NULL)">
+                                        <i class="ph ph-x"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        `,).join("")}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Designations Panel -->
+            <div class="sort-order-panel" id="sort-panel-designations">
+                <div class="sort-order-card">
+                    <div class="sort-order-header-bar">
+                        <div>
+                            <h3>Designation Sort Order</h3>
+                            <p>Set priority order for designations globally, independent of department. Lower number = appears first in Designation Stats.</p>
+                        </div>
+                        <button class="btn-order-save" id="btn-save-designations">
+                            <i class="ph-bold ph-floppy-disk"></i> Save
+                        </button>
+                    </div>
+                    <div id="designations-list">
+                        ${designations.map((d) => `
+                            <div class="sort-order-item">
+                                <div style="display:flex;align-items:center;">
+                                    <i class="ph ph-identification-badge" style="color:#6366f1;margin-right:10px;font-size:16px;"></i>
+                                    <span class="sort-order-item-name">${d.name}</span>
+                                    ${d.sortOrder === null ? '<span class="sort-order-null-badge">not set</span>' : ""}
+                                </div>
+                                <div style="display:flex;align-items:center;gap:6px;">
+                                    <div class="sort-order-control">
+                                        <button class="sort-order-btn btn-dec" type="button"><i class="ph ph-minus"></i></button>
+                                        <input type="number" class="sort-order-input designation-order-input"
+                                            data-id="${d.id}"
+                                            value="${d.sortOrder !== null ? d.sortOrder : ""}"
+                                            placeholder="–">
+                                        <button class="sort-order-btn btn-inc" type="button"><i class="ph ph-plus"></i></button>
+                                    </div>
+                                    <button class="sort-order-clear-btn" data-target="designation" data-id="${d.id}" title="Clear (reset to NULL)">
                                         <i class="ph ph-x"></i>
                                     </button>
                                 </div>
@@ -6352,6 +6398,31 @@ class AttendanceView {
                 alert("Department sort order saved successfully!");
                 model.state.filterLists = null;
             } else {
+                alert("Failed: " + (res ? res.message : "Unknown error"));
+            }
+        });
+
+        document.getElementById("btn-save-designations").addEventListener("click", async () => {
+            const inputs = contentEl.querySelectorAll(".designation-order-input");
+            const items = [];
+            inputs.forEach((input) => {
+                items.push({
+                    id: parseInt(input.dataset.id),
+                    sortOrder: input.value !== "" ? parseInt(input.value) : null,
+                });
+            });
+
+            this.showOverlay("Saving designation order...");
+            const res = await model.saveDesignationGlobalOrder(items);
+
+            if (res && res.success) {
+                this.showOverlay("Refreshing data...");
+                await model.fetchData();
+                this.hideOverlay();
+                alert("Designation sort order saved successfully!");
+                model.state.filterLists = null;
+            } else {
+                this.hideOverlay();
                 alert("Failed: " + (res ? res.message : "Unknown error"));
             }
         });
