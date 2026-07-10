@@ -43,7 +43,7 @@ class AttendanceView {
         let stats = model.getSummaryStats();
 
         if (state.activeTab === "night") {
-            stats = state.nightShiftStats || stats;
+            stats = model.getNightShiftStats();
         }
 
         const { logs, emps, empMap } = model.getFilteredData();
@@ -67,7 +67,8 @@ class AttendanceView {
                                 ? this._renderGenderSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "latein"
                                 ? this._renderLateInSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "earlyout"
                                 ? this._renderEarlyOutSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "shift"
-                                ? this._renderShiftSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "staff"
+                                ? this._renderShiftSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "night"
+                                ? this._renderNightSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "staff"
                                 ? this._renderStaffSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "worker"
                                 ? this._renderWorkerSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "resigned"
                                 ? this._renderResignedSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "newjoined"
@@ -1798,6 +1799,106 @@ class AttendanceView {
         `;
     }
 
+
+    _renderNightSummaryCards(emps, stats, model, logs, empMap) {
+        // Ignore passed-in generic data — always scope to night-shift-only employees/logs
+        const nightData = model.getNightShiftData();
+        const nEmps = nightData.emps;
+        const nLogs = nightData.logs;
+        const nEmpMap = nightData.empMap;
+
+        const { dateFrom, dateTo } = model.state.filters;
+        const dayLogs = this._buildEmployeeDayLogs(nEmps, nLogs, dateFrom, dateTo);
+        this._currentNightSummaryData = { emps: nEmps, model, dayLogs, empMap: nEmpMap };
+
+        const shifts = [...new Set(nEmps.map((e) => e.shift || "No Shift"))];
+        const colorCls = ["info", "success", "warning", "accent", "danger"];
+
+        const counts = {};
+        shifts.forEach((s) => (counts[s] = 0));
+        dayLogs.forEach((l) => {
+            const e = nEmpMap[l.empId];
+            if (!e) return;
+            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present");
+            if (!isPresentOrHalf) return;
+            const s = e.shift || "No Shift";
+            if (counts[s] !== undefined) counts[s]++;
+        });
+
+        this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
+            this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") ||
+            this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present")
+        ).map((l) => ({ log: l, emp: nEmpMap[l.empId], date: l.date }));
+
+        const totalPresentHalf = this._currentTabPresentHeadcountItems.length;
+
+        const cards = [
+            { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "" },
+            ...shifts.map((s, i) => ({ type: "shift", label: s, val: counts[s], icon: "ph-clock-clockwise", cls: colorCls[i % colorCls.length], shift: s })),
+            { type: "avgHours", label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "" },
+        ];
+
+        return `
+            <div class="summary-grid">
+                ${cards.map((c) => {
+            if (c.type === "shift") {
+                return `
+                    <div class="stat-card ${c.cls} stat-card-clickable"
+                        data-night-shift="${this._escapeAttr(c.shift)}"
+                        onclick="AppController.view._showNightSummaryDrilldown('${this._escapeAttr(c.shift)}')">
+                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                        <div class="stat-content">
+                            <span class="stat-label">${c.label}</span>
+                            <span class="stat-value">${c.val}</span>
+                            <span class="stat-card-hint">↓ click to view</span>
+                        </div>
+                    </div>
+                `;
+            }
+            if (c.type === "avgHours") {
+                return `
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                        <div class="stat-content">
+                            <span class="stat-label">${c.label}</span>
+                            <span class="stat-value">${c.val}</span>
+                        </div>
+                    </div>
+                `;
+            }
+            return `
+                <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
+                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">${c.label}</span>
+                        <span class="stat-value">${c.val}</span>
+                        <span class="stat-card-hint">↓ click to view</span>
+                    </div>
+                </div>
+            `;
+        }).join("")}
+            </div>
+        `;
+    }
+
+    _showNightSummaryDrilldown(shiftName) {
+        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(`.stat-card-clickable[data-night-shift="${shiftName}"]`);
+        if (card) card.classList.add("active");
+
+        const data = this._currentNightSummaryData;
+        if (!data) return;
+        const { dayLogs, empMap } = data;
+        const shiftLogs = dayLogs.filter((l) => {
+            const e = empMap[l.empId];
+            if (!e || (e.shift || "No Shift") !== shiftName) return false;
+            return this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present");
+        });
+        const items = shiftLogs.map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
+        this._renderStatCardDrilldown("nightSummary_" + shiftName, items, 1);
+    }
+
+
     _renderStaffSummaryCards(emps, stats, model, logs, empMap) {
         const staffTeamId = model.state.teamConfig?.staffTeamId ?? 7;
         const staffEmps = emps.filter((e) => e.team === staffTeamId);
@@ -2633,7 +2734,7 @@ class AttendanceView {
                 break;
             case "night":
                 const nightData = model.getNightShiftData();
-                content = this._renderNightShift(nightData.logs, nightData.emps, nightData.empMap,);
+                content = this._renderNightShift(nightData.logs, nightData.emps, nightData.empMap, model);
                 break;
             case "designation":
                 content = this._renderDesignationWise(logs, emps, empMap, model);
@@ -4625,21 +4726,104 @@ class AttendanceView {
         content.renderCharts();
     }
 
-    _renderNightShift(logs, emps, empMap) {
-        const filtered = logs;
-        const rows = filtered.slice(0, 100).map((l) => {
-            const e = empMap[l.empId] || {};
-            return [e.name, e.dept, this._formatDate(l.date), l.inTime, l.outTime, l.hoursWorked, l.status];
+    _renderNightShift(logs, emps, empMap, model, page = 1) {
+        this._currentNightShiftLogs = logs;
+        this._currentNightShiftEmps = emps;
+        this._currentNightShiftEmpMap = empMap;
+        this._currentNightShiftModel = model;
+
+        const { dateFrom, dateTo } = model.state.filters;
+        const shifts = [...new Set(emps.map((e) => e.shift || "No Shift"))];
+        const groups = this._computeGroupedDayStats(emps, logs, dateFrom, dateTo, (e) => e.shift || "No Shift");
+        const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
+
+        const rows = shifts.map((s) => {
+            const g = groups[s] || { total: 0, present: 0, halfPresent: 0, weeklyOffPresent: 0, weeklyOffHalfPresent: 0, weeklyOff: 0, singlePunch: 0, absent: 0 };
+            const rate = g.total ? Math.round((g.present / g.total) * 100) + "%" : "0%";
+            return [s, g.total, g.present, g.halfPresent, g.weeklyOffPresent, g.weeklyOffHalfPresent, g.weeklyOff, g.singlePunch, g.absent, rate];
         });
+
+        this._lastData["night-shift"] = rows.map((r) => ({
+            Shift: r[0], Total: r[1], Present: r[2], HalfPresent: r[3],
+            WOPresent: r[4], WOHalfPresent: r[5], WeeklyOff: r[6],
+            SinglePunch: r[7], Absent: r[8], Rate: r[9],
+        }));
+
+        const pageSize = 25;
+        const currentPage = page;
+        const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+        const pageRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+        let pageButtons = "";
+        const startPage = Math.max(1, currentPage - 2);
+        const endPage = Math.min(totalPages, currentPage + 2);
+        for (let i = startPage; i <= endPage; i++) {
+            pageButtons += `
+                <button class="btn-page ${i === currentPage ? "btn-page-active" : ""}" onclick="AppController.view._reRenderNightShiftPage(${i})">
+                    ${i}
+                </button>
+            `;
+        }
+
         return {
             html: `
-				<h2 class="section-title"><i class="ph-fill ph-moon">
-					</i> Night Shift
-				</h2>
-				${this._tableHTML("tbl-ns", ["Name", "Dept", "Date", "In", "Out", "Hours", "Status"], rows, "night-shift")}
-			`,
-            renderCharts: () => { },
+                <h2 class="section-title"><i class="ph-fill ph-moon"></i> Night Shift</h2>
+                <div class="charts-grid">
+                    ${this._chartCard("ch-night-bar", '<i class="ph-fill ph-chart-bar"></i>', "info", "Present by Shift", "Click a segment for detail")}
+                </div>
+                <div id="main-table-wrap">
+                    ${this._tableHTML("tbl-night", ["Shift", "Total", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Single Punch", "Absent", "Rate"], pageRows, "night-shift", (currentPage - 1) * pageSize)}
+                    <div class="pagination-bar">
+                        <div class="pagination-text">
+                            Showing ${rows.length ? (currentPage - 1) * pageSize + 1 : 0}–${Math.min(currentPage * pageSize, rows.length)} of ${rows.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
+                        </div>
+                        <div class="pagination-buttons">
+                            <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderNightShiftPage(1)">«</button>
+                            <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderNightShiftPage(${currentPage - 1})">‹</button>
+                            ${pageButtons}
+                            <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderNightShiftPage(${currentPage + 1})">›</button>
+                            <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderNightShiftPage(${totalPages})">»</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="drilldown-table" style="margin-top:16px"></div>
+            `,
+            renderCharts: () => {
+                Charts.stacked(
+                    "ch-night-bar", shifts,
+                    [
+                        { name: "Present", data: rows.map((r) => r[2]) },
+                        { name: "Half Present", data: rows.map((r) => r[3]) },
+                        { name: "WO Present", data: rows.map((r) => r[4]) },
+                        { name: "WO Half Present", data: rows.map((r) => r[5]) },
+                        { name: "Weekly Off", data: rows.map((r) => r[6]) },
+                        { name: "Single Punch", data: rows.map((r) => r[7]) },
+                        { name: "Absent", data: rows.map((r) => r[8]) },
+                    ],
+                    "Night Shift Attendance",
+                    (shiftName, index, seriesIndex, seriesName) => {
+                        const filteredLogs = dayLogs.filter((l) => {
+                            const e = empMap[l.empId];
+                            if (!e || (e.shift || "No Shift") !== shiftName) return false;
+                            return this._matchesStatus(l, seriesName);
+                        });
+                        this._renderDrillDown(filteredLogs, `Night Shift: ${shiftName} - ${seriesName}`, empMap);
+                    },
+                );
+            },
         };
+    }
+
+    _reRenderNightShiftPage(page) {
+        const content = this._renderNightShift(
+            this._currentNightShiftLogs,
+            this._currentNightShiftEmps,
+            this._currentNightShiftEmpMap,
+            this._currentNightShiftModel,
+            page
+        );
+        document.querySelector(".tab-pane-container").innerHTML = content.html;
+        content.renderCharts();
     }
 
 

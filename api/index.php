@@ -100,9 +100,6 @@ switch ($action) {
     case 'dashboard_data':
         handleDashboardData($input);
         break;
-    case 'night_shift_dashboard_data':
-        handleNightShiftData($input);
-        break;
     case 'get_std_hc':
         handleGetStdHC();
         break;
@@ -1432,102 +1429,6 @@ function handleDashboardData($input, $returnData = false) {
         'newJoinedEmployees' => $newJoinedEmployees,
         'timestamp' => date('Y-m-d H:i:s'),
         'dataSource' => $dataSource
-    ]);
-}
-
-function handleNightShiftData($input) {
-    $data = handleDashboardData($input, true);
-    $conn = $data['conn'];
-    $employees = $data['employees'];
-    $logs = $data['logs'];
-    $devTables = $data['devTables'];
-    $dayFrom = $data['dayFrom'];
-    $dayTo = $data['dayTo'];
-
-    $nightShiftEmployees = [];
-    foreach ($employees as $emp) {
-        if (in_array($emp['shift'], ['DSTN', 'CPC'])) {
-            $nightShiftEmployees[] = $emp;
-        }
-    }
-    
-    $nightShiftEmployeeIds = array_column($nightShiftEmployees, 'id');
-
-    $nightShiftLogs = [];
-    foreach ($logs as $log) {
-        if (in_array($log['empId'], $nightShiftEmployeeIds)) {
-            $nightShiftLogs[] = $log;
-        }
-    }
-
-    $nightSinglePunch = 0;
-    $nightLateIn = 0;
-    $nightEarlyOut = 0;
-    $nightTotalHours = 0;
-    $nightHoursCount = 0;
-    foreach ($nightShiftLogs as $log) {
-        if (($log['missedInPunch'] ?? 0) == 1 || ($log['missedOutPunch'] ?? 0) == 1) {
-            $nightSinglePunch++;
-        }
-        if (($log['lateBy'] ?? 0) > 0) {
-            $nightLateIn++;
-        }
-        if (($log['earlyBy'] ?? 0) > 0) {
-            $nightEarlyOut++;
-        }
-        $nightTotalHours += floatval($log['hoursWorked']);
-        if ($log['hoursWorked'] > 0) {
-            $nightHoursCount++;
-        }
-    }
-
-    $nightAvgHours = $nightHoursCount > 0 ? round($nightTotalHours / $nightHoursCount, 2) : 0;
-    $nightTotalEmployees = count($nightShiftEmployees);
-
-    if (!empty($nightShiftLogs)) {
-        $nightPresentIds = [];
-        foreach ($nightShiftLogs as $log) {
-            if ($log['present'] == 1) {
-                $nightPresentIds[$log['empId']] = true;
-            }
-        }
-        $nightPresentEmployees = count($nightPresentIds);
-    } else {
-        $nightPresentEmployees = 0;
-
-        if (!empty($nightShiftEmployeeIds) && !empty($devTables)) {
-            $unionParts = [];
-            foreach ($devTables as $devTable) {
-                $unionParts[] = "SELECT D.UserId, D.LogDate FROM $devTable D WITH (NOLOCK) WHERE D.LogDate >= '$dayFrom' AND D.LogDate <= '$dayTo 23:59:59'";
-            }
-            $unionSql = implode(" UNION ALL ", $unionParts);
-
-            $sql = "SELECT COUNT(DISTINCT E.EmployeeId) AS PresentEmployees FROM ($unionSql) D INNER JOIN Employees E WITH (NOLOCK) ON CAST(D.UserId AS VARCHAR(50)) = CAST(E.EmployeeCodeInDevice AS VARCHAR(50)) WHERE E.EmployeeId IN (" . implode(',', $nightShiftEmployeeIds) . ")";
-
-            $stmt = sqlsrv_query($conn, $sql);
-
-            if ($stmt && ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC))) {
-                $nightPresentEmployees = intval($row['PresentEmployees']);
-            }
-        }
-    }
-
-    $nightAbsentEmployees = max(0, $nightTotalEmployees - $nightPresentEmployees);
-
-    echo json_encode([
-        'success' => true,
-        'nightShiftStats' => [
-            'present' => $nightPresentEmployees,
-            'absent' => $nightAbsentEmployees,
-            'total' => $nightTotalEmployees,
-            'singlePunch' => $nightSinglePunch,
-            'lateIn' => $nightLateIn,
-            'earlyOut' => $nightEarlyOut,
-            'avgHours' => $nightAvgHours
-        ],
-        'nightShiftEmployees' => $nightShiftEmployees,
-        'nightShiftLogs' => $nightShiftLogs,
-        'timestamp' => date('Y-m-d H:i:s')
     ]);
 }
 

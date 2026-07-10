@@ -121,8 +121,6 @@ class AttendanceModel {
                     newJoinedEmployees: data.newJoinedEmployees || [],
                     attendanceLogs: data.attendanceLogs,
                     shiftStats: data.shiftStats || [],
-                    nightShiftEmployees: data.nightShiftEmployees || [],
-                    nightShiftLogs: data.nightShiftLogs || [],
                     counts: data.counts,
                     singlePunchKeys: new Set(data.singlePunchKeys || []),
                     singlePunchData: data.singlePunchData || {}
@@ -155,15 +153,6 @@ class AttendanceModel {
                     workerHalfPresent: 0, 
                     workerWeeklyOff: 0, 
                     workerAbsent: 0
-                };
-                this.state.nightShiftStats = data.nightShiftStats || {
-                    present: 0,
-                    absent: 0,
-                    total: 0,
-                    singlePunch: 0,
-                    lateIn: 0,
-                    earlyOut: 0,
-                    avgHours: 0
                 };
                 
                 this.state.requiredHeadcount = data.requiredHeadcount ?? 0;
@@ -280,17 +269,83 @@ class AttendanceModel {
     }
 
 
-    getNightShiftData() {
-        const empMap = {};
+    _toMinutes(timeStr) {
+        if (!timeStr) return null;
 
-        (this.state.data.nightShiftEmployees || []).forEach(e => {
-            empMap[e.id] = e;
+        const parts = String(timeStr).split(':');
+        if (parts.length < 2) return null;
+
+        const h = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+
+        if (isNaN(h) || isNaN(m)) return null;
+
+        return h * 60 + m;
+    }
+
+    _isNightShiftTiming(startTime, endTime) {
+        const start = this._toMinutes(startTime);
+        const end = this._toMinutes(endTime);
+
+        if (start === null || end === null) return false;
+        if (start === end) return false;
+
+        return end < start;
+    }
+
+    getNightShiftData() {
+        const { logs, emps } = this.getFilteredData();
+
+        const nightShiftLogs = logs.filter(log => this._isNightShiftTiming(log.shiftStart, log.shiftEnd));
+
+        const nightEmpIdSet = new Set(nightShiftLogs.map(log => log.empId));
+
+        const nightEmployees = emps.filter(emp => nightEmpIdSet.has(emp.id));
+
+        const nightEmpMap = {};
+
+        nightEmployees.forEach(emp => {
+            nightEmpMap[emp.id] = emp;
         });
 
         return {
-            logs: this.state.data.nightShiftLogs || [],
-            emps: this.state.data.nightShiftEmployees || [],
-            empMap
+            logs: nightShiftLogs,
+            emps: nightEmployees,
+            empMap: nightEmpMap
+        };
+    }
+
+
+    getNightShiftStats() {
+        const { logs, emps } = this.getNightShiftData();
+        const todayStats = this.state.todayStats;
+
+        // Reuse the same present/absent logic as getSummaryStats(),
+        // but scoped only to night-shift logs/emps
+        const isPresent = (l) => l.present === 1 || l.status === 'Present';
+        const totalPresentRecords = logs.filter(isPresent).length;
+        const totalAbsentRecords = Math.max(0, emps.length - totalPresentRecords);
+
+        const avgHours = logs.length
+            ? (logs.reduce((sum, l) => sum + (l.hoursWorked || 0), 0) / logs.length).toFixed(1)
+            : 0;
+
+        return {
+            present: totalPresentRecords,
+            halfPresent: logs.filter(l => (l.detailedStatusCode || '').toUpperCase().includes('½')).length,
+            weeklyOffPresent: 0,
+            weeklyOffHalfPresent: 0,
+            weeklyOff: logs.filter(l => (l.detailedStatusCode || '').toUpperCase() === 'WO').length,
+            absent: totalAbsentRecords,
+            singlePunch: logs.filter(l => l.status === 'Single Punch').length,
+            lateIn: logs.filter(l => (l.lateBy || 0) > 0).length,
+            earlyOut: logs.filter(l => (l.earlyBy || 0) > 0).length,
+            avgHours,
+            total: emps.length,
+            resigned: 0,
+            newJoined: 0,
+            filteredIn: 0,
+            filteredOut: 0
         };
     }
 
