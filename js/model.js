@@ -159,6 +159,7 @@ class AttendanceModel {
                 this.state.gapHeadcount = data.gapHeadcount ?? 0;
                 this.state.requiredHeadcountByDept = data.requiredHeadcountByDept || {};
                 this.state.teamConfig = data.teamConfig || { staffTeamId: 7, workerTeamId: 6 };
+                this.state.isMaster = (data.isMaster !== undefined) ? !!data.isMaster : (window.HRMS_USER?.isMaster ?? true);
 
                 this.state.lastUpdated = new Date().toLocaleTimeString();
                 

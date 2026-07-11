@@ -549,52 +549,75 @@ class AttendanceView {
             </div>
         `;
 
-        // --- Company cards, grouped into category sections (ON-ROLL, CONTRACTOR, CC, OUTSOURCE, OTHER) ---
         this._currentCompanyData = { emps, model, dayLogs, empMap, isDashboard: true, };
 
-        const categoryOrder = ["ON-ROLL", "CONTRACTOR", "CC", "OUTSOURCE", "OTHER"];
+        const categoryOrder = ["ON-ROLL", "CC", "CONTRACTOR"];
         const categoryLabels = {
-            "ON-ROLL": "On-Roll Companies",
-            "CONTRACTOR": "Contractor Companies",
-            "CC": "CC Companies",
-            "OUTSOURCE": "Outsource Companies",
-            "OTHER": "Other Companies",
+            "ON-ROLL": "ON-ROLL",
+            "CC": "COMPANY CONTRACT (CC)",
+            "CONTRACTOR": "CONTRACTOR",
         };
         const compColorCls = ["info", "success", "warning", "accent", "danger"];
 
+        const mergeCat = (rawCat) => {
+            const c = rawCat || "OTHER";
+            return (c === "OUTSOURCE" || c === "OTHER") ? "CONTRACTOR" : c;
+        };
+
         const companiesByCategory = {};
         emps.forEach((e) => {
-            const cat = e.companyCategory || "OTHER";
+            const cat = mergeCat(e.companyCategory);
             if (!companiesByCategory[cat]) companiesByCategory[cat] = {};
             if (!companiesByCategory[cat][e.company]) companiesByCategory[cat][e.company] = 0;
             companiesByCategory[cat][e.company]++;
         });
 
-        let companySectionsHtml = "";
-        categoryOrder.forEach((cat) => {
-            const companiesInCat = companiesByCategory[cat];
-            if (!companiesInCat) return;
+        const catCardsHtml = categoryOrder.map((cat, i) => {
+            const companiesInCat = companiesByCategory[cat] || {};
+            const companyNames = Object.keys(companiesInCat);
+            const totalCount = companyNames.reduce((sum, c) => sum + companiesInCat[c], 0);
+            const catLabel = categoryLabels[cat] || cat;
 
-            const cards = Object.keys(companiesInCat).map((c, i) => `
-                <div class="stat-card ${compColorCls[i % compColorCls.length]} stat-card-clickable"
-                    data-company="${this._escapeAttr(c)}"
-                    onclick="AppController.view._showCompanyDrilldown('${this._escapeAttr(c)}')">
-                    <div class="stat-icon"><i class="ph ph-buildings"></i></div>
-                    <div class="stat-content">
-                        <span class="stat-label">${c}</span>
-                        <span class="stat-value">${companiesInCat[c]}</span>
-                        <span class="stat-card-hint">↓ click to view</span>
-                    </div>
-                </div>
-            `).join("");
-
-            companySectionsHtml += `
-                ${sectionLabel(categoryLabels[cat] || cat)}
-                <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
-                    ${cards}
+            const topLabel = `
+                <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#9ca3af;margin-bottom:8px;">
+                    ${catLabel}
                 </div>
             `;
-        });
+
+            if (companyNames.length === 0) {
+                return `
+                    <div class="stat-card ${compColorCls[i % compColorCls.length]}">
+                        ${topLabel}
+                        <div class="stat-icon"><i class="ph ph-buildings"></i></div>
+                        <div class="stat-content">
+                            <span class="stat-label">Total Companies</span>
+                            <span class="stat-value">0</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="stat-card ${compColorCls[i % compColorCls.length]} stat-card-clickable"
+                    data-company-category="${cat}"
+                    onclick="AppController.view._showCompanyCategoryDrilldown('${cat}')">
+                    ${topLabel}
+                    <div class="stat-icon"><i class="ph ph-buildings"></i></div>
+                    <div class="stat-content">
+                        ${companyNames.length === 1
+                            ? `<span class="stat-label">${this._escapeAttr(companyNames[0])}</span><span class="stat-value">${totalCount}</span>`
+                            : `<span class="stat-label">Total Companies</span><span class="stat-value">${companyNames.length}</span>`
+                        }
+                    </div>
+                </div>
+            `;
+        }).join("");
+
+        const companySectionsHtml = `
+            <div class="summary-grid" style="grid-template-columns: repeat(3, minmax(0,1fr));">
+                ${catCardsHtml}
+            </div>
+        `;
 
         // --- Gender ---
         this._currentGenderSummaryData = { emps, model, dayLogs, empMap, isDashboard: true, };
@@ -736,6 +759,7 @@ class AttendanceView {
 
                 ${sectionLabel("By Companies")}
                 ${companySectionsHtml}
+                <div id="dashboard-company-category-drilldown" style="margin-top:8px;"></div>
 
                 ${sectionLabel("Gender & Workforce Type")}
                 <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
@@ -1061,54 +1085,87 @@ class AttendanceView {
             </div>
         `;
 
-        const categoryOrder = ["ON-ROLL", "CONTRACTOR", "CC", "OUTSOURCE", "OTHER"];
+        this._currentCompanyData = { emps, model, dayLogs, empMap };
+
+        const sectionLabelCS = (text) => `
+            <div style="
+                font-size:10px;font-weight:700;text-transform:uppercase;
+                letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px;
+                display:flex;align-items:center;gap:8px;
+            ">
+                ${text}
+                <span style="flex:1;height:1px;background:#e5e7eb;display:block;"></span>
+            </div>
+        `;
+
+        const categoryOrder = ["ON-ROLL", "CC", "CONTRACTOR"];
         const categoryLabels = {
-            "ON-ROLL": "On-Roll Companies",
-            "CONTRACTOR": "Contractor Companies",
-            "CC": "CC Companies",
-            "OUTSOURCE": "Outsource Companies",
-            "OTHER": "Other Companies",
+            "ON-ROLL": "ON-ROLL",
+            "CC": "COMPANY CONTRACT (CC)",
+            "CONTRACTOR": "CONTRACTOR",
+        };
+
+        const mergeCat = (rawCat) => {
+            const c = rawCat || "OTHER";
+            return (c === "OUTSOURCE" || c === "OTHER") ? "CONTRACTOR" : c;
         };
 
         const companiesByCategory = {};
         emps.forEach((e) => {
-            const cat = e.companyCategory || "OTHER";
+            const cat = mergeCat(e.companyCategory);
             if (!companiesByCategory[cat]) companiesByCategory[cat] = new Set();
             companiesByCategory[cat].add(e.company);
         });
 
-        let companySectionsHtml = "";
-        categoryOrder.forEach((cat) => {
+        const catCardsHtml = categoryOrder.map((cat, i) => {
             const companySet = companiesByCategory[cat];
-            if (!companySet || companySet.size === 0) return;
+            const companyNames = companySet ? [...companySet] : [];
+            const catLabel = categoryLabels[cat] || cat;
 
-            const cardsHtml = [...companySet].map((c, i) => `
-                <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
-                    data-company="${this._escapeAttr(c)}"
-                    onclick="AppController.view._showCompanyDrilldown('${this._escapeAttr(c)}')">
-                    <div class="stat-icon"><i class="ph ph-buildings"></i></div>
-                    <div class="stat-content">
-                        <span class="stat-label">${c}</span>
-                        <span class="stat-value">${counts[c] || 0}</span>
-                        <span class="stat-card-hint">↓ click to view</span>
-                    </div>
-                </div>
-            `).join("");
-
-            companySectionsHtml += `
-                ${sectionLabel(categoryLabels[cat] || cat)}
-                <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
-                    ${cardsHtml}
+            const topLabel = `
+                <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#9ca3af;margin-bottom:8px;">
+                    ${catLabel}
                 </div>
             `;
-        });
+
+            if (companyNames.length === 0) {
+                return `
+                    <div class="stat-card ${colorCls[i % colorCls.length]}">
+                        ${topLabel}
+                        <div class="stat-icon"><i class="ph ph-buildings"></i></div>
+                        <div class="stat-content">
+                            <span class="stat-label">Total Companies</span>
+                            <span class="stat-value">0</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            const catPresentTotal = companyNames.reduce((sum, c) => sum + (counts[c] || 0), 0);
+
+            return `
+                <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
+                    data-company-category="${cat}"
+                    onclick="AppController.view._showCompanyCategoryDrilldown('${cat}')">
+                    ${topLabel}
+                    <div class="stat-icon"><i class="ph ph-buildings"></i></div>
+                    <div class="stat-content">
+                        ${companyNames.length === 1
+                            ? `<span class="stat-label">${this._escapeAttr(companyNames[0])}</span><span class="stat-value">${counts[companyNames[0]] || 0}</span>`
+                            : `<span class="stat-label">Total Companies</span><span class="stat-value">${catPresentTotal}</span>`
+                        }
+                    </div>
+                </div>
+            `;
+        }).join("");
 
         return `
-            <div class="summary-grid">
+            <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
                 ${headcountCardHtml}
+                ${catCardsHtml}
                 ${avgHoursCardHtml}
             </div>
-            ${companySectionsHtml}
+            <div id="company-category-drilldown" style="margin-top:8px;"></div>
         `;
     }
 
@@ -2381,6 +2438,87 @@ class AttendanceView {
         this._renderStatCardDrilldown("company_" + company, items, 1);
     }
 
+    _showCompanyCategoryDrilldown(category) {
+        document.querySelectorAll(".stat-card-clickable[data-company-category]").forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(`.stat-card-clickable[data-company-category="${category}"]`);
+        if (card) card.classList.add("active");
+
+        const data = this._currentCompanyData;
+        if (!data) return;
+        const { emps, dayLogs, empMap, isDashboard } = data;
+
+        const mergeCat = (rawCat) => {
+            const c = rawCat || "OTHER";
+            return (c === "OUTSOURCE" || c === "OTHER") ? "CONTRACTOR" : c;
+        };
+
+        const catEmps = emps.filter((e) => mergeCat(e.companyCategory) === category);
+        const companyCounts = {};
+        catEmps.forEach((e) => { if (companyCounts[e.company] === undefined) companyCounts[e.company] = 0; });
+
+        if (isDashboard) {
+            catEmps.forEach((e) => { companyCounts[e.company]++; });
+        } else {
+            dayLogs.forEach((l) => {
+                const e = empMap[l.empId];
+                if (!e || mergeCat(e.companyCategory) !== category) return;
+                
+                const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present");
+                
+                if (!isPresentOrHalf) return;
+                if (companyCounts[e.company] !== undefined) companyCounts[e.company]++;
+            });
+        }
+        
+        const companies = Object.keys(companyCounts);
+
+        const colorCls = ["info", "success", "warning", "accent", "danger"];
+
+        const panel = document.getElementById("dashboard-company-category-drilldown") || document.getElementById("company-category-drilldown");
+        
+        if (!panel) return;
+
+        // Sirf 1 company hai category me (subadmin ka ON-ROLL/CC single-company case) -> seedha employee list dikhao
+        if (companies.length === 1) {
+            panel.innerHTML = "";
+            this._showCompanyDrilldown(companies[0]);
+            return;
+        }
+
+        const cardsHtml = companies.map((c, i) => `
+            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
+                data-company="${this._escapeAttr(c)}"
+                onclick="AppController.view._showCompanyDrilldown('${this._escapeAttr(c)}')">
+                <div class="stat-icon"><i class="ph ph-buildings"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">${c}</span>
+                    <span class="stat-value">${companyCounts[c]}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+        `).join("");
+
+        const categoryLabelsForDrilldown = {
+            "ON-ROLL": "ON-ROLL",
+            "CC": "COMPANY CONTRACT (CC)",
+            "CONTRACTOR": "CONTRACTOR",
+        };
+
+        panel.style.display = "block";
+        
+        panel.innerHTML = `
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;margin:20px 0 10px;display:flex;align-items:center;gap:8px;">
+                ${categoryLabelsForDrilldown[category] || category}
+                <span style="flex:1;height:1px;background:#e5e7eb;"></span>
+            </div>
+            <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                ${cardsHtml}
+            </div>
+        `;
+
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
     _showAvgHoursDrilldown() {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
         const card = this.app.querySelector(`.stat-card-clickable[data-card-key="avgHours"]`,);
@@ -3108,6 +3246,9 @@ class AttendanceView {
                         earlyBy: 0,
                         missedInPunch: 0,
                         missedOutPunch: 0,
+                        shiftStart: e.shiftStart || null,
+                        shiftEnd: e.shiftEnd || null,
+                        shiftGroupName: e.shiftGroupName || null,
                     });
                 }
             });
@@ -5108,6 +5249,7 @@ class AttendanceView {
             },
         };
     }
+
     _reRenderShiftWisePage(page) {
         const content = this._renderShiftWise(
             this._currentShiftWiseLogs,
@@ -5387,7 +5529,7 @@ class AttendanceView {
         if (isDashboardMode) {
             headers = isJoinExitRelated
                 ? ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Location",]
-                : ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Shift", "Shift Start", "Shift End", "Location",];
+                : ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Location",];
         } else if (isResignedOnly) {
             headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "DOJ", "DOR", "Status",];
         } else if (isNewJoinedOnly) {
@@ -5440,9 +5582,6 @@ class AttendanceView {
                         <td>${emp.company || "–"}</td>
                         <td>${emp.designation || "–"}</td>
                         <td>${emp.shiftGroupName || "–"}</td>
-                        <td>${emp.shift || "–"}</td>
-                        <td>${emp.shiftStart || "–"}</td>
-                        <td>${emp.shiftEnd || "–"}</td>
                         <td>${emp.location || "–"}</td>
                     </tr>
                 `;

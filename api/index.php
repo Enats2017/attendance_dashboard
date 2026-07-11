@@ -235,6 +235,7 @@ function handleLogin($data) {
     while ($row = sqlsrv_fetch_array($stmtLoc, SQLSRV_FETCH_ASSOC)) {
         $locations[] = intval($row['LocationId']);
     }
+    $locationsAssigned = !empty($locations);
 
     if (empty($locations)) {
         $stmtAllLoc = sqlsrv_query($conn, "SELECT LocationId FROM Locations");
@@ -247,7 +248,8 @@ function handleLogin($data) {
     while ($row = sqlsrv_fetch_array($stmtComp, SQLSRV_FETCH_ASSOC)) {
         $companies[] = intval($row['CompanyId']);
     }
-    
+    $companiesAssigned = !empty($companies);
+
     if (empty($companies)) {
         $stmtAllComp = sqlsrv_query($conn, "SELECT CompanyId FROM Companies");
         while ($row = sqlsrv_fetch_array($stmtAllComp, SQLSRV_FETCH_ASSOC)) {
@@ -259,6 +261,7 @@ function handleLogin($data) {
     while ($row = sqlsrv_fetch_array($stmtDept, SQLSRV_FETCH_ASSOC)) {
         $departments[] = intval($row['DepartmentId']);
     }
+    $departmentsAssigned = !empty($departments);
 
     if (empty($departments)) {
         $stmtAllDept = sqlsrv_query($conn, "SELECT DepartmentId FROM Departments");
@@ -267,10 +270,14 @@ function handleLogin($data) {
         }
     }
 
+    // Master = koi bhi dimension (location/company/department) me explicit restriction nahi hai
+    $isMaster = !$locationsAssigned && !$companiesAssigned && !$departmentsAssigned;
+
     $_SESSION['userId'] = $user['UserId'];
     $_SESSION['locations'] = $locations;
     $_SESSION['companies'] = $companies;
     $_SESSION['departments'] = $departments;
+    $_SESSION['isMaster'] = $isMaster;
 
     echo json_encode([
         'success' => true,
@@ -279,7 +286,8 @@ function handleLogin($data) {
             'id' => $user['UserId'],
             'username' => $user['LoginName'],
             'employee_id' => $user['EmployeeId'],
-            'role' => $user['RoleName']
+            'role' => $user['RoleName'],
+            'isMaster' => $isMaster
         ]
     ]);
 }
@@ -321,6 +329,7 @@ function setupPassword($data) {
         while ($row = sqlsrv_fetch_array($stmtLoc, SQLSRV_FETCH_ASSOC)) {
             $locations[] = intval($row['LocationId']);
         }
+        $locationsAssigned = !empty($locations);
         
         if (empty($locations)) {
             $stmtAllLoc = sqlsrv_query($conn, "SELECT LocationId FROM Locations");
@@ -333,6 +342,7 @@ function setupPassword($data) {
         while ($row = sqlsrv_fetch_array($stmtComp, SQLSRV_FETCH_ASSOC)) {
             $companies[] = intval($row['CompanyId']);
         }
+        $companiesAssigned = !empty($companies);
         
         if (empty($companies)) {
             $stmtAllComp = sqlsrv_query($conn, "SELECT CompanyId FROM Companies");
@@ -345,6 +355,7 @@ function setupPassword($data) {
         while ($row = sqlsrv_fetch_array($stmtDept, SQLSRV_FETCH_ASSOC)) {
             $departments[] = intval($row['DepartmentId']);
         }
+        $departmentsAssigned = !empty($departments);
         
         if (empty($departments)) {
             $stmtAllDept = sqlsrv_query($conn, "SELECT DepartmentId FROM Departments");
@@ -352,11 +363,15 @@ function setupPassword($data) {
                 $departments[] = intval($row['DepartmentId']);
             }
         }
+
+        // Master = koi bhi dimension (location/company/department) me explicit restriction nahi hai
+        $isMaster = !$locationsAssigned && !$companiesAssigned && !$departmentsAssigned;
         
         $_SESSION['userId'] = $userId;
         $_SESSION['locations'] = $locations;
         $_SESSION['companies'] = $companies;
         $_SESSION['departments'] = $departments;
+        $_SESSION['isMaster'] = $isMaster;
         
         echo json_encode([
             'success' => true,
@@ -365,7 +380,8 @@ function setupPassword($data) {
                 'id' => $user['UserId'],
                 'username' => $user['LoginName'],
                 'employee_id' => $user['EmployeeId'],
-                'role' => $user['RoleName']
+                'role' => $user['RoleName'],
+                'isMaster' => $isMaster
             ]
         ]);
     } else {
@@ -1064,9 +1080,9 @@ function handleDashboardData($input, $returnData = false) {
             'date' => $date,
             'inTime' => $devInTime,
             'outTime' => $hasOut ? $stat['lastOut']->format('H:i') : null,
-            'status' => 'Present',
-            'detailedStatus' => 'Present',
-            'detailedStatusCode' => 'P',
+            'status' => 'Device Present',
+            'detailedStatus' => 'Device Present',
+            'detailedStatusCode' => 'D.P',
             'present' => 1,
             'weeklyOff' => 0,
             'holiday' => 0,
