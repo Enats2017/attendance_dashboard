@@ -5540,10 +5540,9 @@ class AttendanceView {
         } else if (isTotalHeadcount) {
             headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "Shift", "Shift Start", "Shift End", "Location"];
         } else if (isStaffList || isWorkerList) {
-            const isDashboardStaffWorker =
-                items.length > 0 && items[0].log === null;
+            const isDashboardStaffWorker = items.length > 0 && items[0].log === null;
             if (isDashboardStaffWorker) {
-                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "Shift", "Shift Start", "Shift End", "Location"];
+                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "Location"];
             } else {
                 headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "Shift", "Shift Start", "Shift End", "Date", "In Time", "Out Time", "Hours Worked", "Status", "Detailed Status", "Location"];
             }
@@ -5623,9 +5622,6 @@ class AttendanceView {
                             <td>${emp.designation || "–"}</td>
                             <td>${emp.teamName || "-"}</td>
                             <td>${emp.shiftGroupName || "–"}</td>
-                            <td>${emp.shift || "–"}</td>
-                            <td>${emp.shiftStart || "–"}</td>
-                            <td>${emp.shiftEnd || "–"}</td>
                             <td>${emp.location || "–"}</td>
                         </tr>
                     `;
