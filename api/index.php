@@ -672,7 +672,8 @@ function handleDashboardData($input, $returnData = false) {
                 'shiftEnd' => null,
                 'location' => $row['location'] ?: 'Head Office',
                 'doj' => $row['DOJ'] ? $row['DOJ']->format('Y-m-d') : null,               
-                'team' => isset($row['Team']) ? intval($row['Team']) : null                  
+                'team' => isset($row['Team']) ? intval($row['Team']) : null,
+                'teamName' => isset($row['Team']) ? ($allTeams[intval($row['Team'])] ?? 'No Team') : 'No Team'                  
             ];
         }
 
@@ -728,6 +729,7 @@ function handleDashboardData($input, $returnData = false) {
                 'company' => $row['company'] ?: 'Unknown',
                 'categoryId' => intval($row['CategoryId']),
                 'team' => isset($row['Team']) ? intval($row['Team']) : null,
+                'teamName' => isset($row['Team']) ? ($allTeams[intval($row['Team'])] ?? 'No Team') : 'No Team',
                 'designationId' => intval($row['Designation']),
                 'designation' => $row['DesignationName'] ?: 'Staff',
                 'shiftGroupName' => $shiftGroupNameMap[intval($row['ShiftGroupId'])] ?? 'No Shift Group',
@@ -769,6 +771,7 @@ function handleDashboardData($input, $returnData = false) {
                 'company' => $row['company'] ?: 'Unknown',
                 'categoryId' => intval($row['CategoryId']),
                 'team' => isset($row['Team']) ? intval($row['Team']) : null,
+                'teamName' => isset($row['Team']) ? ($allTeams[intval($row['Team'])] ?? 'No Team') : 'No Team',
                 'designationId' => intval($row['Designation']),
                 'designation' => $row['DesignationName'] ?: 'Staff',
                 'shiftGroupName' => $shiftGroupNameMap[intval($row['ShiftGroupId'])] ?? 'No Shift Group',

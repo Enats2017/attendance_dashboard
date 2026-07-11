@@ -3707,6 +3707,7 @@ class AttendanceView {
                     <td>${e.name || "–"}</td>
                     <td>${e.dept || "–"}</td>
                     <td>${e.company || "–"}</td>
+                    <td>${e.teamName || "–"}</td>
                     <td>${e.shiftGroupName || "–"}</td>
                     <td>${e.shift || "–"}</td>
                     <td>${l.shiftStart || "–"}</td>
@@ -3732,6 +3733,7 @@ class AttendanceView {
                 Name: e.name,
                 Dept: e.dept,
                 Company: e.company,
+                TeamName: e.teamName,
                 Shift: e.shift,
                 ShiftStart: l.shiftStart || "",
                 ShiftEnd: l.shiftEnd || "",
@@ -3790,6 +3792,7 @@ class AttendanceView {
 								<th>Name</th>
 								<th>Dept</th>
 	                            <th>Company</th>
+                                <th>Team</th>  
                                 <th>Shift Group</th>
                                 <th>Shift</th>
 								<th>Shift Start</th>
@@ -5528,28 +5531,28 @@ class AttendanceView {
 
         if (isDashboardMode) {
             headers = isJoinExitRelated
-                ? ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Location",]
-                : ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Location",];
+                ? ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "Location",]
+                : ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "Location",];
         } else if (isResignedOnly) {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "DOJ", "DOR", "Status",];
+            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "DOJ", "DOR", "Status",];
         } else if (isNewJoinedOnly) {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "DOJ", "Status"];
+            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "DOJ", "Status"];
         } else if (isTotalHeadcount) {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Shift", "Shift Start", "Shift End", "Location"];
+            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "Shift", "Shift Start", "Shift End", "Location"];
         } else if (isStaffList || isWorkerList) {
             const isDashboardStaffWorker =
                 items.length > 0 && items[0].log === null;
             if (isDashboardStaffWorker) {
-                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Shift", "Shift Start", "Shift End", "Location"];
+                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "Shift", "Shift Start", "Shift End", "Location"];
             } else {
-                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Shift", "Shift Start", "Shift End", "Date", "In Time", "Out Time", "Hours Worked", "Status", "Detailed Status", "Location"];
+                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "Shift", "Shift Start", "Shift End", "Date", "In Time", "Out Time", "Hours Worked", "Status", "Detailed Status", "Location"];
             }
         } else if (key === "lateIn") {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Late By", "Detailed Status"];
+            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Late By", "Detailed Status"];
         } else if (key === "earlyOut") {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Early By", "Detailed Status"];
+            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Early By", "Detailed Status"];
         } else {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift Group", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Status", "Detailed Status"];
+            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Status", "Detailed Status"];
         }
         ths = headers.map((h) => `<th>${h}</th>`).join("");
 
@@ -5568,6 +5571,7 @@ class AttendanceView {
                             <td>${emp.dept || "–"}</td>
                             <td>${emp.company || "–"}</td>
                             <td>${emp.designation || "–"}</td>
+                            <td>${emp.teamName || "-"}</td>
                             <td>${emp.shiftGroupName || "–"}</td>
                             <td>${emp.location || "–"}</td>
                         </tr>
@@ -5581,6 +5585,7 @@ class AttendanceView {
                         <td>${emp.dept || "–"}</td>
                         <td>${emp.company || "–"}</td>
                         <td>${emp.designation || "–"}</td>
+                        <td>${emp.teamName || "-"}</td>
                         <td>${emp.shiftGroupName || "–"}</td>
                         <td>${emp.location || "–"}</td>
                     </tr>
@@ -5596,6 +5601,7 @@ class AttendanceView {
                         <td>${emp.dept || "–"}</td>
                         <td>${emp.company || "–"}</td>
                         <td>${emp.designation || "–"}</td>
+                        <td>${emp.teamName || "-"}</td>
                         <td>${emp.shiftGroupName || "–"}</td>
                         <td>${emp.shift || "–"}</td>
                         <td>${emp.shiftStart || "–"}</td>
@@ -5615,6 +5621,7 @@ class AttendanceView {
                             <td>${emp.dept || "–"}</td>
                             <td>${emp.company || "–"}</td>
                             <td>${emp.designation || "–"}</td>
+                            <td>${emp.teamName || "-"}</td>
                             <td>${emp.shiftGroupName || "–"}</td>
                             <td>${emp.shift || "–"}</td>
                             <td>${emp.shiftStart || "–"}</td>
@@ -5631,6 +5638,7 @@ class AttendanceView {
                         <td>${emp.dept || "–"}</td>
                         <td>${emp.company || "–"}</td>
                         <td>${emp.designation || "–"}</td>
+                        <td>${emp.teamName || "-"}</td>
                         <td>${emp.shiftGroupName || "–"}</td>
                         <td>${emp.shift || "–"}</td>
                         <td>${log?.shiftStart || emp?.shiftStart || "–"}</td>
@@ -5655,6 +5663,7 @@ class AttendanceView {
                         <td>${emp.dept || "–"}</td>
                         <td>${emp.company || "–"}</td>
                         <td>${emp.designation || "–"}</td>
+                        <td>${emp.teamName || "-"}</td>
                         <td>${emp.shiftGroupName || "–"}</td>
                         <td>${this._formatDate(emp.doj) || "–"}</td>
                         <td>${this._formatDate(emp.dor) || "–"}</td>
@@ -5672,6 +5681,7 @@ class AttendanceView {
                         <td>${emp.dept || "–"}</td>
                         <td>${emp.company || "–"}</td>
                         <td>${emp.designation || "–"}</td>
+                        <td>${emp.teamName || "-"}</td>
                         <td>${emp.shiftGroupName || "–"}</td>
                         <td>${this._formatDate(emp.doj) || "–"}</td>
                         <td><span class="badge ${badgeClass}">${emp.status || "Working"}</span></td>
@@ -5682,8 +5692,8 @@ class AttendanceView {
             const lastCol =
                 key === "lateIn"
                     ? `<td>${this._fmtMins(log?.lateBy)}</td>` : key === "earlyOut"
-                        ? `<td>${this._fmtMins(log?.earlyBy)}</td>` : key === "weeklyOff"
-                            ? `<td><span class="badge badge-info">Weekly Off</span></td>` : `<td>${log?.status || "–"}</td>`;
+                    ? `<td>${this._fmtMins(log?.earlyBy)}</td>` : key === "weeklyOff"
+                    ? `<td><span class="badge badge-info">Weekly Off</span></td>` : `<td>${log?.status || "–"}</td>`;
 
             const detailedStatusCol = `<td>${log?.detailedStatus || "–"}</td>`;
 
@@ -5695,6 +5705,7 @@ class AttendanceView {
                     <td>${emp.dept || "–"}</td>
                     <td>${emp.company || "–"}</td>
                     <td>${emp.designation || "–"}</td>
+                    <td>${emp.teamName || "-"}</td>
                     <td>${emp.shiftGroupName || "–"}</td>
                     <td>${emp.shift || "–"}</td>
                     <td>${log?.shiftStart || emp?.shiftStart || "–"}</td>
@@ -5729,6 +5740,7 @@ class AttendanceView {
                     Dept: emp?.dept,
                     Company: emp?.company,
                     Designation: emp?.designation,
+                    TeamName: emp?.teamName,
                     shiftGroupName: emp?.shiftGroupName,
                     Shift: emp?.shift,
                     ShiftStart: emp?.shiftStart || "",
@@ -5743,6 +5755,7 @@ class AttendanceView {
                     Dept: emp?.dept,
                     Company: emp?.company,
                     Designation: emp?.designation,
+                    TeamName: emp?.teamName,
                     shiftGroupName: emp?.shiftGroupName,
                     DOJ: emp?.doj,
                     DOR: emp?.dor,
@@ -5756,6 +5769,7 @@ class AttendanceView {
                     Dept: emp?.dept,
                     Company: emp?.company,
                     Designation: emp?.designation,
+                    TeamName: emp?.teamName,
                     shiftGroupName: emp?.shiftGroupName,
                     Shift: emp?.shift,
                     ShiftStart: emp?.shiftStart || "",
@@ -5770,6 +5784,7 @@ class AttendanceView {
                     Dept: emp?.dept,
                     Company: emp?.company,
                     Designation: emp?.designation,
+                    TeamName: emp?.teamName,
                     shiftGroupName: emp?.shiftGroupName,
                     Shift: emp?.shift,
                     Location: emp?.location,
@@ -5782,6 +5797,7 @@ class AttendanceView {
                     Dept: emp?.dept,
                     Company: emp?.company,
                     Designation: emp?.designation,
+                    TeamName: emp?.teamName,
                     shiftGroupName: emp?.shiftGroupName,
                     DOJ: emp?.doj,
                     Status: emp?.status,
@@ -5795,6 +5811,7 @@ class AttendanceView {
                     Dept: emp?.dept,
                     Company: emp?.company,
                     Designation: emp?.designation,
+                    TeamName: emp?.teamName,
                     shiftGroupName: emp?.shiftGroupName,
                     Shift: emp?.shift,
                     Location: emp?.location,
@@ -5807,6 +5824,7 @@ class AttendanceView {
                 Dept: emp?.dept,
                 Company: emp?.company,
                 Designation: emp?.designation,
+                TeamName: emp?.teamName,
                 shiftGroupName: emp?.shiftGroupName,
                 Shift: emp?.shift,
                 ShiftStart: log?.shiftStart || emp?.shiftStart || "",
