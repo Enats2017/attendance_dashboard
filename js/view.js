@@ -446,12 +446,18 @@ class AttendanceView {
 
         const sectionLabel = (text) => `
             <div style="
-                font-size:10px;font-weight:700;text-transform:uppercase;
-                letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px;
+                font-size:13px;font-weight:600;text-transform:uppercase;
+                letter-spacing:0.06em;color:#334155;margin:24px 0 12px;
                 display:flex;align-items:center;gap:8px;
             ">
                 ${text}
-                <span style="flex:1;height:1px;background:#e5e7eb;display:block;"></span>
+                <span style="
+                    flex:1;
+                    height:1px;
+                    background:#64748b;
+                    display:block;
+                    border-radius:2px;
+                "></span>
             </div>
         `;
 
@@ -579,7 +585,7 @@ class AttendanceView {
             const catLabel = categoryLabels[cat] || cat;
 
             const topLabel = `
-                <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#9ca3af;margin-bottom:8px;">
+                <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;color:#475569;margin-bottom:8px;">
                     ${catLabel}
                 </div>
             `;
@@ -606,7 +612,7 @@ class AttendanceView {
                     <div class="stat-content">
                         ${companyNames.length === 1
                             ? `<span class="stat-label">${this._escapeAttr(companyNames[0])}</span><span class="stat-value">${totalCount}</span>`
-                            : `<span class="stat-label">Total Companies</span><span class="stat-value">${companyNames.length}</span>`
+                            : `<span class="stat-label">Total Headcount</span><span class="stat-value">${totalCount}</span><span class="stat-card-sub">(${companyNames.length} Companies)</span>`
                         }
                     </div>
                 </div>
@@ -1152,7 +1158,7 @@ class AttendanceView {
                     <div class="stat-content">
                         ${companyNames.length === 1
                             ? `<span class="stat-label">${this._escapeAttr(companyNames[0])}</span><span class="stat-value">${counts[companyNames[0]] || 0}</span>`
-                            : `<span class="stat-label">Total Companies</span><span class="stat-value">${catPresentTotal}</span>`
+                            : `<span class="stat-label">Total Present</span><span class="stat-value">${catPresentTotal}</span><span class="stat-card-sub">(${companyNames.length} Companies)</span>`
                         }
                     </div>
                 </div>
@@ -2507,9 +2513,9 @@ class AttendanceView {
         panel.style.display = "block";
         
         panel.innerHTML = `
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;margin:20px 0 10px;display:flex;align-items:center;gap:8px;">
+            <div style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#334155;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
                 ${categoryLabelsForDrilldown[category] || category}
-                <span style="flex:1;height:1px;background:#e5e7eb;"></span>
+                <span style="flex:1;height:1px;background:#64748b;display:block;border-radius:2px;"></span>
             </div>
             <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
                 ${cardsHtml}
@@ -2610,12 +2616,12 @@ class AttendanceView {
         panel.style.display = "block";
         panel.innerHTML = `
             <div style="
-                font-size:10px;font-weight:700;text-transform:uppercase;
-                letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px;
+                font-size:13px;font-weight:600;text-transform:uppercase;
+                letter-spacing:0.06em;color:#334155;margin:24px 0 12px;
                 display:flex;align-items:center;gap:8px;
             ">
                 BY ${dept.toUpperCase()} DEPARTMENT DESIGNATIONS
-                <span style="flex:1;height:1px;background:#e5e7eb;display:block;"></span>
+                <span style="flex:1;height:1px;background:#64748b;display:block;border-radius:2px;"></span>
             </div>
             <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
                 ${desigCardsHtml || '<p style="padding:16px;color:#94a3b8;">No designations found.</p>'}
@@ -5405,7 +5411,6 @@ class AttendanceView {
             return `<span class="dq-badge" title="${esc(tooltip)}">${esc(iss.field)}</span>`;
         }).join(' ');
 
-        // Small helper: render a value cell, flagging it visually if that field is in the issues list
         const flagCell = (issues, fieldName, displayValue) => {
             const hit = issues.find(i => i.field === fieldName);
             if (!hit) return esc(displayValue || '-');

@@ -1200,3 +1200,10 @@ body {
 .dept-accordion.dimmed .dept-acc-seg.active-highlight {
     opacity: 1;
 }
+
+.stat-card-sub {
+    font-size: 12px;
+    color: #94a3b8;
+    font-weight: 500;
+    margin-top: 2px;
+}
