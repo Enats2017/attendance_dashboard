@@ -1682,9 +1682,7 @@ function handleGetCompanies() {
     echo json_encode($data);
 }
 
-/**
- * Get simple list of active shifts for employees at Location 14
- */
+
 /**
  * Get simple list of active shifts for employees at Location 14
  */
