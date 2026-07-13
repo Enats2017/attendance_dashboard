@@ -170,6 +170,26 @@ switch ($action) {
 
 // --- Function Implementations ---
 
+function getPlaceholderIds($conn, $table, $idCol, $nameCol) {
+    $badIds = [];
+    $sql = "SELECT $idCol AS id, $nameCol AS name FROM $table";
+    $stmt = sqlsrv_query($conn, $sql);
+    if ($stmt) {
+        while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+            $name = strtolower(trim($row['name'] ?? ''));
+            $isBad = in_array($name, ['default', 'none', '0', 'unknown', '.', ''])
+                || strpos($name, 'default') !== false
+                || stripos($row['name'] ?? '', 'del_') === 0;
+            
+                if ($isBad) {
+                $badIds[] = intval($row['id']);
+            }
+        }
+    }
+    
+    return $badIds;
+}
+
 /**
  * Handle User Login
  */
@@ -270,6 +290,14 @@ function handleLogin($data) {
         }
     }
 
+    $placeholderIds = [
+        'designation' => getPlaceholderIds($conn, 'Designations', 'DesignationId', 'DesignationsName'),
+        'department' => getPlaceholderIds($conn, 'Departments', 'DepartmentId', 'DepartmentFName'),
+        'company' => getPlaceholderIds($conn, 'Companies', 'CompanyId', 'CompanyFName'),
+        'shiftGroup' => getPlaceholderIds($conn, 'ShiftGroups', 'ShiftGroupId', 'ShiftGroupName'),
+        'location' => getPlaceholderIds($conn, 'Locations', 'LocationId', 'LocationName'),
+    ];
+
     // Master = koi bhi dimension (location/company/department) me explicit restriction nahi hai
     $isMaster = !$locationsAssigned && !$companiesAssigned && !$departmentsAssigned;
 
@@ -278,6 +306,7 @@ function handleLogin($data) {
     $_SESSION['companies'] = $companies;
     $_SESSION['departments'] = $departments;
     $_SESSION['isMaster'] = $isMaster;
+    $_SESSION['placeholderIds'] = $placeholderIds;
 
     echo json_encode([
         'success' => true,
@@ -364,6 +393,14 @@ function setupPassword($data) {
             }
         }
 
+        $placeholderIds = [
+            'designation' => getPlaceholderIds($conn, 'Designations', 'DesignationId', 'DesignationsName'),
+            'department'  => getPlaceholderIds($conn, 'Departments', 'DepartmentId', 'DepartmentFName'),
+            'company'     => getPlaceholderIds($conn, 'Companies', 'CompanyId', 'CompanyFName'),
+            'shiftGroup'  => getPlaceholderIds($conn, 'ShiftGroups', 'ShiftGroupId', 'ShiftGroupName'),
+            'location'    => getPlaceholderIds($conn, 'Locations', 'LocationId', 'LocationName'),
+        ];
+
         // Master = koi bhi dimension (location/company/department) me explicit restriction nahi hai
         $isMaster = !$locationsAssigned && !$companiesAssigned && !$departmentsAssigned;
         
@@ -372,6 +409,7 @@ function setupPassword($data) {
         $_SESSION['companies'] = $companies;
         $_SESSION['departments'] = $departments;
         $_SESSION['isMaster'] = $isMaster;
+        $_SESSION['placeholderIds'] = $placeholderIds;
         
         echo json_encode([
             'success' => true,
@@ -602,6 +640,10 @@ function handleDashboardData($input, $returnData = false) {
     $userLocations = $_SESSION['locations'] ?? [];
     $userCompanies = $_SESSION['companies'] ?? [];
     $userDepartments = $_SESSION['departments'] ?? [];
+
+    $placeholderIds = $_SESSION['placeholderIds'] ?? [
+        'designation' => [], 'department' => [], 'company' => [], 'shiftGroup' => [], 'location' => []
+    ];
 
     $locationList = !empty($userLocations) ? implode(',', array_map('intval', $userLocations)) : '0';
     $companyList = !empty($userCompanies) ? implode(',', array_map('intval', $userCompanies)) : '0';
@@ -1428,6 +1470,7 @@ function handleDashboardData($input, $returnData = false) {
             'staffTeamId' => $staffTeamId,
             'workerTeamId' => $workerTeamId,
         ],
+        'placeholderIds' => $placeholderIds,
         'singlePunchKeys' => $singlePunchKeys,
 		'singlePunchData' => $singlePunchData,
         'staffWorkerStats' => [
@@ -1829,14 +1872,7 @@ function handleGetCompaniesOrder() {
     $locationList = implode(',', array_map('intval', $_SESSION['locations']));
     $companyList  = implode(',', array_map('intval', $_SESSION['companies']));
 
-    $sql = "SELECT C.CompanyId, C.CompanyFName AS CompanyName, C.SortOrder 
-            FROM Companies C WITH (NOLOCK) 
-            INNER JOIN Employees E WITH (NOLOCK) ON C.CompanyId = E.CompanyId 
-            WHERE E.Location IN ($locationList) 
-            AND E.CompanyId IN ($companyList) 
-            AND E.Status = 'Working' 
-            GROUP BY C.CompanyId, C.CompanyFName, C.SortOrder 
-            ORDER BY CASE WHEN C.SortOrder IS NULL THEN 1 ELSE 0 END, C.SortOrder, C.CompanyFName";
+    $sql = "SELECT C.CompanyId, C.CompanyFName AS CompanyName, C.SortOrder FROM Companies C WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON C.CompanyId = E.CompanyId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.Status = 'Working' GROUP BY C.CompanyId, C.CompanyFName, C.SortOrder ORDER BY CASE WHEN C.SortOrder IS NULL THEN 1 ELSE 0 END, C.SortOrder, C.CompanyFName";
     
     $stmt = sqlsrv_query($conn, $sql);
     

@@ -159,6 +159,9 @@ class AttendanceModel {
                 this.state.gapHeadcount = data.gapHeadcount ?? 0;
                 this.state.requiredHeadcountByDept = data.requiredHeadcountByDept || {};
                 this.state.teamConfig = data.teamConfig || { staffTeamId: 7, workerTeamId: 6 };
+                this.state.placeholderIds = data.placeholderIds || {
+                    designation: [], department: [], company: [], shiftGroup: [], location: []
+                };
                 this.state.isMaster = (data.isMaster !== undefined) ? !!data.isMaster : (window.HRMS_USER?.isMaster ?? true);
 
                 this.state.lastUpdated = new Date().toLocaleTimeString();
@@ -436,40 +439,55 @@ class AttendanceModel {
 
         const staffTeamId = this.state.teamConfig?.staffTeamId ?? 7;
         const workerTeamId = this.state.teamConfig?.workerTeamId ?? 6;
+        const placeholderIds = this.state.placeholderIds || {
+            designation: [], department: [], company: [], shiftGroup: [], location: []
+        };
 
         emps.forEach(emp => {
-            const missingFields = [];
+            const issues = [];
+            const addIssue = (field, reason, rawValue) => {
+                issues.push({ field, reason, rawValue: rawValue ?? null });
+            };
 
-            if (!emp.code) missingFields.push('Employee Code');
-            if (!emp.name) missingFields.push('Name');
-            if (!emp.dobRaw) missingFields.push('DOB');
-            if (!emp.genderRaw) missingFields.push('Gender');
+            if (!emp.code) addIssue('Employee Code', 'missing', emp.code);
+            if (!emp.name) addIssue('Name', 'missing', emp.name);
+            if (!emp.dobRaw) addIssue('DOB', 'missing', emp.dobRaw);
+            if (!emp.genderRaw) addIssue('Gender', 'missing', emp.genderRaw);
+
             if (emp.categoryIdRaw === null || emp.categoryIdRaw === undefined || emp.categoryIdRaw === '') {
-                missingFields.push('Category');
-            }
-            if (emp.team === null || emp.team === undefined || (emp.team !== staffTeamId && emp.team !== workerTeamId)) {
-                missingFields.push('Team');
-            }
-            if (!emp.designationRaw) {
-                missingFields.push('Designation');
-            } else if (!emp.designationNameRaw) {
-                missingFields.push('Designation Name (invalid link)');
-            } else if (this._isPlaceholderValue(emp.designationNameRaw)) {
-                missingFields.push('Designation (not set)');
-            }
-            if (!emp.doj) missingFields.push('DOJ');
-            if (this._isPlaceholderValue(emp.company)) {
-                missingFields.push('Company (not set)');
-            }
-            if (this._isPlaceholderValue(emp.dept)) {
-                missingFields.push('Department (not set)');
-            }
-            if (this._isPlaceholderValue(emp.location)) {
-                missingFields.push('Location (not set)');
+                addIssue('Category', 'missing', emp.categoryIdRaw);
             }
 
-            if (missingFields.length > 0) {
-                result.push({ emp, missingFields });
+            if (emp.team === null || emp.team === undefined || (emp.team !== staffTeamId && emp.team !== workerTeamId)) {
+                addIssue('Team', 'unassigned/invalid', emp.team);
+            }
+
+            if (!emp.designationRaw) {
+                addIssue('Designation', 'missing id', emp.designationRaw);
+            } else if (!emp.designationNameRaw) {
+                addIssue('Designation', 'invalid link (id has no matching name)', emp.designationId);
+            } else if (this._isPlaceholderValue(emp.designationNameRaw) || (placeholderIds.designation || []).includes(emp.designationId)) {
+                addIssue('Designation', 'placeholder value', emp.designationId);
+            }
+
+            if (!emp.shiftGroupId || (placeholderIds.shiftGroup || []).includes(emp.shiftGroupId)) {
+                addIssue('Shift Group', 'not set', emp.shiftGroupId);
+            }
+
+            if (!emp.doj) addIssue('DOJ', 'missing', emp.doj);
+
+            if (this._isPlaceholderValue(emp.company) || (placeholderIds.company || []).includes(emp.companyId)) {
+                addIssue('Company', 'not set', emp.companyId);
+            }
+            if (this._isPlaceholderValue(emp.dept) || (placeholderIds.department || []).includes(emp.deptId)) {
+                addIssue('Department', 'not set', emp.deptId);
+            }
+            if (this._isPlaceholderValue(emp.location) || (placeholderIds.location || []).includes(emp.locationId)) {
+                addIssue('Location', 'not set', emp.locationId);
+            }
+
+            if (issues.length > 0) {
+                result.push({ emp, issues, missingFields: issues.map(i => i.field) });
             }
         });
 

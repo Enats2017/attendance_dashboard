@@ -5387,33 +5387,75 @@ class AttendanceView {
     _renderDataQuality(logs, emps, empMap, filters, model, dqPage = 1) {
         const missingDataItems = model.findMissingDataEmployees();
 
+        const severityClass = (count) => {
+            if (count >= 4) return 'dq-severity-high';
+            if (count >= 2) return 'dq-severity-med';
+            return 'dq-severity-low';
+        };
+
+        const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => (
+            { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+        ));
+
+        const renderIssueBadges = (issues) => issues.map(iss => {
+            const hasVal = iss.rawValue !== null && iss.rawValue !== undefined && iss.rawValue !== '';
+            const tooltip = hasVal
+                ? `${iss.field}: ${iss.reason} (value: ${iss.rawValue})`
+                : `${iss.field}: ${iss.reason}`;
+            return `<span class="dq-badge" title="${esc(tooltip)}">${esc(iss.field)}</span>`;
+        }).join(' ');
+
+        // Small helper: render a value cell, flagging it visually if that field is in the issues list
+        const flagCell = (issues, fieldName, displayValue) => {
+            const hit = issues.find(i => i.field === fieldName);
+            if (!hit) return esc(displayValue || '-');
+            const hasVal = hit.rawValue !== null && hit.rawValue !== undefined && hit.rawValue !== '';
+            const tooltip = hasVal ? `${hit.reason} (value: ${hit.rawValue})` : hit.reason;
+            return `<span class="dq-badge" title="${esc(tooltip)}">${esc(displayValue || 'Not set')}</span>`;
+        };
+
         const dqRows = missingDataItems.map((x) => [
             x.emp.code || "-",
             x.emp.name || "-",
             x.emp.dept || "-",
             x.emp.company || "-",
             x.emp.designation || "-",
-            x.missingFields.join(", "),
+            flagCell(x.issues, 'Team', x.emp.teamName),
+            flagCell(x.issues, 'Shift Group', x.emp.shiftGroupName),
+            `<span class="dq-count ${severityClass(x.issues.length)}">${x.issues.length}</span>`,
+            renderIssueBadges(x.issues),
         ]);
 
         this._currentDataQualityRows = dqRows;
 
-        const dqHeaders = ["Code", "Name", "Dept", "Company", "Designation", "Missing Fields"];
+        const dqHeaders = ["Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "Issues", "Missing / Invalid Fields"];
         const pageSize = 10;
 
         return {
             html: `
                 <h2 class="section-title"><i class="ph-fill ph-database"></i> Data Quality Alerts</h2>
                 <div class="table-wrap">
-                    <div class="table-header"><h3>⚠️ Employees with Missing Critical Data</h3></div>
+                    <div class="table-header">
+                        <h3>⚠️ Employees with Missing Critical Data (${missingDataItems.length})</h3>
+                    </div>
                     <div id="dq-table-wrap" style="overflow-x:auto">
                         ${this._buildPaginatedTable(dqRows, dqHeaders, dqPage, pageSize, "tbl-dq", "_reRenderDataQualityPage")}
                     </div>
                 </div>
+                <style>
+                    .dq-badge{display:inline-block;padding:2px 8px;margin:2px;border-radius:12px;
+                        background:#fdecea;color:#c0392b;font-size:11px;white-space:nowrap;cursor:help;}
+                    .dq-count{display:inline-block;min-width:22px;padding:2px 6px;border-radius:10px;
+                        text-align:center;font-weight:600;color:#fff;}
+                    .dq-severity-low{background:#f0ad4e;}
+                    .dq-severity-med{background:#e67e22;}
+                    .dq-severity-high{background:#c0392b;}
+                </style>
             `,
             renderCharts: () => { },
         };
     }
+
 
     _reRenderDataQualityPage(page) {
         const rows = this._currentDataQualityRows || [];
