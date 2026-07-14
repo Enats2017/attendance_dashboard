@@ -1839,7 +1839,7 @@ class AttendanceView {
 
     _renderShiftSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
-        const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
+        const dayLogs = this._buildShiftStatsLogs(emps, logs, dateFrom, dateTo);
         this._currentShiftSummaryData = { emps, model, dayLogs, empMap };
 
         const shiftStats = model.state.data.shiftStats || [];
@@ -3292,6 +3292,111 @@ class AttendanceView {
             const status = r.status || "No Status";
             statusCounts[status] = (statusCounts[status] || 0) + 1;
         });
+
+        return result;
+    }
+
+
+    _buildShiftStatsLogs(emps, logs, dateFrom, dateTo) {
+       const logMap = {};
+        logs.forEach((l) => {
+            const key = `${l.empId}_${l.date}`;
+            const existing = logMap[key];
+
+            if (!existing || Number(l.present) > Number(existing.present)) {
+                logMap[key] = l;
+            }
+        });
+
+        const dates = this._getDateRange(dateFrom, dateTo);
+        const result = [];
+
+        const singlePunchKeys = window.AppController?.model?.state?.data?.singlePunchKeys || new Set();
+        const singlePunchData = window.AppController?.model?.state?.data?.singlePunchData || {};
+
+        emps.forEach((emp) => {
+            dates.forEach((date) => {
+                const key = `${emp.id}_${date}`;
+                const log = logMap[key];
+
+                if (singlePunchKeys.has(key)) {
+                    const punch = singlePunchData[key] || {};
+                    result.push({
+                        empId: emp.id,
+                        date,
+                        inTime: punch.direction === "in" ? punch.time : log?.inTime || null,
+                        outTime: punch.direction === "out" ? punch.time : log?.outTime || null,
+                        status: "Single Punch",
+                        detailedStatus: "Single Punch",
+                        detailedStatusCode: "SP",
+                        present: 0,
+                        absent: 0,
+                        weeklyOff: 0,
+                        holiday: 0,
+                        isOnLeave: 0,
+                        hoursWorked: log?.hoursWorked || 0,
+                        lateBy: 0,
+                        earlyBy: 0,
+                        shiftId: log?.shiftId ?? emp.shiftId ?? null,
+                        shiftName: log?.shiftName ?? emp.shift ?? "No Shift",
+                        shiftGroupName: log?.shiftGroupName ?? emp.shiftGroupName ?? "",
+                        shiftStart: punch.shiftStart ?? log?.shiftStart ?? emp.shiftStart ?? null,
+                        shiftEnd: punch.shiftEnd ?? log?.shiftEnd ?? emp.shiftEnd ?? null,
+                    });
+
+                    return;
+                }
+
+                if (log) {
+                    result.push({
+                        ...log,
+                        shiftId: log.shiftId ?? emp.shiftId ?? null,
+                        shiftName: log.shiftName ?? emp.shift ?? "NoShift",
+                        shiftGroupName: log.shiftGroupName ?? emp.shiftGroupName ?? "",
+                        shiftStart: log.shiftStart ?? emp.shiftStart ?? null,
+                        shiftEnd: log.shiftEnd ?? emp.shiftEnd ?? null,
+                    });
+
+                    return;
+                }
+
+                result.push({
+                    empId: emp.id,
+                    date,
+                    inTime: null,
+                    outTime: null,
+                    status: "Absent",
+                    detailedStatus: "Absent",
+                    detailedStatusCode: "A",
+                    present: 0,
+                    absent: 1,
+                    weeklyOff: 0,
+                    holiday: 0,
+                    isOnLeave: 0,
+                    hoursWorked: 0,
+                    lateBy: 0,
+                    earlyBy: 0,
+                    missedInPunch: 0,
+                    missedOutPunch: 0,
+                    shiftId: emp.shiftId ?? null,
+                    shiftName: emp.shift ?? "NoShift",
+                    shiftGroupName: emp.shiftGroupName ?? "",
+                    shiftStart: emp.shiftStart ?? null,
+                    shiftEnd: emp.shiftEnd ?? null,
+                });
+            });
+        });
+
+        const duplicateMap = {};
+        result.forEach((r) => {
+            const key = `${r.empId}_${r.date}`;
+            duplicateMap[key] = (duplicateMap[key] || 0) + 1;
+        });
+
+        const duplicateCount = Object.values(duplicateMap).filter(c => c > 1).length;
+
+        console.log("Shift Stats Logs:", result.length);
+        console.log("Duplicate Employee-Date:", duplicateCount);
 
         return result;
     }
@@ -5201,7 +5306,8 @@ class AttendanceView {
                 </button>
             `;
         }
-        const fullLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
+
+        const fullLogs = this._buildShiftStatsLogs(emps, logs, dateFrom, dateTo);
 
         return {
             html: `
@@ -5249,9 +5355,7 @@ class AttendanceView {
                     "Shift Attendance",
                     (shiftName, index, seriesIndex, seriesName) => {
                         const filteredLogs = fullLogs.filter((l) => {
-                            const e = empMap[l.empId];
-                            if (!e) return false;
-                            if ((l.shiftName || "No Shift") !== shiftName) return false;
+                            if ((l.shiftName || "NoShift") !== shiftName) { return false; }
                             return this._matchesStatus(l, seriesName);
                         });
 

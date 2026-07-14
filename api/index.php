@@ -435,7 +435,6 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
     $shiftStats = [];
     $logKeyMap = [];
 
-    // Map of empId_date => that day's log row (first one wins if duplicates)
     foreach ($logs as $log) {
         $key = $log['empId'] . '_' . $log['date'];
         if (!isset($logKeyMap[$key])) {
@@ -443,17 +442,13 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
         }
     }
 
-    // Map of empId_date => which shift they were on that day
-    // FIX #2: we now store shiftId as the grouping key (not shiftName)
     $shiftLookup = [];
-
     foreach ($logs as $log) {
         $key = $log['empId'] . '_' . $log['date'];
 
-        // FIX #3 support: treat missing/0 shiftId as "no shift" bucket, using a safe string key
-        $shiftId = !empty($log['shiftId']) ? $log['shiftId'] : 'no_shift';
-        $shiftName = $log['shiftName'] ?: 'No Shift';
-        $shiftCode = $log['shiftCode'] ?: null;
+        $shiftId = !empty($log['shiftId']) ? $log['shiftId'] : 3;
+        $shiftName = $log['shiftName'] ?: 'NoShift';
+        $shiftCode = $log['shiftCode'] ?: 'NS';
 
         $shiftLookup[$key] = [
             'shiftId'   => $shiftId,
@@ -489,9 +484,16 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
             $key = $empId . '_' . $dateStr;
 
             if (!isset($shiftLookup[$key])) {
-                $shiftId   = !empty($e['shiftId']) ? $e['shiftId'] : 'no_shift';
-                $shiftName = $e['shift'] ?: 'No Shift';
-                $shiftCode = null;
+                if (!empty($e['shiftId'])) {
+                    $shiftId   = $e['shiftId'];
+                    $shiftName = $e['shift'];
+                    $shiftCode = null;
+                } else {
+                    // Normalize all missing shifts to the official NoShift bucket
+                    $shiftId   = 3;
+                    $shiftName = 'NoShift';
+                    $shiftCode = 'NS';
+                }
                 
                 if (!isset($shiftStats[$shiftId])) {
                     $shiftStats[$shiftId] = [
@@ -528,7 +530,6 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
 
                 switch ($code) {
                     case 'P':
-                    case 'D.P':
                         $shiftStats[$shiftId]['present']++;
                         break;
 
@@ -1170,9 +1171,9 @@ function handleDashboardData($input, $returnData = false) {
             'earlyBy' => 0,
             'missedInPunch' => 0,                  
             'missedOutPunch' => 0,   
-            'shiftId' => null,
-            'shiftName' => 'No Shift',
-            'shiftCode' => null,
+            'shiftId' => 3,
+            'shiftName' => 'NoShift',
+            'shiftCode' => 'NS',
             'shiftStart' => null,
             'shiftEnd' => null,
         ];
@@ -1327,7 +1328,6 @@ function handleDashboardData($input, $returnData = false) {
         $isWeeklyOff = intval($log['weeklyOff']) === 1;
 
         switch ($code) {
-
             case 'P':
                 $statusKeyMap[$key] = 'present';
                 break;
@@ -1344,15 +1344,11 @@ function handleDashboardData($input, $returnData = false) {
                 break;
 
             case 'WOP':
-                $statusKeyMap[$key] = $isWeeklyOff
-                    ? 'weeklyOffPresent'
-                    : 'present';
+                $statusKeyMap[$key] = $isWeeklyOff? 'weeklyOffPresent': 'present';
                 break;
 
             case '½PLD(WO)':
-                $statusKeyMap[$key] = $isWeeklyOff
-                    ? 'weeklyOffHalfPresent'
-                    : 'halfPresent';
+                $statusKeyMap[$key] = $isWeeklyOff ? 'weeklyOffHalfPresent' : 'halfPresent';
                 break;
 
             case 'A':
