@@ -5988,7 +5988,7 @@ class AttendanceView {
                         <td>${emp.designation || "–"}</td>
                         <td>${emp.teamName || "-"}</td>
                         <td>${emp.shiftGroupName || "–"}</td>
-                        <td>${emp.shift || "–"}</td>
+                        <td>${log?.shiftName || emp?.shift || "–"}</td>
                         <td>${log?.shiftStart || emp?.shiftStart || "–"}</td>
                         <td>${log?.shiftEnd || emp?.shiftEnd || "–"}</td>
                         <td>${this._formatDate(date || log?.date || "")}</td>
@@ -6055,7 +6055,7 @@ class AttendanceView {
                     <td>${emp.designation || "–"}</td>
                     <td>${emp.teamName || "-"}</td>
                     <td>${emp.shiftGroupName || "–"}</td>
-                    <td>${emp.shift || "–"}</td>
+                    <td>${log?.shiftName || emp?.shift || "–"}</td>
                     <td>${log?.shiftStart || emp?.shiftStart || "–"}</td>
                     <td>${log?.shiftEnd || emp?.shiftEnd || "–"}</td>
                     <td>${this._formatDate(date || log?.date || "")}</td>
