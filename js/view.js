@@ -2280,7 +2280,7 @@ class AttendanceView {
         const { dayLogs, empMap } = data;
         const shiftLogs = dayLogs.filter((l) => {
             const e = empMap[l.empId];
-            if (!e || (e.shift || "No Shift") !== shiftName) return false;
+            if (!e || (l.shiftName || "No Shift") !== shiftName) return false;
             return (this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present"));
         });
 
@@ -3228,6 +3228,8 @@ class AttendanceView {
                         hoursWorked: log ? (log.hoursWorked || 0) : 0,
                         lateBy: 0,
                         earlyBy: 0,
+                        shiftId: (log ? log.shiftId : e.shiftId) || null,
+                        shiftName: (log && log.shiftName) || e.shift || "No Shift",
                         shiftStart: punchInfo.shiftStart || (log ? log.shiftStart : null),
                         shiftEnd: punchInfo.shiftEnd || (log ? log.shiftEnd : null),
                     });
@@ -3255,6 +3257,7 @@ class AttendanceView {
                         shiftStart: e.shiftStart || null,
                         shiftEnd: e.shiftEnd || null,
                         shiftGroupName: e.shiftGroupName || null,
+                        shiftName: e.shift || "No Shift",
                     });
                 }
             });
@@ -3715,7 +3718,7 @@ class AttendanceView {
                     <td>${e.company || "–"}</td>
                     <td>${e.teamName || "–"}</td>
                     <td>${e.shiftGroupName || "–"}</td>
-                    <td>${e.shift || "–"}</td>
+                    <td>${l.shiftName || e.shift || "–"}</td>
                     <td>${l.shiftStart || "–"}</td>
                     <td>${l.shiftEnd || "–"}</td>
                     <td>${this._formatDate(l.date)}</td>
@@ -5248,7 +5251,7 @@ class AttendanceView {
                         const filteredLogs = fullLogs.filter((l) => {
                             const e = empMap[l.empId];
                             if (!e) return false;
-                            if (e.shift !== shiftName) return false;
+                            if ((l.shiftName || "No Shift") !== shiftName) return false;
                             return this._matchesStatus(l, seriesName);
                         });
 

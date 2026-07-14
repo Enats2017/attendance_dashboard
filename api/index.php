@@ -435,37 +435,43 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
     $shiftStats = [];
     $logKeyMap = [];
 
+    // Map of empId_date => that day's log row (first one wins if duplicates)
     foreach ($logs as $log) {
         $key = $log['empId'] . '_' . $log['date'];
-
         if (!isset($logKeyMap[$key])) {
             $logKeyMap[$key] = $log;
         }
     }
 
+    // Map of empId_date => which shift they were on that day
+    // FIX #2: we now store shiftId as the grouping key (not shiftName)
     $shiftLookup = [];
 
     foreach ($logs as $log) {
         $key = $log['empId'] . '_' . $log['date'];
 
+        // FIX #3 support: treat missing/0 shiftId as "no shift" bucket, using a safe string key
+        $shiftId = !empty($log['shiftId']) ? $log['shiftId'] : 'no_shift';
+        $shiftName = $log['shiftName'] ?: 'No Shift';
+        $shiftCode = $log['shiftCode'] ?: null;
+
         $shiftLookup[$key] = [
-            'shiftId' => $log['shiftId'],
-            'shiftCode' => $log['shiftCode'],
-            'shiftName' => $log['shiftName']
+            'shiftId'   => $shiftId,
+            'shiftCode' => $shiftCode,
+            'shiftName' => $shiftName
         ];
 
-        if (!isset($shiftStats[$log['shiftName']])) {
-            $shiftStats[$log['shiftName']] = [
-                'shiftCode' => $log['shiftCode'],
-                'shiftName' => $log['shiftName'],
+        // FIX #2: bucket is now keyed by shiftId, not shiftName
+        if (!isset($shiftStats[$shiftId])) {
+            $shiftStats[$shiftId] = [
+                'shiftCode' => $shiftCode,
+                'shiftName' => $shiftName,
                 'total' => 0,
                 'present' => 0,
                 'weeklyOffPresent' => 0,
                 'halfPresent' => 0,
                 'weeklyOffHalfPresent' => 0,
                 'weeklyOff' => 0,
-                // 'holiday' => 0,
-                // 'leave' => 0,
                 'singlePunch' => 0,
                 'absent' => 0
             ];
@@ -483,14 +489,35 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
             $key = $empId . '_' . $dateStr;
 
             if (!isset($shiftLookup[$key])) {
+                $shiftId   = !empty($e['shiftId']) ? $e['shiftId'] : 'no_shift';
+                $shiftName = $e['shift'] ?: 'No Shift';
+                $shiftCode = null;
+                
+                if (!isset($shiftStats[$shiftId])) {
+                    $shiftStats[$shiftId] = [
+                        'shiftCode' => $shiftCode,
+                        'shiftName' => $shiftName,
+                        'total' => 0,
+                        'present' => 0,
+                        'weeklyOffPresent' => 0,
+                        'halfPresent' => 0,
+                        'weeklyOffHalfPresent' => 0,
+                        'weeklyOff' => 0,
+                        'singlePunch' => 0,
+                        'absent' => 0
+                    ];
+                }
+
+                $shiftStats[$shiftId]['total']++;
+                $shiftStats[$shiftId]['absent']++;
                 continue;
             }
 
-            $shiftName = $shiftLookup[$key]['shiftName'];
-            $shiftStats[$shiftName]['total']++;
+            $shiftId = $shiftLookup[$key]['shiftId'];
+            $shiftStats[$shiftId]['total']++;
 
             if (isset($singlePunchData[$key])) {
-                $shiftStats[$shiftName]['singlePunch']++;
+                $shiftStats[$shiftId]['singlePunch']++;
                 continue;
             }
 
@@ -501,44 +528,45 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
 
                 switch ($code) {
                     case 'P':
-                        $shiftStats[$shiftName]['present']++;
+                    case 'D.P':
+                        $shiftStats[$shiftId]['present']++;
                         break;
 
                     case '½PLD':
                     case 'L_CL':
                     case '½PCL':
                     case '½PLD(HO)':
-                        $shiftStats[$shiftName]['halfPresent']++;
+                        $shiftStats[$shiftId]['halfPresent']++;
                         break;
 
                     case 'WO':
-                        $shiftStats[$shiftName]['weeklyOff']++;
+                        $shiftStats[$shiftId]['weeklyOff']++;
                         break;
 
                     case 'WOP':
                         if ($isWeeklyOff) {
-                            $shiftStats[$shiftName]['weeklyOffPresent']++;
+                            $shiftStats[$shiftId]['weeklyOffPresent']++;
                         } else {
-                            $shiftStats[$shiftName]['present']++;
+                            $shiftStats[$shiftId]['present']++;
                         }
                         break;
 
                     case '½PLD(WO)':
                         if ($isWeeklyOff) {
-                            $shiftStats[$shiftName]['weeklyOffHalfPresent']++;
+                            $shiftStats[$shiftId]['weeklyOffHalfPresent']++;
                         } else {
-                            $shiftStats[$shiftName]['halfPresent']++;
+                            $shiftStats[$shiftId]['halfPresent']++;
                         }
                         break;
 
                     case 'A':
                     case 'ALD':
                     case 'WOA':
-                        $shiftStats[$shiftName]['absent']++;
+                        $shiftStats[$shiftId]['absent']++;
                         break;
 
                     default:
-                        $shiftStats[$shiftName]['absent']++;
+                        $shiftStats[$shiftId]['absent']++;
                         break;
                 }
             }
@@ -546,13 +574,13 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
                 $stat = $deviceEmployeeStats[$key];
 
                 if (($stat['inCount'] ?? 0) >= 1 && ($stat['outCount'] ?? 0) >= 1) {
-                    $shiftStats[$shiftName]['present']++;
+                    $shiftStats[$shiftId]['present']++;
                 } else {
-                    $shiftStats[$shiftName]['absent']++;
+                    $shiftStats[$shiftId]['absent']++;
                 }
             }
             else {
-                $shiftStats[$shiftName]['absent']++;
+                $shiftStats[$shiftId]['absent']++;
             }
         }
     }
@@ -569,8 +597,6 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
             'halfPresent' => $row['halfPresent'],
             'weeklyOffHalfPresent' => $row['weeklyOffHalfPresent'],
             'weeklyOff' => $row['weeklyOff'],
-            // 'holiday' => $row['holiday'],
-            // 'leave' => $row['leave'],
             'singlePunch' => $row['singlePunch'],
             'absent' => $row['absent'],
             'rate' => $row['total'] > 0 ? round(($row['present'] / $row['total']) * 100) : 0
@@ -590,23 +616,6 @@ function getAllTeams($conn) {
         }
     }
     return $teamMap;
-}
-
-
-function categorizeCompanyEmail($email) {
-    $e = strtolower(trim($email ?? ''));
-    if ($e === '') {
-        return 'OTHER';
-    } if (strpos($e, 'contractor') !== false) {
-        return 'CONTRACTOR';
-    } if (strpos($e, 'on-roll') !== false || strpos($e, 'onroll') !== false) {
-        return 'ON-ROLL';
-    } if (strpos($e, 'outsource') !== false) {
-        return 'OUTSOURCE';
-    } if ($e === 'cc@gmail.com') {
-        return 'CC';
-    }
-    return 'OTHER';
 }
 
 
@@ -657,7 +666,7 @@ function handleDashboardData($input, $returnData = false) {
         }
     }
 
-    $sqlEmp = "SELECT E.EmployeeId, E.DepartmentId, E.ShiftGroupId, E.EmployeeName, E.EmployeeCode, E.Gender, E.DOB, E.CategoryId, E.Designation, E.DOJ, E.Team, DG.DesignationsName as DesignationName, ISNULL(DSO.SortOrder, 0) as designationSortOrder, ISNULL(DG.SortOrder, 0) as designationGlobalSortOrder, C.CompanyFName as company, C.CompanyeMail as companyEmail, L.LocationName as location, D.DepartmentFName as dept, D.std_hc FROM Employees E WITH (NOLOCK) LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId LEFT JOIN departmentDeginationSortOrder DSO WITH (NOLOCK) ON E.DepartmentId = DSO.DepartmentId AND E.Designation = DSO.DesignationId WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working'";
+    $sqlEmp = "SELECT E.EmployeeId, E.DepartmentId, E.ShiftGroupId, E.EmployeeName, E.EmployeeCode, E.Gender, E.DOB, E.CategoryId, E.Designation, E.DOJ, E.Team, DG.DesignationsName as DesignationName, ISNULL(DSO.SortOrder, 0) as designationSortOrder, ISNULL(DG.SortOrder, 0) as designationGlobalSortOrder, C.CompanyFName as company, C.CompanyeMail as companyEmail, Z.ZoneName as zoneName, L.LocationName as location, D.DepartmentFName as dept, D.std_hc FROM Employees E WITH (NOLOCK) LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Zones Z WITH (NOLOCK) ON C.ZoneId = Z.ZoneId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId LEFT JOIN departmentDeginationSortOrder DSO WITH (NOLOCK) ON E.DepartmentId = DSO.DepartmentId AND E.Designation = DSO.DesignationId WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working'";
 
     $paramsEmp = [];
     
@@ -684,6 +693,28 @@ function handleDashboardData($input, $returnData = false) {
     
     if ($stmtEmp) {
         while ($row = sqlsrv_fetch_array($stmtEmp, SQLSRV_FETCH_ASSOC)) {
+            $zoneName = strtoupper(trim($row['zoneName'] ?? ''));
+                switch ($zoneName) {
+                    case 'CONTRACTOR':
+                        $companyCategory = 'CONTRACTOR';
+                        break;
+                    case 'ONROLL':
+                        $companyCategory = 'ON-ROLL';
+                        break;
+                    case 'CC':
+                        $companyCategory = 'CC';
+                        break;
+                    case 'AUDITOR':
+                        $companyCategory = 'AUDITOR';
+                        break;
+                    case 'OUTSOURCE':
+                        $companyCategory = 'OUTSOURCE';
+                        break;
+                    default:
+                        $companyCategory = 'OTHER';
+                        break;
+                }
+
             $employees[] = [
                 'id' => (string)$row['EmployeeId'],
                 'code' => $row['EmployeeCode'],
@@ -697,7 +728,7 @@ function handleDashboardData($input, $returnData = false) {
                 'std_hc' => intval($row['std_hc']),
                 'company' => $row['company'] ?: 'Unknown',
                 'companyEmail' => $row['companyEmail'] ?? null,
-                'companyCategory' => categorizeCompanyEmail($row['companyEmail'] ?? null),
+                'companyCategory' => $companyCategory,
                 'categoryId' => intval($row['CategoryId']),
                 'categoryIdRaw' => $row['CategoryId'],                                        
                 'designationId' => intval($row['Designation']),
@@ -1139,7 +1170,7 @@ function handleDashboardData($input, $returnData = false) {
             'earlyBy' => 0,
             'missedInPunch' => 0,                  
             'missedOutPunch' => 0,   
-            'shiftId' => 3,
+            'shiftId' => null,
             'shiftName' => 'No Shift',
             'shiftCode' => null,
             'shiftStart' => null,
