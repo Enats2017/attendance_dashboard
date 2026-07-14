@@ -20,12 +20,14 @@ class AttendanceView {
             { id: "worker", label: "Workmen", icon: "ph-hard-hat" },
             { id: "resigned", label: "Resigned Employees", icon: "ph-user-minus", },
             { id: "newjoined", label: "New Joined", icon: "ph-user-plus" },
+            { id: "overtime", label: "Overtime", icon: "ph-hourglass-high" },
             { id: "special", label: "Critical Alerts", icon: "ph-warning-circle", },
             { id: "data_quality", label: "Employee Data Alerts", icon: "ph-database", },
             { id: "designation_order", label: "Designations Order", icon: "ph-sliders", },
             { id: "designation_families", label: "Designation Families", icon: "ph-cards", },
             { id: "sort_order", label: "Sort Order Settings", icon: "ph-sort-ascending", },
         ];
+
         this._lastData = {};
         this._renderToken = 0;
         this.LATE_THRESHOLD = 3;
@@ -77,6 +79,7 @@ class AttendanceView {
                                 ? "" : state.activeTab === "designation_order"
                                 ? "" : state.activeTab === "sort_order"
                                 ? "" : state.activeTab === "designation_families"
+                                ? "" : state.activeTab === "overtime"
                                 ? "" : state.activeTab === "feature"
                                 ? this._renderDashboardSummaryCards(emps, stats, model, logs, empMap) : this._renderSummaryCards(stats, emps, logs, empMap, model)
                         }
@@ -410,6 +413,7 @@ class AttendanceView {
             { key: "weeklyOffPresent", label: "WO Present", val: stats.weeklyOffPresent ?? 0, icon: "ph-calendar-check", cls: "success", },
             { key: "weeklyOffHalfPresent", label: "WO Half Present", val: stats.weeklyOffHalfPresent ?? 0, icon: "ph-calendar-check", cls: "warning", },
             { key: "singlePunch", label: "Single Punch", val: stats.singlePunch, icon: "ph-lightning", cls: "warning", },
+            { key: "manualPunch", label: "Manual Punch", val: model.getManualPunchEmployees().length, icon: "ph-pencil-simple", cls: "warning", },
             { key: "lateIn", label: "Late In", val: stats.lateIn, icon: "ph-clock-afternoon", cls: "info", },
             { key: "earlyOut", label: "Early Out", val: stats.earlyOut, icon: "ph-sign-out", cls: "accent", },
             { key: null, label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", },
@@ -2961,6 +2965,9 @@ class AttendanceView {
             case "newjoined":
                 content = this._renderJoinExitTab(model, "newjoined");
                 break;
+            case "overtime":
+                content = this._renderOvertime(logs, emps, empMap, model);
+                break;
             case "special":
                 content = this._renderSpecial(logs, emps, empMap, filters, model);
                 break;
@@ -3692,6 +3699,14 @@ class AttendanceView {
                                 <span class="stat-card-hint">↓ click to view</span>
                             </div>
                         </div>
+                        <div id="card-manual-punches" class="stat-card warning stat-card-clickable" style="flex:1; cursor:pointer;">
+                            <div class="stat-icon"><i class="ph ph-pencil-simple"></i></div>
+                            <div class="stat-content">
+                                <span class="stat-label">Manual Punches</span>
+                                <span class="stat-value">${AppController.model.getManualPunchEmployees().length}</span>
+                                <span class="stat-card-hint">↓ click to view</span>
+                            </div>
+                        </div>
                     </div>
                     <div style="flex:1; min-width:0;">
                         ${this._chartCard("ch-all-io", '<i class="ph-fill ph-chart-pie-slice"></i>', "sky", "In vs Out Distribution")}
@@ -3757,6 +3772,11 @@ class AttendanceView {
                 document.getElementById("card-total-out")?.addEventListener("click", () => {
                     const outPunchLogs = logs.filter(l => parseFloat(l.present) > 0 && l.missedInPunch != 1);
                     this._renderDrillDown(outPunchLogs, "Total Out Punches", empMap);
+                });
+
+                document.getElementById("card-manual-punches")?.addEventListener("click", () => {
+                    const items = AppController.model.getManualPunchEmployees();
+                    this._renderManualPunchDrilldown(items, "Manual Punches");
                 });
             },
         };
@@ -3964,6 +3984,133 @@ class AttendanceView {
         const m = document.getElementById("main-table-wrap");
         if (m) m.style.display = "";
     }
+
+
+    _renderManualPunchDrilldown(items, title, page = 1) {
+        this._manualPunchItems = items;
+        this._manualPunchTitle = title;
+
+        const container = document.getElementById("drilldown-table");
+        if (!container) return;
+        const mainWrap = document.getElementById("main-table-wrap");
+        if (mainWrap) mainWrap.style.display = "none";
+
+        if (!items || items.length === 0) {
+            container.innerHTML = `
+                <div class="drilldown-box">
+                    <div class="drilldown-header">
+                        <span class="drilldown-title">🔍 ${title}</span>
+                        <div class="drilldown-btn-group">
+                            <button class="btn-drill btn-drill-back" onclick="AppController.view.closeDrillDown()">← Back</button>
+                        </div>
+                    </div>
+                    <p style="padding:32px; color:#6b7280;">No manual punches found.</p>
+                </div>
+            `;
+            container.scrollIntoView({ behavior: "smooth", block: "start" });
+            return;
+        }
+
+        const pageSize = 25;
+        const currentPage = page;
+        const totalPages = Math.ceil(items.length / pageSize);
+        const pageItems = items.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+        const rows = pageItems.map(({ log, emp, date }, i) => `
+            <tr>
+                <td>${(currentPage - 1) * pageSize + i + 1}</td>
+                <td><b>${emp.code || "–"}</b></td>
+                <td>${emp.name || "–"}</td>
+                <td>${emp.dept || "–"}</td>
+                <td>${emp.company || "–"}</td>
+                <td>${this._formatDate(date)}</td>
+                <td>${log.inTime || "–"}</td>
+                <td>${log.outTime || "–"}</td>
+                <td>${log.punchDevicesName || "–"}</td>
+            </tr>
+        `).join("");
+
+        this._manualPunchExportData = items.map(({ log, emp, date }) => ({
+            Code: emp.code,
+            Name: emp.name,
+            Dept: emp.dept,
+            Company: emp.company,
+            Date: this._formatDate(date),
+            In: log.inTime,
+            Out: log.outTime,
+            Device: log.punchDevicesName,
+        }));
+
+        let pageButtons = "";
+        const startPage = Math.max(1, currentPage - 2);
+        const endPage = Math.min(totalPages, currentPage + 2);
+        for (let i = startPage; i <= endPage; i++) {
+            pageButtons += `
+                <button class="btn-page ${i === currentPage ? "btn-page-active" : ""}"
+                    onclick="AppController.view._renderManualPunchDrilldown(AppController.view._manualPunchItems, AppController.view._manualPunchTitle, ${i})">
+                    ${i}
+                </button>
+            `;
+        }
+
+        container.innerHTML = `
+            <div class="drilldown-box">
+                <div class="drilldown-header">
+                    <div class="drilldown-title">
+                        🔍 ${title}
+                        <small>${items.length} records</small>
+                    </div>
+                    <div class="drilldown-btn-group">
+                        <button class="btn-drill btn-drill-excel"
+                            onclick="AppController.view.exportExcel(AppController.view._manualPunchExportData, 'manual-punches')">
+                            ↓ Excel
+                        </button>
+                        <button class="btn-drill btn-drill-back" onclick="AppController.view.closeDrillDown()">
+                            ← Back
+                        </button>
+                    </div>
+                </div>
+
+                <div style="overflow-x:auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Sr.No</th>
+                                <th>Code</th>
+                                <th>Name</th>
+                                <th>Dept</th>
+                                <th>Company</th>
+                                <th>Date</th>
+                                <th>In</th>
+                                <th>Out</th>
+                                <th>Device</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+
+                <div class="pagination-bar">
+                    <div class="pagination-text">
+                        Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, items.length)} of ${items.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
+                    </div>
+                    <div class="pagination-buttons">
+                        <button class="btn-page" ${currentPage === 1 ? "disabled" : ""}
+                            onclick="AppController.view._renderManualPunchDrilldown(AppController.view._manualPunchItems, AppController.view._manualPunchTitle, 1)">«</button>
+                        <button class="btn-page" ${currentPage === 1 ? "disabled" : ""}
+                            onclick="AppController.view._renderManualPunchDrilldown(AppController.view._manualPunchItems, AppController.view._manualPunchTitle, ${currentPage - 1})">‹</button>
+                        ${pageButtons}
+                        <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""}
+                            onclick="AppController.view._renderManualPunchDrilldown(AppController.view._manualPunchItems, AppController.view._manualPunchTitle, ${currentPage + 1})">›</button>
+                        <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""}
+                            onclick="AppController.view._renderManualPunchDrilldown(AppController.view._manualPunchItems, AppController.view._manualPunchTitle, ${totalPages})">»</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        container.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
 
     _escapeAttr(str) {
         return String(str).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -5365,6 +5512,57 @@ class AttendanceView {
             },
         };
     }
+
+
+    _renderOvertime(logs, emps, empMap, model, page = 1) {
+        this._currentOvertimeItems = model.getOvertimeEmployees();
+        this._currentOvertimeEmpMap = empMap;
+        const shiftOT = model.getOvertimeByShift();
+
+        this._lastData["overtime"] = this._currentOvertimeItems.map(({ log, emp, date }) => ({
+            Code: emp.code,
+            Name: emp.name,
+            Dept: emp.dept,
+            Company: emp.company,
+            Shift: log.shiftName || emp.shift || 'No Shift',
+            Date: this._formatDate(date),
+            In: log.inTime,
+            Out: log.outTime,
+            OvertimeMinutes: log.overtime,
+            OvertimeHours: (log.overtime / 60).toFixed(2)
+        }));
+
+        const rows = shiftOT.map(s => [s.shiftName, s.empCount, s.recordCount, s.totalHours + 'h']);
+
+        return {
+            html: `
+                <h2 class="section-title"><i class="ph-fill ph-hourglass-high"></i> Overtime</h2>
+                <div class="charts-grid">
+                    ${this._chartCard("ch-ot-shift", '<i class="ph-fill ph-chart-bar"></i>', "warning", "Overtime Hours by Shift", "Click bar for employee list")}
+                </div>
+                <div id="main-table-wrap">
+                    ${this._tableHTML("tbl-ot", ["Shift", "Employees", "OT Records", "Total OT Hours"], rows, "overtime")}
+                </div>
+                <div id="drilldown-table" style="margin-top:16px"></div>
+            `,
+            renderCharts: () => {
+                Charts.stacked(
+                    "ch-ot-shift",
+                    shiftOT.map(s => s.shiftName),
+                    [{ name: "OT Hours", data: shiftOT.map(s => s.totalHours) }],
+                    "Overtime by Shift",
+                    (shiftName) => {
+                        const shiftItems = this._currentOvertimeItems.filter(it =>
+                            (it.log.shiftName || it.emp.shift || 'No Shift') === shiftName
+                        );
+                        const shiftLogs = shiftItems.map(it => it.log);
+                        this._renderDrillDown(shiftLogs, `Overtime — Shift: ${shiftName}`, empMap);
+                    }
+                );
+            }
+        };
+    }
+
 
     _reRenderShiftWisePage(page) {
         const content = this._renderShiftWise(

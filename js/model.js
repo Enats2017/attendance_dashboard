@@ -535,6 +535,7 @@ class AttendanceModel {
             weeklyOff: todayStats?.weeklyOff ?? 0,
             absent: todayStats?.absent ?? 0,
             singlePunch: todayStats?.singlePunch ?? 0,
+            manualPunch: todayStats?.manualPunch ?? 0,
             lateIn: todayStats?.lateIn ?? 0,
             earlyOut: todayStats?.earlyOut ?? 0,
             avgHours: todayStats?.avgHours ?? 0,
@@ -744,6 +745,68 @@ class AttendanceModel {
 
         result.sort((a, b) => b.date.localeCompare(a.date));
         return result;
+    }
+
+
+    getManualPunchEmployees() {
+        const { logs, empMap } = this.getFilteredData();
+        const result = logs.filter(l => l.isManualPunch === 1).map(log => ({
+            log,
+            emp: empMap[log.empId],
+            date: log.date
+        })).filter(item => !!item.emp);
+        result.sort((a, b) => b.date.localeCompare(a.date));
+        return result;
+    }
+
+
+    getOvertimeEmployees() {
+        const { filters } = this.state;
+        const { logs, emps } = this.getFilteredData();
+        const fromStr = filters.dateFrom;
+        const toStr = filters.dateTo;
+
+        const logMap = {};
+        logs.forEach(l => {
+            if ((l.overtime || 0) > 0) {
+                logMap[l.empId + '_' + l.date] = l;
+            }
+        });
+
+        const result = [];
+        emps.forEach(emp => {
+            const from = new Date(fromStr);
+            const to = new Date(toStr);
+            for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+                const dateStr = d.toISOString().slice(0, 10);
+                const log = logMap[emp.id + '_' + dateStr];
+                if (log) result.push({ log, emp, date: dateStr });
+            }
+        });
+
+        result.sort((a, b) => b.date.localeCompare(a.date));
+        return result;
+    }
+
+    getOvertimeByShift() {
+        const items = this.getOvertimeEmployees();
+        const groups = {};
+        items.forEach(({ log, emp }) => {
+            const shiftName = log.shiftName || emp.shift || 'No Shift';
+            if (!groups[shiftName]) {
+                groups[shiftName] = { shiftName, totalMinutes: 0, empSet: new Set(), recordCount: 0 };
+            }
+            groups[shiftName].totalMinutes += (log.overtime || 0);
+            groups[shiftName].empSet.add(emp.id);
+            groups[shiftName].recordCount++;
+        });
+        return Object.values(groups).map(g => ({
+            shiftName: g.shiftName,
+            totalMinutes: g.totalMinutes,
+            totalHours: +(g.totalMinutes / 60).toFixed(2),
+            empCount: g.empSet.size,
+            recordCount: g.recordCount
+        })).sort((a, b) => b.totalMinutes - a.totalMinutes);
     }
 
 

@@ -882,7 +882,7 @@ function handleDashboardData($input, $returnData = false) {
         $tableExists = isset($allTableNames[$logTable]);
 
         if ($tableExists) {
-            $sqlLogs = "SELECT A.EmployeeId, A.AttendanceDate, A.InTime, A.OutTime, A.Status, A.DetailedStatus, A.DetailedStatusCode, A.Duration, A.LateBy, A.EarlyBy, A.ComplinFreeLateBy, A.ComplinFreeEarlyBy, A.Present, A.Absent, A.WeeklyOff, A.Holiday, A.IsOnLeave, A.IsPartialDay, A.MissedInPunch, A.MissedOutPunch, A.PunchRecords, A.ReportPunchRecords, A.PunchDirections, A.ShiftId, S.ShiftCode, S.ShiftName, S.BeginTime, S.EndTime FROM $logTable A WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON A.EmployeeId = E.EmployeeId LEFT JOIN Shifts S WITH (NOLOCK) ON A.ShiftId = S.ShiftId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND A.AttendanceDate >= '$dayFrom' AND A.AttendanceDate <= '$dayTo 23:59:59' AND E.Status = 'Working'";
+            $sqlLogs = "SELECT A.EmployeeId, A.AttendanceDate, A.InTime, A.OutTime, A.Status, A.DetailedStatus, A.DetailedStatusCode, A.Duration, A.LateBy, A.EarlyBy, A.ComplinFreeLateBy, A.ComplinFreeEarlyBy, A.Present, A.Absent, A.WeeklyOff, A.Holiday, A.IsOnLeave, A.IsPartialDay, A.MissedInPunch, A.MissedOutPunch, A.PunchRecords, A.ReportPunchRecords, A.PunchDirections, A.ShiftId, A.InDeviceId, A.OutDeviceId, A.PunchDevicesName, A.LastUpdatedOn, A.OverTime, S.ShiftCode, S.ShiftName, S.BeginTime, S.EndTime FROM $logTable A WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON A.EmployeeId = E.EmployeeId LEFT JOIN Shifts S WITH (NOLOCK) ON A.ShiftId = S.ShiftId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND A.AttendanceDate >= '$dayFrom' AND A.AttendanceDate <= '$dayTo 23:59:59' AND E.Status = 'Working'";
 
             $paramsLogs = [];
             
@@ -906,7 +906,8 @@ function handleDashboardData($input, $returnData = false) {
             if ($stmtLogs) {
                 while ($row = sqlsrv_fetch_array($stmtLogs, SQLSRV_FETCH_ASSOC)) {
                     $status = $row['Status'] ?: 'Absent';
-
+                    $outDeviceId = intval($row['OutDeviceId'] ?? 0);
+                    
                     $logs[] = [
                         'empId' => (string)$row['EmployeeId'],
                         'date' => $row['AttendanceDate'] ? $row['AttendanceDate']->format('Y-m-d') : null,
@@ -933,7 +934,13 @@ function handleDashboardData($input, $returnData = false) {
                         'shiftName' => $row['ShiftName'],
                         'shiftCode' => $row['ShiftCode'],
                         'shiftStart' => $row['BeginTime'] ? (is_object($row['BeginTime']) ? $row['BeginTime']->format('H:i') : $row['BeginTime']) : null,
-                        'shiftEnd' => $row['EndTime'] ? (is_object($row['EndTime']) ? $row['EndTime']->format('H:i') : $row['EndTime']) : null
+                        'shiftEnd' => $row['EndTime'] ? (is_object($row['EndTime']) ? $row['EndTime']->format('H:i') : $row['EndTime']) : null,
+                        'inDeviceId' => intval($row['InDeviceId'] ?? 0),
+                        'outDeviceId' => $outDeviceId,
+                        'punchDevicesName' => trim($row['PunchDevicesName'] ?? ''),
+                        'lastUpdatedOn' => $row['LastUpdatedOn'] ? (is_object($row['LastUpdatedOn']) ? $row['LastUpdatedOn']->format('Y-m-d H:i:s') : $row['LastUpdatedOn']) : null,
+                        'isManualPunch' => ($outDeviceId === 5) ? 1 : 0,
+                        'overtime' => intval($row['OverTime'] ?? 0), 
                     ];
                 }
             }
@@ -1176,6 +1183,7 @@ function handleDashboardData($input, $returnData = false) {
             'shiftCode' => 'NS',
             'shiftStart' => null,
             'shiftEnd' => null,
+            'overtime' => 0,
         ];
 
         $employeesInAttendanceLogs[$key] = true;
@@ -1296,6 +1304,7 @@ function handleDashboardData($input, $returnData = false) {
 	$earlyOut = 0;
 	$totalHours = 0;
 	$hoursCount = 0;
+    $manualPunchCount = 0;  
 	foreach ($logs as $log) {
 		if (($log['lateBy'] ?? 0) > 0) {
 			$lateIn++;
@@ -1309,6 +1318,9 @@ function handleDashboardData($input, $returnData = false) {
 		if ($log['hoursWorked'] > 0) {
 			$hoursCount++;
 		}
+         if (!empty($log['isManualPunch'])) {  
+            $manualPunchCount++;              
+        }  
 	}
 
     $avgHours = $hoursCount > 0 ? round($totalHours / $hoursCount, 2) : 0;
@@ -1484,6 +1496,7 @@ function handleDashboardData($input, $returnData = false) {
             'absent' => $absentEmployees,
             'total' => $totalEmployees,
             'singlePunch' => $singlePunch,
+            'manualPunch' => $manualPunchCount,
             'lateIn' => $lateIn,
             'earlyOut' => $earlyOut,
             'avgHours' => $avgHours,

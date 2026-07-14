@@ -78,6 +78,9 @@ class AttendanceController {
                 case 'earlyOut':    
                     items = this.model.getEarlyOutEmployees();    
                     break;
+                case 'manualPunch':                                   
+                    items = this.model.getManualPunchEmployees();      
+                    break;           
                 case "staffList": {
                     const data = this.view._currentStaffSummaryData;
                     if (data && data.isDashboard) {
