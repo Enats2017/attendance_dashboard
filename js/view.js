@@ -3164,15 +3164,47 @@ class AttendanceView {
         }
     }
 
+    
     exportExcel(data, filename) {
         if (!window.XLSX) {
             return console.error("SheetJS not loaded");
         }
-        const ws = XLSX.utils.json_to_sheet(data);
+
+        const cleanData = data.map((row) => {
+            const cleaned = {};
+            Object.keys(row).forEach((key) => {
+                let val = row[key];
+                if (typeof val === "string") {
+                    val = val.trim().replace(/\s+/g, " "); 
+                }
+                cleaned[key] = val;
+            });
+            return cleaned;
+        });
+
+        const ws = XLSX.utils.json_to_sheet(cleanData, { cellText: false });
+
+        const range = XLSX.utils.decode_range(ws["!ref"]);
+        const headerRow = 0;
+        const codeColIndex = Object.keys(cleanData[0] || {}).findIndex((k) => k.toLowerCase() === "code");
+
+        if (codeColIndex !== -1) {
+            for (let r = range.s.r + 1; r <= range.e.r; r++) {
+                const cellRef = XLSX.utils.encode_cell({ r, c: codeColIndex });
+                const cell = ws[cellRef];
+                if (cell) {
+                    cell.t = "s";                 
+                    cell.z = "@";                 
+                    cell.v = String(cell.v ?? "").trim();
+                }
+            }
+        }
+
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Report");
         XLSX.writeFile(wb, `${filename}.xlsx`);
     }
+
 
     _countBy(arr, keyFn) {
         const out = {};

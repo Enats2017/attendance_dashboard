@@ -390,12 +390,7 @@ class AttendanceModel {
         const result = [];
         emps.forEach(emp => {
             const dates = (empLogs[emp.id] || []).sort();
-            const allDates = [];
-            const from = new Date(filters.dateFrom);
-            const to = new Date(filters.dateTo);
-            for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
-                allDates.push(d.toISOString().slice(0, 10));
-            }
+            const allDates = this._getDateRangeUTC(filters.dateFrom, filters.dateTo);
             let maxGap = 0, gap = 0, gapStart = null, maxGapStart = null;
             allDates.forEach(dt => {
                 if (dates.indexOf(dt) === -1) {
@@ -590,16 +585,14 @@ class AttendanceModel {
         const toStr = filters.dateTo;
         const result = [];
 
+        const dateRange = this._getDateRangeUTC(fromStr, toStr);
         emps.forEach(emp => {
-            const from = new Date(fromStr);
-            const to = new Date(toStr);
-            for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
-                const dateStr = d.toISOString().slice(0, 10);
+            dateRange.forEach(dateStr => {
                 const key = emp.id + '_' + dateStr;
                 if (statusKeyMap[key] === 'present') {
                     result.push({ log: logMap[key] || null, emp, date: dateStr });
                 }
-            }
+            });
         });
 
         result.sort((a, b) => b.date.localeCompare(a.date));
@@ -618,17 +611,15 @@ class AttendanceModel {
         const toStr = filters.dateTo;
         const result = [];
 
+        const dateRange = this._getDateRangeUTC(fromStr, toStr);
         emps.forEach(emp => {
-            const from = new Date(fromStr);
-            const to = new Date(toStr);
-            for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
-                const dateStr = d.toISOString().slice(0, 10);
+            dateRange.forEach(dateStr => {
                 const key = emp.id + '_' + dateStr;
                 const status = statusKeyMap[key] ?? 'absent';
                 if (status === 'absent') {
                     result.push({ log: logMap[key] || null, emp, date: dateStr });
                 }
-            }
+            });
         });
 
         result.sort((a, b) => b.date.localeCompare(a.date));
@@ -647,16 +638,14 @@ class AttendanceModel {
         const toStr = filters.dateTo;
         const result = [];
 
+        const dateRange = this._getDateRangeUTC(fromStr, toStr);
         emps.forEach(emp => {
-            const from = new Date(fromStr);
-            const to = new Date(toStr);
-            for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
-                const dateStr = d.toISOString().slice(0, 10);
+            dateRange.forEach(dateStr => {
                 const key = emp.id + '_' + dateStr;
                 if (statusKeyMap[key] === 'halfPresent') {
                     result.push({ log: logMap[key] || null, emp, date: dateStr });
                 }
-            }
+            });
         });
 
         result.sort((a, b) => b.date.localeCompare(a.date));
@@ -675,16 +664,14 @@ class AttendanceModel {
         const toStr = filters.dateTo;
         const result = [];
 
+        const dateRange = this._getDateRangeUTC(fromStr, toStr);
         emps.forEach(emp => {
-            const from = new Date(fromStr);
-            const to = new Date(toStr);
-            for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
-                const dateStr = d.toISOString().slice(0, 10);
+            dateRange.forEach(dateStr => {
                 const key = emp.id + '_' + dateStr;
                 if (statusKeyMap[key] === 'weeklyOff') {
                     result.push({ log: logMap[key] || null, emp, date: dateStr });
                 }
-            }
+            });
         });
 
         result.sort((a, b) => b.date.localeCompare(a.date));
@@ -705,14 +692,12 @@ class AttendanceModel {
         const toStr = filters.dateTo;
         const result = [];
 
+        const dateRange = this._getDateRangeUTC(fromStr, toStr);
         emps.forEach(emp => {
-            const from = new Date(fromStr);
-            const to = new Date(toStr);
-            for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
-                const dateStr = d.toISOString().slice(0, 10);
+            dateRange.forEach(dateStr => {
                 const key = emp.id + '_' + dateStr;
 
-                if (statusKeyMap[key] !== 'singlePunch') continue;
+                if (statusKeyMap[key] !== 'singlePunch') return;
 
                 if (singlePunchKeys.has(key)) {
                     // no real log row exists — build a synthetic one from singlePunchData
@@ -740,7 +725,7 @@ class AttendanceModel {
                 } else {
                     result.push({ log: logMap[key] || null, emp, date: dateStr });
                 }
-            }
+            });
         });
 
         result.sort((a, b) => b.date.localeCompare(a.date));
@@ -774,14 +759,12 @@ class AttendanceModel {
         });
 
         const result = [];
+        const dateRange = this._getDateRangeUTC(fromStr, toStr);
         emps.forEach(emp => {
-            const from = new Date(fromStr);
-            const to = new Date(toStr);
-            for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
-                const dateStr = d.toISOString().slice(0, 10);
+            dateRange.forEach(dateStr => {
                 const log = logMap[emp.id + '_' + dateStr];
                 if (log) result.push({ log, emp, date: dateStr });
-            }
+            });
         });
 
         result.sort((a, b) => b.date.localeCompare(a.date));
@@ -827,17 +810,15 @@ class AttendanceModel {
         const toStr = filters.dateTo;
         const result = [];
 
+        const dateRange = this._getDateRangeUTC(fromStr, toStr);
         emps.forEach(emp => {
-            const from = new Date(fromStr);
-            const to = new Date(toStr);
-            for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
-                const dateStr = d.toISOString().slice(0, 10);
+            dateRange.forEach(dateStr => {
                 const log = logMap[emp.id + '_' + dateStr];
 
                 if (log && (log.lateBy || 0) > 0) {
                     result.push({ log, emp, date: dateStr });
                 }
-            }
+            });
         });
 
         result.sort((a, b) => b.date.localeCompare(a.date));
@@ -872,17 +853,15 @@ class AttendanceModel {
         const toStr = filters.dateTo;
         const result = [];
 
+        const dateRange = this._getDateRangeUTC(fromStr, toStr);
         emps.forEach(emp => {
-            const from = new Date(fromStr);
-            const to = new Date(toStr);
-            for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
-                const dateStr = d.toISOString().slice(0, 10);
+            dateRange.forEach(dateStr => {
                 const log = logMap[emp.id + '_' + dateStr];
 
                 if (log && (log.earlyBy || 0) > 0) {
                     result.push({ log, emp, date: dateStr });
                 }
-            }
+            });
         });
 
         result.sort((a, b) => b.date.localeCompare(a.date));
@@ -1085,17 +1064,15 @@ class AttendanceModel {
 
         const result = [];
         
+        const dateRange = this._getDateRangeUTC(dateFrom, dateTo);
         staffEmps.forEach(emp => {
-            const from = new Date(dateFrom);
-            const to = new Date(dateTo);
-            for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
-                const dateStr = d.toISOString().slice(0, 10);
+            dateRange.forEach(dateStr => {
                 const key = emp.id + '_' + dateStr;
                 const status = statusMap[key];
                 if (status === 'present' || status === 'halfPresent') {
                     result.push({ log: logMap[key] || null, emp, date: dateStr });
                 }
-            }
+            });
         });
         
         result.sort((a, b) => b.date.localeCompare(a.date));
@@ -1113,17 +1090,15 @@ class AttendanceModel {
 
         const result = [];
 
+        const dateRange = this._getDateRangeUTC(dateFrom, dateTo);
         workerEmps.forEach(emp => {
-            const from = new Date(dateFrom);
-            const to = new Date(dateTo);
-            for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
-                const dateStr = d.toISOString().slice(0, 10);
+            dateRange.forEach(dateStr => {
                 const key = emp.id + '_' + dateStr;
                 const status = statusMap[key];
                 if (status === 'present' || status === 'halfPresent') {
                     result.push({ log: logMap[key] || null, emp, date: dateStr });
                 }
-            }
+            });
         });
         
         result.sort((a, b) => b.date.localeCompare(a.date));
@@ -1145,16 +1120,14 @@ class AttendanceModel {
         const toStr = filters.dateTo;
         const result = [];
 
+        const dateRange = this._getDateRangeUTC(fromStr, toStr);
         emps.forEach(emp => {
-            const from = new Date(fromStr);
-            const to = new Date(toStr);
-            for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
-                const dateStr = d.toISOString().slice(0, 10);
+            dateRange.forEach(dateStr => {
                 const key = emp.id + '_' + dateStr;
                 if (statusKeyMap[key] === 'weeklyOffPresent') {
                     result.push({ log: logMap[key] || null, emp, date: dateStr });
                 }
-            }
+            });
         });
 
         result.sort((a, b) => b.date.localeCompare(a.date));
@@ -1170,16 +1143,14 @@ class AttendanceModel {
         const toStr = filters.dateTo;
         const result = [];
 
+        const dateRange = this._getDateRangeUTC(fromStr, toStr);
         emps.forEach(emp => {
-            const from = new Date(fromStr);
-            const to = new Date(toStr);
-            for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
-                const dateStr = d.toISOString().slice(0, 10);
+            dateRange.forEach(dateStr => {
                 const key = emp.id + '_' + dateStr;
                 if (statusKeyMap[key] === 'weeklyOffHalfPresent') {
                     result.push({ log: logMap[key] || null, emp, date: dateStr });
                 }
-            }
+            });
         });
 
         result.sort((a, b) => b.date.localeCompare(a.date));
@@ -1249,6 +1220,22 @@ class AttendanceModel {
             }
         });
         return map;
+    }
+
+
+    _getDateRangeUTC(fromStr, toStr) {
+        const [fy, fm, fd] = fromStr.split('-').map(Number);
+        const [ty, tm, td] = toStr.split('-').map(Number);
+
+        let cur = new Date(Date.UTC(fy, fm - 1, fd));
+        const end = new Date(Date.UTC(ty, tm - 1, td));
+
+        const dates = [];
+        while (cur <= end) {
+            dates.push(cur.toISOString().slice(0, 10));
+            cur.setUTCDate(cur.getUTCDate() + 1);
+        }
+        return dates;
     }
 
 
