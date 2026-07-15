@@ -3616,6 +3616,8 @@ class AttendanceView {
                 l.earlyOut ? '<span class="badge badge-warning">Yes</span>' : "No",
                 `<span class="badge ${l.status === "Present" ? "badge-success" : "badge-danger"}">${l.status}</span>`,
                 l.detailedStatus || "-",
+                 this._formatDate(e.dobRaw),
+                (l.overtime || 0) > 0 ? this._fmtMins(l.overtime) : "-",
             ];
         });
 
@@ -3634,6 +3636,8 @@ class AttendanceView {
                 EarlyOut: Number(l.earlyBy) > 0 ? "Yes" : "No",
                 Status: l.status,
                 DetailedStatus: l.detailedStatus,
+                DOB: this._formatDate(e.dobRaw),
+                Overtime: l.overtime || 0,
             };
         });
 
@@ -3746,7 +3750,7 @@ class AttendanceView {
                 </div>
 
                 <div id="main-table-wrap">
-                    ${this._tableHTML("tbl-all", ["Code", "Name", "Dept", "Company", "Date", "In", "Out", "Hours", "Late In", "Early Out", "Status", "Detailed Status"], rows, "all-attendance", (currentPage - 1) * pageSize)}
+                    ${this._tableHTML("tbl-all", ["Code", "Name", "Dept", "Company", "Date", "In", "Out", "Hours", "Late In", "Early Out", "Status", "Detailed Status", "DOB", "Overtime"], rows, "all-attendance", (currentPage - 1) * pageSize)}
                     <div class="pagination-bar">
                         <div class="pagination-text">
                             Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, logs.length)} of ${logs.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
@@ -3888,6 +3892,8 @@ class AttendanceView {
                     <td>${(l.earlyBy || 0) > 0 ? this._fmtMins(l.earlyBy) : "-"}</td>
                     <td>${l.status}</td>
                     <td>${l.detailedStatus || "–"}</td>
+                    <td>${this._formatDate(e.dobRaw)}</td>
+                    <td>${(l.overtime || 0) > 0 ? this._fmtMins(l.overtime) : "–"}</td>
                 </tr>
             `;
         }).join("");
@@ -3911,6 +3917,8 @@ class AttendanceView {
                 Early: (l.earlyBy || 0) > 0 ? "Yes" : "No",
                 Status: l.status,
                 DetailedStatus: l.detailedStatus,
+                DOB: this._formatDate(e.dobRaw),
+                Overtime: l.overtime || 0,
             };
         });
 
@@ -3973,6 +3981,8 @@ class AttendanceView {
 								<th>Early By</th>
 								<th>Status</th>
                                 <th>Detailed Status</th>
+                                <th>DOB</th>
+                                <th>Overtime</th>
 	                        </tr>
 	                    </thead>
 	                    <tbody>${rows}</tbody>
@@ -4059,6 +4069,8 @@ class AttendanceView {
                 <td>${log.inTime || "–"}</td>
                 <td>${log.outTime || "–"}</td>
                 <td>${log.punchDevicesName || "–"}</td>
+                <td>${this._formatDate(emp.dobRaw)}</td>
+                <td>${(log.overtime || 0) > 0 ? this._fmtMins(log.overtime) : "–"}</td>
             </tr>
         `).join("");
 
@@ -4071,6 +4083,8 @@ class AttendanceView {
             In: log.inTime,
             Out: log.outTime,
             Device: log.punchDevicesName,
+            DOB: this._formatDate(emp.dobRaw),
+            Overtime: log.overtime || 0,
         }));
 
         let pageButtons = "";
@@ -4116,6 +4130,8 @@ class AttendanceView {
                                 <th>In</th>
                                 <th>Out</th>
                                 <th>Device</th>
+                                <th>DOB</th>
+                                <th>Overtime</th>
                             </tr>
                         </thead>
                         <tbody>${rows}</tbody>
@@ -5915,28 +5931,29 @@ class AttendanceView {
 
         if (isDashboardMode) {
             headers = isJoinExitRelated
-                ? ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "Location",]
-                : ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "Location",];
+                ? ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "DOB", "Location",]
+                : ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "DOB", "Location",];
         } else if (isResignedOnly) {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "DOJ", "DOR", "Status",];
+            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "DOB", "DOJ", "DOR", "Status",];
         } else if (isNewJoinedOnly) {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "DOJ", "Status"];
+            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "DOB", "DOJ", "Status"];
         } else if (isTotalHeadcount) {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "Shift", "Shift Start", "Shift End", "Location"];
+            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "DOB", "Shift", "Shift Start", "Shift End", "Location"];
         } else if (isStaffList || isWorkerList) {
             const isDashboardStaffWorker = items.length > 0 && items[0].log === null;
             if (isDashboardStaffWorker) {
-                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "Location"];
+                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "DOB", "Location"];
             } else {
-                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "Shift", "Shift Start", "Shift End", "Date", "In Time", "Out Time", "Hours Worked", "Status", "Detailed Status", "Location"];
+                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "DOB", "Shift", "Shift Start", "Shift End", "Date", "In Time", "Out Time", "Hours Worked", "Overtime", "Status", "Detailed Status", "Location"];
             }
         } else if (key === "lateIn") {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Late By", "Detailed Status"];
+            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "DOB", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Overtime", "Late By", "Detailed Status"];
         } else if (key === "earlyOut") {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Early By", "Detailed Status"];
+            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "DOB", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Overtime", "Early By", "Detailed Status"];
         } else {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Status", "Detailed Status"];
+            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "DOB", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Overtime", "Status", "Detailed Status"];
         }
+
         ths = headers.map((h) => `<th>${h}</th>`).join("");
 
         const trs = pageItems.map(({ log, emp, date }, i) => {
@@ -5956,6 +5973,7 @@ class AttendanceView {
                             <td>${emp.designation || "–"}</td>
                             <td>${emp.teamName || "-"}</td>
                             <td>${emp.shiftGroupName || "–"}</td>
+                            <td>${this._formatDate(emp.dobRaw)}</td>
                             <td>${emp.location || "–"}</td>
                         </tr>
                     `;
@@ -5970,6 +5988,7 @@ class AttendanceView {
                         <td>${emp.designation || "–"}</td>
                         <td>${emp.teamName || "-"}</td>
                         <td>${emp.shiftGroupName || "–"}</td>
+                        <td>${this._formatDate(emp.dobRaw)}</td>
                         <td>${emp.location || "–"}</td>
                     </tr>
                 `;
@@ -5986,6 +6005,7 @@ class AttendanceView {
                         <td>${emp.designation || "–"}</td>
                         <td>${emp.teamName || "-"}</td>
                         <td>${emp.shiftGroupName || "–"}</td>
+                        <td>${this._formatDate(emp.dobRaw)}</td>
                         <td>${emp.shift || "–"}</td>
                         <td>${emp.shiftStart || "–"}</td>
                         <td>${emp.shiftEnd || "–"}</td>
@@ -6006,6 +6026,7 @@ class AttendanceView {
                             <td>${emp.designation || "–"}</td>
                             <td>${emp.teamName || "-"}</td>
                             <td>${emp.shiftGroupName || "–"}</td>
+                            <td>${this._formatDate(emp.dobRaw)}</td>
                             <td>${emp.location || "–"}</td>
                         </tr>
                     `;
@@ -6020,6 +6041,7 @@ class AttendanceView {
                         <td>${emp.designation || "–"}</td>
                         <td>${emp.teamName || "-"}</td>
                         <td>${emp.shiftGroupName || "–"}</td>
+                        <td>${this._formatDate(emp.dobRaw)}</td>
                         <td>${log?.shiftName || emp?.shift || "–"}</td>
                         <td>${log?.shiftStart || emp?.shiftStart || "–"}</td>
                         <td>${log?.shiftEnd || emp?.shiftEnd || "–"}</td>
@@ -6027,6 +6049,7 @@ class AttendanceView {
                         <td>${log?.inTime || "–"}</td>
                         <td>${log?.outTime || "–"}</td>
                         <td>${log?.hoursWorked != null ? log.hoursWorked : "–"}</td>
+                        <td>${(log?.overtime || 0) > 0 ? this._fmtMins(log.overtime) : "–"}</td>
                         <td>${log?.status || "–"}</td>
                         <td>${log?.detailedStatus || "–"}</td>
                         <td>${emp.location || "–"}</td>
@@ -6045,6 +6068,7 @@ class AttendanceView {
                         <td>${emp.designation || "–"}</td>
                         <td>${emp.teamName || "-"}</td>
                         <td>${emp.shiftGroupName || "–"}</td>
+                        <td>${this._formatDate(emp.dobRaw)}</td>
                         <td>${this._formatDate(emp.doj) || "–"}</td>
                         <td>${this._formatDate(emp.dor) || "–"}</td>
                         <td><span class="badge badge-danger">${emp.status || "Resigned"}</span></td>
@@ -6063,6 +6087,7 @@ class AttendanceView {
                         <td>${emp.designation || "–"}</td>
                         <td>${emp.teamName || "-"}</td>
                         <td>${emp.shiftGroupName || "–"}</td>
+                        <td>${this._formatDate(emp.dobRaw)}</td>
                         <td>${this._formatDate(emp.doj) || "–"}</td>
                         <td><span class="badge ${badgeClass}">${emp.status || "Working"}</span></td>
                     </tr>
@@ -6087,6 +6112,7 @@ class AttendanceView {
                     <td>${emp.designation || "–"}</td>
                     <td>${emp.teamName || "-"}</td>
                     <td>${emp.shiftGroupName || "–"}</td>
+                    <td>${this._formatDate(emp.dobRaw)}</td>
                     <td>${log?.shiftName || emp?.shift || "–"}</td>
                     <td>${log?.shiftStart || emp?.shiftStart || "–"}</td>
                     <td>${log?.shiftEnd || emp?.shiftEnd || "–"}</td>
@@ -6094,6 +6120,7 @@ class AttendanceView {
                     <td>${log?.inTime || "–"}</td>
                     <td>${log?.outTime || "–"}</td>
                     <td>${log?.hoursWorked != null ? log.hoursWorked : "–"}</td>
+                    <td>${(log?.overtime || 0) > 0 ? this._fmtMins(log.overtime) : "–"}</td>
                     ${lastCol}
                     ${detailedStatusCol}
                 </tr>
@@ -6217,6 +6244,8 @@ class AttendanceView {
                 EarlyBy: log?.earlyBy ?? "",
                 Status: key === "weeklyOff" ? "Weekly Off" : log?.status || "",
                 DetailedStatus: log?.detailedStatus || "",
+                DOB: this._formatDate(emp?.dobRaw),
+                Overtime: log?.overtime || 0,
             };
         });
 
@@ -7554,15 +7583,15 @@ class AttendanceView {
 
         const rows = pageItems.map(({ emp }) =>
             isResigned
-                ? [emp.code || "-", emp.name || "-", emp.dept || "-", emp.company || "-", emp.designation || "-", this._formatDate(emp.doj), this._formatDate(emp.dor), `<span class="badge badge-danger">${emp.status || "Resigned"}</span>`]
-                : [emp.code || "-", emp.name || "-", emp.dept || "-", emp.company || "-", emp.designation || "-", this._formatDate(emp.doj), `<span class="badge badge-success">${emp.status || "Working"}</span>`],
+                ? [emp.code || "-", emp.name || "-", emp.dept || "-", emp.company || "-", emp.designation || "-", this._formatDate(emp.dobRaw), this._formatDate(emp.doj), this._formatDate(emp.dor), `<span class="badge badge-danger">${emp.status || "Resigned"}</span>`]
+                : [emp.code || "-", emp.name || "-", emp.dept || "-", emp.company || "-", emp.designation || "-", this._formatDate(emp.dobRaw), this._formatDate(emp.doj), `<span class="badge badge-success">${emp.status || "Working"}</span>`],
         );
 
         const exportKey = isResigned ? "resigned-tab" : "newjoined-tab";
         this._lastData[exportKey] = items.map(({ emp }) =>
             isResigned
-                ? { Code: emp.code, Name: emp.name, Dept: emp.dept, Company: emp.company, Designation: emp.designation, DOJ: emp.doj, DOR: emp.dor, Status: emp.status, }
-                : { Code: emp.code, Name: emp.name, Dept: emp.dept, Company: emp.company, Designation: emp.designation, DOJ: emp.doj, Status: emp.status, },
+                ? { Code: emp.code, Name: emp.name, Dept: emp.dept, Company: emp.company, Designation: emp.designation, DOB: this._formatDate(emp.dobRaw), DOJ: emp.doj, DOR: emp.dor, Status: emp.status, }
+                : { Code: emp.code, Name: emp.name, Dept: emp.dept, Company: emp.company, Designation: emp.designation, DOB: this._formatDate(emp.dobRaw), DOJ: emp.doj, Status: emp.status, },
         );
 
         let pageButtons = "";
@@ -7574,8 +7603,8 @@ class AttendanceView {
         }
 
         const headers = isResigned
-            ? ["Code", "Name", "Dept", "Company", "Designation", "DOJ", "DOR", "Status"]
-            : ["Code", "Name", "Dept", "Company", "Designation", "DOJ", "Status"];
+            ? ["Code", "Name", "Dept", "Company", "Designation", "DOB", "DOJ", "DOR", "Status"]
+            : ["Code", "Name", "Dept", "Company", "Designation", "DOB", "DOJ", "Status"];
 
         const chartId = isResigned ? "ch-resigned-date" : "ch-newjoined-date";
         const tableId = isResigned ? "tbl-resigned" : "tbl-newjoined";
@@ -7668,8 +7697,8 @@ class AttendanceView {
         );
 
         const headers = isResigned
-            ? ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "DOJ", "DOR", "Status"]
-            : ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "DOJ", "Status"];
+            ? ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "DOB", "DOJ", "DOR", "Status"]
+            : ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "DOB", "DOJ", "Status"];
 
         const rows = pageEmps.map((emp, i) => {
             const sr = (currentPage - 1) * pageSize + i + 1;
@@ -7682,6 +7711,7 @@ class AttendanceView {
                         <td>${emp.dept || "–"}</td>
                         <td>${emp.company || "–"}</td>
                         <td>${emp.designation || "–"}</td>
+                        <td>${this._formatDate(emp.dobRaw)}</td>
                         <td>${this._formatDate(emp.doj)}</td>
                         <td>${this._formatDate(emp.dor)}</td>
                         <td><span class="badge badge-danger">${emp.status || "Resigned"}</span></td>
@@ -7696,6 +7726,7 @@ class AttendanceView {
                         <td>${emp.dept || "–"}</td>
                         <td>${emp.company || "–"}</td>
                         <td>${emp.designation || "–"}</td>
+                        <td>${this._formatDate(emp.dobRaw)}</td>
                         <td>${this._formatDate(emp.doj)}</td>
                         <td><span class="badge badge-success">${emp.status || "Working"}</span></td>
                     </tr>
@@ -7705,9 +7736,10 @@ class AttendanceView {
 
         const exportData = emps.map((emp) =>
             isResigned
-                ? { Code: emp.code, Name: emp.name, Dept: emp.dept, Company: emp.company, Designation: emp.designation, DOJ: emp.doj, DOR: emp.dor, Status: emp.status, }
-                : { Code: emp.code, Name: emp.name, Dept: emp.dept, Company: emp.company, Designation: emp.designation, DOJ: emp.doj, Status: emp.status, },
+                ? { Code: emp.code, Name: emp.name, Dept: emp.dept, Company: emp.company, Designation: emp.designation, DOB: this._formatDate(emp.dobRaw), DOJ: emp.doj, DOR: emp.dor, Status: emp.status, }
+                : { Code: emp.code, Name: emp.name, Dept: emp.dept, Company: emp.company, Designation: emp.designation, DOB: this._formatDate(emp.dobRaw), DOJ: emp.doj, Status: emp.status, },
         );
+
         this._joinExitDrillExportData = exportData;
 
         let pageButtons = "";
