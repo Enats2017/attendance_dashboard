@@ -1598,28 +1598,65 @@ function handleGetReport($input) {
     $month = intval($input['month']); $year = intval($input['year']);
     $fromDay = intval($input['day_from']); $toDay = intval($input['day_to']);
     
-    // Construct full date strings for SQL Server query
     $dayFrom = "$year-" . sprintf("%02d", $month) . "-" . sprintf("%02d", $fromDay);
     $dayTo = "$year-" . sprintf("%02d", $month) . "-" . sprintf("%02d", $toDay);
     
     $sqlConn = getSQLServer();
-
     $locationList = !empty($_SESSION['locations']) ? implode(',', array_map('intval', $_SESSION['locations'])) : '0';
 
-    // 1. Departments and HC from SQL Server, filtered by Location 14
-    $sqlD = "SELECT DISTINCT D.DepartmentId, D.DepartmentFName as DepartmentName, D.std_hc FROM Departments D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON D.DepartmentId = E.DepartmentId WHERE E.Location IN ($locationList) AND E.Status = 'Working' ORDER BY D.DepartmentFName ASC";
+    // 1. Departments and HC, sorted by SortOrder
+    $sqlD = "SELECT D.DepartmentId, D.DepartmentFName as DepartmentName, D.std_hc, D.SortOrder FROM Departments D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON D.DepartmentId = E.DepartmentId WHERE E.Location IN ($locationList) AND E.Status = 'Working' GROUP BY D.DepartmentId, D.DepartmentFName, D.std_hc, D.SortOrder ORDER BY CASE WHEN D.SortOrder IS NULL THEN 1 ELSE 0 END, D.SortOrder ASC, D.DepartmentFName ASC";
 
     $stmtD = sqlsrv_query($sqlConn, $sqlD);
-    
-    $depts = [];
-    $hcMap = [];
-    while ($row = sqlsrv_fetch_array($stmtD, SQLSRV_FETCH_ASSOC)) {
-        $depts[$row['DepartmentId']] = $row['DepartmentName'];
-        $hcMap[$row['DepartmentId']] = intval($row['std_hc']);
+
+    if (!$stmtD) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Query failed (departments)',
+            'errors' => sqlsrv_errors()
+        ]);
+        return;
     }
 
+    $depts = [];
+    $hcMap = [];
+    $deptOrder = [];
+    while ($row = sqlsrv_fetch_array($stmtD, SQLSRV_FETCH_ASSOC)) {
+        $deptId = $row['DepartmentId'];
+        $depts[$deptId] = $row['DepartmentName'];
+        $hcMap[$deptId] = intval($row['std_hc']);
+        $deptOrder[] = $deptId;
+    }
+
+    // 1b. Designations per department, sorted by departmentDeginationSortOrder
+    $sqlDesig = "SELECT E.DepartmentId, E.Designation as DesignationId, DG.DesignationsName, ISNULL(DSO.SortOrder, 0) as DesigSortOrder FROM Employees E WITH (NOLOCK) INNER JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId LEFT JOIN departmentDeginationSortOrder DSO WITH (NOLOCK) ON E.DepartmentId = DSO.DepartmentId AND E.Designation = DSO.DesignationId WHERE E.Location IN ($locationList) AND E.Status = 'Working' GROUP BY E.DepartmentId, E.Designation, DG.DesignationsName, ISNULL(DSO.SortOrder, 0) ORDER BY CASE WHEN ISNULL(DSO.SortOrder, 0) IS NULL THEN 1 ELSE 0 END, ISNULL(DSO.SortOrder, 0) ASC, DG.DesignationsName ASC";
+
+    $stmtDesig = sqlsrv_query($sqlConn, $sqlDesig);
+
+    if (!$stmtDesig) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Query failed (designations)',
+            'errors' => sqlsrv_errors()
+        ]);
+        return;
+    }
+
+    $desigByDept = [];
+    if ($stmtDesig) {
+        while ($row = sqlsrv_fetch_array($stmtDesig, SQLSRV_FETCH_ASSOC)) {
+            $deptId = $row['DepartmentId'];
+            if (!isset($desigByDept[$deptId])) $desigByDept[$deptId] = [];
+            $desigByDept[$deptId][] = [
+                'id' => $row['DesignationId'],
+                'name' => $row['DesignationsName'],
+                'sortOrder' => intval($row['DesigSortOrder'])
+            ];
+        }
+    }
+
+    // Find the attendance table
     $tableName = "AttendanceLogs_{$month}_{$year}";
-    // Check if table exists (trying both month formats)
     $tableExists = false;
     $checkTable = sqlsrv_query($sqlConn, "SELECT 1 FROM sys.tables WHERE name = ?", array($tableName));
     if ($checkTable && sqlsrv_fetch_array($checkTable)) {
@@ -1631,6 +1668,7 @@ function handleGetReport($input) {
     }
 
     $liveData = [];
+    $liveDataByDesig = [];
     if ($tableExists) {
         $sql = "SELECT E.DepartmentId, DAY(A.AttendanceDate) as AttDay, COUNT(CASE WHEN A.Present = 1 THEN 1 END) as PresentCount, COUNT(CASE WHEN A.OverTime > 0 THEN 1 END) as OTCount, COUNT(CASE WHEN A.WeeklyOff = 1 THEN 1 END) as WOCount, COUNT(CASE WHEN A.IsOnLeave = 1 THEN 1 END) as LeaveCount FROM $tableName A WITH (NOLOCK) JOIN Employees E WITH (NOLOCK) ON A.EmployeeId = E.EmployeeId WHERE A.AttendanceDate >= '$dayFrom' AND A.AttendanceDate <= '$dayTo 23:59:59' AND E.Location IN ($locationList) AND E.Status = 'Working' GROUP BY E.DepartmentId, DAY(A.AttendanceDate)";
     
@@ -1643,9 +1681,18 @@ function handleGetReport($input) {
                 ];
             }
         }
+
+        $sqlDesigData = "SELECT E.DepartmentId, E.Designation as DesignationId, DAY(A.AttendanceDate) as AttDay, COUNT(CASE WHEN A.Present = 1 THEN 1 END) as PresentCount FROM $tableName A WITH (NOLOCK) JOIN Employees E WITH (NOLOCK) ON A.EmployeeId = E.EmployeeId WHERE A.AttendanceDate >= '$dayFrom' AND A.AttendanceDate <= '$dayTo 23:59:59' AND E.Location IN ($locationList) AND E.Status = 'Working' GROUP BY E.DepartmentId, E.Designation, DAY(A.AttendanceDate)";
+
+        $stmtDesigData = sqlsrv_query($sqlConn, $sqlDesigData);
+        if ($stmtDesigData) {
+            while ($row = sqlsrv_fetch_array($stmtDesigData, SQLSRV_FETCH_ASSOC)) {
+                $liveDataByDesig[$row['DepartmentId']][$row['DesignationId']][$row['AttDay']] = intval($row['PresentCount']);
+            }
+        }
     }
 
-    // 3. Format Response
+    // Format Response
     $numDays = $toDay - $fromDay + 1;
     $departments = [];
     $summary = [
@@ -1657,13 +1704,15 @@ function handleGetReport($input) {
         'left' => array_fill($fromDay, $numDays, 0),
         'recruited_hc' => array_fill($fromDay, $numDays, array_sum($hcMap))
     ];
-    // Combine all unique IDs from both hcMap and liveData to ensure all active depts are shown
-    $allIds = array_unique(array_merge(array_keys($hcMap), array_keys($liveData)));
+
+    $allIds = $deptOrder;
+    foreach (array_keys($liveData) as $id) {
+        if (!in_array($id, $allIds)) $allIds[] = $id;
+    }
 
     foreach ($allIds as $id) {
         $stdHc = isset($hcMap[$id]) ? intval($hcMap[$id]) : 0;
         $hasData = isset($liveData[$id]);
-        
         if ($stdHc <= 0 && !$hasData) continue;
         
         $name = isset($depts[$id]) ? $depts[$id] : "Dept $id";
@@ -1678,13 +1727,37 @@ function handleGetReport($input) {
                 $summary['on_leave'][$d] += intval($liveData[$id][$d]['leave']);
             }
         }
+
+        $designations = [];
+        if (isset($desigByDept[$id])) {
+            foreach ($desigByDept[$id] as $desig) {
+                $desigId = $desig['id'];
+                $desigDays = []; $desigSum = 0;
+                for ($d = $fromDay; $d <= $toDay; $d++) {
+                    $val = isset($liveDataByDesig[$id][$desigId][$d]) ? $liveDataByDesig[$id][$desigId][$d] : 0;
+                    $desigDays[$d] = $val;
+                    $desigSum += $val;
+                }
+                $designations[] = [
+                    'designationId' => $desigId,
+                    'designationName' => $desig['name'],
+                    'sortOrder' => $desig['sortOrder'],
+                    'days' => $desigDays,
+                    'avg_hc' => round($desigSum / $numDays)
+                ];
+            }
+        }
+
         $departments[] = [
-            'department' => $name, 'std_hc' => $stdHc, 'days' => $days,
-            'avg_hc' => round($deptSum / $numDays)
+            'departmentId' => $id,
+            'department' => $name,
+            'std_hc' => $stdHc,
+            'days' => $days,
+            'avg_hc' => round($deptSum / $numDays),
+            'designations' => $designations
         ];
     }
 
-    // Calculate summary averages for the bottom row
     $summary_avg = [];
     foreach ($summary as $key => $values) {
         if (is_array($values)) {
