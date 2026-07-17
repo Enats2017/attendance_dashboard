@@ -1207,3 +1207,198 @@ body {
     font-weight: 500;
     margin-top: 2px;
 }
+
+.rd-view-link { color:#2563eb; text-decoration:underline; cursor:pointer; }
+/* ─────────────────────────────────────────────
+   Record Detail Modal - Simple UI
+─────────────────────────────────────────────*/
+
+#record-detail-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 3000;
+    padding: 20px;
+}
+
+#record-detail-overlay.active {
+    display: flex;
+}
+
+/* Modal */
+
+.rd-modal {
+    width: 100%;
+    max-width: 760px;
+    max-height: 85vh;
+    background: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 10px 30px rgba(0,0,0,.12);
+}
+
+/* Header */
+
+.rd-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 18px;
+    border-bottom: 1px solid #ececec;
+}
+
+.rd-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.rd-close {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #666;
+    transition: .2s;
+}
+
+.rd-close:hover {
+    background: #f4f4f4;
+    color: #000;
+}
+
+/* Body */
+
+.rd-body {
+    padding: 20px;
+    overflow-y: auto;
+}
+
+/* Sections */
+
+.rd-section {
+    margin-bottom: 28px;
+}
+
+.rd-section:last-child {
+    margin-bottom: 0;
+}
+
+.rd-section-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--primary);
+    margin-bottom: 12px;
+}
+
+/* Grid */
+
+.rd-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 50px;
+    row-gap: 8px;
+}
+
+/* One Row */
+
+.rd-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    min-height: 24px;
+}
+
+/* Label */
+
+.rd-label {
+    width: 135px;
+    flex-shrink: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #666;
+}
+
+/* Colon */
+
+.rd-label::after {
+    content: ":";
+    float: right;
+}
+
+/* Value */
+
+.rd-value {
+    flex: 1;
+    font-size: 13px;
+    color: #222;
+    word-break: break-word;
+}
+
+/* Full Width */
+
+.rd-row-full {
+    grid-column: 1 / -1;
+}
+
+/* Status */
+
+.rd-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.rd-badge.present {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.rd-badge.absent {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.rd-badge.half {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.rd-badge.wo {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.rd-badge.default {
+    background: #eef2f7;
+    color: #475569;
+}
+
+/* Responsive */
+
+@media (max-width:700px){
+
+    .rd-modal{
+        max-width:100%;
+    }
+
+    .rd-grid{
+        grid-template-columns:1fr;
+        column-gap:0;
+    }
+
+    .rd-label{
+        width:120px;
+    }
+
+}

@@ -3604,20 +3604,17 @@ class AttendanceView {
         const rows = pageLogs.map((l) => {
             const e = empMap[l.empId] || {};
             return [
-                e.code || "",
-                e.name || "",
-                e.dept || "",
-                e.company || "",
-                this._formatDate(l.date),
+                e.code || "-",
+                e.name || "-",
+                e.company || "-",
+                e.dept || "-",
+                e.designation || "-",
+                e.shiftGroupName || "-",
+                l.shiftName || e.shift || "-",
                 l.inTime || "-",
                 l.outTime || "-",
-                l.hoursWorked || 0,
-                l.lateIn ? '<span class="badge badge-warning">Yes</span>' : "No",
-                l.earlyOut ? '<span class="badge badge-warning">Yes</span>' : "No",
-                `<span class="badge ${l.status === "Present" ? "badge-success" : "badge-danger"}">${l.status}</span>`,
-                l.detailedStatus || "-",
-                 this._formatDate(e.dobRaw),
-                (l.overtime || 0) > 0 ? this._fmtMins(l.overtime) : "-",
+                `<span class="badge ${l.status === "Present" ? "badge-success" : "badge-danger"}">${l.status || "-"}</span>`,
+                this._actionViewLink(l, e, l.date),
             ];
         });
 
@@ -3750,7 +3747,7 @@ class AttendanceView {
                 </div>
 
                 <div id="main-table-wrap">
-                    ${this._tableHTML("tbl-all", ["Code", "Name", "Dept", "Company", "Date", "In", "Out", "Hours", "Late In", "Early Out", "Status", "Detailed Status", "DOB", "Overtime"], rows, "all-attendance", (currentPage - 1) * pageSize)}
+                    ${this._tableHTML("tbl-all", ["Code", "Name", "Company", "Department", "Designation", "Shift Group", "Shift", "In Time", "Out Time", "Status", "Action"], rows, "all-attendance", (currentPage - 1) * pageSize)}
                     <div class="pagination-bar">
                         <div class="pagination-text">
                             Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, logs.length)} of ${logs.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
@@ -3798,15 +3795,13 @@ class AttendanceView {
                 // In vs Out donut (moved here from Dashboard tab)
                 Charts.donut("ch-all-io", ["In Punches", "Out Punches"], [totalIn, totalOut], "In vs Out");
 
-                // Total In Punches card
                 document.getElementById("card-total-in")?.addEventListener("click", () => {
-                    const inPunchLogs = logs.filter(l => parseFloat(l.present) > 0 || l.missedOutPunch == 1);
+                    const inPunchLogs = logs.filter(l => (parseFloat(l.present) > 0 || l.missedOutPunch == 1) && l.isManualPunch !== 1);
                     this._renderDrillDown(inPunchLogs, "Total In Punches", empMap);
                 });
 
-                // Total Out Punches card
                 document.getElementById("card-total-out")?.addEventListener("click", () => {
-                    const outPunchLogs = logs.filter(l => parseFloat(l.present) > 0 && l.missedInPunch != 1);
+                    const outPunchLogs = logs.filter(l => parseFloat(l.present) > 0 && l.missedInPunch != 1 && l.isManualPunch !== 1);
                     this._renderDrillDown(outPunchLogs, "Total Out Punches", empMap);
                 });
 
@@ -3875,25 +3870,15 @@ class AttendanceView {
                     <td>${(currentPage - 1) * pageSize + index + 1}</td>
                     <td><b>${e.code || "–"}</b></td>
                     <td>${e.name || "–"}</td>
-                    <td>${e.dept || "–"}</td>
                     <td>${e.company || "–"}</td>
-                    <td>${e.teamName || "–"}</td>
+                    <td>${e.dept || "–"}</td>
+                    <td>${e.designation || "–"}</td>
                     <td>${e.shiftGroupName || "–"}</td>
                     <td>${l.shiftName || e.shift || "–"}</td>
-                    <td>${l.shiftStart || "–"}</td>
-                    <td>${l.shiftEnd || "–"}</td>
-                    <td>${this._formatDate(l.date)}</td>
                     <td>${l.inTime || "–"}</td>
                     <td>${l.outTime || "–"}</td>
-                    <td><b>${l.hoursWorked || 0}h</b></td>
-                    <td>${(l.lateBy || 0) > 0 ? "Yes" : "No"}</td>
-                    <td>${(l.lateBy || 0) > 0 ? this._fmtMins(l.lateBy) : "-"}</td>
-                    <td>${(l.earlyBy || 0) > 0 ? "Yes" : "No"}</td>
-                    <td>${(l.earlyBy || 0) > 0 ? this._fmtMins(l.earlyBy) : "-"}</td>
-                    <td>${l.status}</td>
-                    <td>${l.detailedStatus || "–"}</td>
-                    <td>${this._formatDate(e.dobRaw)}</td>
-                    <td>${(l.overtime || 0) > 0 ? this._fmtMins(l.overtime) : "–"}</td>
+                    <td>${l.status || "–"}</td>
+                    <td>${this._actionViewLink(l, e, l.date)}</td>
                 </tr>
             `;
         }).join("");
@@ -3964,25 +3949,15 @@ class AttendanceView {
 	                            <th>Sr.No</th>
 								<th>Code</th>
 								<th>Name</th>
-								<th>Dept</th>
-	                            <th>Company</th>
-                                <th>Team</th>  
+								<th>Company</th>
+								<th>Department</th>
+                                <th>Designation</th>
                                 <th>Shift Group</th>
                                 <th>Shift</th>
-								<th>Shift Start</th>
-								<th>Shift End</th>
-								<th>Date</th>
-								<th>In</th>
-	                            <th>Out</th>
-								<th>Hours</th>
-								<th>Late</th>
-								<th>Late By</th>
-								<th>Early</th>
-								<th>Early By</th>
+								<th>In Time</th>
+								<th>Out Time</th>
 								<th>Status</th>
-                                <th>Detailed Status</th>
-                                <th>DOB</th>
-                                <th>Overtime</th>
+								<th>Action</th>
 	                        </tr>
 	                    </thead>
 	                    <tbody>${rows}</tbody>
@@ -7914,6 +7889,148 @@ class AttendanceView {
             behavior: "smooth",
             block: "start",
         });
+    }
+
+
+    // Add these two new methods to AttendanceView
+
+    _storeRecordDetail(log, emp, date) {
+        if (!this._recordDetailStore) this._recordDetailStore = [];
+        const id = this._recordDetailStore.length;
+        this._recordDetailStore.push({ log, emp, date });
+        return id;
+    }
+
+    _showRecordDetailModal(id) {
+        const rec = this._recordDetailStore[id];
+        if (!rec) return;
+
+        const { log, emp, date } = rec;
+        let overlay = document.getElementById("record-detail-overlay");
+        
+        if (!overlay) {
+            overlay = document.createElement("div");
+            overlay.id = "record-detail-overlay";
+            document.body.appendChild(overlay);
+        }
+
+        const statusClass = (() => {
+            const s = (log?.status || "").toLowerCase();
+
+            if (s.includes("half")) return "half";
+            if (s.includes("wo") || s.includes("weekly")) return "wo";
+            if (s.includes("absent")) return "absent";
+            if (s.includes("present")) return "present";
+
+            return "default";
+        })();
+
+        const row = (label, value, full = false) => `
+            <div class="rd-row ${full ? "rd-row-full" : ""}">
+                <div class="rd-label">${label}</div>
+                <div class="rd-value">${value ?? "-"}</div>
+            </div>
+        `;
+
+        overlay.innerHTML = `
+            <div class="rd-modal">
+                <div class="rd-header">
+                    <div class="rd-title">Employee Details</div>
+                    <button class="rd-close"
+                        onclick="AppController.view._closeRecordDetailModal()">
+                        <i class="ph ph-x"></i>
+                    </button>
+                </div>
+
+                <div class="rd-body">
+                    <div class="rd-section">
+                        <div class="rd-section-title">
+                            Employee Information
+                        </div>
+                        <div class="rd-grid">
+                            ${row("Employee Name", emp?.name)}
+                            ${row("Employee Code", emp?.code)}
+                            ${row("Company", emp?.company)}
+                            ${row("Department", emp?.dept)}
+                            ${row("Designation", emp?.designation)}
+                            ${row("Location", emp?.location)}
+                            ${row("Team", emp?.teamName)}
+                            ${row("Shift Group", emp?.shiftGroupName)}
+                        </div>
+                    </div>
+
+                    <div class="rd-section">
+                        <div class="rd-section-title">
+                            Shift Information
+                        </div>
+
+                        <div class="rd-grid">
+                            ${row("Shift", log?.shiftName || emp?.shift)}
+                            ${row("Shift Start", log?.shiftStart || emp?.shiftStart)}
+                            ${row("Shift End", log?.shiftEnd || emp?.shiftEnd)}
+                            ${row("In Time", log?.inTime)}
+                            ${row("Out Time", log?.outTime)}
+                            ${row("Hours Worked", log?.hoursWorked)}
+                            ${row("Overtime",(log?.overtime || 0) > 0 ? this._fmtMins(log.overtime) : "-")}
+                            ${row("Late By",(log?.lateBy || 0) > 0 ? this._fmtMins(log.lateBy) : "-")}
+                            ${row("Early By",(log?.earlyBy || 0) > 0 ? this._fmtMins(log.earlyBy) : "-")}
+                        </div>
+                    </div>
+
+                    <div class="rd-section">
+                        <div class="rd-section-title">
+                            Attendance
+                        </div>
+
+                        <div class="rd-grid">
+                            ${row("Attendance Date", this._formatDate(date || log?.date))}
+                            <div class="rd-row">
+                                <div class="rd-label">
+                                    Status
+                                </div>
+
+                                <div class="rd-value">
+                                    <span class="rd-badge ${statusClass}">
+                                        ${log?.status || "-"}
+                                    </span>
+                                </div>
+                            </div>
+
+                            ${row("Detailed Status", log?.detailedStatus, true)}
+                        </div>
+                    </div>
+
+                    <div class="rd-section">
+                        <div class="rd-section-title">
+                            Employment
+                        </div>
+
+                        <div class="rd-grid">
+                            ${row("Date of Birth", this._formatDate(emp?.dobRaw))}
+                            ${row("Joining Date", this._formatDate(emp?.doj))}
+                            ${row("Relieving Date", this._formatDate(emp?.dor))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        overlay.classList.add("active");
+        overlay.onclick = (e) => {
+            if (e.target === overlay) {
+                this._closeRecordDetailModal();
+            }
+        };
+    }
+
+    _closeRecordDetailModal() {
+        const overlay = document.getElementById("record-detail-overlay");
+        if (overlay) overlay.classList.remove("active");
+    }
+
+    _actionViewLink(log, emp, date) {
+        const id = this._storeRecordDetail(log, emp, date);
+        return `<a href="javascript:void(0)" class="rd-view-link" onclick="AppController.view._showRecordDetailModal(${id})">View</a>`;
     }
 }
 
