@@ -25,6 +25,8 @@ export default function DeptAttendance() {
     const [unitCapacity, setUnitCapacity] = useState("150 Tons");
     const [unitName, setUnitName] = useState("PSF");
     const [expandedDept, setExpandedDept] = useState(null);
+	const [expandedDesig, setExpandedDesig] = useState(null);
+	const [expandedSummary, setExpandedSummary] = useState(null);
 
     const showToast = useCallback((msg, type = "success") => {
         setToast({ msg, type });
@@ -231,15 +233,19 @@ export default function DeptAttendance() {
                     </div>
                 ) : reportData ? (
                     <ReportTable
-                        data={reportData}
-                        days={days}
-                        unitName={unitName}
-                        unitCapacity={unitCapacity}
-                        month={month}
-                        year={year}
-                        expandedDept={expandedDept}
-                        onToggleDept={(id) => setExpandedDept((prev) => (prev === id ? null : id))}
-                    />
+						data={reportData}
+						days={days}
+						unitName={unitName}
+						unitCapacity={unitCapacity}
+						month={month}
+						year={year}
+						expandedDept={expandedDept}
+						onToggleDept={(id) => setExpandedDept((prev) => (prev === id ? null : id))}
+						expandedDesig={expandedDesig}
+						onToggleDesig={(key) => setExpandedDesig((prev) => (prev === key ? null : key))}
+						expandedSummary={expandedSummary}
+						onToggleSummary={(id) => setExpandedSummary((prev) => (prev === id ? null : id))}
+					/>
                 ) : (
                     <div className="da-loading">
                         <p>No data available.</p>
@@ -252,7 +258,38 @@ export default function DeptAttendance() {
     );
 }
 
-function ReportTable({ data, days, unitName, unitCapacity, month, year, expandedDept, onToggleDept }) {
+function DeptSummaryRows({ summary, days }) {
+    const rows = [
+        { key: "total_present", label: "Total Present", cls: "da-dsum-present" },
+        { key: "total_half_present", label: "Total Half Present", cls: "da-dsum-half" },
+        { key: "total_wo_present", label: "Total Weekly-Off Present", cls: "da-dsum-wop" },
+        { key: "total_wo_half_present", label: "Total Weekly-Off Half Present", cls: "da-dsum-wohp" },
+        { key: "total_weekly_off", label: "Total Weekly Off", cls: "da-dsum-wo" },
+        { key: "total_absent", label: "Total Absent", cls: "da-dsum-absent" },
+    ];
+
+    return (
+        <>
+            {rows.map((row) => (
+                <tr key={row.key} className={`da-dept-summary-row ${row.cls}`}>
+                    <td className="da-dept-summary-label">{row.label}</td>
+                    <td>–</td>
+                    {days.map((d) => {
+                        const val = summary[row.key] && summary[row.key][d] !== undefined ? summary[row.key][d] : "";
+                        return (
+                            <td key={d} className={val === 0 || val === "" ? "da-empty" : ""}>
+                                {val === 0 ? "" : val}
+                            </td>
+                        );
+                    })}
+                    <td>–</td>
+                </tr>
+            ))}
+        </>
+    );
+}
+
+function ReportTable({ data, days, unitName, unitCapacity, month, year, expandedDept, onToggleDept, expandedDesig, onToggleDesig, expandedSummary, onToggleSummary }) {
     if (!data || !data.departments) return null;
     const departments = data.departments || [];
     const summary = data.summary || {};
@@ -288,7 +325,7 @@ function ReportTable({ data, days, unitName, unitCapacity, month, year, expanded
                                 <tr
                                     onClick={() => dept.designations && dept.designations.length > 0 && onToggleDept(dept.departmentId)}
                                     style={{ cursor: dept.designations && dept.designations.length > 0 ? "pointer" : "default" }}
-                                    className="da-dept-row"
+                                    className={`da-dept-row ${expandedDept === dept.departmentId ? "da-dept-row-open" : ""}`}
                                 >
                                     <td>{dept.department}</td>
                                     <td>{dept.std_hc}</td>
@@ -303,23 +340,69 @@ function ReportTable({ data, days, unitName, unitCapacity, month, year, expanded
                                     <td>{dept.avg_hc}</td>
                                 </tr>
 
-                                {expandedDept === dept.departmentId &&
-                                    dept.designations &&
-                                    dept.designations.map((desig, j) => (
-                                        <tr key={`desig-${dept.departmentId}-${j}`} className="da-designation-row">
-											<td className="da-designation-cell">{desig.designationName}</td>
-                                            <td>–</td>
-                                            {days.map((d) => {
-                                                const val = desig.days && desig.days[d] !== undefined ? desig.days[d] : "";
-                                                return (
-                                                    <td key={d} className={val === 0 || val === "" ? "da-empty" : ""}>
-                                                        {val === 0 ? "" : val}
-                                                    </td>
-                                                );
-                                            })}
-                                            <td>{desig.avg_hc}</td>
-                                        </tr>
-                                    ))}
+                                {expandedDept === dept.departmentId && dept.designations && dept.designations.map((desig, j) => {
+										const desigKey = `${dept.departmentId}-${desig.designationId}`;
+										const hasEmployees = desig.employees && desig.employees.length > 0;
+										return (
+											<React.Fragment key={desigKey}>
+												<tr
+													className="da-designation-row"
+													onClick={() => hasEmployees && onToggleDesig(desigKey)}
+													style={{ cursor: hasEmployees ? "pointer" : "default" }}
+												>
+													<td className="da-designation-cell">{desig.designationName}</td>
+													<td>–</td>
+													{days.map((d) => {
+														const val = desig.days && desig.days[d] !== undefined ? desig.days[d] : "";
+														return (
+															<td key={d} className={val === 0 || val === "" ? "da-empty" : ""}>
+																{val === 0 ? "" : val}
+															</td>
+														);
+													})}
+													<td>{desig.avg_hc}</td>
+												</tr>
+
+												{expandedDesig === desigKey &&
+													desig.employees.map((emp) => (
+														<tr key={emp.employeeId} className="da-employee-row">
+															<td className="da-employee-cell">
+																{emp.employeeName} <span className="da-emp-code">({emp.employeeCode})</span>
+															</td>
+															<td>–</td>
+															{days.map((d) => {
+																const status = emp.days && emp.days[d];
+																return (
+																	<td
+																		key={d}
+																		className={status ? `da-emp-status da-status-${status.toLowerCase()}` : "da-empty"}
+																	>
+																		{status || ""}
+																	</td>
+																);
+															})}
+															<td>–</td>
+														</tr>
+													))}
+											</React.Fragment>
+										);
+									})}
+
+								{expandedDept === dept.departmentId && dept.summary && (
+									<>
+										<tr
+											className="da-summary-toggle-row"
+											onClick={() => onToggleSummary(dept.departmentId)}
+										>
+											<td colSpan={days.length + 3}>
+												{expandedSummary === dept.departmentId ? "▲ Hide Summary" : "▼ Show Summary"}
+											</td>
+										</tr>
+										{expandedSummary === dept.departmentId && (
+											<DeptSummaryRows summary={dept.summary} days={days} />
+										)}
+									</>
+								)}
                             </React.Fragment>
                         ))}
                     </tbody>

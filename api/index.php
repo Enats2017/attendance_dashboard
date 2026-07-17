@@ -1591,21 +1591,106 @@ function handleBulkUpdateStdHC($input) {
     echo json_encode(['success' => true]);
 }
 
+
+// >>> NEW: add this small helper function ABOVE handleGetReport (outside it), once.
+function resolveAttendanceStatusCode($detailedStatusCode, $isWeeklyOff) {
+    $code = strtoupper(trim($detailedStatusCode ?? ''));
+    switch ($code) {
+        case 'P':
+            return 'P';
+        case '½PLD':
+        case 'L_CL':
+        case '½PCL':
+        case '½PLD(HO)':
+            return 'HD';
+        case 'WO':
+            return 'WO';
+        case 'WOP':
+            return $isWeeklyOff ? 'WOP' : 'P';
+        case '½PLD(WO)':
+            return $isWeeklyOff ? 'WOHP' : 'HD';
+        case 'A':
+        case 'ALD':
+        case 'WOA':
+        default:
+            return 'A';
+    }
+}
+
+
+function isSinglePunchDay($rec) {
+    if (floatval($rec['present'] ?? 0) == 0 && floatval($rec['absent'] ?? 0) == 0 && intval($rec['wo'] ?? 0) == 1) {
+        return false;
+    }
+
+    $hasInTime = !empty($rec['inTime']) && $rec['inTime'] !== '00:00' && $rec['inTime'] !== '00:00:00';
+    $hasOutTime = !empty($rec['outTime']) && $rec['outTime'] !== '00:00' && $rec['outTime'] !== '00:00:00';
+
+    if ($hasInTime && $hasOutTime) {
+        return false;
+    }
+
+    $punchRecords = trim($rec['punchRecords'] ?? '');
+    if (empty($punchRecords)) {
+        return false;
+    }
+
+    $punchRecordsLower = strtolower($punchRecords);
+    $inCount = substr_count($punchRecordsLower, '(in)');
+    $outCount = substr_count($punchRecordsLower, '(out)');
+    $totalPunches = $inCount + $outCount;
+
+    if ($totalPunches !== 1) {
+        return false; 
+    }
+
+    if ($inCount === 1) {
+        preg_match('/(\d{2}:\d{2}:\d{2})\(in\)/i', $punchRecords, $matches);
+    } else {
+        preg_match('/(\d{2}:\d{2}:\d{2})\(out\)/i', $punchRecords, $matches);
+    }
+
+    return !empty($matches[1]);
+}
+
+
+function resolveDayStatus($rec) {
+    if (isSinglePunchDay($rec)) {
+        return 'SP';
+    }
+
+    return resolveAttendanceStatusCode($rec['code'], $rec['wo']);
+}
+
+
 /**
  * Generate Department Attendance Report
  */
 function handleGetReport($input) {
     $month = intval($input['month']); $year = intval($input['year']);
     $fromDay = intval($input['day_from']); $toDay = intval($input['day_to']);
-    
+
     $dayFrom = "$year-" . sprintf("%02d", $month) . "-" . sprintf("%02d", $fromDay);
     $dayTo = "$year-" . sprintf("%02d", $month) . "-" . sprintf("%02d", $toDay);
-    
+
     $sqlConn = getSQLServer();
     $locationList = !empty($_SESSION['locations']) ? implode(',', array_map('intval', $_SESSION['locations'])) : '0';
 
-    // 1. Departments and HC, sorted by SortOrder
     $sqlD = "SELECT D.DepartmentId, D.DepartmentFName as DepartmentName, D.std_hc, D.SortOrder FROM Departments D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON D.DepartmentId = E.DepartmentId WHERE E.Location IN ($locationList) AND E.Status = 'Working' GROUP BY D.DepartmentId, D.DepartmentFName, D.std_hc, D.SortOrder ORDER BY CASE WHEN D.SortOrder IS NULL THEN 1 ELSE 0 END, D.SortOrder ASC, D.DepartmentFName ASC";
+
+    $sqlEmpDates = "SELECT E.EmployeeId, E.DepartmentId, E.DOJ, E.DOR, E.Status FROM Employees E WITH (NOLOCK) WHERE E.Location IN ($locationList)";
+    $stmtEmpDates = sqlsrv_query($sqlConn, $sqlEmpDates);
+    $empDateRows = [];
+    if ($stmtEmpDates) {
+        while ($row = sqlsrv_fetch_array($stmtEmpDates, SQLSRV_FETCH_ASSOC)) {
+            $empDateRows[] = [
+                'deptId' => $row['DepartmentId'],
+                'doj' => $row['DOJ'] ? $row['DOJ']->format('Y-m-d') : null,
+                'dor' => $row['DOR'] ? $row['DOR']->format('Y-m-d') : null,
+                'status' => $row['Status']
+            ];
+        }
+    }
 
     $stmtD = sqlsrv_query($sqlConn, $sqlD);
 
@@ -1615,6 +1700,7 @@ function handleGetReport($input) {
             'message' => 'Query failed (departments)',
             'errors' => sqlsrv_errors()
         ]);
+        
         return;
     }
 
@@ -1628,7 +1714,6 @@ function handleGetReport($input) {
         $deptOrder[] = $deptId;
     }
 
-    // 1b. Designations per department, sorted by departmentDeginationSortOrder
     $sqlDesig = "SELECT E.DepartmentId, E.Designation as DesignationId, DG.DesignationsName, ISNULL(DSO.SortOrder, 0) as DesigSortOrder FROM Employees E WITH (NOLOCK) INNER JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId LEFT JOIN departmentDeginationSortOrder DSO WITH (NOLOCK) ON E.DepartmentId = DSO.DepartmentId AND E.Designation = DSO.DesignationId WHERE E.Location IN ($locationList) AND E.Status = 'Working' GROUP BY E.DepartmentId, E.Designation, DG.DesignationsName, ISNULL(DSO.SortOrder, 0) ORDER BY CASE WHEN ISNULL(DSO.SortOrder, 0) IS NULL THEN 1 ELSE 0 END, ISNULL(DSO.SortOrder, 0) ASC, DG.DesignationsName ASC";
 
     $stmtDesig = sqlsrv_query($sqlConn, $sqlDesig);
@@ -1639,6 +1724,7 @@ function handleGetReport($input) {
             'message' => 'Query failed (designations)',
             'errors' => sqlsrv_errors()
         ]);
+
         return;
     }
 
@@ -1655,7 +1741,27 @@ function handleGetReport($input) {
         }
     }
 
-    // Find the attendance table
+    $sqlEmpList = "SELECT E.EmployeeId, E.EmployeeCode, E.EmployeeName, E.DepartmentId, E.Designation as DesignationId FROM Employees E WITH (NOLOCK) WHERE E.Location IN ($locationList) AND E.Status = 'Working'";
+
+    $stmtEmpList = sqlsrv_query($sqlConn, $sqlEmpList);
+
+    $employeesByDeptDesig = [];
+    $empMeta = []; 
+    if ($stmtEmpList) {
+        while ($row = sqlsrv_fetch_array($stmtEmpList, SQLSRV_FETCH_ASSOC)) {
+            $deptId = $row['DepartmentId'];
+            $desigId = $row['DesignationId'];
+            $empId = (string)$row['EmployeeId'];
+            $employeesByDeptDesig[$deptId][$desigId][] = [
+                'id' => $empId,
+                'code' => $row['EmployeeCode'],
+                'name' => $row['EmployeeName']
+            ];
+            
+            $empMeta[$empId] = ['dept' => $deptId, 'desig' => $desigId]; 
+        }
+    }
+
     $tableName = "AttendanceLogs_{$month}_{$year}";
     $tableExists = false;
     $checkTable = sqlsrv_query($sqlConn, "SELECT 1 FROM sys.tables WHERE name = ?", array($tableName));
@@ -1669,14 +1775,15 @@ function handleGetReport($input) {
 
     $liveData = [];
     $liveDataByDesig = [];
+    $empDayStatus = [];
     if ($tableExists) {
         $sql = "SELECT E.DepartmentId, DAY(A.AttendanceDate) as AttDay, COUNT(CASE WHEN A.Present = 1 THEN 1 END) as PresentCount, COUNT(CASE WHEN A.OverTime > 0 THEN 1 END) as OTCount, COUNT(CASE WHEN A.WeeklyOff = 1 THEN 1 END) as WOCount, COUNT(CASE WHEN A.IsOnLeave = 1 THEN 1 END) as LeaveCount FROM $tableName A WITH (NOLOCK) JOIN Employees E WITH (NOLOCK) ON A.EmployeeId = E.EmployeeId WHERE A.AttendanceDate >= '$dayFrom' AND A.AttendanceDate <= '$dayTo 23:59:59' AND E.Location IN ($locationList) AND E.Status = 'Working' GROUP BY E.DepartmentId, DAY(A.AttendanceDate)";
-    
+
         $stmt = sqlsrv_query($sqlConn, $sql);
         if ($stmt) {
             while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
                 $liveData[$row['DepartmentId']][$row['AttDay']] = [
-                    'present' => $row['PresentCount'], 'ot' => $row['OTCount'], 
+                    'present' => $row['PresentCount'], 'ot' => $row['OTCount'],
                     'wo' => $row['WOCount'], 'leave' => $row['LeaveCount']
                 ];
             }
@@ -1690,60 +1797,225 @@ function handleGetReport($input) {
                 $liveDataByDesig[$row['DepartmentId']][$row['DesignationId']][$row['AttDay']] = intval($row['PresentCount']);
             }
         }
+
+        $sqlEmpDayStatus = "SELECT A.EmployeeId, DAY(A.AttendanceDate) as AttDay, A.DetailedStatusCode, A.WeeklyOff, A.InTime, A.OutTime, A.ReportPunchRecords, A.Present, A.Absent FROM $tableName A WITH (NOLOCK) JOIN Employees E WITH (NOLOCK) ON A.EmployeeId = E.EmployeeId WHERE A.AttendanceDate >= '$dayFrom' AND A.AttendanceDate <= '$dayTo 23:59:59' AND E.Location IN ($locationList) AND E.Status = 'Working'";
+
+        $stmtEmpDayStatus = sqlsrv_query($sqlConn, $sqlEmpDayStatus);
+        if ($stmtEmpDayStatus) {
+            while ($row = sqlsrv_fetch_array($stmtEmpDayStatus, SQLSRV_FETCH_ASSOC)) {
+                $empDayStatus[(string)$row['EmployeeId']][$row['AttDay']] = [
+                    'code' => strtoupper(trim($row['DetailedStatusCode'] ?? '')),
+                    'wo' => intval($row['WeeklyOff']),
+                    'inTime' => $row['InTime'] ? (is_object($row['InTime']) ? $row['InTime']->format('H:i:s') : $row['InTime']) : null,
+                    'outTime' => $row['OutTime'] ? (is_object($row['OutTime']) ? $row['OutTime']->format('H:i:s') : $row['OutTime']) : null,
+                    'punchRecords' => trim($row['ReportPunchRecords'] ?? ''),
+                    'present' => floatval($row['Present'] ?? 0), 
+                    'absent' => floatval($row['Absent'] ?? 0)    
+                ];
+            }
+        }
     }
 
-    // Format Response
+    $liveDataPresentByDept = [];   
+    $liveDataPresentByDesig = [];  
+    $spCountByDept = [];           
+
+    foreach ($empDayStatus as $empId => $days) {
+        if (!isset($empMeta[$empId])) continue;
+        $deptId = $empMeta[$empId]['dept'];
+        $desigId = $empMeta[$empId]['desig'];
+
+        foreach ($days as $day => $rec) {
+            $status = resolveDayStatus($rec);
+            if ($status === 'P' || $status === 'HD' || $status === 'WOP' || $status === 'WOHP' || $status === 'SP') {
+                $liveDataPresentByDept[$deptId][$day] = ($liveDataPresentByDept[$deptId][$day] ?? 0) + 1;
+                $liveDataPresentByDesig[$deptId][$desigId][$day] = ($liveDataPresentByDesig[$deptId][$desigId][$day] ?? 0) + 1;
+            }
+
+            if ($status === 'SP') {
+                $spCountByDept[$deptId][$day] = ($spCountByDept[$deptId][$day] ?? 0) + 1;
+            }
+        }
+    }
+
     $numDays = $toDay - $fromDay + 1;
     $departments = [];
     $summary = [
         'total_present' => array_fill($fromDay, $numDays, 0),
+        'single_punch' => array_fill($fromDay, $numDays, 0), 
         'overtime_paid' => array_fill($fromDay, $numDays, 0),
         'weekly_off_ph' => array_fill($fromDay, $numDays, 0),
         'on_leave' => array_fill($fromDay, $numDays, 0),
         'new_joinee' => array_fill($fromDay, $numDays, 0),
         'left' => array_fill($fromDay, $numDays, 0),
-        'recruited_hc' => array_fill($fromDay, $numDays, array_sum($hcMap))
+        'recruited_hc' => array_fill($fromDay, $numDays, 0)   
     ];
+
+    $deptHeadcountByDay = [];
+    for ($d = $fromDay; $d <= $toDay; $d++) {
+        $dateStr = "$year-" . sprintf('%02d', $month) . "-" . sprintf('%02d', $d);
+        $deptActiveToday = [];
+        foreach ($empDateRows as $emp) {
+            if (!$emp['doj'] || $emp['doj'] > $dateStr) continue;
+            $wasActive = ($emp['status'] === 'Working')
+                || ($emp['status'] === 'Resigned' && $emp['dor'] && $emp['dor'] > $dateStr);
+            if ($wasActive) {
+                $deptActiveToday[$emp['deptId']] = true;
+                $deptHeadcountByDay[$emp['deptId']][$d] = ($deptHeadcountByDay[$emp['deptId']][$d] ?? 0) + 1;
+            }
+        }
+
+        $daySum = 0;
+        foreach ($deptActiveToday as $deptId => $_) {
+            $daySum += $hcMap[$deptId] ?? 0;
+        }
+        $summary['recruited_hc'][$d] = $daySum;
+    }
+
+    $sqlNewJoinByDay = "SELECT DAY(E.DOJ) as JoinDay, COUNT(*) as Cnt FROM Employees E WITH (NOLOCK) WHERE E.Location IN ($locationList) AND E.DOJ >= '$dayFrom' AND E.DOJ <= '$dayTo' GROUP BY DAY(E.DOJ)";
+    $stmtNewJoin = sqlsrv_query($sqlConn, $sqlNewJoinByDay);
+    if ($stmtNewJoin) {
+        while ($row = sqlsrv_fetch_array($stmtNewJoin, SQLSRV_FETCH_ASSOC)) {
+            $d = intval($row['JoinDay']);
+            if (isset($summary['new_joinee'][$d])) {
+                $summary['new_joinee'][$d] = intval($row['Cnt']);
+            }
+        }
+    }
+
+    $sqlLeftByDay = "SELECT DAY(E.DOR) as LeaveDay, COUNT(*) as Cnt FROM Employees E WITH (NOLOCK) WHERE E.Location IN ($locationList) AND E.Status = 'Resigned' AND E.DOR >= '$dayFrom' AND E.DOR <= '$dayTo' GROUP BY DAY(E.DOR)";
+    $stmtLeft = sqlsrv_query($sqlConn, $sqlLeftByDay);
+    if ($stmtLeft) {
+        while ($row = sqlsrv_fetch_array($stmtLeft, SQLSRV_FETCH_ASSOC)) {
+            $d = intval($row['LeaveDay']);
+            if (isset($summary['left'][$d])) {
+                $summary['left'][$d] = intval($row['Cnt']);
+            }
+        }
+    }
 
     $allIds = $deptOrder;
     foreach (array_keys($liveData) as $id) {
         if (!in_array($id, $allIds)) $allIds[] = $id;
     }
 
+    foreach (array_keys($liveDataPresentByDept) as $id) {
+        if (!in_array($id, $allIds)) $allIds[] = $id;
+    }
+
     foreach ($allIds as $id) {
         $stdHc = isset($hcMap[$id]) ? intval($hcMap[$id]) : 0;
-        $hasData = isset($liveData[$id]);
+        $hasData = isset($liveData[$id]) || isset($liveDataPresentByDept[$id]); 
         if ($stdHc <= 0 && !$hasData) continue;
-        
+
         $name = isset($depts[$id]) ? $depts[$id] : "Dept $id";
         $days = []; $deptSum = 0;
         for ($d = $fromDay; $d <= $toDay; $d++) {
-            $val = isset($liveData[$id][$d]) ? intval($liveData[$id][$d]['present']) : 0;
-            $days[$d] = $val; $deptSum += $val;
-            $summary['total_present'][$d] += $val;
-            if (isset($liveData[$id][$d])) {
-                $summary['overtime_paid'][$d] += intval($liveData[$id][$d]['ot']);
-                $summary['weekly_off_ph'][$d] += intval($liveData[$id][$d]['wo']);
-                $summary['on_leave'][$d] += intval($liveData[$id][$d]['leave']);
+            if ($d > date('j') && $month == date('n') && $year == date('Y')) {
+                $days[$d] = null;
+            } else {
+                $val = $liveDataPresentByDept[$id][$d] ?? 0;
+                $days[$d] = $deptHeadcountByDay[$id][$d] ?? 0;  
+                $deptSum += $days[$d];                            
+                $summary['total_present'][$d] += $val;
+                $summary['single_punch'][$d] += $spCountByDept[$id][$d] ?? 0;
+                if (isset($liveData[$id][$d])) {
+                    $summary['overtime_paid'][$d] += intval($liveData[$id][$d]['ot']);
+                    $summary['weekly_off_ph'][$d] += intval($liveData[$id][$d]['wo']);
+                    $summary['on_leave'][$d] += intval($liveData[$id][$d]['leave']);
+                }
             }
         }
+
+        $deptSummary = [
+            'total_present' => array_fill($fromDay, $numDays, 0),
+            'total_half_present' => array_fill($fromDay, $numDays, 0),
+            'total_wo_present' => array_fill($fromDay, $numDays, 0),
+            'total_wo_half_present' => array_fill($fromDay, $numDays, 0),
+            'total_absent' => array_fill($fromDay, $numDays, 0),
+            'total_weekly_off' => array_fill($fromDay, $numDays, 0),
+        ];
 
         $designations = [];
         if (isset($desigByDept[$id])) {
             foreach ($desigByDept[$id] as $desig) {
                 $desigId = $desig['id'];
+                $empCountInDesig = count($employeesByDeptDesig[$id][$desigId] ?? []);
                 $desigDays = []; $desigSum = 0;
                 for ($d = $fromDay; $d <= $toDay; $d++) {
-                    $val = isset($liveDataByDesig[$id][$desigId][$d]) ? $liveDataByDesig[$id][$desigId][$d] : 0;
-                    $desigDays[$d] = $val;
-                    $desigSum += $val;
+                    if ($d > date('j') && $month == date('n') && $year == date('Y')) {
+                        $desigDays[$d] = null;
+                    } else {
+                        $desigDays[$d] = $empCountInDesig;
+                        $desigSum += $empCountInDesig;
+                    }
                 }
+
+                $desigSummary = [
+                    'total_employees' => count($employeesByDeptDesig[$id][$desigId] ?? []),
+                    'total_present' => array_fill($fromDay, $numDays, 0),
+                    'total_half_present' => array_fill($fromDay, $numDays, 0),
+                    'total_wo_present' => array_fill($fromDay, $numDays, 0),
+                    'total_wo_half_present' => array_fill($fromDay, $numDays, 0),
+                    'total_absent' => array_fill($fromDay, $numDays, 0),
+                    'total_weekly_off' => array_fill($fromDay, $numDays, 0),
+                ];
+
+                $empList = [];
+                if (isset($employeesByDeptDesig[$id][$desigId])) {
+                    foreach ($employeesByDeptDesig[$id][$desigId] as $emp) {
+                        $empDays = [];
+                        for ($d = $fromDay; $d <= $toDay; $d++) {
+                            $rec = $empDayStatus[$emp['id']][$d] ?? null;
+                            $status = $rec ? resolveDayStatus($rec) : null;
+                            $empDays[$d] = $status;
+
+                            switch ($status) {
+                                case 'P':
+                                case 'SP':
+                                    $desigSummary['total_present'][$d]++;
+                                    $deptSummary['total_present'][$d]++;
+                                    break;
+                                case 'HD':
+                                    $desigSummary['total_half_present'][$d]++;
+                                    $deptSummary['total_half_present'][$d]++;
+                                    break;
+                                case 'WOP':
+                                    $desigSummary['total_wo_present'][$d]++;
+                                    $deptSummary['total_wo_present'][$d]++;
+                                    break;
+                                case 'WOHP':
+                                    $desigSummary['total_wo_half_present'][$d]++;
+                                    $deptSummary['total_wo_half_present'][$d]++;
+                                    break;
+                                case 'A':
+                                    $desigSummary['total_absent'][$d]++;
+                                    $deptSummary['total_absent'][$d]++;
+                                    break;
+                                case 'WO':
+                                    $desigSummary['total_weekly_off'][$d]++;
+                                    $deptSummary['total_weekly_off'][$d]++;
+                                    break;
+                            }
+                        }
+
+                        $empList[] = [
+                            'employeeId' => $emp['id'],
+                            'employeeCode' => $emp['code'],
+                            'employeeName' => $emp['name'],
+                            'days' => $empDays
+                        ];
+                    }
+                }
+
                 $designations[] = [
                     'designationId' => $desigId,
                     'designationName' => $desig['name'],
                     'sortOrder' => $desig['sortOrder'],
                     'days' => $desigDays,
-                    'avg_hc' => round($desigSum / $numDays)
+                    'avg_hc' => round($desigSum / $numDays),
+                    'employees' => $empList,
+                    'summary' => $desigSummary
                 ];
             }
         }
@@ -1754,7 +2026,8 @@ function handleGetReport($input) {
             'std_hc' => $stdHc,
             'days' => $days,
             'avg_hc' => round($deptSum / $numDays),
-            'designations' => $designations
+            'designations' => $designations,
+            'summary' => $deptSummary
         ];
     }
 
@@ -1766,13 +2039,15 @@ function handleGetReport($input) {
     }
 
     echo json_encode([
-        'success' => true, 
-        'departments' => $departments, 
+        'success' => true,
+        'departments' => $departments,
         'summary' => $summary,
         'summary_avg' => $summary_avg,
         'total_std_hc' => array_sum($hcMap)
     ]);
 }
+
+
 
 /**
  * Get simple list of departments filtered by Location 14
