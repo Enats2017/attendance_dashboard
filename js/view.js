@@ -3732,14 +3732,7 @@ class AttendanceView {
                                 <span class="stat-card-hint">↓ click to view</span>
                             </div>
                         </div>
-                        <div id="card-manual-punches" class="stat-card warning stat-card-clickable" style="flex:1; cursor:pointer;">
-                            <div class="stat-icon"><i class="ph ph-pencil-simple"></i></div>
-                            <div class="stat-content">
-                                <span class="stat-label">Manual Punches</span>
-                                <span class="stat-value">${AppController.model.getManualPunchEmployees().length}</span>
-                                <span class="stat-card-hint">↓ click to view</span>
-                            </div>
-                        </div>
+                        <!-- card-manual-punches removed — already shown in the top summary row -->
                     </div>
                     <div style="flex:1; min-width:0;">
                         ${this._chartCard("ch-all-io", '<i class="ph-fill ph-chart-pie-slice"></i>', "sky", "In vs Out Distribution")}
@@ -3803,11 +3796,6 @@ class AttendanceView {
                 document.getElementById("card-total-out")?.addEventListener("click", () => {
                     const outPunchLogs = logs.filter(l => parseFloat(l.present) > 0 && l.missedInPunch != 1 && l.isManualPunch !== 1);
                     this._renderDrillDown(outPunchLogs, "Total Out Punches", empMap);
-                });
-
-                document.getElementById("card-manual-punches")?.addEventListener("click", () => {
-                    const items = AppController.model.getManualPunchEmployees();
-                    this._renderManualPunchDrilldown(items, "Manual Punches");
                 });
             },
         };
@@ -5896,7 +5884,7 @@ class AttendanceView {
         const isTotalHeadcount = key === "totalHeadcount";
         const isHalfPresent = key === "halfPresent";
         const isWeeklyOff = key === "weeklyOff";
-        const isDashboardMode = items.length > 0 && items[0].log === null && !isResignedOnly && !isNewJoinedOnly && !isStaffList && !isWorkerList;
+        const isDashboardMode = items.length > 0 && items[0].log === null && !isResignedOnly && !isNewJoinedOnly;
         const pageSize = 10;
         const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
         const currentPage = Math.min(page, totalPages);
@@ -5905,28 +5893,9 @@ class AttendanceView {
         let headers, ths;
 
         if (isDashboardMode) {
-            headers = isJoinExitRelated
-                ? ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "DOB", "Location",]
-                : ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "DOB", "Location",];
-        } else if (isResignedOnly) {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "DOB", "DOJ", "DOR", "Status",];
-        } else if (isNewJoinedOnly) {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "DOB", "DOJ", "Status"];
-        } else if (isTotalHeadcount) {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "DOB", "Shift", "Shift Start", "Shift End", "Location"];
-        } else if (isStaffList || isWorkerList) {
-            const isDashboardStaffWorker = items.length > 0 && items[0].log === null;
-            if (isDashboardStaffWorker) {
-                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "DOB", "Location"];
-            } else {
-                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "DOB", "Shift", "Shift Start", "Shift End", "Date", "In Time", "Out Time", "Hours Worked", "Overtime", "Status", "Detailed Status", "Location"];
-            }
-        } else if (key === "lateIn") {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "DOB", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Overtime", "Late By", "Detailed Status"];
-        } else if (key === "earlyOut") {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "DOB", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Overtime", "Early By", "Detailed Status"];
+            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "DOB", "Location"];
         } else {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "DOB", "Shift", "Shift Start", "Shift End", "Date", "In", "Out", "Hours", "Overtime", "Status", "Detailed Status"];
+            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift", "In Time", "Out Time", "Status", "Action"];
         }
 
         ths = headers.map((h) => `<th>${h}</th>`).join("");
@@ -5937,22 +5906,6 @@ class AttendanceView {
             const sr = (currentPage - 1) * pageSize + i + 1;
 
             if (isDashboardMode) {
-                if (isJoinExitRelated) {
-                    return `
-                        <tr>
-                            <td>${sr}</td>
-                            <td><b>${emp.code || "–"}</b></td>
-                            <td>${emp.name || "–"}</td>
-                            <td>${emp.dept || "–"}</td>
-                            <td>${emp.company || "–"}</td>
-                            <td>${emp.designation || "–"}</td>
-                            <td>${emp.teamName || "-"}</td>
-                            <td>${emp.shiftGroupName || "–"}</td>
-                            <td>${this._formatDate(emp.dobRaw)}</td>
-                            <td>${emp.location || "–"}</td>
-                        </tr>
-                    `;
-                }
                 return `
                     <tr>
                         <td>${sr}</td>
@@ -5969,113 +5922,17 @@ class AttendanceView {
                 `;
             }
 
-            if (isTotalHeadcount) {
-                return `
-                    <tr>
-                        <td>${sr}</td>
-                        <td><b>${emp.code || "–"}</b></td>
-                        <td>${emp.name || "–"}</td>
-                        <td>${emp.dept || "–"}</td>
-                        <td>${emp.company || "–"}</td>
-                        <td>${emp.designation || "–"}</td>
-                        <td>${emp.teamName || "-"}</td>
-                        <td>${emp.shiftGroupName || "–"}</td>
-                        <td>${this._formatDate(emp.dobRaw)}</td>
-                        <td>${emp.shift || "–"}</td>
-                        <td>${emp.shiftStart || "–"}</td>
-                        <td>${emp.shiftEnd || "–"}</td>
-                        <td>${emp.location || "–"}</td>
-                    </tr>
-                `;
-            }
-
-            if (isStaffList || isWorkerList) {
-                if (log === null) {
-                    return `
-                        <tr>
-                            <td>${sr}</td>
-                            <td><b>${emp.code || "–"}</b></td>
-                            <td>${emp.name || "–"}</td>
-                            <td>${emp.dept || "–"}</td>
-                            <td>${emp.company || "–"}</td>
-                            <td>${emp.designation || "–"}</td>
-                            <td>${emp.teamName || "-"}</td>
-                            <td>${emp.shiftGroupName || "–"}</td>
-                            <td>${this._formatDate(emp.dobRaw)}</td>
-                            <td>${emp.location || "–"}</td>
-                        </tr>
-                    `;
-                }
-                return `
-                    <tr>
-                        <td>${sr}</td>
-                        <td><b>${emp.code || "–"}</b></td>
-                        <td>${emp.name || "–"}</td>
-                        <td>${emp.dept || "–"}</td>
-                        <td>${emp.company || "–"}</td>
-                        <td>${emp.designation || "–"}</td>
-                        <td>${emp.teamName || "-"}</td>
-                        <td>${emp.shiftGroupName || "–"}</td>
-                        <td>${this._formatDate(emp.dobRaw)}</td>
-                        <td>${log?.shiftName || emp?.shift || "–"}</td>
-                        <td>${log?.shiftStart || emp?.shiftStart || "–"}</td>
-                        <td>${log?.shiftEnd || emp?.shiftEnd || "–"}</td>
-                        <td>${this._formatDate(date || log?.date || "")}</td>
-                        <td>${log?.inTime || "–"}</td>
-                        <td>${log?.outTime || "–"}</td>
-                        <td>${log?.hoursWorked != null ? log.hoursWorked : "–"}</td>
-                        <td>${(log?.overtime || 0) > 0 ? this._fmtMins(log.overtime) : "–"}</td>
-                        <td>${log?.status || "–"}</td>
-                        <td>${log?.detailedStatus || "–"}</td>
-                        <td>${emp.location || "–"}</td>
-                    </tr>
-                `;
-            }
-
+            let statusCell;
             if (isResignedOnly) {
-                return `
-                    <tr>
-                        <td>${sr}</td>
-                        <td><b>${emp.code || "–"}</b></td>
-                        <td>${emp.name || "–"}</td>
-                        <td>${emp.dept || "–"}</td>
-                        <td>${emp.company || "–"}</td>
-                        <td>${emp.designation || "–"}</td>
-                        <td>${emp.teamName || "-"}</td>
-                        <td>${emp.shiftGroupName || "–"}</td>
-                        <td>${this._formatDate(emp.dobRaw)}</td>
-                        <td>${this._formatDate(emp.doj) || "–"}</td>
-                        <td>${this._formatDate(emp.dor) || "–"}</td>
-                        <td><span class="badge badge-danger">${emp.status || "Resigned"}</span></td>
-                    </tr>
-                `;
-            }
-            if (isNewJoinedOnly) {
+                statusCell = `<span class="badge badge-danger">${emp.status || "Resigned"}</span>`;
+            } else if (isNewJoinedOnly) {
                 const badgeClass = emp.status === "Resigned" ? "badge-danger" : "badge-success";
-                return `
-                    <tr>
-                        <td>${sr}</td>
-                        <td><b>${emp.code || "–"}</b></td>
-                        <td>${emp.name || "–"}</td>
-                        <td>${emp.dept || "–"}</td>
-                        <td>${emp.company || "–"}</td>
-                        <td>${emp.designation || "–"}</td>
-                        <td>${emp.teamName || "-"}</td>
-                        <td>${emp.shiftGroupName || "–"}</td>
-                        <td>${this._formatDate(emp.dobRaw)}</td>
-                        <td>${this._formatDate(emp.doj) || "–"}</td>
-                        <td><span class="badge ${badgeClass}">${emp.status || "Working"}</span></td>
-                    </tr>
-                `;
+                statusCell = `<span class="badge ${badgeClass}">${emp.status || "Working"}</span>`;
+            } else if (key === "weeklyOff") {
+                statusCell = `<span class="badge badge-info">Weekly Off</span>`;
+            } else {
+                statusCell = log?.status || "–";
             }
-
-            const lastCol =
-                key === "lateIn"
-                    ? `<td>${this._fmtMins(log?.lateBy)}</td>` : key === "earlyOut"
-                    ? `<td>${this._fmtMins(log?.earlyBy)}</td>` : key === "weeklyOff"
-                    ? `<td><span class="badge badge-info">Weekly Off</span></td>` : `<td>${log?.status || "–"}</td>`;
-
-            const detailedStatusCol = `<td>${log?.detailedStatus || "–"}</td>`;
 
             return `
                 <tr>
@@ -6085,19 +5942,11 @@ class AttendanceView {
                     <td>${emp.dept || "–"}</td>
                     <td>${emp.company || "–"}</td>
                     <td>${emp.designation || "–"}</td>
-                    <td>${emp.teamName || "-"}</td>
-                    <td>${emp.shiftGroupName || "–"}</td>
-                    <td>${this._formatDate(emp.dobRaw)}</td>
                     <td>${log?.shiftName || emp?.shift || "–"}</td>
-                    <td>${log?.shiftStart || emp?.shiftStart || "–"}</td>
-                    <td>${log?.shiftEnd || emp?.shiftEnd || "–"}</td>
-                    <td>${this._formatDate(date || log?.date || "")}</td>
                     <td>${log?.inTime || "–"}</td>
                     <td>${log?.outTime || "–"}</td>
-                    <td>${log?.hoursWorked != null ? log.hoursWorked : "–"}</td>
-                    <td>${(log?.overtime || 0) > 0 ? this._fmtMins(log.overtime) : "–"}</td>
-                    ${lastCol}
-                    ${detailedStatusCol}
+                    <td>${statusCell}</td>
+                    <td>${this._actionViewLink(log, emp, date || log?.date)}</td>
                 </tr>
             `;
         }).join("");
