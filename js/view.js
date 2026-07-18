@@ -3596,10 +3596,13 @@ class AttendanceView {
         this._currentAllEmpMap = empMap;
         this._currentAllFilters = filters;
 
+        const { dateFrom, dateTo } = filters;
+        const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
+
         const pageSize = 25;
         const currentPage = page;
-        const totalPages = Math.ceil(logs.length / pageSize);
-        const pageLogs = logs.slice((currentPage - 1) * pageSize, currentPage * pageSize,);
+        const totalPages = Math.ceil(dayLogs.length / pageSize);
+        const pageLogs = dayLogs.slice((currentPage - 1) * pageSize, currentPage * pageSize,)
 
         const rows = pageLogs.map((l) => {
             const e = empMap[l.empId] || {};
@@ -3618,7 +3621,7 @@ class AttendanceView {
             ];
         });
 
-        this._lastData["all-attendance"] = logs.map((l) => {
+        this._lastData["all-attendance"] = dayLogs.map((l) => {
             const e = empMap[l.empId] || {};
             return {
                 Code: e.code,
@@ -3642,9 +3645,6 @@ class AttendanceView {
         const dates = [...new Set(logs.map((l) => l.date))].sort();
         const formattedDates = dates.map((d) => this._formatDate(d));
 
-        const { dateFrom, dateTo } = filters;
-        const dayLogsForChart = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
-
         const presentByDate = {};
         const halfByDate = {};
         const woPresentByDate = {};
@@ -3663,7 +3663,7 @@ class AttendanceView {
             absentByDate[d] = 0;
         });
 
-        dayLogsForChart.forEach((l) => {
+        dayLogs.forEach((l) => {
             if (this._matchesStatus(l, "Present"))
                 presentByDate[l.date]++;
 
@@ -3743,7 +3743,7 @@ class AttendanceView {
                     ${this._tableHTML("tbl-all", ["Code", "Name", "Company", "Department", "Designation", "Shift Group", "Shift", "In Time", "Out Time", "Status", "Action"], rows, "all-attendance", (currentPage - 1) * pageSize)}
                     <div class="pagination-bar">
                         <div class="pagination-text">
-                            Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, logs.length)} of ${logs.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
+                            Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, dayLogs.length)} of ${dayLogs.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
                         </div>
                         <div class="pagination-buttons">
                             <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderAllPage(1)">«</button>
@@ -3774,7 +3774,7 @@ class AttendanceView {
                     "Daily Attendance",
                     (category, index, seriesIndex, seriesName) => {
                         const dateVal = dates[index];
-                        const filteredLogs = dayLogsForChart.filter((l) => l.date === dateVal && this._matchesStatus(l, seriesName),);
+                        const filteredLogs = dayLogs.filter((l) => l.date === dateVal && this._matchesStatus(l, seriesName),);
                         this._renderDrillDown(filteredLogs, `Date: ${formattedDates[index]} - ${seriesName}`, empMap);
                     },
                 );

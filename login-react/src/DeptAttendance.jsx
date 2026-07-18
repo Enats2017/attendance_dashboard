@@ -27,6 +27,7 @@ export default function DeptAttendance() {
     const [expandedDept, setExpandedDept] = useState(null);
 	const [expandedDesig, setExpandedDesig] = useState(null);
 	const [expandedSummary, setExpandedSummary] = useState(null);
+	const [empModal, setEmpModal] = useState(null); 
 
     const showToast = useCallback((msg, type = "success") => {
         setToast({ msg, type });
@@ -245,6 +246,19 @@ export default function DeptAttendance() {
 						onToggleDesig={(key) => setExpandedDesig((prev) => (prev === key ? null : key))}
 						expandedSummary={expandedSummary}
 						onToggleSummary={(id) => setExpandedSummary((prev) => (prev === id ? null : id))}
+						onCellClick={(statusKey, day, label) => {
+							console.log("CLICK FIRED:", { statusKey, day, label });
+							const dayBucket = reportData.summary_employees?.[day];
+							console.log("dayBucket:", dayBucket);
+							const employees = dayBucket?.[statusKey] || [];
+							console.log("employees:", employees);
+							if (employees.length === 0) {
+								console.log("BAILING — empty array");
+								return;
+							}
+							setEmpModal({ label, day, employees });
+							console.log("setEmpModal called");
+						}}
 					/>
                 ) : (
                     <div className="da-loading">
@@ -254,6 +268,51 @@ export default function DeptAttendance() {
             </div>
 
             {showSettings && <SettingsModal editHc={editHc} setEditHc={setEditHc} onSave={saveStdHc} onClose={() => setShowSettings(false)} deptList={deptList} />}
+            {empModal && <EmployeeListModal modal={empModal} onClose={() => setEmpModal(null)} />}
+        </div>
+    );
+}
+
+function EmployeeListModal({ modal, onClose }) {
+    const { label, day, employees } = modal;
+    return (
+        <div
+            className="da-modal-overlay"
+            onClick={(e) => {
+                if (e.target === e.currentTarget) onClose();
+            }}
+        >
+            <div className="da-modal">
+                <div className="da-modal-header">
+                    <h2>{label} — Day {day} ({employees.length})</h2>
+                    <button className="da-modal-close" onClick={onClose}>✕</button>
+                </div>
+                <div className="da-settings-table-wrap">
+                    <table className="da-settings-table">
+                        <thead>
+                            <tr>
+                                <th>Code</th>
+                                <th>Employee Name</th>
+                                <th>Department</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {employees.map((emp) => (
+                                <tr key={emp.employeeId}>
+                                    <td style={{ fontSize: 11, color: "#94a3b8" }}>{emp.employeeCode}</td>
+                                    <td style={{ fontWeight: 600 }}>{emp.employeeName}</td>
+                                    <td>{emp.departmentName}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+                <div className="da-modal-footer">
+                    <button className="da-btn da-btn-sm" style={{ background: "#e2e8f0", color: "#475569" }} onClick={onClose}>
+                        Close
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }
@@ -289,7 +348,7 @@ function DeptSummaryRows({ summary, days }) {
     );
 }
 
-function ReportTable({ data, days, unitName, unitCapacity, month, year, expandedDept, onToggleDept, expandedDesig, onToggleDesig, expandedSummary, onToggleSummary }) {
+function ReportTable({ data, days, unitName, unitCapacity, month, year, expandedDept, onToggleDept, expandedDesig, onToggleDesig, expandedSummary, onToggleSummary, onCellClick }) {
     if (!data || !data.departments) return null;
     const departments = data.departments || [];
     const summary = data.summary || {};
@@ -415,11 +474,18 @@ function ReportTable({ data, days, unitName, unitCapacity, month, year, expanded
                             days={days}
                             className="da-row-total"
                         />
-                        <SummaryRow label="Over-Time Paid" stdValue="" dayValues={summary.overtime_paid} avgValue={summary_avg.overtime_paid} days={days} className="da-row-ot" />
+                        <SummaryRow label="— Present" stdValue="" dayValues={summary.present} avgValue={summary_avg.present} days={days} className="da-row-sub" statusKey="present" onCellClick={onCellClick} />
+                        <SummaryRow label="— Half Present" stdValue="" dayValues={summary.half_present} avgValue={summary_avg.half_present} days={days} className="da-row-sub" statusKey="half_present" onCellClick={onCellClick} />
+                        <SummaryRow label="— Weekly-Off Present" stdValue="" dayValues={summary.wo_present} avgValue={summary_avg.wo_present} days={days} className="da-row-sub" statusKey="wo_present" onCellClick={onCellClick} />
+                        <SummaryRow label="— Weekly-Off Half Present" stdValue="" dayValues={summary.wo_half_present} avgValue={summary_avg.wo_half_present} days={days} className="da-row-sub" statusKey="wo_half_present" onCellClick={onCellClick} />
+                        <SummaryRow label="— Single Punch" stdValue="" dayValues={summary.single_punch} avgValue={summary_avg.single_punch} days={days} className="da-row-sub" statusKey="single_punch" onCellClick={onCellClick} />
+                        <SummaryRow label="Total Absent" stdValue="" dayValues={summary.total_absent} avgValue={summary_avg.total_absent} days={days} className="da-row-absent-total" statusKey="absent" onCellClick={onCellClick} />
+                        <SummaryRow label="Weekly Off" stdValue="" dayValues={summary.weekly_off} avgValue={summary_avg.weekly_off} days={days} className="da-row-sub" statusKey="weekly_off" onCellClick={onCellClick} />
+                        <SummaryRow label="Over-Time Paid" stdValue="" dayValues={summary.overtime_paid} avgValue={summary_avg.overtime_paid} days={days} className="da-row-ot" statusKey="overtime_paid" onCellClick={onCellClick} />
                         <SummaryRow label="Weekly-Off / PH" stdValue="" dayValues={summary.weekly_off_ph} avgValue={summary_avg.weekly_off_ph} days={days} className="da-row-weekoff" />
-                        <SummaryRow label="On Leave" stdValue="" dayValues={summary.on_leave} avgValue={summary_avg.on_leave} days={days} className="da-row-leave" />
-                        <SummaryRow label="New Joinee" stdValue="" dayValues={summary.new_joinee} avgValue={summary_avg.new_joinee} days={days} className="da-row-joinee" />
-                        <SummaryRow label="Left" stdValue="" dayValues={summary.left} avgValue={summary_avg.left} days={days} className="da-row-left" />
+                        <SummaryRow label="On Leave" stdValue="" dayValues={summary.on_leave} avgValue={summary_avg.on_leave} days={days} className="da-row-leave" statusKey="on_leave" onCellClick={onCellClick} />
+                        <SummaryRow label="New Joinee" stdValue="" dayValues={summary.new_joinee} avgValue={summary_avg.new_joinee} days={days} className="da-row-joinee" statusKey="new_joinee" onCellClick={onCellClick} />
+                        <SummaryRow label="Left" stdValue="" dayValues={summary.left} avgValue={summary_avg.left} days={days} className="da-row-left" statusKey="left" onCellClick={onCellClick} />
                         <SummaryRow label="Recruited Head Count" stdValue="" dayValues={summary.recruited_hc} avgValue={summary_avg.recruited_hc} days={days} className="da-row-recruited" />
                     </tfoot>
                 </table>
@@ -428,15 +494,21 @@ function ReportTable({ data, days, unitName, unitCapacity, month, year, expanded
     );
 }
 
-function SummaryRow({ label, stdValue, dayValues, avgValue, days, className }) {
+function SummaryRow({ label, stdValue, dayValues, avgValue, days, className, statusKey, onCellClick }) {
+    const clickable = !!statusKey && !!onCellClick;
     return (
         <tr className={className}>
             <td>{label}</td>
             <td>{stdValue}</td>
             {days.map((d) => {
                 const val = dayValues && dayValues[d] !== undefined ? dayValues[d] : "";
+                const isClickable = clickable && val !== 0 && val !== "";
                 return (
-                    <td key={d} className={val === 0 ? "da-empty" : ""}>
+                    <td
+                        key={d}
+                        className={`${val === 0 ? "da-empty" : ""} ${isClickable ? "da-cell-clickable" : ""}`}
+                        onClick={isClickable ? () => onCellClick(statusKey, d, label) : undefined}
+                    >
                         {val === 0 ? "" : val}
                     </td>
                 );

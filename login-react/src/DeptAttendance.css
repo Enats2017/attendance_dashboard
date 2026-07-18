@@ -58,6 +58,12 @@
 .da-row-left td { color: #dc2626; background: rgba(254,226,226,0.3); }
 .da-row-recruited td { font-weight: 800 !important; color: #0f172a !important; background: #d9f99d !important; border-top: 2.5px solid #4d7c0f !important; border-bottom: 2.5px solid #4d7c0f !important; }
 .da-row-recruited td:first-child { background: #d9f99d !important; }
+.da-row-sub td { color: #64748b; font-size: 12px; background: rgba(248,250,252,0.6); }
+.da-row-sub td:first-child { padding-left: 26px !important; font-weight: 500; }
+.da-row-absent-total td { color: #b91c1c; font-weight: 700; background: rgba(254,226,226,0.3); }
+
+.da-cell-clickable { cursor: pointer; }
+.da-cell-clickable:hover { background: rgba(124,58,237,0.12) !important; text-decoration: underline; }
 .da-table tbody tr:hover td { background: rgba(124,58,237,0.04); }
 
 .da-designation-row td { background: #f8fafc; color: #64748b; font-size: 12px; font-weight: 500; }

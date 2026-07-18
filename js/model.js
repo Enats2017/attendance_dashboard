@@ -324,6 +324,8 @@ class AttendanceModel {
         const { logs, emps } = this.getNightShiftData();
         const todayStats = this.state.todayStats;
 
+        // Reuse the same present/absent logic as getSummaryStats(),
+        // but scoped only to night-shift logs/emps
         const isPresent = (l) => l.present === 1 || l.status === 'Present';
         const totalPresentRecords = logs.filter(isPresent).length;
         const totalAbsentRecords = Math.max(0, emps.length - totalPresentRecords);
@@ -517,8 +519,8 @@ class AttendanceModel {
         const todayStats = this.state.todayStats;
         const totalPresentRecords = todayStats ? todayStats.present : logs.filter(isPresent).length;
         const totalAbsentRecords = todayStats ? todayStats.absent : Math.max(0, emps.length - totalPresentRecords);
-        const totalIn = logs.filter(l => (parseFloat(l.present) > 0 || l.missedOutPunch == 1) && l.isManualPunch !== 1).length;
-        const totalOut = logs.filter(l => parseFloat(l.present) > 0 && l.missedInPunch != 1 && l.isManualPunch !== 1).length;
+        const totalIn = logs.filter(l => parseFloat(l.present) > 0 || l.missedOutPunch == 1  ).length;
+        const totalOut = logs.filter(l => parseFloat(l.present) > 0 && l.missedInPunch != 1   ).length;
 
         return {
             present: todayStats?.present ?? 0,
