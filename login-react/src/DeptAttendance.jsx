@@ -27,7 +27,8 @@ export default function DeptAttendance() {
     const [expandedDept, setExpandedDept] = useState(null);
 	const [expandedDesig, setExpandedDesig] = useState(null);
 	const [expandedSummary, setExpandedSummary] = useState(null);
-	const [empModal, setEmpModal] = useState(null); 
+
+	const [expandedStatus, setExpandedStatus] = useState(null); 
 
     const showToast = useCallback((msg, type = "success") => {
         setToast({ msg, type });
@@ -44,7 +45,7 @@ export default function DeptAttendance() {
     }, []);
 
     useEffect(() => {
-        loadReport(); // eslint-disable-next-line
+        loadReport(); 
     }, [month, year, dayFrom, dayTo, stdHcMap]);
 
     async function fetchStdHc() {
@@ -82,15 +83,12 @@ export default function DeptAttendance() {
 			});
 			
 			const data = await res.json();
-			console.log("REPORT DATA:", data);
-			console.log("First dept designations:", data.departments?.[0]?.designations);
 
 			if (data.success) {
 				setReportData(data);
 				setLoading(false);
 				return;
 			}
-			// NEW: surface the real backend error instead of silently faking data
 			console.error("get_report failed:", data.message, data.errors);
 			showToast(data.message || "Failed to load report — showing sample data", "error");
 		} catch (err) {
@@ -122,9 +120,20 @@ export default function DeptAttendance() {
     function exportExcel() {
         const table = document.getElementById("da-report-table");
         if (!table) return;
-        const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
-      <head><meta charset="utf-8"><style>td,th{border:1px solid #ccc;padding:4px 8px;font-family:Calibri;font-size:11pt;}th{background:#fbbf24;font-weight:bold;}</style></head>
-      <body>${table.outerHTML}</body></html>`;
+        const html = `
+            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
+                <head>
+                    <meta charset="utf-8">
+                    <style>
+                        td,th{border:1px solid #ccc;padding:4px 8px;font-family:Calibri;font-size:11pt;}
+                        th{background:#fbbf24;font-weight:bold;}
+                    </style>
+                </head>
+                <body>
+                    ${table.outerHTML}
+                </body>
+            </html>
+        `;
         const blob = new Blob([html], { type: "application/vnd.ms-excel" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -140,6 +149,10 @@ export default function DeptAttendance() {
     const clampedFrom = Math.max(1, Math.min(dayFrom, maxDays));
     const clampedTo = Math.max(clampedFrom, Math.min(dayTo, maxDays));
     for (let d = clampedFrom; d <= clampedTo; d++) days.push(d);
+
+    function handleStatusToggle(statusKey) {
+        setExpandedStatus((prev) => (prev === statusKey ? null : statusKey));
+    }
 
     return (
         <div className="da-page">
@@ -246,19 +259,8 @@ export default function DeptAttendance() {
 						onToggleDesig={(key) => setExpandedDesig((prev) => (prev === key ? null : key))}
 						expandedSummary={expandedSummary}
 						onToggleSummary={(id) => setExpandedSummary((prev) => (prev === id ? null : id))}
-						onCellClick={(statusKey, day, label) => {
-							console.log("CLICK FIRED:", { statusKey, day, label });
-							const dayBucket = reportData.summary_employees?.[day];
-							console.log("dayBucket:", dayBucket);
-							const employees = dayBucket?.[statusKey] || [];
-							console.log("employees:", employees);
-							if (employees.length === 0) {
-								console.log("BAILING — empty array");
-								return;
-							}
-							setEmpModal({ label, day, employees });
-							console.log("setEmpModal called");
-						}}
+						expandedStatus={expandedStatus}
+						onToggleStatus={handleStatusToggle}
 					/>
                 ) : (
                     <div className="da-loading">
@@ -268,51 +270,6 @@ export default function DeptAttendance() {
             </div>
 
             {showSettings && <SettingsModal editHc={editHc} setEditHc={setEditHc} onSave={saveStdHc} onClose={() => setShowSettings(false)} deptList={deptList} />}
-            {empModal && <EmployeeListModal modal={empModal} onClose={() => setEmpModal(null)} />}
-        </div>
-    );
-}
-
-function EmployeeListModal({ modal, onClose }) {
-    const { label, day, employees } = modal;
-    return (
-        <div
-            className="da-modal-overlay"
-            onClick={(e) => {
-                if (e.target === e.currentTarget) onClose();
-            }}
-        >
-            <div className="da-modal">
-                <div className="da-modal-header">
-                    <h2>{label} — Day {day} ({employees.length})</h2>
-                    <button className="da-modal-close" onClick={onClose}>✕</button>
-                </div>
-                <div className="da-settings-table-wrap">
-                    <table className="da-settings-table">
-                        <thead>
-                            <tr>
-                                <th>Code</th>
-                                <th>Employee Name</th>
-                                <th>Department</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {employees.map((emp) => (
-                                <tr key={emp.employeeId}>
-                                    <td style={{ fontSize: 11, color: "#94a3b8" }}>{emp.employeeCode}</td>
-                                    <td style={{ fontWeight: 600 }}>{emp.employeeName}</td>
-                                    <td>{emp.departmentName}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-                <div className="da-modal-footer">
-                    <button className="da-btn da-btn-sm" style={{ background: "#e2e8f0", color: "#475569" }} onClick={onClose}>
-                        Close
-                    </button>
-                </div>
-            </div>
         </div>
     );
 }
@@ -348,12 +305,15 @@ function DeptSummaryRows({ summary, days }) {
     );
 }
 
-function ReportTable({ data, days, unitName, unitCapacity, month, year, expandedDept, onToggleDept, expandedDesig, onToggleDesig, expandedSummary, onToggleSummary, onCellClick }) {
+function ReportTable({ data, days, unitName, unitCapacity, month, year, expandedDept, onToggleDept, expandedDesig, onToggleDesig, expandedSummary, onToggleSummary, expandedStatus, onToggleStatus }) {
     if (!data || !data.departments) return null;
     const departments = data.departments || [];
     const summary = data.summary || {};
     const summary_avg = data.summary_avg || {};
+    const summary_employees = data.summary_employees || {};
     const total_std_hc = data.total_std_hc || 0;
+    const colSpan = days.length + 3;
+
     return (
         <div className="da-report-card">
             <div className="da-report-title">
@@ -453,7 +413,7 @@ function ReportTable({ data, days, unitName, unitCapacity, month, year, expanded
 											className="da-summary-toggle-row"
 											onClick={() => onToggleSummary(dept.departmentId)}
 										>
-											<td colSpan={days.length + 3}>
+											<td colSpan={colSpan}>
 												{expandedSummary === dept.departmentId ? "▲ Hide Summary" : "▼ Show Summary"}
 											</td>
 										</tr>
@@ -466,26 +426,19 @@ function ReportTable({ data, days, unitName, unitCapacity, month, year, expanded
                         ))}
                     </tbody>
                     <tfoot>
-                        <SummaryRow
-                            label="Total Present For The Day"
-                            stdValue={total_std_hc}
-                            dayValues={summary.total_present}
-                            avgValue={summary_avg.total_present}
-                            days={days}
-                            className="da-row-total"
-                        />
-                        <SummaryRow label="— Present" stdValue="" dayValues={summary.present} avgValue={summary_avg.present} days={days} className="da-row-sub" statusKey="present" onCellClick={onCellClick} />
-                        <SummaryRow label="— Half Present" stdValue="" dayValues={summary.half_present} avgValue={summary_avg.half_present} days={days} className="da-row-sub" statusKey="half_present" onCellClick={onCellClick} />
-                        <SummaryRow label="— Weekly-Off Present" stdValue="" dayValues={summary.wo_present} avgValue={summary_avg.wo_present} days={days} className="da-row-sub" statusKey="wo_present" onCellClick={onCellClick} />
-                        <SummaryRow label="— Weekly-Off Half Present" stdValue="" dayValues={summary.wo_half_present} avgValue={summary_avg.wo_half_present} days={days} className="da-row-sub" statusKey="wo_half_present" onCellClick={onCellClick} />
-                        <SummaryRow label="— Single Punch" stdValue="" dayValues={summary.single_punch} avgValue={summary_avg.single_punch} days={days} className="da-row-sub" statusKey="single_punch" onCellClick={onCellClick} />
-                        <SummaryRow label="Total Absent" stdValue="" dayValues={summary.total_absent} avgValue={summary_avg.total_absent} days={days} className="da-row-absent-total" statusKey="absent" onCellClick={onCellClick} />
-                        <SummaryRow label="Weekly Off" stdValue="" dayValues={summary.weekly_off} avgValue={summary_avg.weekly_off} days={days} className="da-row-sub" statusKey="weekly_off" onCellClick={onCellClick} />
-                        <SummaryRow label="Over-Time Paid" stdValue="" dayValues={summary.overtime_paid} avgValue={summary_avg.overtime_paid} days={days} className="da-row-ot" statusKey="overtime_paid" onCellClick={onCellClick} />
+                        <SummaryRow label="Total Present" stdValue={total_std_hc} dayValues={summary.total_present} avgValue={summary_avg.total_present} days={days} className="da-row-combined" />
+                        <SummaryRow label="Total Present" stdValue="" dayValues={summary.present} avgValue={summary_avg.present} days={days} className="da-row-total" statusKey="present" expandedStatus={expandedStatus} onToggleStatus={onToggleStatus} summaryEmployeesByDay={summary_employees} colSpan={colSpan} />
+                        <SummaryRow label="Total Half Present" stdValue="" dayValues={summary.half_present} avgValue={summary_avg.half_present} days={days} className="da-row-heading" statusKey="half_present" expandedStatus={expandedStatus} onToggleStatus={onToggleStatus} summaryEmployeesByDay={summary_employees} colSpan={colSpan} />
+                        <SummaryRow label="Total Weekly-Off Present" stdValue="" dayValues={summary.wo_present} avgValue={summary_avg.wo_present} days={days} className="da-row-heading" statusKey="wo_present" expandedStatus={expandedStatus} onToggleStatus={onToggleStatus} summaryEmployeesByDay={summary_employees} colSpan={colSpan} />
+                        <SummaryRow label="Total Weekly-Off Half Present" stdValue="" dayValues={summary.wo_half_present} avgValue={summary_avg.wo_half_present} days={days} className="da-row-heading" statusKey="wo_half_present" expandedStatus={expandedStatus} onToggleStatus={onToggleStatus} summaryEmployeesByDay={summary_employees} colSpan={colSpan} />
+                        <SummaryRow label="Total Weekly Off" stdValue="" dayValues={summary.weekly_off} avgValue={summary_avg.weekly_off} days={days} className="da-row-heading" statusKey="weekly_off" expandedStatus={expandedStatus} onToggleStatus={onToggleStatus} summaryEmployeesByDay={summary_employees} colSpan={colSpan} />
+                        <SummaryRow label="Total Absent" stdValue="" dayValues={summary.total_absent} avgValue={summary_avg.total_absent} days={days} className="da-row-absent-total" statusKey="absent" expandedStatus={expandedStatus} onToggleStatus={onToggleStatus} summaryEmployeesByDay={summary_employees} colSpan={colSpan} />
+                        <SummaryRow label="Total Single Punches" stdValue="" dayValues={summary.single_punch} avgValue={summary_avg.single_punch} days={days} className="da-row-heading" statusKey="single_punch" expandedStatus={expandedStatus} onToggleStatus={onToggleStatus} summaryEmployeesByDay={summary_employees} colSpan={colSpan} />
+                        <SummaryRow label="Over-Time Paid" stdValue="" dayValues={summary.overtime_paid} avgValue={summary_avg.overtime_paid} days={days} className="da-row-ot" statusKey="overtime_paid" expandedStatus={expandedStatus} onToggleStatus={onToggleStatus} summaryEmployeesByDay={summary_employees} colSpan={colSpan} />
                         <SummaryRow label="Weekly-Off / PH" stdValue="" dayValues={summary.weekly_off_ph} avgValue={summary_avg.weekly_off_ph} days={days} className="da-row-weekoff" />
-                        <SummaryRow label="On Leave" stdValue="" dayValues={summary.on_leave} avgValue={summary_avg.on_leave} days={days} className="da-row-leave" statusKey="on_leave" onCellClick={onCellClick} />
-                        <SummaryRow label="New Joinee" stdValue="" dayValues={summary.new_joinee} avgValue={summary_avg.new_joinee} days={days} className="da-row-joinee" statusKey="new_joinee" onCellClick={onCellClick} />
-                        <SummaryRow label="Left" stdValue="" dayValues={summary.left} avgValue={summary_avg.left} days={days} className="da-row-left" statusKey="left" onCellClick={onCellClick} />
+                        <SummaryRow label="On Leave" stdValue="" dayValues={summary.on_leave} avgValue={summary_avg.on_leave} days={days} className="da-row-leave" statusKey="on_leave" expandedStatus={expandedStatus} onToggleStatus={onToggleStatus} summaryEmployeesByDay={summary_employees} colSpan={colSpan} />
+                        <SummaryRow label="Total New Joinee" stdValue="" dayValues={summary.new_joinee} avgValue={summary_avg.new_joinee} days={days} className="da-row-joinee" statusKey="new_joinee" expandedStatus={expandedStatus} onToggleStatus={onToggleStatus} summaryEmployeesByDay={summary_employees} colSpan={colSpan} />
+                        <SummaryRow label="Total Resigned" stdValue="" dayValues={summary.left} avgValue={summary_avg.left} days={days} className="da-row-left" statusKey="left" expandedStatus={expandedStatus} onToggleStatus={onToggleStatus} summaryEmployeesByDay={summary_employees} colSpan={colSpan} />
                         <SummaryRow label="Recruited Head Count" stdValue="" dayValues={summary.recruited_hc} avgValue={summary_avg.recruited_hc} days={days} className="da-row-recruited" />
                     </tfoot>
                 </table>
@@ -494,27 +447,77 @@ function ReportTable({ data, days, unitName, unitCapacity, month, year, expanded
     );
 }
 
-function SummaryRow({ label, stdValue, dayValues, avgValue, days, className, statusKey, onCellClick }) {
-    const clickable = !!statusKey && !!onCellClick;
+function SummaryRow({ label, stdValue, dayValues, avgValue, days, className, statusKey, expandedStatus, onToggleStatus, summaryEmployeesByDay, colSpan }) {
+    const clickable = !!statusKey && !!onToggleStatus;
+    const isExpanded = clickable && expandedStatus === statusKey;
+
+    let employeeRows = [];
+    if (isExpanded) {
+        const map = {};
+        days.forEach((d) => {
+            const list = (summaryEmployeesByDay && summaryEmployeesByDay[d] && summaryEmployeesByDay[d][statusKey]) || [];
+            list.forEach((emp) => {
+                const key = emp.employeeId ?? emp.employeeCode;
+                if (!map[key]) {
+                    map[key] = {
+                        employeeId: key,
+                        employeeName: emp.employeeName,
+                        employeeCode: emp.employeeCode,
+                        departmentName: emp.departmentName,
+                        presence: {},
+                    };
+                }
+                map[key].presence[d] = true;
+            });
+        });
+        employeeRows = Object.values(map).sort((a, b) => a.employeeName.localeCompare(b.employeeName));
+    }
+
     return (
-        <tr className={className}>
-            <td>{label}</td>
-            <td>{stdValue}</td>
-            {days.map((d) => {
-                const val = dayValues && dayValues[d] !== undefined ? dayValues[d] : "";
-                const isClickable = clickable && val !== 0 && val !== "";
-                return (
-                    <td
-                        key={d}
-                        className={`${val === 0 ? "da-empty" : ""} ${isClickable ? "da-cell-clickable" : ""}`}
-                        onClick={isClickable ? () => onCellClick(statusKey, d, label) : undefined}
-                    >
-                        {val === 0 ? "" : val}
+        <>
+            <tr className={className}>
+                <td
+                    className={clickable ? "da-summary-label-clickable" : ""}
+                    onClick={clickable ? () => onToggleStatus(statusKey) : undefined}
+                >
+                    {label}
+                </td>
+                <td>{stdValue}</td>
+                {days.map((d) => {
+                    const val = dayValues && dayValues[d] !== undefined ? dayValues[d] : "";
+                    return (
+                        <td key={d} className={val === 0 || val === "" ? "da-empty" : ""}>
+                            {val === 0 ? "" : val}
+                        </td>
+                    );
+                })}
+                <td>{avgValue || 0}</td>
+            </tr>
+
+            {isExpanded && employeeRows.length === 0 && (
+                <tr className="da-emp-expand-empty-row">
+                    <td colSpan={colSpan} className="da-emp-expand-empty">
+                        No employees found for this range.
                     </td>
-                );
-            })}
-            <td>{avgValue || 0}</td>
-        </tr>
+                </tr>
+            )}
+
+            {isExpanded &&
+                employeeRows.map((emp) => (
+                    <tr key={emp.employeeId} className="da-employee-row da-employee-row-summary">
+                        <td className="da-employee-cell">
+                            {emp.employeeName} - {emp.departmentName} <span className="da-emp-code">({emp.employeeCode})</span>
+                        </td>
+                        <td>–</td>
+                        {days.map((d) => (
+                            <td key={d} className={emp.presence[d] ? "da-yn-yes" : "da-yn-no"}>
+                                {emp.presence[d] ? "Yes" : " "}
+                            </td>
+                        ))}
+                        <td>–</td>
+                    </tr>
+                ))}
+        </>
     );
 }
 

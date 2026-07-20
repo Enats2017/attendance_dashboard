@@ -49,8 +49,11 @@
 .da-table tbody td:last-child { font-weight: 800; color: #065f46; background: rgba(209,250,229,0.4); }
 .da-table tfoot td { font-size: 13px; font-weight: 500; color: #374151; }
 
-.da-row-total td { font-weight: 800 !important; color: #0f172a !important; background: #fef9c3 !important; border-top: 2.5px solid #92400e !important; border-bottom: 2.5px solid #92400e !important; }
-.da-row-total td:first-child { background: #fef9c3 !important; }
+/* FIX: combined "Total Present" row (summary.total_present) — blue, NOT clickable, plain numbers only. */
+.da-row-combined td { font-weight: 800 !important; color: #1e40af !important; background: rgba(219,234,254,0.6) !important; border-top: 2.5px solid #1e40af !important; border-bottom: 1px solid #93c5fd !important; }
+.da-row-combined td:first-child { background: rgba(219,234,254,0.6) !important; cursor: default !important; }
+
+.da-row-total td { font-weight: 700; color: #374151; }
 .da-row-ot td { color: #7c3aed; background: rgba(237,233,254,0.3); }
 .da-row-weekoff td { color: #0369a1; background: rgba(224,242,254,0.3); }
 .da-row-leave td { color: #c2410c; background: rgba(255,237,213,0.3); }
@@ -60,10 +63,25 @@
 .da-row-recruited td:first-child { background: #d9f99d !important; }
 .da-row-sub td { color: #64748b; font-size: 12px; background: rgba(248,250,252,0.6); }
 .da-row-sub td:first-child { padding-left: 26px !important; font-weight: 500; }
+.da-row-heading td { color: #374151; font-size: 13px; background: rgba(248,250,252,0.5); }
 .da-row-absent-total td { color: #b91c1c; font-weight: 700; background: rgba(254,226,226,0.3); }
 
-.da-cell-clickable { cursor: pointer; }
-.da-cell-clickable:hover { background: rgba(124,58,237,0.12) !important; text-decoration: underline; }
+/* FIX: sirf row label click hota hai — value cells ab plain read-only numbers hain. */
+.da-summary-label-clickable { cursor: pointer; }
+
+/* FIX: summary-row expand ab nested <table> nahi use karta — employee rows
+   seedha da-table ke andar plain <tr> ke roop mein add hote hain, isliye
+   dates ka header sirf ek hi baar (top par) dikhta hai, duplicate nahi. */
+.da-emp-expand-empty-row td { text-align: left !important; position: static !important; }
+.da-emp-expand-empty { padding: 10px 14px !important; font-size: 12px; color: #94a3b8; font-style: italic; text-align: left !important; }
+
+.da-employee-row-summary td { background: #fcfcfd; }
+.da-employee-row-summary:first-of-type td { border-top: 2px solid #e2e8f0; }
+
+.da-emp-code { color: #94a3b8; font-weight: 400; }
+.da-yn-yes { color: #059669; font-weight: 700; }
+.da-yn-no { color: #cbd5e1; font-weight: 500; }
+
 .da-table tbody tr:hover td { background: rgba(124,58,237,0.04); }
 
 .da-designation-row td { background: #f8fafc; color: #64748b; font-size: 12px; font-weight: 500; }
@@ -71,7 +89,6 @@
 
 .da-employee-row td { background: #fcfcfd; color: #94a3b8; font-size: 11px; font-weight: 400; }
 .da-employee-cell { padding-left: 46px !important; }
-.da-emp-code { color: #cbd5e1; font-weight: 400; }
 .da-emp-status { font-weight: 700; }
 .da-status-p, .da-status-hd, .da-status-wop, .da-status-wohp, .da-status-sp { color: #059669; }
 .da-status-a { color: #dc2626; }
@@ -121,6 +138,7 @@
 .da-btn-icon-danger:hover { color: #ef4444; background: rgba(239,68,68,0.1); }
 
 .da-toast { position: fixed; top: 80px; right: 28px; z-index: 2000; padding: 12px 20px; border-radius: 10px; font-size: 13px; font-weight: 600; font-family: 'Plus Jakarta Sans', sans-serif; box-shadow: 0 8px 24px rgba(0,0,0,0.15); animation: toastIn 0.3s cubic-bezier(0.16,1,0.3,1) both; display: flex; align-items: center; gap: 8px; }
+
 @keyframes toastIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
 .da-toast-success { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
 .da-toast-error { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
@@ -138,4 +156,3 @@
   .da-report-card { box-shadow: none; border: none; }
   .da-table th, .da-table td { font-size: 10px; padding: 4px 6px; }
 }
-
