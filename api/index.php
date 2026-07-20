@@ -2178,8 +2178,6 @@ function handleGetReport($input) {
 }
  
 
-
-
 /**
  * Get simple list of departments filtered by Location 14
  */
