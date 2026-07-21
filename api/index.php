@@ -447,7 +447,7 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
         $key = $log['empId'] . '_' . $log['date'];
 
         $shiftId = !empty($log['shiftId']) ? $log['shiftId'] : 3;
-        $shiftName = $log['shiftName'] ?: 'NoShift';
+        $shiftName = $log['shiftName'] ?: 'No Shift';
         $shiftCode = $log['shiftCode'] ?: 'NS';
 
         $shiftLookup[$key] = [
@@ -489,7 +489,7 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
                     $shiftCode = null;
                 } else {
                     $shiftId = 3;
-                    $shiftName = 'NoShift';
+                    $shiftName = 'No Shift';
                     $shiftCode = 'NS';
                 }
                 
@@ -516,7 +516,9 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
             $shiftId = $shiftLookup[$key]['shiftId'];
             $shiftStats[$shiftId]['total']++;
 
-            if (isset($logKeyMap[$key])) {
+            if (isset($singlePunchData[$key])) {
+                $shiftStats[$shiftId]['singlePunch']++;
+            } elseif (isset($logKeyMap[$key])) {
                 $log = $logKeyMap[$key];
                 $code = strtoupper(trim($log['detailedStatusCode'] ?? ''));
                 $isWeeklyOff = intval($log['weeklyOff']) === 1;
@@ -525,18 +527,15 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
                     case 'P':
                         $shiftStats[$shiftId]['present']++;
                         break;
-
                     case '½PLD':
                     case 'L_CL':
                     case '½PCL':
                     case '½PLD(HO)':
                         $shiftStats[$shiftId]['halfPresent']++;
                         break;
-
                     case 'WO':
                         $shiftStats[$shiftId]['weeklyOff']++;
                         break;
-
                     case 'WOP':
                         if ($isWeeklyOff) {
                             $shiftStats[$shiftId]['weeklyOffPresent']++;
@@ -544,7 +543,6 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
                             $shiftStats[$shiftId]['present']++;
                         }
                         break;
-
                     case '½PLD(WO)':
                         if ($isWeeklyOff) {
                             $shiftStats[$shiftId]['weeklyOffHalfPresent']++;
@@ -552,20 +550,17 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
                             $shiftStats[$shiftId]['halfPresent']++;
                         }
                         break;
-
                     case 'A':
                     case 'ALD':
                     case 'WOA':
                         $shiftStats[$shiftId]['absent']++;
                         break;
-
                     default:
                         $shiftStats[$shiftId]['absent']++;
                         break;
                 }
             } elseif (isset($deviceEmployeeStats[$key])) {
                 $stat = $deviceEmployeeStats[$key];
-
                 if (($stat['inCount'] ?? 0) >= 1 && ($stat['outCount'] ?? 0) >= 1) {
                     $shiftStats[$shiftId]['present']++;
                 } else {
@@ -1083,7 +1078,7 @@ function handleDashboardData($input, $returnData = false) {
 
     if ($shiftName) {
         $employees = array_values(array_filter($employees, function($emp) use ($shiftName) {
-            return $emp['shiftGroupName'] === $shiftName;
+            return $emp['shift'] === $shiftName;
         }));
         $staffEmpIds  = [];
         $workerEmpIds = [];
@@ -1171,7 +1166,7 @@ function handleDashboardData($input, $returnData = false) {
             'missedInPunch' => 0,                  
             'missedOutPunch' => 0,   
             'shiftId' => 3,
-            'shiftName' => 'NoShift',
+            'shiftName' => 'No Shift',
             'shiftCode' => 'NS',
             'shiftStart' => null,
             'shiftEnd' => null,

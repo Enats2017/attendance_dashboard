@@ -843,7 +843,8 @@ class AttendanceView {
             this._matchesStatus(l, "Present") ||
             this._matchesStatus(l, "Half Present") ||
             this._matchesStatus(l, "WO Present") ||
-            this._matchesStatus(l, "WO Half Present")
+            this._matchesStatus(l, "WO Half Present") ||
+            this._matchesStatus(l, "Single Punch")
         ).map((l) => ({
             log: l,
             emp: empMap[l.empId],
@@ -880,7 +881,7 @@ class AttendanceView {
                 debugStatusCounts.absent++;
             }
 
-            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present");
+            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch");
 
             if (!isPresentOrHalf) return;
 
@@ -945,14 +946,15 @@ class AttendanceView {
             this._matchesStatus(l, "Present") ||
             this._matchesStatus(l, "Half Present") ||
             this._matchesStatus(l, "WO Present") ||
-            this._matchesStatus(l, "WO Half Present")
+            this._matchesStatus(l, "WO Half Present") ||
+            this._matchesStatus(l, "Single Punch")
         ).map((l) => ({
             log: l,
             emp: empMap[l.empId],
             date: l.date,
         }));
 
-        const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) + (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0);
+        const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) + (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0) + (stats.singlePunch || 0);
 
         if (!families.length) {
             return `
@@ -977,7 +979,7 @@ class AttendanceView {
         dayLogs.forEach((l) => {
             const e = empMap[l.empId];
             if (!e) return;
-            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present");
+            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch");
             if (!isPresentOrHalf) return;
 
             const famInfo = famMap[e.designationId];
@@ -1058,18 +1060,19 @@ class AttendanceView {
         dayLogs.forEach((l) => {
             const e = empMap[l.empId];
             if (!e) return;
-            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present");
+            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch");
             if (!isPresentOrHalf) return;
             if (counts[e.company] !== undefined) counts[e.company]++;
         });
 
-        const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) + (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0);
+        const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) + (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0) + (stats.singlePunch || 0);
 
         this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
             this._matchesStatus(l, "Present") ||
             this._matchesStatus(l, "Half Present") ||
             this._matchesStatus(l, "WO Present") ||
-            this._matchesStatus(l, "WO Half Present")
+            this._matchesStatus(l, "WO Half Present") ||
+            this._matchesStatus(l, "Single Punch")
         ).map((l) => ({
             log: l,
             emp: empMap[l.empId],
@@ -1195,19 +1198,20 @@ class AttendanceView {
         dayLogs.forEach((l) => {
             const e = empMap[l.empId];
             if (!e) return;
-            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present");
+            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch");
             if (!isPresentOrHalf) return;
             if (counts[e.dept] !== undefined) counts[e.dept]++;
         });
 
         // const totalPresentHalf = depts.reduce((sum, d) => sum + counts[d], 0);
-        const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) + (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0);
+        const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) + (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0) + (stats.singlePunch || 0);
 
         this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
             this._matchesStatus(l, "Present") ||
             this._matchesStatus(l, "Half Present") ||
             this._matchesStatus(l, "WO Present") ||
-            this._matchesStatus(l, "WO Half Present")
+            this._matchesStatus(l, "WO Half Present") ||
+            this._matchesStatus(l, "Single Punch")
         ).map((l) => ({
             log: l,
             emp: empMap[l.empId],
@@ -1278,14 +1282,14 @@ class AttendanceView {
         dayLogs.forEach((l) => {
             const e = empMap[l.empId];
             if (!e) return;
-            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present");
+            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch");
             if (!isPresentOrHalf) return;
             if (counts[e.gender] !== undefined) counts[e.gender]++;
         });
 
-        this._currentTabPresentHeadcountItems = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present"),).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
-        // const totalPresentHalf = this._currentTabPresentHeadcountItems.length;
-        const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) + (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0);
+        this._currentTabPresentHeadcountItems = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch"),).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
+        
+        const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) + (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0) + (stats.singlePunch || 0);
 
         const cards = [
             { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
@@ -1344,7 +1348,8 @@ class AttendanceView {
             this._matchesStatus(l, "Present") ||
             this._matchesStatus(l, "Half Present") ||
             this._matchesStatus(l, "WO Present") ||
-            this._matchesStatus(l, "WO Half Present")
+            this._matchesStatus(l, "WO Half Present") ||
+            this._matchesStatus(l, "Single Punch")
         ).map((l) => ({
             log: l,
             emp: empMap[l.empId],
@@ -1843,19 +1848,36 @@ class AttendanceView {
         `;
     }
 
+
     _renderShiftSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
         const dayLogs = this._buildShiftStatsLogs(emps, logs, dateFrom, dateTo);
         this._currentShiftSummaryData = { emps, model, dayLogs, empMap };
 
-        const shiftStats = model.state.data.shiftStats || [];
+        const shifts = [...new Set(dayLogs.map((l) => l.shiftName || "No Shift"))];
         const colorCls = ["info", "success", "warning", "accent", "danger"];
+
+        const counts = {};
+        shifts.forEach((s) => (counts[s] = 0));
+
+        dayLogs.forEach((l) => {
+            const isPresentOrHalf =
+                this._matchesStatus(l, "Present") ||
+                this._matchesStatus(l, "Half Present") ||
+                this._matchesStatus(l, "WO Present") ||
+                this._matchesStatus(l, "WO Half Present") ||
+                this._matchesStatus(l, "Single Punch");
+            if (!isPresentOrHalf) return;
+            const s = l.shiftName || "No Shift";
+            if (counts[s] !== undefined) counts[s]++;
+        });
 
         this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
             this._matchesStatus(l, "Present") ||
             this._matchesStatus(l, "Half Present") ||
             this._matchesStatus(l, "WO Present") ||
-            this._matchesStatus(l, "WO Half Present")
+            this._matchesStatus(l, "WO Half Present") ||
+            this._matchesStatus(l, "Single Punch")
         ).map((l) => ({
             log: l,
             emp: empMap[l.empId],
@@ -1865,50 +1887,57 @@ class AttendanceView {
         const totalPresentHalf = this._currentTabPresentHeadcountItems.length;
 
         const cards = [
-            { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
-            ...shiftStats.map((s, i) => ({ type: "shift", label: s.shiftName, val: (s.present || 0) + (s.halfPresent || 0), icon: "ph-clock-clockwise", cls: colorCls[i % colorCls.length], shift: s.shiftName, })),
-            { type: "avgHours", label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", },
+            { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "" },
+            ...shifts.map((s, i) => ({
+                type: "shift",
+                label: s,
+                val: counts[s],
+                icon: "ph-clock-clockwise",
+                cls: colorCls[i % colorCls.length],
+                shift: s,
+            })),
+            { type: "avgHours", label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "" },
         ];
 
         return `
             <div class="summary-grid">
                 ${cards.map((c) => {
-            if (c.type === "shift") {
-                return `
-                    <div class="stat-card ${c.cls} stat-card-clickable"
-                        data-shift="${this._escapeAttr(c.shift)}"
-                        onclick="AppController.view._showShiftSummaryDrilldown('${this._escapeAttr(c.shift)}')">
-                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                        <div class="stat-content">
-                            <span class="stat-label">${c.label}</span>
-                            <span class="stat-value">${c.val}</span>
-                            <span class="stat-card-hint">↓ click to view</span>
-                        </div>
-                    </div>
-                `;
-            }
-            if (c.type === "avgHours") {
-                return `
-                    <div class="stat-card">
-                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                    if (c.type === "shift") {
+                        return `
+                            <div class="stat-card ${c.cls} stat-card-clickable"
+                                data-shift="${this._escapeAttr(c.shift)}"
+                                onclick="AppController.view._showShiftSummaryDrilldown('${this._escapeAttr(c.shift)}')">
+                                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                                <div class="stat-content">
+                                    <span class="stat-label">${c.label}</span>
+                                    <span class="stat-value">${c.val}</span>
+                                    <span class="stat-card-hint">↓ click to view</span>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    if (c.type === "avgHours") {
+                        return `
+                            <div class="stat-card">
+                                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                                <div class="stat-content">
+                                    <span class="stat-label">${c.label}</span>
+                                    <span class="stat-value">${c.val}</span>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    return `
+                        <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
+                            <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                             <div class="stat-content">
                                 <span class="stat-label">${c.label}</span>
                                 <span class="stat-value">${c.val}</span>
+                                <span class="stat-card-hint">↓ click to view</span>
                             </div>
                         </div>
-                `;
-            }
-            return `
-                <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
-                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                    <div class="stat-content">
-                        <span class="stat-label">${c.label}</span>
-                        <span class="stat-value">${c.val}</span>
-                        <span class="stat-card-hint">↓ click to view</span>
-                    </div>
-                </div>
-            `;
-        }).join("")}
+                    `;
+                }).join("")}
             </div>
         `;
     }
@@ -1969,7 +1998,6 @@ class AttendanceView {
 
 
     _renderNightSummaryCards(emps, stats, model, logs, empMap) {
-        // Ignore passed-in generic data — always scope to night-shift-only employees/logs
         const nightData = model.getNightShiftData();
         const nEmps = nightData.emps;
         const nLogs = nightData.logs;
@@ -1994,8 +2022,11 @@ class AttendanceView {
         });
 
         this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
-            this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") ||
-            this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present")
+            this._matchesStatus(l, "Present") || 
+            this._matchesStatus(l, "Half Present") ||
+            this._matchesStatus(l, "WO Present") || 
+            this._matchesStatus(l, "WO Half Present") ||
+            this._matchesStatus(l, "Single Punch")
         ).map((l) => ({ log: l, emp: nEmpMap[l.empId], date: l.date }));
 
         const totalPresentHalf = this._currentTabPresentHeadcountItems.length;
@@ -2083,7 +2114,7 @@ class AttendanceView {
         dayLogs.forEach((l) => {
             const e = empMap[l.empId];
             if (!e) return;
-            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present");
+            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch");
             if (!isPresentOrHalf) return;
             if (counts[e.dept] !== undefined) {
                 counts[e.dept]++;
@@ -2096,7 +2127,8 @@ class AttendanceView {
             this._matchesStatus(l, "Present") ||
             this._matchesStatus(l, "Half Present") ||
             this._matchesStatus(l, "WO Present") ||
-            this._matchesStatus(l, "WO Half Present")
+            this._matchesStatus(l, "WO Half Present") ||
+            this._matchesStatus(l, "Single Punch")
         ).map((l) => ({
             log: l,
             emp: empMap[l.empId],
@@ -2168,7 +2200,7 @@ class AttendanceView {
         dayLogs.forEach((l) => {
             const e = empMap[l.empId];
             if (!e) return;
-            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present");
+            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch");
             if (!isPresentOrHalf) return;
             if (counts[e.dept] !== undefined) {
                 counts[e.dept]++;
@@ -2179,7 +2211,8 @@ class AttendanceView {
             this._matchesStatus(l, "Present") ||
             this._matchesStatus(l, "Half Present") ||
             this._matchesStatus(l, "WO Present") ||
-            this._matchesStatus(l, "WO Half Present")
+            this._matchesStatus(l, "WO Half Present") ||
+            this._matchesStatus(l, "Single Punch")
         ).map((l) => ({
             log: l,
             emp: empMap[l.empId],
@@ -2329,10 +2362,8 @@ class AttendanceView {
 
     _showShiftSummaryDrilldown(shiftName) {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-shift="${shiftName}"]`,);
-        if (card) {
-            card.classList.add("active");
-        }
+        const card = this.app.querySelector(`.stat-card-clickable[data-shift="${shiftName}"]`);
+        if (card) card.classList.add("active");
 
         const data = this._currentShiftSummaryData;
         if (!data) return;
@@ -2341,7 +2372,11 @@ class AttendanceView {
         const shiftLogs = dayLogs.filter((l) => {
             const e = empMap[l.empId];
             if (!e || (l.shiftName || "No Shift") !== shiftName) return false;
-            return (this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present"));
+            return this._matchesStatus(l, "Present") ||
+                this._matchesStatus(l, "Half Present") ||
+                this._matchesStatus(l, "WO Present") ||
+                this._matchesStatus(l, "WO Half Present") ||
+                this._matchesStatus(l, "Single Punch");
         });
 
         const items = shiftLogs.map((l) => ({
@@ -2425,7 +2460,7 @@ class AttendanceView {
         const deptLogs = dayLogs.filter((l) => {
             const e = empMap[l.empId];
             if (!e || e.dept !== dept) return false;
-            return (this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present"));
+            return (this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "Single Punch"));
         });
 
         const items = deptLogs.map((l) => ({
@@ -2467,7 +2502,7 @@ class AttendanceView {
             if (!e) return false;
             const famInfo = famMap[e.designationId];
             if (!famInfo || famInfo.familyId !== familyId) return false;
-            return this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present");
+            return this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "Single Punch");
         }).map((l) => ({
             log: l,
             emp: empMap[l.empId],
@@ -2493,7 +2528,7 @@ class AttendanceView {
             items = data.dayLogs.filter((l) => {
                 const e = data.empMap[l.empId];
                 if (!e || e.company !== company) return false;
-                return (this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present"));
+                return (this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "Single Punch"));
             }).map((l) => ({
                 log: l,
                 emp: data.empMap[l.empId],
@@ -2529,7 +2564,7 @@ class AttendanceView {
                 const e = empMap[l.empId];
                 if (!e || mergeCat(e.companyCategory) !== category) return;
                 
-                const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present");
+                const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch");
                 
                 if (!isPresentOrHalf) return;
                 if (companyCounts[e.company] !== undefined) companyCounts[e.company]++;
@@ -2615,7 +2650,7 @@ class AttendanceView {
                 const e = data.empMap[l.empId];
                 if (!e || data.model.getAgeGroup(e.dob) !== group)
                     return false;
-                return (this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present"));
+                return (this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "Single Punch"));
             }).map((l) => ({
                 log: l,
                 emp: data.empMap[l.empId],
@@ -3449,7 +3484,7 @@ class AttendanceView {
                     result.push({
                         ...log,
                         shiftId: log.shiftId ?? emp.shiftId ?? null,
-                        shiftName: log.shiftName ?? emp.shift ?? "NoShift",
+                        shiftName: log.shiftName ?? emp.shift ?? "No Shift",
                         shiftGroupName: log.shiftGroupName ?? emp.shiftGroupName ?? "",
                         shiftStart: log.shiftStart ?? emp.shiftStart ?? null,
                         shiftEnd: log.shiftEnd ?? emp.shiftEnd ?? null,
@@ -3477,7 +3512,7 @@ class AttendanceView {
                     missedInPunch: 0,
                     missedOutPunch: 0,
                     shiftId: emp.shiftId ?? null,
-                    shiftName: emp.shift ?? "NoShift",
+                    shiftName: emp.shift ?? "No Shift",
                     shiftGroupName: emp.shiftGroupName ?? "",
                     shiftStart: emp.shiftStart ?? null,
                     shiftEnd: emp.shiftEnd ?? null,
@@ -5589,7 +5624,7 @@ class AttendanceView {
                     "Shift Attendance",
                     (shiftName, index, seriesIndex, seriesName) => {
                         const filteredLogs = fullLogs.filter((l) => {
-                            if ((l.shiftName || "NoShift") !== shiftName) { return false; }
+                            if ((l.shiftName || "No Shift") !== shiftName) { return false; }
                             return this._matchesStatus(l, seriesName);
                         });
 

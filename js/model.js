@@ -81,9 +81,9 @@ class AttendanceModel {
             ]);
 
             this.state.filterLists = {
-                depts:     Array.isArray(deptRes)  ? deptRes.map(d => d.DepartmentName).filter(Boolean)  : [],
-                companies: Array.isArray(compRes)  ? compRes.map(c => c.CompanyName).filter(Boolean)      : [],
-                shifts:    Array.isArray(shiftRes) ? shiftRes.map(s => s.ShiftName).filter(Boolean)       : []
+                depts: Array.isArray(deptRes) ? deptRes.map(d => d.DepartmentName).filter(Boolean) : [],
+                companies: Array.isArray(compRes) ? compRes.map(c => c.CompanyName).filter(Boolean) : [],
+                shifts: (Array.isArray(shiftRes) ? shiftRes.map(s => s.ShiftName).filter(Boolean) : []).concat('No Shift')
             };
 
             this._commit();              // ← ADD THIS LINE
@@ -91,9 +91,8 @@ class AttendanceModel {
 
         } catch (error) {
             console.error('Fetch Filter Options Error:', error);
-            // Don't crash the app - just use empty lists
-            this.state.filterLists = { depts: [], companies: [], shifts: [] };
-            this._commit();              // ← ADD THIS LINE
+            this.state.filterLists = { depts: [], companies: [], shifts: ['No Shift'] };   
+            this._commit();
             return { success: false, error: error.message };
         }
     }
@@ -234,7 +233,7 @@ class AttendanceModel {
             if (filters.gender !== 'All' && emp.gender !== filters.gender) {
                 return false;
             }
-            if (filters.shift !== 'All' && emp.log !== filters.shift) {
+            if (filters.shift !== 'All' && emp.shift !== filters.shift) {
                 return false;
             }
             if (filters.location !== 'All' && emp.location !== filters.location) {
