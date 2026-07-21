@@ -283,12 +283,14 @@ class AttendanceView {
 		`;
     }
     
+
     _scrollActiveSidebarItem() {
         const activeItem = document.querySelector(".sidebar-nav .nav-item.active");
         if (!activeItem) return;
         activeItem.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
     }
 
+    
     _renderTopbar(state) {
         const user = window.HRMS_USER || {};
         const displayName = user.name || user.username || "Admin User";
@@ -1037,6 +1039,7 @@ class AttendanceView {
         `;
     }
 
+
     _renderCompanySummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
         const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
@@ -1183,6 +1186,7 @@ class AttendanceView {
             <div id="company-category-drilldown" style="margin-top:8px;"></div>
         `;
     }
+
 
     _renderDeptSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
@@ -1340,6 +1344,7 @@ class AttendanceView {
         `;
     }
 
+
     _renderLateInSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
         const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo,);
@@ -1381,6 +1386,7 @@ class AttendanceView {
         `;
     }
 
+
     _renderEarlyOutSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
         const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
@@ -1408,6 +1414,7 @@ class AttendanceView {
             </div>
         `;
     }
+
 
     _renderResignedSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
@@ -1627,6 +1634,7 @@ class AttendanceView {
             </div>
         `;
     }
+
 
     _renderNewJoinedSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
@@ -1979,6 +1987,7 @@ class AttendanceView {
         return `<div class="summary-grid">${totalCard}${shiftCards}</div>`;
     }
 
+
     _showManualPunchShiftDrilldown(shiftName) {
         document.querySelectorAll(".stat-card-clickable[data-mp-shift],.stat-card-clickable[data-mp-total]")
             .forEach(c => c.classList.remove("active"));
@@ -2079,6 +2088,7 @@ class AttendanceView {
             </div>
         `;
     }
+
 
     _showNightSummaryDrilldown(shiftName) {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
@@ -2184,6 +2194,7 @@ class AttendanceView {
         `;
     }
 
+
     _renderWorkerSummaryCards(emps, stats, model, logs, empMap) {
         const workerTeamId = model.state.teamConfig?.workerTeamId ?? 6;
         const workerEmps = emps.filter((e) => e.team === workerTeamId);
@@ -2270,6 +2281,7 @@ class AttendanceView {
         `;
     }
 
+
     _showWorkerSummaryDrilldown(dept) {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
         const card = this.app.querySelector(`.stat-card-clickable[data-worker-dept="${dept}"]`,);
@@ -2299,6 +2311,7 @@ class AttendanceView {
         this._renderStatCardDrilldown("workerSummary_" + dept, items, 1);
     }
 
+
     _showAvgHoursWorkerDrilldown() {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
         const card = this.app.querySelector(`.stat-card-clickable[data-card-key="avgHoursWorker"]`,);
@@ -2315,6 +2328,7 @@ class AttendanceView {
         this._renderStatCardDrilldown("avgHoursWorker", items, 1);
     }
 
+    
     _showStaffSummaryDrilldown(dept) {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
         const card = this.app.querySelector(`.stat-card-clickable[data-staff-dept="${dept}"]`,);
@@ -2344,6 +2358,7 @@ class AttendanceView {
         this._renderStatCardDrilldown("staffSummary_" + dept, items, 1);
     }
 
+    
     _showAvgHoursStaffDrilldown() {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
         const card = this.app.querySelector(`.stat-card-clickable[data-card-key="avgHoursStaff"]`,);
@@ -2360,6 +2375,7 @@ class AttendanceView {
         this._renderStatCardDrilldown("avgHoursStaff", items, 1);
     }
 
+    
     _showShiftSummaryDrilldown(shiftName) {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
         const card = this.app.querySelector(`.stat-card-clickable[data-shift="${shiftName}"]`);
@@ -2388,6 +2404,7 @@ class AttendanceView {
         this._renderStatCardDrilldown("shiftSummary_" + shiftName, items, 1);
     }
 
+
     _showAvgHoursShiftDrilldown() {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
         const card = this.app.querySelector(`.stat-card-clickable[data-card-key="avgHoursShift"]`,);
@@ -2401,6 +2418,7 @@ class AttendanceView {
 
         this._renderStatCardDrilldown("avgHoursShift", items, 1);
     }
+
 
     _showGenderSummaryDrilldown(gender) {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
@@ -2429,6 +2447,7 @@ class AttendanceView {
         this._renderStatCardDrilldown("genderSummary_" + gender, items, 1);
     }
 
+
     _showAvgHoursGenderDrilldown() {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
         const card = this.app.querySelector(`.stat-card-clickable[data-card-key="avgHoursGender"]`,);
@@ -2444,6 +2463,7 @@ class AttendanceView {
 
         this._renderStatCardDrilldown("avgHoursGender", items, 1);
     }
+
 
     _showDeptSummaryDrilldown(dept) {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
@@ -2471,6 +2491,7 @@ class AttendanceView {
 
         this._renderStatCardDrilldown("deptSummary_" + dept, items, 1);
     }
+
 
     _showAvgHoursDeptDrilldown() {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
@@ -2538,6 +2559,7 @@ class AttendanceView {
 
         this._renderStatCardDrilldown("company_" + company, items, 1);
     }
+
 
     _showCompanyCategoryDrilldown(category) {
         document.querySelectorAll(".stat-card-clickable[data-company-category]").forEach((c) => c.classList.remove("active"));
@@ -2620,6 +2642,7 @@ class AttendanceView {
         panel.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
+
     _showAvgHoursDrilldown() {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
         const card = this.app.querySelector(`.stat-card-clickable[data-card-key="avgHours"]`,);
@@ -2633,6 +2656,7 @@ class AttendanceView {
 
         this._renderStatCardDrilldown("avgHours", items, 1);
     }
+
 
     _showAgeGroupDrilldown(group) {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
@@ -2660,6 +2684,7 @@ class AttendanceView {
 
         this._renderStatCardDrilldown("ageGroup_" + group, items, 1);
     }
+
 
     _showDashboardDeptDrilldown(dept) {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
@@ -2726,6 +2751,7 @@ class AttendanceView {
         panel.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
+
     _showDashboardFamilyDrilldown(familyId) {
         document.querySelectorAll(".stat-card-clickable[data-dashboard-family-id]").forEach((c) => c.classList.remove("active"));
         const card = this.app.querySelector(`.stat-card-clickable[data-dashboard-family-id="${familyId}"]`);
@@ -2744,6 +2770,7 @@ class AttendanceView {
         this._renderStatCardDrilldown("dashboardFamily_" + familyId, items, 1);
     }
 
+
     _showDashboardDesigDrilldown(designation) {
         document.querySelectorAll(".stat-card-clickable[data-dashboard-desig]").forEach((c) => c.classList.remove("active"));
         const card = this.app.querySelector(`.stat-card-clickable[data-dashboard-desig="${designation}"]`,);
@@ -2757,6 +2784,7 @@ class AttendanceView {
 
         this._renderStatCardDrilldown("dashboardDesig_" + designation, items, 1);
     }
+
 
     _showNewJoinedBreakdownDrilldown(type, value) {
         document.querySelectorAll("[data-nj-company],[data-nj-gender],[data-nj-workforce],[data-nj-age]",).forEach((c) => c.classList.remove("active"));
@@ -2791,11 +2819,13 @@ class AttendanceView {
         this._renderStatCardDrilldown(`njBreakdown_${type}_${value}`, items, 1, "newjoined-breakdown-drilldown", "AppController.view._closeNewJoinedBreakdownDrilldown()");
     }
 
+
     _closeNewJoinedBreakdownDrilldown() {
         const c = document.getElementById("newjoined-breakdown-drilldown");
         if (c) c.innerHTML = "";
         document.querySelectorAll("[data-nj-company],[data-nj-gender],[data-nj-workforce],[data-nj-age]",).forEach((el) => el.classList.remove("active"));
     }
+
 
     _showNewJoinedDeptDrilldown(dept) {
         document.querySelectorAll(".stat-card-clickable[data-newjoined-dept]").forEach((c) => c.classList.remove("active"));
@@ -2860,6 +2890,7 @@ class AttendanceView {
         panel.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
+
     _showResignedBreakdownDrilldown(type, value) {
         document.querySelectorAll("[data-res-company],[data-res-gender],[data-res-workforce],[data-res-age]",).forEach((c) => c.classList.remove("active"));
 
@@ -2891,11 +2922,13 @@ class AttendanceView {
         this._renderStatCardDrilldown(`resBreakdown_${type}_${value}`, items, 1, "resigned-breakdown-drilldown", "AppController.view._closeResignedBreakdownDrilldown()");
     }
 
+
     _closeResignedBreakdownDrilldown() {
         const c = document.getElementById("resigned-breakdown-drilldown");
         if (c) c.innerHTML = "";
         document.querySelectorAll("[data-res-company],[data-res-gender],[data-res-workforce],[data-res-age]",).forEach((el) => el.classList.remove("active"));
     }
+
 
     _showResignedDeptDrilldown(dept) {
         document.querySelectorAll(".stat-card-clickable[data-resigned-dept]").forEach((c) => c.classList.remove("active"));
@@ -2960,6 +2993,7 @@ class AttendanceView {
         panel.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
+
     _showResignedDesigDrilldown(designation) {
         document.querySelectorAll(".stat-card-clickable[data-resigned-desig]").forEach((c) => c.classList.remove("active"));
         const card = this.app.querySelector(`.stat-card-clickable[data-resigned-desig="${designation}"]`,);
@@ -2974,11 +3008,13 @@ class AttendanceView {
         this._renderStatCardDrilldown("resignedDesig_" + designation, items, 1, "resigned-desig-table-container", "AppController.view._closeResignedDesigTable()",);
     }
 
+
     _closeResignedDesigTable() {
         const c = document.getElementById("resigned-desig-table-container");
         if (c) c.innerHTML = "";
         document.querySelectorAll(".stat-card-clickable[data-resigned-desig]").forEach((el) => el.classList.remove("active"));
     }
+
 
     _showNewJoinedDesigDrilldown(designation) {
         document.querySelectorAll(".stat-card-clickable[data-newjoined-desig]").forEach((c) => c.classList.remove("active"));
@@ -2994,17 +3030,20 @@ class AttendanceView {
         this._renderStatCardDrilldown("newjoinedDesig_" + designation, items, 1, "newjoined-desig-table-container", "AppController.view._closeNewJoinedDesigTable()",);
     }
 
+
     _closeNewJoinedDesigTable() {
         const c = document.getElementById("newjoined-desig-table-container");
         if (c) c.innerHTML = "";
         document.querySelectorAll(".stat-card-clickable[data-newjoined-desig]").forEach((el) => el.classList.remove("active"));
     }
 
+
     _closeDashboardDesigTable() {
         const c = document.getElementById("dashboard-desig-table-container");
         if (c) c.innerHTML = "";
         document.querySelectorAll(".stat-card-clickable[data-dashboard-desig]").forEach((el) => el.classList.remove("active"));
     }
+
 
     _renderTabContent(tabId, logs, emps, empMap, filters, counts, model) {
         let content;
@@ -3121,6 +3160,7 @@ class AttendanceView {
         return typeof content === "object" ? content.html : content;
     }
 
+
     _initChartRendering(tabId, logs, emps, empMap, filters, counts, model, renderToken) {
         if (tabId === "designation_order") {
             this._initDesignationOrderTab(model);
@@ -3149,6 +3189,7 @@ class AttendanceView {
         }
     }
 
+
     _waitForLayout(renderToken, callback, attempts = 0) {
         if (renderToken !== this._renderToken) {
             return;
@@ -3173,6 +3214,7 @@ class AttendanceView {
         }, 30);
     }
 
+
     _restoreFilterValues(filters) {
         const fields = ["company", "dept", "shift", "location"];
         fields.forEach((f) => {
@@ -3182,6 +3224,7 @@ class AttendanceView {
             }
         });
     }
+
 
     bindSwitchTab(handler) {
         if (this._tabClickHandler) {
@@ -3195,6 +3238,7 @@ class AttendanceView {
         };
         this.app.addEventListener("click", this._tabClickHandler);
     }
+
 
     bindApplyFilters(handler) {
         if (this._applyFilterHandler) {
@@ -3215,6 +3259,7 @@ class AttendanceView {
         this.app.addEventListener("click", this._applyFilterHandler);
     }
 
+
     bindRefreshData(handler) {
         if (this._refreshHandler) {
             this.app.removeEventListener("click", this._refreshHandler);
@@ -3226,6 +3271,7 @@ class AttendanceView {
         };
         this.app.addEventListener("click", this._refreshHandler);
     }
+
 
     bindResetFilters(handler) {
         if (this._resetHandler) {
@@ -3239,6 +3285,7 @@ class AttendanceView {
         this.app.addEventListener("click", this._resetHandler);
     }
 
+
     showOverlay(message) {
         const overlay = document.getElementById("auth-check-overlay");
         if (overlay) {
@@ -3247,6 +3294,7 @@ class AttendanceView {
             overlay.querySelector("p").innerText = message;
         }
     }
+
 
     hideOverlay() {
         const overlay = document.getElementById("auth-check-overlay");
@@ -3308,6 +3356,7 @@ class AttendanceView {
         });
         return out;
     }
+
 
     _getDateRange(dateFrom, dateTo) {
         const dates = [];
@@ -3617,6 +3666,7 @@ class AttendanceView {
 		`;
     }
 
+    
     _tableHTML(id, headers, rows, exportName, startIndex = 0) {
         const ths = `<th class="sr-col">Sr No</th>` + headers.map((h) => `<th>${h}</th>`).join("");
 
@@ -3652,6 +3702,7 @@ class AttendanceView {
         `;
     }
 
+    
     _renderFeature(counts) {
         return {
             html: `
@@ -3684,6 +3735,7 @@ class AttendanceView {
         };
     }
 
+    
     _renderAll(logs, emps, empMap, filters, page = 1) {
         this._currentAllLogs = logs;
         this._currentAllEmps = emps;
@@ -3895,6 +3947,7 @@ class AttendanceView {
         };
     }
 
+    
     _reRenderAllPage(page) {
         const content = this._renderAll(
             this._currentAllLogs,
@@ -4079,6 +4132,7 @@ class AttendanceView {
         container.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
+    
     closeDrillDown() {
         const d = document.getElementById("drilldown-table");
         if (d) d.innerHTML = "";
@@ -4225,6 +4279,7 @@ class AttendanceView {
         return String(str).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
 
+
     _computeNiceAxis(maxValue, tickCount = 4) {
         if (maxValue <= 0) {
             return { ticks: [0, 1], niceMax: 1 };
@@ -4255,6 +4310,7 @@ class AttendanceView {
 
         return { ticks, niceMax: niceMax || 1 };
     }
+
 
     _renderDeptAccordionChart(depts, rows) {
         const maxTotal = Math.max(1, ...rows.map((r) => r[1]));
@@ -4319,6 +4375,7 @@ class AttendanceView {
 			</div>
 		`;
     }
+
 
     _toggleDeptAccordionEl(expandEl, dept, emps, logs, model) {
         if (expandEl.style.display !== "none" && expandEl.innerHTML !== "") {
@@ -4560,6 +4617,8 @@ class AttendanceView {
             },
         };
     }
+    
+    
     _reRenderAgeWisePage(page) {
         const content = this._renderAgeWise(
             this._currentAgeWiseLogs,
@@ -4572,6 +4631,7 @@ class AttendanceView {
         content.renderCharts();
     }
 
+    
     _matchesStatus(log, seriesName) {
         if (log.status === "Single Punch") {
             return seriesName === "Single Punch";
@@ -4714,6 +4774,8 @@ class AttendanceView {
             },
         };
     }
+    
+    
     _reRenderCompanyWisePage(page) {
         const content = this._renderCompanyWise(
             this._currentCompanyWiseLogs,
@@ -4726,6 +4788,7 @@ class AttendanceView {
         content.renderCharts();
     }
 
+    
     _renderDeptWise(logs, emps, empMap, model, page = 1) {
         this._currentDeptWiseLogs = logs;
         this._currentDeptWiseEmps = emps;
@@ -4836,6 +4899,8 @@ class AttendanceView {
             },
         };
     }
+    
+    
     _reRenderDeptWisePage(page) {
         const content = this._renderDeptWise(
             this._currentDeptWiseLogs,
@@ -4848,6 +4913,7 @@ class AttendanceView {
         content.renderCharts();
     }
 
+    
     _renderDeptDesignationDrilldown(dept, emps, logs, model, anchorEl) {
         const deptEmps = emps.filter((e) => e.dept === dept);
         const { dateFrom, dateTo } = model.state.filters;
@@ -5028,6 +5094,8 @@ class AttendanceView {
             },
         };
     }
+    
+    
     _reRenderGenderWisePage(page) {
         const content = this._renderGenderWise(
             this._currentGenderWiseLogs,
@@ -5040,6 +5108,7 @@ class AttendanceView {
         content.renderCharts();
     }
 
+    
     _fmtMins(mins) {
         const m = parseInt(mins) || 0;
         if (m <= 0) return "-";
@@ -5048,6 +5117,7 @@ class AttendanceView {
         return `${Math.floor(m / 60)}h ${m % 60}m`;
     }
 
+    
     _formatDate(dateStr) {
         if (!dateStr) return "-";
         try {
@@ -5061,6 +5131,7 @@ class AttendanceView {
         }
     }
 
+    
     _calculateAge(dobStr) {                        
         if (!dobStr) return "-";
         const dob = new Date(dobStr);
@@ -5074,6 +5145,7 @@ class AttendanceView {
         return age;
     }
 
+    
     _getSeverityStyle(count) {
         if (count < this.LATE_THRESHOLD) return "";
         const intensity = Math.min((count - this.LATE_THRESHOLD + 1) / 8, 1);
@@ -5081,6 +5153,7 @@ class AttendanceView {
         return `background: rgba(244,63,94,${alpha});`;
     }
 
+    
     _renderLateIn(logs, emps, empMap, model, page = 1) {
         const groups = model ? model.getLateInEmployeesGrouped() : this._currentLateInGroups;
         this._currentLateInGroups = groups;
@@ -5180,18 +5253,21 @@ class AttendanceView {
         };
     }
 
+    
     _showLateInEmployeeDrilldown(empId) {
         const group = (this._currentLateInGroups || []).find((g) => String(g.emp.id) === String(empId));
         if (!group) return;
         this._renderDrillDown(group.logs, `Late In - ${group.emp.name} (${group.emp.code})`, this._currentLateInEmpMap);
     }
 
+    
     _reRenderLateInPage(page) {
         const content = this._renderLateIn(null, null, this._currentLateInEmpMap, null, page);
         document.querySelector(".tab-pane-container").innerHTML = content.html;
         content.renderCharts();
     }
 
+    
     _renderEarlyOut(logs, emps, empMap, model, page = 1) {
         const groups = model ? model.getEarlyOutEmployeesGrouped() : this._currentEarlyOutGroups;
         this._currentEarlyOutGroups = groups;
@@ -5304,18 +5380,21 @@ class AttendanceView {
         };
     }
 
+    
     _showEarlyOutEmployeeDrilldown(empId) {
         const group = (this._currentEarlyOutGroups || []).find((g) => String(g.emp.id) === String(empId));
         if (!group) return;
         this._renderDrillDown(group.logs, `Early Out - ${group.emp.name} (${group.emp.code})`, this._currentEarlyOutEmpMap);
     }
 
+    
     _reRenderEarlyOutPage(page) {
         const content = this._renderEarlyOut(null, null, this._currentEarlyOutEmpMap, null, page);
         document.querySelector(".tab-pane-container").innerHTML = content.html;
         content.renderCharts();
     }
 
+    
     _renderNightShift(logs, emps, empMap, model, page = 1) {
         this._currentNightShiftLogs = logs;
         this._currentNightShiftEmps = emps;
@@ -5404,6 +5483,7 @@ class AttendanceView {
         };
     }
 
+    
     _reRenderNightShiftPage(page) {
         const content = this._renderNightShift(
             this._currentNightShiftLogs,
@@ -5526,6 +5606,8 @@ class AttendanceView {
             },
         };
     }
+    
+    
     _reRenderDesignationWisePage(page) {
         const content = this._renderDesignationWise(
             this._currentDesignationWiseLogs,
@@ -5538,6 +5620,7 @@ class AttendanceView {
         content.renderCharts();
     }
 
+    
     _renderShiftWise(logs, emps, empMap, model, page = 1) {
         this._currentShiftWiseLogs = logs;
         this._currentShiftWiseEmps = emps;
@@ -5744,6 +5827,7 @@ class AttendanceView {
         content.renderCharts();
     }
 
+    
     _buildPaginatedTable(rows, headers, page, pageSize, tableId, reRenderFnName) {
         const currentPage = page;
         const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
@@ -5791,6 +5875,7 @@ class AttendanceView {
 		`;
     }
 
+    
     _renderSpecial(logs, emps, empMap, filters, model, npPage = 1, spPage = 1) {
         const noPunch = model.findNoPunchEmployees();
         const singlePunchItems = model.getSinglePunchEmployees();
@@ -5844,6 +5929,7 @@ class AttendanceView {
         };
     }
 
+    
     _reRenderNoPunchPage(page) {
         const rows = this._currentNoPunchRows || [];
         const headers = ["Code", "Name", "Dept", "Designation", "Shift", "Company", "Gap", "Start"];
@@ -5853,6 +5939,7 @@ class AttendanceView {
         }
     }
 
+    
     _reRenderSinglePunchPage(page) {
         const rows = this._currentSinglePunchRows || [];
         const headers = ["Code", "Name", "Dept", "Designation", "Shift", "Company", "Date", "Time"];
@@ -5991,6 +6078,7 @@ class AttendanceView {
         });
     }
 
+    
     _renderStatCardDrilldown(key, items, page = 1, containerId = "stat-card-drilldown", closeHandler = "AppController.view._closeStatCardDrilldown()") {
         this._statCardKey = key;
         this._statCardItems = items;
@@ -6286,6 +6374,7 @@ class AttendanceView {
         panel.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
+    
     _closeStatCardDrilldown() {
         const panel = document.getElementById("stat-card-drilldown");
         if (panel) {
@@ -7201,6 +7290,7 @@ class AttendanceView {
         });
     }
 
+    
     _toggleDesigFamilyDetail(familyId) {
         const el = document.getElementById(`desig-fam-detail-${familyId}`);
         if (!el) return;
@@ -7209,6 +7299,7 @@ class AttendanceView {
         el.style.display = isOpen ? "none" : "block";
     }
 
+    
     _filterDesigFamilyCheckboxes(familyId, query) {
         const grid = document.getElementById(`desig-fam-checkbox-grid-${familyId}`);
         const noResultsEl = document.getElementById(`desig-fam-no-results-${familyId}`);
@@ -7230,6 +7321,7 @@ class AttendanceView {
         }
     }
 
+    
     async _createNewDesigFamily(name) {
         const trimmed = (name || "").trim();
         if (!trimmed) {
@@ -7247,6 +7339,7 @@ class AttendanceView {
         }
     }
 
+    
     async _deleteDesigFamilyConfirm(familyId) {
         if (!confirm("Delete this family? Its designations will become unmapped.")) return;
 
@@ -7261,6 +7354,7 @@ class AttendanceView {
         }
     }
 
+    
     async _addDesigsToFamily(familyId) {
         const data = this._currentDesigFamiliesData;
         if (!data) return;
@@ -7291,6 +7385,7 @@ class AttendanceView {
         }
     }
 
+    
     async _removeDesigFromFamily(familyId, designationId) {
         const data = this._currentDesigFamiliesData;
         if (!data) return;
@@ -7311,6 +7406,7 @@ class AttendanceView {
         }
     }
 
+    
     _renderStaff(logs, emps, empMap, model, page = 1) {
         this._currentStaffTabLogs = logs;
         this._currentStaffTabEmps = emps;
@@ -7412,6 +7508,8 @@ class AttendanceView {
             },
         };
     }
+    
+    
     _reRenderStaffTabPage(page) {
         const content = this._renderStaff(
             this._currentStaffTabLogs,
@@ -7424,6 +7522,7 @@ class AttendanceView {
         content.renderCharts();
     }
 
+    
     _renderWorker(logs, emps, empMap, model, page = 1) {
         this._currentWorkerTabLogs = logs;
         this._currentWorkerTabEmps = emps;
@@ -7519,6 +7618,8 @@ class AttendanceView {
             },
         };
     }
+    
+    
     _reRenderWorkerTabPage(page) {
         const content = this._renderWorker(
             this._currentWorkerTabLogs,
@@ -7531,6 +7632,7 @@ class AttendanceView {
         content.renderCharts();
     }
 
+    
     _renderJoinExitTab(model, mode, page = 1) {
         const isResigned = mode === "resigned";
         this._joinExitCache = this._joinExitCache || {};
@@ -7649,6 +7751,7 @@ class AttendanceView {
         };
     }
 
+    
     _renderJoinExitDrillDown(emps, title, isResigned, page = 1) {
         this._joinExitDrillEmps = emps;
         this._joinExitDrillTitle = title;
@@ -7790,12 +7893,14 @@ class AttendanceView {
         container.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
+    
     _reRenderJoinExitPage(mode, page) {
         const content = this._renderJoinExitTab(null, mode, page);
         document.querySelector(".tab-pane-container").innerHTML = content.html;
         content.renderCharts();
     }
 
+    
     _showPresentHeadcountDrilldown() {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
 
@@ -7903,14 +8008,13 @@ class AttendanceView {
     }
 
 
-    // Add these two new methods to AttendanceView
-
     _storeRecordDetail(log, emp, date) {
         if (!this._recordDetailStore) this._recordDetailStore = [];
         const id = this._recordDetailStore.length;
         this._recordDetailStore.push({ log, emp, date });
         return id;
     }
+
 
     _showRecordDetailModal(id) {
         const rec = this._recordDetailStore[id];
@@ -8035,10 +8139,12 @@ class AttendanceView {
         };
     }
 
+
     _closeRecordDetailModal() {
         const overlay = document.getElementById("record-detail-overlay");
         if (overlay) overlay.classList.remove("active");
     }
+
 
     _actionViewLink(log, emp, date) {
         const id = this._storeRecordDetail(log, emp, date);
