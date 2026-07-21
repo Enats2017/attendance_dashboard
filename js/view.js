@@ -16,6 +16,7 @@ class AttendanceView {
             { id: "night", label: "Night Shift", icon: "ph-moon" },
             { id: "designation", label: "Designation Stats", icon: "ph-identification-badge", },
             { id: "shift", label: "Shift Stats", icon: "ph-clock-clockwise" },
+            { id: "manual_punch", label: "Manual Punches", icon: "ph-pencil-simple" },
             { id: "staff", label: "Staff", icon: "ph-identification-badge" },
             { id: "worker", label: "Workmen", icon: "ph-hard-hat" },
             { id: "resigned", label: "Resigned Employees", icon: "ph-user-minus", },
@@ -69,7 +70,8 @@ class AttendanceView {
                                 ? this._renderGenderSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "latein"
                                 ? this._renderLateInSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "earlyout"
                                 ? this._renderEarlyOutSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "shift"
-                                ? this._renderShiftSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "night"
+                                ? this._renderShiftSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "manual_punch"
+                                ? this._renderManualPunchSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "night"
                                 ? this._renderNightSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "staff"
                                 ? this._renderStaffSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "worker"
                                 ? this._renderWorkerSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "resigned"
@@ -1912,6 +1914,60 @@ class AttendanceView {
     }
 
 
+    _renderManualPunchSummaryCards(emps, stats, model, logs, empMap) {
+        const items = model.getManualPunchEmployees();
+        this._currentManualPunchSummaryItems = items;
+
+        const shiftMP = model.getManualPunchByShift();
+        const colorCls = ["info", "success", "warning", "accent", "danger"];
+
+        const totalCard = `
+            <div class="stat-card warning stat-card-clickable"
+                data-mp-total="all"
+                onclick="AppController.view._showManualPunchShiftDrilldown(null)">
+                <div class="stat-icon"><i class="ph ph-pencil-simple"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">Total Manual Punches</span>
+                    <span class="stat-value">${items.length}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+        `;
+
+        const shiftCards = shiftMP.map((s, i) => `
+            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
+                data-mp-shift="${this._escapeAttr(s.shiftName)}"
+                onclick="AppController.view._showManualPunchShiftDrilldown('${this._escapeAttr(s.shiftName)}')">
+                <div class="stat-icon"><i class="ph ph-clock-clockwise"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">${s.shiftName}</span>
+                    <span class="stat-value">${s.count}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+        `).join("");
+
+        return `<div class="summary-grid">${totalCard}${shiftCards}</div>`;
+    }
+
+    _showManualPunchShiftDrilldown(shiftName) {
+        document.querySelectorAll(".stat-card-clickable[data-mp-shift],.stat-card-clickable[data-mp-total]")
+            .forEach(c => c.classList.remove("active"));
+
+        const card = shiftName
+            ? this.app.querySelector(`.stat-card-clickable[data-mp-shift="${shiftName}"]`)
+            : this.app.querySelector(`.stat-card-clickable[data-mp-total]`);
+    
+        if (card) card.classList.add("active");
+
+        const items = shiftName
+            ? (this._currentManualPunchSummaryItems || []).filter(it => (it.log.shiftName || it.emp.shift || "No Shift") === shiftName)
+            : (this._currentManualPunchSummaryItems || []);
+
+        this._renderStatCardDrilldown(shiftName ? "manualPunchShift_" + shiftName : "manualPunchAll", items, 1);
+    }
+
+
     _renderNightSummaryCards(emps, stats, model, logs, empMap) {
         // Ignore passed-in generic data — always scope to night-shift-only employees/logs
         const nightData = model.getNightShiftData();
@@ -2952,6 +3008,9 @@ class AttendanceView {
                 break;
             case "shift":
                 content = this._renderShiftWise(logs, emps, empMap, model);
+                break;
+            case "manual_punch":                           
+                content = this._renderManualPunchesTab(logs, emps, empMap, model);
                 break;
             case "staff":
                 content = this._renderStaff(logs, emps, empMap, model);
@@ -4036,6 +4095,7 @@ class AttendanceView {
                 <td>${log.punchDevicesName || "–"}</td>
                 <td>${this._formatDate(emp.dobRaw)}</td>
                 <td>${(log.overtime || 0) > 0 ? this._fmtMins(log.overtime) : "–"}</td>
+                <td>${this._actionViewLink(log, emp, date)}</td>
             </tr>
         `).join("");
 
@@ -4097,6 +4157,7 @@ class AttendanceView {
                                 <th>Device</th>
                                 <th>DOB</th>
                                 <th>Overtime</th>
+                                <th>Action</th>
                             </tr>
                         </thead>
                         <tbody>${rows}</tbody>
@@ -5586,6 +5647,52 @@ class AttendanceView {
                     }
                 );
             }
+        };
+    }
+
+
+    _renderManualPunchesTab(logs, emps, empMap, model) {
+        this._currentManualPunchItems = model.getManualPunchEmployees();
+        this._currentManualPunchEmpMap = empMap;
+        const shiftMP = model.getManualPunchByShift();
+
+        this._lastData["manual-punch"] = this._currentManualPunchItems.map(({ log, emp, date }) => ({
+            Code: emp.code,
+            Name: emp.name,
+            Dept: emp.dept,
+            Company: emp.company,
+            Shift: log.shiftName || emp.shift || "No Shift",
+            Date: this._formatDate(date),
+            In: log.inTime,
+            Out: log.outTime,
+            Device: log.punchDevicesName,
+        }));
+
+        const rows = shiftMP.map(s => [s.shiftName, s.empCount, s.count]);
+
+        return {
+            html: `
+                <h2 class="section-title"><i class="ph-fill ph-pencil-simple"></i> Manual Punches</h2>
+                <div class="charts-grid">
+                    ${this._chartCard("ch-mp-shift", '<i class="ph-fill ph-chart-bar"></i>', "warning", "Manual Punches by Shift", "Click bar for employee list")}
+                </div>
+                <div id="main-table-wrap">
+                    ${this._tableHTML("tbl-mp", ["Shift", "Employees", "Manual Punch Records"], rows, "manual-punch")}
+                </div>
+                <div id="drilldown-table" style="margin-top:16px"></div>
+            `,
+            renderCharts: () => {
+                Charts.stacked(
+                    "ch-mp-shift",
+                    shiftMP.map(s => s.shiftName),
+                    [{ name: "Manual Punches", data: shiftMP.map(s => s.count) }],
+                    "Manual Punches by Shift",
+                    (shiftName) => {
+                        const shiftItems = this._currentManualPunchItems.filter(it => (it.log.shiftName || it.emp.shift || "No Shift") === shiftName);
+                        this._renderManualPunchDrilldown(shiftItems, `Manual Punches — Shift: ${shiftName}`);
+                    }
+                );
+            },
         };
     }
 

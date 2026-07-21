@@ -897,6 +897,7 @@ function handleDashboardData($input, $returnData = false) {
             if ($stmtLogs) {
                 while ($row = sqlsrv_fetch_array($stmtLogs, SQLSRV_FETCH_ASSOC)) {
                     $status = $row['Status'] ?: 'Absent';
+                    $inDeviceId = intval($row['InDeviceId'] ?? 0);
                     $outDeviceId = intval($row['OutDeviceId'] ?? 0);
                     
                     $logs[] = [
@@ -926,11 +927,11 @@ function handleDashboardData($input, $returnData = false) {
                         'shiftCode' => $row['ShiftCode'],
                         'shiftStart' => $row['BeginTime'] ? (is_object($row['BeginTime']) ? $row['BeginTime']->format('H:i') : $row['BeginTime']) : null,
                         'shiftEnd' => $row['EndTime'] ? (is_object($row['EndTime']) ? $row['EndTime']->format('H:i') : $row['EndTime']) : null,
-                        'inDeviceId' => intval($row['InDeviceId'] ?? 0),
+                        'inDeviceId' => $inDeviceId,
                         'outDeviceId' => $outDeviceId,
                         'punchDevicesName' => trim($row['PunchDevicesName'] ?? ''),
                         'lastUpdatedOn' => $row['LastUpdatedOn'] ? (is_object($row['LastUpdatedOn']) ? $row['LastUpdatedOn']->format('Y-m-d H:i:s') : $row['LastUpdatedOn']) : null,
-                        'isManualPunch' => ($outDeviceId === 5) ? 1 : 0,
+                        'isManualPunch' => ($inDeviceId === 5 || $outDeviceId === 5) ? 1 : 0,
                         'overtime' => intval($row['OverTime'] ?? 0), 
                     ];
                 }
