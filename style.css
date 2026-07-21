@@ -1299,13 +1299,37 @@ body {
     margin-bottom: 12px;
 }
 
-/* Grid */
+/* Grid - 2 column (Employee Info, Attendance, Employment sections) */
 
 .rd-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     column-gap: 50px;
     row-gap: 8px;
+}
+
+/* Grid - 3 column (Shift Info row, and In/Out/Hours + Overtime/Late/Early rows) */
+
+.rd-grid-3col {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    column-gap: 24px;
+    row-gap: 8px;
+}
+
+.rd-grid-3col .rd-row {
+    align-items: baseline;
+}
+
+.rd-grid-3col .rd-label {
+    width: auto;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.rd-grid-3col .rd-label::after {
+    float: none;
+    margin-left: 2px;
 }
 
 /* One Row */
@@ -1395,6 +1419,11 @@ body {
     .rd-grid{
         grid-template-columns:1fr;
         column-gap:0;
+    }
+
+    .rd-grid-3col{
+        grid-template-columns:1fr;
+        row-gap: 8px;
     }
 
     .rd-label{

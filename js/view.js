@@ -85,7 +85,8 @@ class AttendanceView {
                                 ? "" : state.activeTab === "feature"
                                 ? this._renderDashboardSummaryCards(emps, stats, model, logs, empMap) : this._renderSummaryCards(stats, emps, logs, empMap, model)
                         }
-						<div id="stat-card-drilldown" class="stat-drilldown-panel" style="display:none;"></div>
+						
+                        <div id="stat-card-drilldown" class="stat-drilldown-panel" style="display:none;"></div>
 						<div class="tab-pane-container">
 							${this._renderTabContent(state.activeTab, logs, emps, empMap, state.filters, state.data.counts, model)}
 						</div>
@@ -3962,6 +3963,12 @@ class AttendanceView {
 
 
     _renderDrillDown(logs, title, empMap, page = 1) {
+        logs = [...logs].sort((a, b) => {
+            const ageA = this._getAgeSortValue((empMap[a.empId] || {}).dobRaw);
+            const ageB = this._getAgeSortValue((empMap[b.empId] || {}).dobRaw);
+            return ageB - ageA;
+        });
+
         this._currentDrillLogs = logs;
         this._currentDrillTitle = title;
         this._currentDrillEmpMap = empMap;
@@ -6130,6 +6137,17 @@ class AttendanceView {
         const isHalfPresent = key === "halfPresent";
         const isWeeklyOff = key === "weeklyOff";
         const isDashboardMode = items.length > 0 && items[0].log === null && !isResignedOnly && !isNewJoinedOnly;
+
+        if (isDashboardMode || isAgeGroup) {
+            items = [...items].sort((a, b) => {
+                const ageA = this._getAgeSortValue(a.emp?.dobRaw);
+                const ageB = this._getAgeSortValue(b.emp?.dobRaw);
+                return ageB - ageA;
+            });
+
+            this._statCardItems = items; 
+        }
+
         const pageSize = 10;
         const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
         const currentPage = Math.min(page, totalPages);
@@ -8047,6 +8065,22 @@ class AttendanceView {
             </div>
         `;
 
+        const isManualIn = log?.inDeviceId === 5;
+        const isManualOut = log?.outDeviceId === 5;
+        const hasManualEntry = isManualIn || isManualOut;
+
+        const manualEntryHtml = hasManualEntry ? `
+            <div class="rd-section">
+                <div class="rd-section-title">
+                    Manual Entry
+                </div>
+                <div class="rd-grid-3col">
+                    ${isManualIn ? row("In", log?.inTime) : ""}
+                    ${isManualOut ? row("Out", log?.outTime) : ""}
+                </div>
+            </div>
+        ` : "";
+
         overlay.innerHTML = `
             <div class="rd-modal">
                 <div class="rd-header">
@@ -8079,18 +8113,26 @@ class AttendanceView {
                             Shift Information
                         </div>
 
-                        <div class="rd-grid">
+                        <div class="rd-grid-3col">
                             ${row("Shift", log?.shiftName || emp?.shift)}
                             ${row("Shift Start", log?.shiftStart || emp?.shiftStart)}
                             ${row("Shift End", log?.shiftEnd || emp?.shiftEnd)}
+                        </div>
+
+                        <div class="rd-grid-3col" style="margin-top:8px;">
                             ${row("In Time", log?.inTime)}
                             ${row("Out Time", log?.outTime)}
                             ${row("Hours Worked", log?.hoursWorked)}
-                            ${row("Overtime",(log?.overtime || 0) > 0 ? this._fmtMins(log.overtime) : "-")}
-                            ${row("Late By",(log?.lateBy || 0) > 0 ? this._fmtMins(log.lateBy) : "-")}
-                            ${row("Early By",(log?.earlyBy || 0) > 0 ? this._fmtMins(log.earlyBy) : "-")}
+                        </div>
+
+                        <div class="rd-grid-3col" style="margin-top:8px;">
+                            ${row("Overtime", (log?.overtime || 0) > 0 ? this._fmtMins(log.overtime) : "-")}
+                            ${row("Late By", (log?.lateBy || 0) > 0 ? this._fmtMins(log.lateBy) : "-")}
+                            ${row("Early By", (log?.earlyBy || 0) > 0 ? this._fmtMins(log.earlyBy) : "-")}
                         </div>
                     </div>
+
+                    ${manualEntryHtml}
 
                     <div class="rd-section">
                         <div class="rd-section-title">
@@ -8149,6 +8191,12 @@ class AttendanceView {
     _actionViewLink(log, emp, date) {
         const id = this._storeRecordDetail(log, emp, date);
         return `<a href="javascript:void(0)" class="rd-view-link" onclick="AppController.view._showRecordDetailModal(${id})">View</a>`;
+    }
+
+
+    _getAgeSortValue(dobRaw) {
+        const age = this._calculateAge(dobRaw);
+        return typeof age === "number" ? age : -Infinity; 
     }
 }
 

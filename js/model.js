@@ -810,6 +810,8 @@ class AttendanceModel {
     getLateInEmployees() {
         const { filters } = this.state;
         const { logs, emps } = this.getFilteredData();
+        const singlePunchKeys = this.state.data.singlePunchKeys || new Set();
+        const singlePunchData = this.state.data.singlePunchData || {};
 
         const logMap = {};
         logs.forEach(l => {
@@ -820,6 +822,19 @@ class AttendanceModel {
             }
         });
 
+        singlePunchKeys.forEach(key => {
+            const punchInfo = singlePunchData[key] || {};
+            const existing = logMap[key];
+            logMap[key] = {
+                ...(existing || {}),
+                status: 'Single Punch',
+                detailedStatus: 'Single Punch',
+                detailedStatusCode: 'SP',
+                inTime: punchInfo.direction === 'in' ? punchInfo.time : (existing ? existing.inTime : null),
+                outTime: punchInfo.direction === 'out' ? punchInfo.time : (existing ? existing.outTime : null),
+            };
+        });
+
         const fromStr = filters.dateFrom;
         const toStr = filters.dateTo;
         const result = [];
@@ -828,7 +843,6 @@ class AttendanceModel {
         emps.forEach(emp => {
             dateRange.forEach(dateStr => {
                 const log = logMap[emp.id + '_' + dateStr];
-
                 if (log && (log.lateBy || 0) > 0) {
                     result.push({ log, emp, date: dateStr });
                 }
