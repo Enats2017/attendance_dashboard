@@ -3861,6 +3861,7 @@ class AttendanceView {
                     <td>${e.company || "–"}</td>
                     <td>${e.dept || "–"}</td>
                     <td>${e.designation || "–"}</td>
+                    <td>${this._calculateAge(e.dobRaw)}</td>
                     <td>${e.shiftGroupName || "–"}</td>
                     <td>${l.shiftName || e.shift || "–"}</td>
                     <td>${l.inTime || "–"}</td>
@@ -3940,6 +3941,7 @@ class AttendanceView {
 								<th>Company</th>
 								<th>Department</th>
                                 <th>Designation</th>
+                                <th>Age</th>
                                 <th>Shift Group</th>
                                 <th>Shift</th>
 								<th>In Time</th>
@@ -4963,6 +4965,19 @@ class AttendanceView {
         }
     }
 
+    _calculateAge(dobStr) {                        
+        if (!dobStr) return "-";
+        const dob = new Date(dobStr);
+        if (isNaN(dob.getTime())) return "-";
+        const today = new Date();
+        let age = today.getFullYear() - dob.getFullYear();
+        const m = today.getMonth() - dob.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+            age--;
+        }
+        return age;
+    }
+
     _getSeverityStyle(count) {
         if (count < this.LATE_THRESHOLD) return "";
         const intensity = Math.min((count - this.LATE_THRESHOLD + 1) / 8, 1);
@@ -5893,9 +5908,12 @@ class AttendanceView {
         let headers, ths;
 
         if (isDashboardMode) {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "DOB", "Location"];
+            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "DOB", "Age", "Location"];
         } else {
             headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift", "In Time", "Out Time", "Status", "Action"];
+            if (isAgeGroup) {
+                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Age", "Shift", "In Time", "Out Time", "Status", "Action"];
+            }
         }
 
         ths = headers.map((h) => `<th>${h}</th>`).join("");
@@ -5917,6 +5935,7 @@ class AttendanceView {
                         <td>${emp.teamName || "-"}</td>
                         <td>${emp.shiftGroupName || "–"}</td>
                         <td>${this._formatDate(emp.dobRaw)}</td>
+                        <td>${this._calculateAge(emp.dobRaw)}</td>
                         <td>${emp.location || "–"}</td>
                     </tr>
                 `;
@@ -5942,6 +5961,7 @@ class AttendanceView {
                     <td>${emp.dept || "–"}</td>
                     <td>${emp.company || "–"}</td>
                     <td>${emp.designation || "–"}</td>
+                    ${isAgeGroup ? `<td>${this._calculateAge(emp.dobRaw)}</td>` : ""}
                     <td>${log?.shiftName || emp?.shift || "–"}</td>
                     <td>${log?.inTime || "–"}</td>
                     <td>${log?.outTime || "–"}</td>
@@ -7856,6 +7876,7 @@ class AttendanceView {
 
                         <div class="rd-grid">
                             ${row("Date of Birth", this._formatDate(emp?.dobRaw))}
+                            ${row("Age", this._calculateAge(emp?.dobRaw))}
                             ${row("Joining Date", this._formatDate(emp?.doj))}
                             ${row("Relieving Date", this._formatDate(emp?.dor))}
                         </div>

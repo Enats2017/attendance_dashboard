@@ -456,7 +456,6 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
             'shiftName' => $shiftName
         ];
 
-        // FIX #2: bucket is now keyed by shiftId, not shiftName
         if (!isset($shiftStats[$shiftId])) {
             $shiftStats[$shiftId] = [
                 'shiftCode' => $shiftCode,
@@ -485,12 +484,11 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
 
             if (!isset($shiftLookup[$key])) {
                 if (!empty($e['shiftId'])) {
-                    $shiftId   = $e['shiftId'];
+                    $shiftId = $e['shiftId'];
                     $shiftName = $e['shift'];
                     $shiftCode = null;
                 } else {
-                    // Normalize all missing shifts to the official NoShift bucket
-                    $shiftId   = 3;
+                    $shiftId = 3;
                     $shiftName = 'NoShift';
                     $shiftCode = 'NS';
                 }
@@ -517,11 +515,6 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
 
             $shiftId = $shiftLookup[$key]['shiftId'];
             $shiftStats[$shiftId]['total']++;
-
-            if (isset($singlePunchData[$key])) {
-                $shiftStats[$shiftId]['singlePunch']++;
-                continue;
-            }
 
             if (isset($logKeyMap[$key])) {
                 $log = $logKeyMap[$key];
@@ -570,8 +563,7 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
                         $shiftStats[$shiftId]['absent']++;
                         break;
                 }
-            }
-            elseif (isset($deviceEmployeeStats[$key])) {
+            } elseif (isset($deviceEmployeeStats[$key])) {
                 $stat = $deviceEmployeeStats[$key];
 
                 if (($stat['inCount'] ?? 0) >= 1 && ($stat['outCount'] ?? 0) >= 1) {
@@ -579,8 +571,7 @@ function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesIn
                 } else {
                     $shiftStats[$shiftId]['absent']++;
                 }
-            }
-            else {
+            } else {
                 $shiftStats[$shiftId]['absent']++;
             }
         }
