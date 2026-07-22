@@ -3327,7 +3327,7 @@ class AttendanceView {
         });
 
         const ws = XLSX.utils.json_to_sheet(cleanData);
-        
+
         const wb = XLSX.utils.book_new();
 
         wb.Workbook = {
@@ -6097,6 +6097,7 @@ class AttendanceView {
             resigned: "👤 Resigned Employees",
             newJoined: "🆕 New Joined Employees",
             singlePunch: "⚡ Single Punch Employees",
+            manualPunch: "✏️ Manual Punch Employees",
             lateIn: "🕐 Late In Employees",
             earlyOut: "🚪 Early Out Employees",
             staffList: "👔 Staff Employees",
@@ -6121,6 +6122,8 @@ class AttendanceView {
         const isStaffSummary = key.startsWith("staffSummary_");
         const isWorkerSummary = key.startsWith("workerSummary_");
         const isDashboardDesig = key.startsWith("dashboardDesig_");
+        const isManualPunchShift = key.startsWith("manualPunchShift_");
+        const isManualPunchAll = key === "manualPunchAll";
         const isNewJoinedOnly = key === "newJoined";
         const isNewJoinedRelated = key === "newJoined" || key.startsWith("njBreakdown_") || key.startsWith("newjoinedDesig_");
         const isResignedRelated = key.startsWith("resBreakdown_") || key.startsWith("resignedDesig_");
@@ -6340,7 +6343,7 @@ class AttendanceView {
 			<div class="drilldown-box">
 				<div class="drilldown-header">
 					<div class="drilldown-title">
-                        ${titleMap[key] || (isAgeGroup ? "🎂 Age Group: " + key.replace("ageGroup_", "") : isCompany ? "🏢 Company: " + key.replace("company_", "") : isDeptSummary ? "💼 Dept: " + key.replace("deptSummary_", "") : isGenderSummary ? "⚧ Gender: " + key.replace("genderSummary_", "") : isShiftSummary ? "🕐 Shift: " + key.replace("shiftSummary_", "") : isStaffSummary ? "👔 Staff Dept: " + key.replace("staffSummary_", "") : isWorkerSummary ? "🔧 Workmen Dept: " + key.replace("workerSummary_", "") : isDashboardDesig ? "🏷️ Designation: " + key.replace("dashboardDesig_", "") : key)}
+                        ${titleMap[key] || (isAgeGroup ? "🎂 Age Group: " + key.replace("ageGroup_", "") : isCompany ? "🏢 Company: " + key.replace("company_", "") : isDeptSummary ? "💼 Dept: " + key.replace("deptSummary_", "") : isGenderSummary ? "⚧ Gender: " + key.replace("genderSummary_", "") : isShiftSummary ? "🕐 Shift: " + key.replace("shiftSummary_", "") : isStaffSummary ? "👔 Staff Dept: " + key.replace("staffSummary_", "") : isWorkerSummary ? "🔧 Workmen Dept: " + key.replace("workerSummary_", "") : isDashboardDesig ? "🏷️ Designation: " + key.replace("dashboardDesig_", "") : isManualPunchShift ? "✏️ Manual Punch — Shift: " + key.replace("manualPunchShift_", "") : isManualPunchAll ? "✏️ All Manual Punches" : key)}
 						<small>${items.length} records</small>
 					</div>
 					<div class="drilldown-btn-group">
