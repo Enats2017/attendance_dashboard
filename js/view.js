@@ -3310,7 +3310,8 @@ class AttendanceView {
     
     exportExcel(data, filename) {
         if (!window.XLSX) {
-            return console.error("SheetJS not loaded");
+            console.error("SheetJS not loaded");
+            return;
         }
 
         const cleanData = data.map((row) => {
@@ -3318,33 +3319,51 @@ class AttendanceView {
             Object.keys(row).forEach((key) => {
                 let val = row[key];
                 if (typeof val === "string") {
-                    val = val.trim().replace(/\s+/g, " "); 
+                    val = val.replace(/\u00A0/g, "")   .replace(/\r/g, "").replace(/\n/g, "").replace(/\t/g, "").trim().replace(/\s+/g, " ");
                 }
+
                 cleaned[key] = val;
             });
             return cleaned;
         });
 
-        const ws = XLSX.utils.json_to_sheet(cleanData, { cellText: false });
+        const ws = XLSX.utils.json_to_sheet(cleanData);
 
-        const range = XLSX.utils.decode_range(ws["!ref"]);
-        const headerRow = 0;
-        const codeColIndex = Object.keys(cleanData[0] || {}).findIndex((k) => k.toLowerCase() === "code");
+        if (ws["!ref"]) {
+            const range = XLSX.utils.decode_range(ws["!ref"]);
+            const codeColIndex = Object.keys(cleanData[0] || {}).findIndex(k => k.toLowerCase() === "code");
 
-        if (codeColIndex !== -1) {
-            for (let r = range.s.r + 1; r <= range.e.r; r++) {
-                const cellRef = XLSX.utils.encode_cell({ r, c: codeColIndex });
-                const cell = ws[cellRef];
-                if (cell) {
-                    cell.t = "s";                 
-                    cell.z = "@";                 
-                    cell.v = String(cell.v ?? "").trim();
+            if (codeColIndex !== -1) {
+                for (let r = range.s.r + 1; r <= range.e.r; r++) {
+                    const cellRef = XLSX.utils.encode_cell({
+                        r,
+                        c: codeColIndex
+                    });
+
+                    const cell = ws[cellRef];
+
+                    if (!cell) continue;
+
+                    cell.t = "s";
+                    cell.z = "@";
+                    cell.v = String(cell.v ?? "").replace(/\u00A0/g, "").replace(/\r/g, "").replace(/\n/g, "").replace(/\t/g, "").trim();
                 }
             }
         }
 
         const wb = XLSX.utils.book_new();
+
+        // Force Excel to recalculate formulas when opened
+        wb.Workbook = {
+            CalcPr: {
+                calcMode: "auto",
+                fullCalcOnLoad: true,
+                forceFullCalc: true
+            }
+        };
+
         XLSX.utils.book_append_sheet(wb, ws, "Report");
+
         XLSX.writeFile(wb, `${filename}.xlsx`);
     }
 
