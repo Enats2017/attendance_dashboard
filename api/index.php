@@ -100,6 +100,9 @@ switch ($action) {
     case 'dashboard_data':
         handleDashboardData($input);
         break;
+    case 'get_subadmins':
+        getSubAdmins();
+        break;
     case 'get_std_hc':
         handleGetStdHC();
         break;
@@ -189,6 +192,44 @@ function getPlaceholderIds($conn, $table, $idCol, $nameCol) {
     
     return $badIds;
 }
+
+
+//  RBAC (Role Based Access Control)
+function getModulePermissionMap() {
+    return [
+        'master_module' => ['master'],
+    ];
+}
+
+function getCurrentUserRole() {
+    $isMaster = $_SESSION['isMaster'] ?? false;
+    return $isMaster ? 'master' : 'subadmin';
+}
+
+function checkModulePermission($moduleKey) {
+    $map = getModulePermissionMap();
+    $requiredRoles = $map[$moduleKey] ?? null;
+
+    if ($requiredRoles === null) {
+        return true; 
+    }
+
+    if (!isset($_SESSION['userId'])) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'message' => 'Not logged in']);
+        return false;
+    }
+
+    $userRole = getCurrentUserRole();
+    if (!in_array($userRole, $requiredRoles)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied']);
+        return false;
+    }
+
+    return true;
+}
+
 
 /**
  * Handle User Login
@@ -636,6 +677,34 @@ function handleDashboardData($input, $returnData = false) {
     $userLocations = $_SESSION['locations'] ?? [];
     $userCompanies = $_SESSION['companies'] ?? [];
     $userDepartments = $_SESSION['departments'] ?? [];
+
+    $targetUserId = null;
+    if (!empty($_SESSION['isMaster']) && !empty($input['subadmin_user_id'])) {
+        $targetUserId = intval($input['subadmin_user_id']);
+    }
+
+    if ($targetUserId) {
+        $userLocations = [];
+        $userCompanies = [];
+        $userDepartments = [];
+
+        $stmtLoc = sqlsrv_query($conn, "SELECT LocationId FROM UserLocations WHERE UserId = ?", [$targetUserId]);
+        while ($row = sqlsrv_fetch_array($stmtLoc, SQLSRV_FETCH_ASSOC)) {
+            $userLocations[] = intval($row['LocationId']);
+        }
+        $stmtComp = sqlsrv_query($conn, "SELECT CompanyId FROM UserCompanies WHERE UserId = ?", [$targetUserId]);
+        while ($row = sqlsrv_fetch_array($stmtComp, SQLSRV_FETCH_ASSOC)) {
+            $userCompanies[] = intval($row['CompanyId']);
+        }
+        $stmtDept = sqlsrv_query($conn, "SELECT DepartmentId FROM UserDepartments WHERE UserId = ?", [$targetUserId]);
+        while ($row = sqlsrv_fetch_array($stmtDept, SQLSRV_FETCH_ASSOC)) {
+            $userDepartments[] = intval($row['DepartmentId']);
+        }
+    } else {
+        $userLocations = $_SESSION['locations'] ?? [];
+        $userCompanies = $_SESSION['companies'] ?? [];
+        $userDepartments = $_SESSION['departments'] ?? [];
+    }
 
     $placeholderIds = $_SESSION['placeholderIds'] ?? [
         'designation' => [], 'department' => [], 'company' => [], 'shiftGroup' => [], 'location' => []
@@ -1525,6 +1594,44 @@ function handleDashboardData($input, $returnData = false) {
         'timestamp' => date('Y-m-d H:i:s'),
         'dataSource' => $dataSource
     ]);
+}
+
+
+function getSubAdmins() {
+    if (empty($_SESSION['isMaster'])) {
+        echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+        return;
+    }
+
+    $conn = getSQLServer();
+
+    $sql = "SELECT UserId, LoginName, RoleName FROM SystemUsers WHERE RecordStatus = 1 AND UserId != ?";
+    $stmt = sqlsrv_query($conn, $sql, [$_SESSION['userId']]);
+
+    $subAdmins = [];
+    if ($stmt) {
+        while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+            $stmtLoc = sqlsrv_query($conn, "SELECT COUNT(*) as cnt FROM UserLocations WHERE UserId = ?", [$row['UserId']]);
+            $locCount = sqlsrv_fetch_array($stmtLoc, SQLSRV_FETCH_ASSOC)['cnt'];
+
+            $stmtComp = sqlsrv_query($conn, "SELECT COUNT(*) as cnt FROM UserCompanies WHERE UserId = ?", [$row['UserId']]);
+            $compCount = sqlsrv_fetch_array($stmtComp, SQLSRV_FETCH_ASSOC)['cnt'];
+
+            $stmtDept = sqlsrv_query($conn, "SELECT COUNT(*) as cnt FROM UserDepartments WHERE UserId = ?", [$row['UserId']]);
+            $deptCount = sqlsrv_fetch_array($stmtDept, SQLSRV_FETCH_ASSOC)['cnt'];
+
+            $isSubMaster = ($locCount == 0 && $compCount == 0 && $deptCount == 0);
+            if ($isSubMaster) continue; 
+
+            $subAdmins[] = [
+                'id' => $row['UserId'],
+                'name' => $row['LoginName'],
+                'role' => $row['RoleName'],
+            ];
+        }
+    }
+
+    echo json_encode(['success' => true, 'data' => $subAdmins]);
 }
 
 

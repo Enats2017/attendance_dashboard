@@ -35,6 +35,12 @@ class AttendanceView {
     }
 
 
+    _getVisibleTabs() {
+        const isMaster = !!(window.HRMS_USER && window.HRMS_USER.isMaster);
+        return this.TABS.filter(tab => !tab.roles || (tab.roles.includes("master") && isMaster));
+    }
+
+
     render(state, model) {
         this._renderToken++;
         const myToken = this._renderToken;

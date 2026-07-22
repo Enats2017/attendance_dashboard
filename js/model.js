@@ -19,7 +19,8 @@ class AttendanceModel {
                 dept: 'All',
                 gender: 'All',
                 shift: 'All',
-                location: 'All'
+                location: 'All',
+                subadminUserId: null,
             }
         };
         
@@ -94,6 +95,24 @@ class AttendanceModel {
             this.state.filterLists = { depts: [], companies: [], shifts: ['No Shift'] };   
             this._commit();
             return { success: false, error: error.message };
+        }
+    }
+
+
+    async fetchSubAdmins() {
+        if (this.state.subAdminList) return { success: true };
+        try {
+            const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
+            url.searchParams.set('action', 'get_subadmins');
+            const response = await fetch(url.toString(), { credentials: 'include' });
+            const data = await response.json();
+            this.state.subAdminList = (data.success ? data.data : []) || [];
+            this._commit();
+            return data;
+        } catch (error) {
+            console.error('Fetch SubAdmins Error:', error);
+            this.state.subAdminList = [];
+            return { success: false };
         }
     }
 
@@ -204,6 +223,9 @@ class AttendanceModel {
 
     switchTab(tabId) {
         if (this.state.activeTab === tabId) {
+            return;
+        }
+        if (tabId === 'sort_order' && !(window.HRMS_USER && window.HRMS_USER.isMaster)) {
             return;
         }
         this.state.activeTab = tabId;
