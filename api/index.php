@@ -101,10 +101,11 @@ switch ($action) {
         handleDashboardData($input);
         break;
     case 'get_subadmins':
+        if (!checkModulePermission('get_subadmins')) return;
         getSubAdmins();
         break;
     case 'get_std_hc':
-        handleGetStdHC();
+        handleGetStdHC($input);
         break;
     case 'bulk_update_std_hc':
         handleBulkUpdateStdHC($input);
@@ -113,13 +114,13 @@ switch ($action) {
         handleGetReport($input);
         break;
     case 'get_depts':
-        handleGetDepts();
+        handleGetDepts($input);
         break;
     case 'get_companies':
-        handleGetCompanies();
+        handleGetCompanies($input);
         break;
     case 'get_shifts':
-        handleGetShifts();
+        handleGetShifts($input);
         break;
     case 'get_designations_order':
         handleGetDesignationsOrder();
@@ -198,6 +199,7 @@ function getPlaceholderIds($conn, $table, $idCol, $nameCol) {
 function getModulePermissionMap() {
     return [
         'master_module' => ['master'],
+        'get_subadmins' => ['master'],
     ];
 }
 
@@ -472,6 +474,41 @@ function setupPassword($data) {
 }
 
 
+function resolveScope($conn, $input) {
+    $targetUserId = null;
+    if (!empty($_SESSION['isMaster']) && !empty($input['subadmin_user_id'])) {
+        $targetUserId = intval($input['subadmin_user_id']);
+    }
+
+    if ($targetUserId) {
+        $locations = [];
+        $companies = [];
+        $departments = [];
+
+        $stmtLoc = sqlsrv_query($conn, "SELECT LocationId FROM UserLocations WHERE UserId = ?", [$targetUserId]);
+        while ($row = sqlsrv_fetch_array($stmtLoc, SQLSRV_FETCH_ASSOC)) {
+            $locations[] = intval($row['LocationId']);
+        }
+        $stmtComp = sqlsrv_query($conn, "SELECT CompanyId FROM UserCompanies WHERE UserId = ?", [$targetUserId]);
+        while ($row = sqlsrv_fetch_array($stmtComp, SQLSRV_FETCH_ASSOC)) {
+            $companies[] = intval($row['CompanyId']);
+        }
+        $stmtDept = sqlsrv_query($conn, "SELECT DepartmentId FROM UserDepartments WHERE UserId = ?", [$targetUserId]);
+        while ($row = sqlsrv_fetch_array($stmtDept, SQLSRV_FETCH_ASSOC)) {
+            $departments[] = intval($row['DepartmentId']);
+        }
+
+        return ['locations' => $locations, 'companies' => $companies, 'departments' => $departments];
+    }
+
+    return [
+        'locations'   => $_SESSION['locations'] ?? [],
+        'companies'   => $_SESSION['companies'] ?? [],
+        'departments' => $_SESSION['departments'] ?? [],
+    ];
+}
+
+
 function computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesInAttendanceLogs, $dayFrom, $dayTo, $conn, $singlePunchData = []) {
     $shiftStats = [];
     $logKeyMap = [];
@@ -671,40 +708,14 @@ function handleDashboardData($input, $returnData = false) {
     $compName = isset($input['company']) && $input['company'] !== 'All' ? $input['company'] : null;
     $shiftName = isset($input['shift']) && $input['shift'] !== 'All' ? $input['shift'] : null;
     $locationFilter = isset($input['location']) && $input['location'] !== 'All' ? $input['location'] : null;
+    
     $conn = getSQLServer();
     $allTeams = getAllTeams($conn);
 
-    $userLocations = $_SESSION['locations'] ?? [];
-    $userCompanies = $_SESSION['companies'] ?? [];
-    $userDepartments = $_SESSION['departments'] ?? [];
-
-    $targetUserId = null;
-    if (!empty($_SESSION['isMaster']) && !empty($input['subadmin_user_id'])) {
-        $targetUserId = intval($input['subadmin_user_id']);
-    }
-
-    if ($targetUserId) {
-        $userLocations = [];
-        $userCompanies = [];
-        $userDepartments = [];
-
-        $stmtLoc = sqlsrv_query($conn, "SELECT LocationId FROM UserLocations WHERE UserId = ?", [$targetUserId]);
-        while ($row = sqlsrv_fetch_array($stmtLoc, SQLSRV_FETCH_ASSOC)) {
-            $userLocations[] = intval($row['LocationId']);
-        }
-        $stmtComp = sqlsrv_query($conn, "SELECT CompanyId FROM UserCompanies WHERE UserId = ?", [$targetUserId]);
-        while ($row = sqlsrv_fetch_array($stmtComp, SQLSRV_FETCH_ASSOC)) {
-            $userCompanies[] = intval($row['CompanyId']);
-        }
-        $stmtDept = sqlsrv_query($conn, "SELECT DepartmentId FROM UserDepartments WHERE UserId = ?", [$targetUserId]);
-        while ($row = sqlsrv_fetch_array($stmtDept, SQLSRV_FETCH_ASSOC)) {
-            $userDepartments[] = intval($row['DepartmentId']);
-        }
-    } else {
-        $userLocations = $_SESSION['locations'] ?? [];
-        $userCompanies = $_SESSION['companies'] ?? [];
-        $userDepartments = $_SESSION['departments'] ?? [];
-    }
+    $scope = resolveScope($conn, $input);
+    $userLocations = $scope['locations'];
+    $userCompanies = $scope['companies'];
+    $userDepartments = $scope['departments'];
 
     $placeholderIds = $_SESSION['placeholderIds'] ?? [
         'designation' => [], 'department' => [], 'company' => [], 'shiftGroup' => [], 'location' => []
@@ -1611,22 +1622,36 @@ function getSubAdmins() {
     $subAdmins = [];
     if ($stmt) {
         while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
-            $stmtLoc = sqlsrv_query($conn, "SELECT COUNT(*) as cnt FROM UserLocations WHERE UserId = ?", [$row['UserId']]);
-            $locCount = sqlsrv_fetch_array($stmtLoc, SQLSRV_FETCH_ASSOC)['cnt'];
+            $uid = intval($row['UserId']);
 
-            $stmtComp = sqlsrv_query($conn, "SELECT COUNT(*) as cnt FROM UserCompanies WHERE UserId = ?", [$row['UserId']]);
-            $compCount = sqlsrv_fetch_array($stmtComp, SQLSRV_FETCH_ASSOC)['cnt'];
+            $locations = [];
+            $stmtLoc = sqlsrv_query($conn, "SELECT L.LocationName FROM UserLocations UL INNER JOIN Locations L ON UL.LocationId = L.LocationId WHERE UL.UserId = ?", [$uid]);
+            while ($r = sqlsrv_fetch_array($stmtLoc, SQLSRV_FETCH_ASSOC)) {
+                $locations[] = $r['LocationName'];
+            }
 
-            $stmtDept = sqlsrv_query($conn, "SELECT COUNT(*) as cnt FROM UserDepartments WHERE UserId = ?", [$row['UserId']]);
-            $deptCount = sqlsrv_fetch_array($stmtDept, SQLSRV_FETCH_ASSOC)['cnt'];
+            $companies = [];
+            $stmtComp = sqlsrv_query($conn, "SELECT C.CompanyFName FROM UserCompanies UC INNER JOIN Companies C ON UC.CompanyId = C.CompanyId WHERE UC.UserId = ?", [$uid]);
+            while ($r = sqlsrv_fetch_array($stmtComp, SQLSRV_FETCH_ASSOC)) {
+                $companies[] = $r['CompanyFName'];
+            }
 
-            $isSubMaster = ($locCount == 0 && $compCount == 0 && $deptCount == 0);
+            $departments = [];
+            $stmtDept = sqlsrv_query($conn, "SELECT D.DepartmentFName FROM UserDepartments UD INNER JOIN Departments D ON UD.DepartmentId = D.DepartmentId WHERE UD.UserId = ?", [$uid]);
+            while ($r = sqlsrv_fetch_array($stmtDept, SQLSRV_FETCH_ASSOC)) {
+                $departments[] = $r['DepartmentFName'];
+            }
+
+            $isSubMaster = empty($locations) && empty($companies) && empty($departments);
             if ($isSubMaster) continue; 
 
             $subAdmins[] = [
-                'id' => $row['UserId'],
+                'id' => $uid,
                 'name' => $row['LoginName'],
                 'role' => $row['RoleName'],
+                'locations' => $locations,
+                'companies' => $companies,
+                'departments' => $departments,
             ];
         }
     }
@@ -1638,9 +1663,11 @@ function getSubAdmins() {
 /**
  * Handle Dept Report - Get STD Headcounts
  */
-function handleGetStdHC() {
+function handleGetStdHC($input = []) {
     $sqlConn = getSQLServer();
-    $locationList = !empty($_SESSION['locations']) ? implode(',', array_map('intval', $_SESSION['locations'])) : '0';
+    $scope = resolveScope($sqlConn, $input);
+
+    $locationList = !empty($scope['locations']) ? implode(',', array_map('intval', $scope['locations'])) : '0';
     
     $sqlDepts = "SELECT DISTINCT D.DepartmentId, D.DepartmentFName as DepartmentName, D.std_hc FROM Departments D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON D.DepartmentId = E.DepartmentId WHERE E.Location IN ($locationList) AND E.Status = 'Working' ORDER BY D.DepartmentFName ASC";
     
@@ -1655,7 +1682,7 @@ function handleGetStdHC() {
         ];
     }
 
-    $firstLocation = !empty($_SESSION['locations']) ? intval($_SESSION['locations'][0]) : 0;
+    $firstLocation = !empty($scope['locations']) ? intval($scope['locations'][0]) : 0;
     $sqlLoc = "SELECT LocationName as unit_name, unit_capacity FROM Locations WHERE LocationId = $firstLocation";
     $stmtLoc = sqlsrv_query($sqlConn, $sqlLoc);
     $unitConfig = ['unit_name' => 'PSF', 'unit_capacity' => '150 Tons']; // default
@@ -1768,9 +1795,10 @@ function handleGetReport($input) {
     $dayTo = "$year-" . sprintf("%02d", $month) . "-" . sprintf("%02d", $toDay);
  
     $sqlConn = getSQLServer();
-    $locationList = !empty($_SESSION['locations']) ? implode(',', array_map('intval', $_SESSION['locations'])) : '0';
-    $companyList = !empty($_SESSION['companies']) ? implode(',', array_map('intval', $_SESSION['companies'])) : '0';
-    $departmentList = !empty($_SESSION['departments']) ? implode(',', array_map('intval', $_SESSION['departments'])) : '0';
+    $scope = resolveScope($sqlConn, $input);
+    $locationList = !empty($scope['locations']) ? implode(',', array_map('intval', $scope['locations'])) : '0';
+    $companyList = !empty($scope['companies']) ? implode(',', array_map('intval', $scope['companies'])) : '0';
+    $departmentList = !empty($scope['departments']) ? implode(',', array_map('intval', $scope['departments'])) : '0';
  
     $sqlD = "SELECT D.DepartmentId, D.DepartmentFName as DepartmentName, D.std_hc, D.SortOrder FROM Departments D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON D.DepartmentId = E.DepartmentId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working' GROUP BY D.DepartmentId, D.DepartmentFName, D.std_hc, D.SortOrder ORDER BY CASE WHEN D.SortOrder IS NULL THEN 1 ELSE 0 END, D.SortOrder ASC, D.DepartmentFName ASC";
  
@@ -2275,16 +2303,17 @@ function handleGetReport($input) {
 /**
  * Get simple list of departments filtered by Location 14
  */
-function handleGetDepts() {
+function handleGetDepts($input = []) {
     $conn = getSQLServer();
+    $scope = resolveScope($conn, $input);
 
-    if (empty($_SESSION['locations']) || empty($_SESSION['departments'])) {
+    if (empty($scope['locations']) || empty($scope['departments'])) {
         echo json_encode(['success' => false, 'message' => 'Session expired. Please login again.']);
         return;
     }
 
-    $locationList = implode(',', array_map('intval', $_SESSION['locations']));
-    $departmentList = implode(',', array_map('intval', $_SESSION['departments']));
+    $locationList = implode(',', array_map('intval', $scope['locations']));
+    $departmentList = implode(',', array_map('intval', $scope['departments']));
 
     $sql = "SELECT D.DepartmentId, D.DepartmentFName AS DepartmentName, D.std_hc, D.SortOrder FROM Departments D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON D.DepartmentId = E.DepartmentId WHERE E.Location IN ($locationList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working' GROUP BY D.DepartmentId, D.DepartmentFName, D.std_hc, D.SortOrder ORDER BY CASE WHEN D.SortOrder IS NULL THEN 1 ELSE 0 END, D.SortOrder ASC, D.DepartmentFName ASC;";
 
@@ -2307,16 +2336,17 @@ function handleGetDepts() {
 /**
  * Get simple list of companies filtered by Location 14
  */
-function handleGetCompanies() {
+function handleGetCompanies($input = []) {
     $conn = getSQLServer();
+    $scope = resolveScope($conn, $input);
 
-    if (empty($_SESSION['locations']) || empty($_SESSION['companies'])) {
+    if (empty($scope['locations']) || empty($scope['companies'])) {
         echo json_encode(['success' => false, 'message' => 'Session expired. Please login again.']);
         return;
     }
 
-    $locationList = implode(',', array_map('intval', $_SESSION['locations']));
-    $companyList = implode(',', array_map('intval', $_SESSION['companies']));
+    $locationList = implode(',', array_map('intval', $scope['locations']));
+    $companyList = implode(',', array_map('intval', $scope['companies']));
 
     $sql = "SELECT C.CompanyId, C.CompanyFName AS CompanyName, C.SortOrder FROM Companies C WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON C.CompanyId = E.CompanyId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.Status = 'Working' GROUP BY C.CompanyId, C.CompanyFName, C.SortOrder ORDER BY CASE WHEN C.SortOrder IS NULL THEN 1 ELSE 0 END, C.SortOrder ASC, C.CompanyFName ASC;";
 
@@ -2340,16 +2370,17 @@ function handleGetCompanies() {
 /**
  * Get simple list of active shifts for employees at Location 14
  */
-function handleGetShifts() {
+function handleGetShifts($input = []) {
     $conn = getSQLServer();
+    $scope = resolveScope($conn, $input);
 
-    if (empty($_SESSION['locations']) || empty($_SESSION['companies'])) {
+    if (empty($scope['locations']) || empty($scope['companies'])) {
         echo json_encode(['success' => false, 'message' => 'Session expired. Please login again.']);
         return;
     }
 
-    $locationList = implode(',', array_map('intval', $_SESSION['locations']));
-    $companyList = implode(',', array_map('intval', $_SESSION['companies']));
+    $locationList = implode(',', array_map('intval', $scope['locations']));
+    $companyList = implode(',', array_map('intval', $scope['companies']));
 
     $sql = "SELECT DISTINCT S.ShiftId, S.ShiftName FROM Employees E WITH (NOLOCK) CROSS APPLY (SELECT TOP 1 S.ShiftId, S.ShiftName FROM EmployeeShift ES WITH (NOLOCK) JOIN Shifts S WITH (NOLOCK) ON ES.ShiftId = S.ShiftId WHERE ES.EmployeeId = E.EmployeeId AND S.RecordStatus = '1' ORDER BY ES.Shiftdate DESC) S WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.Status = 'Working' ORDER BY S.ShiftName ASC";
 

@@ -1408,6 +1408,51 @@ body {
     color: #475569;
 }
 
+
+#unit-detail-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 3000;
+    padding: 20px;
+}
+
+#unit-detail-overlay.active { display: flex; }
+
+.unit-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px 16px;
+}
+.unit-detail-grid-item {
+    font-size: 13px;
+    color: #374151;
+    padding: 4px 0;
+    border-bottom: 1px dashed #f1f5f9;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.units-eye-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    color: var(--primary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background .15s;
+}
+.units-eye-btn:hover { background: #eef2ff; }
+
+
 /* Responsive */
 
 @media (max-width:700px){

@@ -225,7 +225,7 @@ class AttendanceModel {
         if (this.state.activeTab === tabId) {
             return;
         }
-        if (tabId === 'sort_order' && !(window.HRMS_USER && window.HRMS_USER.isMaster)) {
+        if ((tabId === 'sort_order' || tabId === 'units') && !(window.HRMS_USER && window.HRMS_USER.isMaster)) {
             return;
         }
         this.state.activeTab = tabId;
