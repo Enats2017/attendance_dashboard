@@ -20,11 +20,14 @@ class AttendanceController {
         });
 
         this.view.bindApplyFilters(async filters => {
+            this.model.setSubAdmin(filters.subadminUserId);
             this.model.updateFilters(filters);
+
             this.view.showOverlay('Updating dashboard...');
             const result = await this.model.fetchData();
+            await this.model.fetchFilterOptions();
             this.view.hideOverlay();
-            
+
             if (!result.success) {
                 alert('Error updating data: ' + result.error);
             }
@@ -41,6 +44,11 @@ class AttendanceController {
             this.view.showOverlay('Resetting dashboard...');
             await this.model.fetchData(); // ← fetch after reset
             this.view.hideOverlay();
+        });
+
+        this.view.bindSubAdminChange((subadminUserId) => {
+            this.model.state.filters.subadminUserId = subadminUserId || null;
+            this.model.state.filterLists = null; 
         });
 
         this.view.bindStatCardClick((key) => {
@@ -119,14 +127,18 @@ class AttendanceController {
 
     async init() {
         this.view.showOverlay('Loading dashboard...');
-        
-        // Fetch filter options (departments, companies) from API
+
         await this.model.fetchFilterOptions();
-        
+
+        if (window.HRMS_USER && window.HRMS_USER.isMaster) {
+            await this.model.fetchSubAdmins();
+        }
+
         const result = await this.model.fetchData();
         if (!result.success) {
             alert('Error loading data: ' + result.error);
         }
+
         this.view.hideOverlay();
     }
 }

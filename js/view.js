@@ -46,6 +46,10 @@ class AttendanceView {
         this._renderToken++;
         const myToken = this._renderToken;
 
+        if (window.HRMS_USER && window.HRMS_USER.isMaster && !model.state.subAdminList) {
+            model.fetchSubAdmins();
+        }
+
         if (window.Charts && typeof Charts.destroyAll === "function") {
             Charts.destroyAll();
         }
@@ -67,7 +71,7 @@ class AttendanceView {
 				<div class="main-content">
 					${this._renderTopbar(state)}
 					<div class="content-body">
-                        ${(state.activeTab !== "feature" && state.activeTab !== "units") ? this._renderFilters(state.filters, filterOpts) : ""}
+                        ${(state.activeTab !== "feature" && state.activeTab !== "units") ? this._renderFilters(state.filters, filterOpts, state) : ""}
                         ${
                             state.activeTab === "designation"
                                 ? this._renderDesignationFamilySummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "age"
@@ -302,9 +306,9 @@ class AttendanceView {
     
     _renderTopbar(state) {
         const user = window.HRMS_USER || {};
+        const isMaster = !!user.isMaster;
         const displayName = user.name || user.username || "Admin User";
         const initials = displayName.split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase();
-
         const currentTab = this.TABS.find((t) => t.id === state.activeTab);
         const pageTitle = currentTab ? currentTab.label : "Dashboard";
 
@@ -332,39 +336,55 @@ class AttendanceView {
     }
 
 
-    _renderFilters(filters, opts) {
-        const selectOpts = (arr) => {
-            return ('<option value="All">All</option>' + arr.map((v) => `<option value="${v}">${v}</option>`).join(""));
-        };
+    _renderFilters(filters, opts, state) {
+        const selectOpts = (arr) => (
+            '<option value="All">All</option>' + arr.map((v) => `<option value="${v}">${v}</option>`).join("")
+        );
+
+        const isMaster = !!(window.HRMS_USER && window.HRMS_USER.isMaster);
+        const subAdminList = (state && state.subAdminList) || [];
+        const selectedId = (state && state.filters.subadminUserId) || "";
 
         return `
-			<div class="filter-panel">
-				<div class="filter-grid">
-					<div class="filter-field">
-						<label>Start Date</label>
-						<input type="date" id="f-from" value="${filters.dateFrom}">
-					</div>
-					<div class="filter-field">
-						<label>End Date</label>
-						<input type="date" id="f-to" value="${filters.dateTo}">
-					</div>
-					<div class="filter-field">
-						<label>Company</label>
-						<select id="f-company">${selectOpts(opts.companies)}</select>
-					</div>
-					<div class="filter-field">
-						<label>Department</label>
-						<select id="f-dept">${selectOpts(opts.depts)}</select>
-					</div>
-					<div class="filter-field">
-						<label>Shift</label>
-						<select id="f-shift">${selectOpts(opts.shifts || [])}</select>
-					</div>
+            <div class="filter-panel">
+                <div class="filter-grid">
+                    <div class="filter-field">
+                        <label>Start Date</label>
+                        <input type="date" id="f-from" value="${filters.dateFrom}">
+                    </div>
+                    <div class="filter-field">
+                        <label>End Date</label>
+                        <input type="date" id="f-to" value="${filters.dateTo}">
+                    </div>
+                    <div class="filter-field">
+                        <label>Company</label>
+                        <select id="f-company">${selectOpts(opts.companies)}</select>
+                    </div>
+                    <div class="filter-field">
+                        <label>Department</label>
+                        <select id="f-dept">${selectOpts(opts.depts)}</select>
+                    </div>
+                    <div class="filter-field">
+                        <label>Shift</label>
+                        <select id="f-shift">${selectOpts(opts.shifts || [])}</select>
+                    </div>
                     <div class="filter-field">
                         <label>Location</label>
                         <select id="f-location">${selectOpts(opts.locations || [])}</select>
                     </div>
-				</div>
+                    ${isMaster ? `
+                    <div class="filter-field">
+                        <label>Viewing As</label>
+                        <select id="f-subadmin">
+                            <option value="">All (Master View)</option>
+                            ${subAdminList.map((s) => `
+                                <option value="${s.id}" ${String(selectedId) === String(s.id) ? "selected" : ""}>
+                                    ${this._escapeAttr(s.name)}
+                                </option>
+                            `).join("")}
+                        </select>
+                    </div>` : ""}
+                </div>
                 <div class="filter-actions">
                     <button class="btn btn-primary" id="btn-apply-filters">
                         <i class="ph ph-funnel"></i> Apply
@@ -377,7 +397,7 @@ class AttendanceView {
                     </button>
                 </div>
             </div>
-		`;
+        `;
     }
 
 
@@ -3267,6 +3287,7 @@ class AttendanceView {
         }
         this._applyFilterHandler = (event) => {
             if (event.target.closest("#btn-apply-filters")) {
+                const subEl = document.getElementById("f-subadmin");
                 handler({
                     dateFrom: document.getElementById("f-from").value,
                     dateTo: document.getElementById("f-to").value,
@@ -3274,6 +3295,7 @@ class AttendanceView {
                     dept: document.getElementById("f-dept").value,
                     shift: document.getElementById("f-shift").value,
                     location: document.getElementById("f-location").value,
+                    subadminUserId: subEl ? (subEl.value || null) : null,
                 });
             }
         };
@@ -3304,6 +3326,19 @@ class AttendanceView {
             }
         };
         this.app.addEventListener("click", this._resetHandler);
+    }
+
+
+    bindSubAdminChange(handler) {
+        if (this._subAdminChangeHandler) {
+            this.app.removeEventListener("change", this._subAdminChangeHandler);
+        }
+        this._subAdminChangeHandler = (event) => {
+            if (event.target && event.target.id === "f-subadmin") {
+                handler(event.target.value);
+            }
+        };
+        this.app.addEventListener("change", this._subAdminChangeHandler);
     }
 
 

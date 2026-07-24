@@ -70,7 +70,8 @@ function getSQLServer() {
         "Uid" => $sqlConfig['uid'],
         "PWD" => $sqlConfig['pwd'],
         "CharacterSet" => "UTF-8",
-        "TrustServerCertificate" => true
+        "TrustServerCertificate" => true,
+        "MultipleActiveResultSets" => true
     ];
     $sqlServerConn = sqlsrv_connect($sqlConfig['server'], $connectionInfo);
     if (!$sqlServerConn) {
@@ -1619,41 +1620,46 @@ function getSubAdmins() {
     $sql = "SELECT UserId, LoginName, RoleName FROM SystemUsers WHERE RecordStatus = 1 AND UserId != ?";
     $stmt = sqlsrv_query($conn, $sql, [$_SESSION['userId']]);
 
-    $subAdmins = [];
+    $userRows = [];
     if ($stmt) {
         while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
-            $uid = intval($row['UserId']);
-
-            $locations = [];
-            $stmtLoc = sqlsrv_query($conn, "SELECT L.LocationName FROM UserLocations UL INNER JOIN Locations L ON UL.LocationId = L.LocationId WHERE UL.UserId = ?", [$uid]);
-            while ($r = sqlsrv_fetch_array($stmtLoc, SQLSRV_FETCH_ASSOC)) {
-                $locations[] = $r['LocationName'];
-            }
-
-            $companies = [];
-            $stmtComp = sqlsrv_query($conn, "SELECT C.CompanyFName FROM UserCompanies UC INNER JOIN Companies C ON UC.CompanyId = C.CompanyId WHERE UC.UserId = ?", [$uid]);
-            while ($r = sqlsrv_fetch_array($stmtComp, SQLSRV_FETCH_ASSOC)) {
-                $companies[] = $r['CompanyFName'];
-            }
-
-            $departments = [];
-            $stmtDept = sqlsrv_query($conn, "SELECT D.DepartmentFName FROM UserDepartments UD INNER JOIN Departments D ON UD.DepartmentId = D.DepartmentId WHERE UD.UserId = ?", [$uid]);
-            while ($r = sqlsrv_fetch_array($stmtDept, SQLSRV_FETCH_ASSOC)) {
-                $departments[] = $r['DepartmentFName'];
-            }
-
-            $isSubMaster = empty($locations) && empty($companies) && empty($departments);
-            if ($isSubMaster) continue; 
-
-            $subAdmins[] = [
-                'id' => $uid,
-                'name' => $row['LoginName'],
-                'role' => $row['RoleName'],
-                'locations' => $locations,
-                'companies' => $companies,
-                'departments' => $departments,
-            ];
+            $userRows[] = $row;   // पूरा result पहले buffer कर लो
         }
+    }
+
+    $subAdmins = [];
+    foreach ($userRows as $row) {   // अब safely inner queries चलाओ
+        $uid = intval($row['UserId']);
+
+        $locations = [];
+        $stmtLoc = sqlsrv_query($conn, "SELECT L.LocationName FROM UserLocations UL INNER JOIN Locations L ON UL.LocationId = L.LocationId WHERE UL.UserId = ?", [$uid]);
+        while ($r = sqlsrv_fetch_array($stmtLoc, SQLSRV_FETCH_ASSOC)) {
+            $locations[] = $r['LocationName'];
+        }
+
+        $companies = [];
+        $stmtComp = sqlsrv_query($conn, "SELECT C.CompanyFName FROM UserCompanies UC INNER JOIN Companies C ON UC.CompanyId = C.CompanyId WHERE UC.UserId = ?", [$uid]);
+        while ($r = sqlsrv_fetch_array($stmtComp, SQLSRV_FETCH_ASSOC)) {
+            $companies[] = $r['CompanyFName'];
+        }
+
+        $departments = [];
+        $stmtDept = sqlsrv_query($conn, "SELECT D.DepartmentFName FROM UserDepartments UD INNER JOIN Departments D ON UD.DepartmentId = D.DepartmentId WHERE UD.UserId = ?", [$uid]);
+        while ($r = sqlsrv_fetch_array($stmtDept, SQLSRV_FETCH_ASSOC)) {
+            $departments[] = $r['DepartmentFName'];
+        }
+
+        $isSubMaster = empty($locations) && empty($companies) && empty($departments);
+        if ($isSubMaster) continue;
+
+        $subAdmins[] = [
+            'id' => $uid,
+            'name' => $row['LoginName'],
+            'role' => $row['RoleName'],
+            'locations' => $locations,
+            'companies' => $companies,
+            'departments' => $departments,
+        ];
     }
 
     echo json_encode(['success' => true, 'data' => $subAdmins]);

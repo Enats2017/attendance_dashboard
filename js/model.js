@@ -64,6 +64,10 @@ class AttendanceModel {
             const urlShifts = new URL(window.APP_CONFIG.API_URL, window.location.origin);
             urlShifts.searchParams.set('action', 'get_shifts');
 
+            if (this.state.filters.subadminUserId) {
+                [urlDepts, urlComps, urlShifts].forEach(u => u.searchParams.set('subadmin_user_id', this.state.filters.subadminUserId));
+            }
+
             const safeJson = async (response) => {
                 const text = await response.text();
                 if (!text || text.trim() === '') return [];
@@ -128,6 +132,9 @@ class AttendanceModel {
             url.searchParams.set('company', this.state.filters.company);
             url.searchParams.set('shift', this.state.filters.shift);
             url.searchParams.set('location', this.state.filters.location);
+            if (this.state.filters.subadminUserId) {
+                url.searchParams.set('subadmin_user_id', this.state.filters.subadminUserId);
+            }
             console.log('Dashboard URL:', url.toString());
             const response = await fetch(url.toString(), { credentials: 'include' });
             const data = await response.json();
@@ -205,6 +212,12 @@ class AttendanceModel {
             ...this.state.filters, 
             ...newFilters 
         };
+    }
+
+
+    setSubAdmin(userId) {
+        this.state.filters.subadminUserId = userId || null;
+        this.state.filterLists = null;   
     }
 
 
