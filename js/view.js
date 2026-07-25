@@ -3375,6 +3375,14 @@ class AttendanceView {
                 let val = row[key];
                 if (typeof val === "string") {
                     val = val.replace(/\u00A0/g, "").replace(/\r/g, "").replace(/\n/g, "").replace(/\t/g, "").trim().replace(/\s+/g, " ");
+
+                    const isCodeColumn = key.toLowerCase() === "code";
+                    const isPureDigits = /^\d+$/.test(val);
+                    const hasLeadingZero = val.length > 1 && val[0] === "0";
+
+                    if (isCodeColumn && isPureDigits && !hasLeadingZero) {
+                        val = Number(val);
+                    }
                 }
                 cleaned[key] = val;
             });
@@ -3665,6 +3673,10 @@ class AttendanceView {
             const isWeeklyOff = parseInt(log.weeklyOff ?? 0) === 1;
 
             switch (code) {
+                case "D.P":
+                    groups[g].present++;
+                    break;
+
                 case "P":
                     groups[g].present++;
                     break;
@@ -3959,6 +3971,14 @@ class AttendanceView {
 
         const rows = pageLogs.map((l) => {
             const e = empMap[l.empId] || {};
+            const displayStatus = this._getDisplayStatus(l);
+            const badgeCls =
+                displayStatus === "Present" || displayStatus === "WO Present" ? "badge-success" :
+                displayStatus === "Half Present" || displayStatus === "WO Half Present" ? "badge-warning" :
+                displayStatus === "Weekly Off" ? "badge-info" :
+                displayStatus === "Single Punch" ? "badge-warning" :
+                "badge-danger";
+
             return [
                 e.code || "-",
                 e.name || "-",
@@ -3969,7 +3989,7 @@ class AttendanceView {
                 l.shiftName || e.shift || "-",
                 l.inTime || "-",
                 l.outTime || "-",
-                `<span class="badge ${l.status === "Present" ? "badge-success" : "badge-danger"}">${l.status || "-"}</span>`,
+                `<span class="badge ${badgeCls}">${displayStatus}</span>`,
                 this._actionViewLink(l, e, l.date),
             ];
         });
@@ -3987,7 +4007,7 @@ class AttendanceView {
                 Hours: l.hoursWorked,
                 LateIn: Number(l.lateBy) > 0 ? "Yes" : "No",
                 EarlyOut: Number(l.earlyBy) > 0 ? "Yes" : "No",
-                Status: l.status,
+                Status: this._getDisplayStatus(l),
                 DetailedStatus: l.detailedStatus,
                 DOB: this._formatDate(e.dobRaw),
                 Overtime: l.overtime || 0,
@@ -4855,6 +4875,10 @@ class AttendanceView {
         let bucket;
 
         switch (code) {
+            case "D.P":
+                bucket = "Present";
+                break;
+
             case "P":
                 bucket = "Present";
                 break;
@@ -4887,6 +4911,45 @@ class AttendanceView {
         }
 
         return seriesName === bucket;
+    }
+
+
+    _getDisplayStatus(log) {
+        if (log.status === "Single Punch") {
+            return "Single Punch";
+        }
+
+        const code = (log.detailedStatusCode || "").toUpperCase().trim();
+        const isWeeklyOff = parseInt(log.weeklyOff ?? 0) === 1;
+
+        switch (code) {
+            case "D.P":
+                    return "Present";
+
+            case "P":
+                return "Present";
+
+            case "½PLD":
+            case "L_CL":
+            case "½PCL":
+            case "½PLD(HO)":
+                return "Half Present";
+
+            case "WO":
+                return "Weekly Off";
+
+            case "WOP":
+                return isWeeklyOff ? "WO Present" : "Present";
+
+            case "½PLD(WO)":
+                return isWeeklyOff ? "WO Half Present" : "Half Present";
+
+            case "A":
+            case "ALD":
+            case "WOA":
+            default:
+                return "Absent";
+        }
     }
 
 

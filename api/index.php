@@ -1024,6 +1024,8 @@ function handleDashboardData($input, $returnData = false) {
 
     $curDate = new DateTime(date('Y-m-01', strtotime($dayFrom)));
     $endDate = new DateTime(date('Y-m-01', strtotime($dayTo)));
+    
+    $empPunchTimeline = [];
 
     while ($curDate <= $endDate) {
         $m = (int)$curDate->format('n');
@@ -1068,6 +1070,15 @@ function handleDashboardData($input, $returnData = false) {
                     $deviceRows[] = $row;
                     $dir = trim($row['AttDirection'] ?? '');
                     $isIn = (strcasecmp($dir, 'in') == 0 || $dir === '0');
+                    $isOut = (strcasecmp($dir, 'out') == 0 || $dir === '1');
+
+                    if ($isIn || $isOut) {
+                        $empIdRaw = (string)$row['EmployeeId'];
+                        $empPunchTimeline[$empIdRaw][] = [
+                            'ts'  => $row['LogDate'],
+                            'dir' => $isIn ? 'in' : 'out',
+                        ];
+                    }
                 }
 
                 $devEmpDayBuckets = [];
@@ -1136,6 +1147,13 @@ function handleDashboardData($input, $returnData = false) {
         $curDate->modify('+1 month');
     }
 
+    foreach ($empPunchTimeline as $empIdKey => &$timeline) {
+        usort($timeline, function ($a, $b) {
+            return $a['ts'] <=> $b['ts'];
+        });
+    }
+    unset($timeline);
+
     $empShiftFromLogs = [];
     foreach ($logs as $log) {
         if (!empty($log['shiftId']) && !isset($empShiftFromLogs[$log['empId']])) {
@@ -1156,6 +1174,56 @@ function handleDashboardData($input, $returnData = false) {
         }
     }
     unset($emp);
+
+    $empShiftFrequency = [];
+    foreach ($logs as $log) {
+        if (empty($log['shiftId']) || empty($log['shiftStart']) || empty($log['shiftEnd'])) {
+            continue;
+        }
+        $eid = $log['empId'];
+        $sid = $log['shiftId'];
+        if (!isset($empShiftFrequency[$eid])) {
+            $empShiftFrequency[$eid] = [];
+        }
+        if (!isset($empShiftFrequency[$eid][$sid])) {
+            $empShiftFrequency[$eid][$sid] = [
+                'count' => 0,
+                'shiftStart' => $log['shiftStart'],
+                'shiftEnd' => $log['shiftEnd'],
+            ];
+        }
+        $empShiftFrequency[$eid][$sid]['count']++;
+    }
+
+    $empUsualShift = [];
+    foreach ($empShiftFrequency as $eid => $shiftCounts) {
+        $best = null;
+        foreach ($shiftCounts as $sid => $info) {
+            if ($best === null || $info['count'] > $best['count']) {
+                $best = $info;
+            }
+        }
+        if ($best) {
+            $empUsualShift[$eid] = [
+                'shiftStart' => $best['shiftStart'],
+                'shiftEnd' => $best['shiftEnd'],
+            ];
+        }
+    }
+
+    $consumedTimestamps = [];
+    foreach ($logs as $log) {
+        $eid = $log['empId'];
+        if (!isset($consumedTimestamps[$eid])) {
+            $consumedTimestamps[$eid] = [];
+        }
+        if (!empty($log['inTime']) && $log['inTime'] !== '00:00:00') {
+            $consumedTimestamps[$eid][$log['date'] . ' ' . substr($log['inTime'], 0, 5)] = true;
+        }
+        if (!empty($log['outTime']) && $log['outTime'] !== '00:00:00') {
+            $consumedTimestamps[$eid][$log['date'] . ' ' . substr($log['outTime'], 0, 5)] = true;
+        }
+    }
 
     if ($shiftName) {
         $employees = array_values(array_filter($employees, function($emp) use ($shiftName) {
@@ -1408,6 +1476,10 @@ function handleDashboardData($input, $returnData = false) {
         $isWeeklyOff = intval($log['weeklyOff']) === 1;
 
         switch ($code) {
+            case 'D.P':
+                $statusKeyMap[$key] = 'present';
+                break;
+                
             case 'P':
                 $statusKeyMap[$key] = 'present';
                 break;
@@ -1437,6 +1509,77 @@ function handleDashboardData($input, $returnData = false) {
             default:
                 $statusKeyMap[$key] = 'absent';
                 break;
+        }
+    }
+
+    $timeToMinutes = function ($hm) {
+        $parts = explode(':', $hm);
+        return (intval($parts[0]) * 60) + intval($parts[1] ?? 0);
+    };
+
+    $stage2SinglePunchCount = 0;
+    $stage2AmbiguousDays = [];
+
+    foreach ($employees as $emp) {
+        $eid = $emp['id'];
+
+        if (!isset($empUsualShift[$eid])) {
+            continue; // no reliable shift pattern for this employee
+        }
+        if (!isset($empPunchTimeline[$eid]) || empty($empPunchTimeline[$eid])) {
+            continue; // no raw punches at all in range
+        }
+
+        $shiftStart = $empUsualShift[$eid]['shiftStart'];
+        $shiftEnd = $empUsualShift[$eid]['shiftEnd'];
+        $isNightShift = $timeToMinutes($shiftEnd) <= $timeToMinutes($shiftStart);
+        $empDoj = $emp['doj'] ?? null;
+
+        $d = new DateTime($dayFrom);
+        $dEnd = new DateTime($dayTo);
+        for (; $d <= $dEnd; $d->modify('+1 day')) {
+            $dateStr = $d->format('Y-m-d');
+            $key = $eid . '_' . $dateStr;
+
+            $empStatus = $statusKeyMap[$key] ?? 'absent';
+            if ($empStatus !== 'absent') continue;   // only try to recover truly-absent days
+            if ($empDoj && $dateStr < $empDoj) continue;
+            if ($dateStr > date('Y-m-d')) continue;
+
+            $winStart = new DateTime("$dateStr $shiftStart");
+            $winStart->modify('-2 hours');
+
+            $winEnd = new DateTime("$dateStr $shiftEnd");
+            if ($isNightShift) {
+                $winEnd->modify('+1 day');
+            }
+            $winEnd->modify('+2 hours');
+
+            $matches = [];
+            foreach ($empPunchTimeline[$eid] as $punch) {
+                if ($punch['ts'] < $winStart || $punch['ts'] > $winEnd) continue;
+
+                $tsKey = $punch['ts']->format('Y-m-d H:i');
+                if (isset($consumedTimestamps[$eid][$tsKey])) continue;
+
+                $matches[] = $punch;
+            }
+
+            if (count($matches) === 1) {
+                $p = $matches[0];
+                $singlePunch++;
+                $singlePunchKeys[] = $key;
+                $singlePunchData[$key] = [
+                    'time' => $p['ts']->format('H:i:s'),
+                    'direction' => $p['dir'],
+                    'shiftStart' => $shiftStart,
+                    'shiftEnd' => $shiftEnd,
+                ];
+                $statusKeyMap[$key] = 'singlePunch';
+                $stage2SinglePunchCount++;
+            } elseif (count($matches) >= 2) {
+                $stage2AmbiguousDays[] = $key;
+            }
         }
     }
 
@@ -1581,6 +1724,10 @@ function handleDashboardData($input, $returnData = false) {
         'placeholderIds' => $placeholderIds,
         'singlePunchKeys' => $singlePunchKeys,
 		'singlePunchData' => $singlePunchData,
+        'stage2Recovery' => [
+            'singlePunchesFound' => $stage2SinglePunchCount,
+            'ambiguousDays' => $stage2AmbiguousDays,
+        ],
         'staffWorkerStats' => [
             'staffTotal' => count($staffEmpIds),
             'staffPresent' => $staffPresent,

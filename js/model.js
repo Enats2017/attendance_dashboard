@@ -1237,6 +1237,10 @@ class AttendanceModel {
             const isWeeklyOff = parseInt(l.weeklyOff ?? 0) === 1;
 
             switch (code) {
+                case 'D.P':
+                    map[key] = 'present';
+                    break;
+
                 case 'P':
                     map[key] = 'present';
                     break;
