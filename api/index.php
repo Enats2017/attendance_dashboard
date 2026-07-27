@@ -933,8 +933,10 @@ function handleDashboardData($input, $returnData = false) {
     }
 
     $logs = [];
-
-    $curDate = new DateTime(date('Y-m-01', strtotime($dayFrom)));
+    $shiftLearningLogs = [];
+    $shiftLearnFromDate = (clone (new DateTime($dayTo)))->modify('-45 days')->format('Y-m-d');
+    $loopStartDate = min(strtotime($dayFrom), strtotime($shiftLearnFromDate));
+    $curDate = new DateTime(date('Y-m-01', $loopStartDate));
     $endDate = new DateTime(date('Y-m-01', strtotime($dayTo)));
 
     while ($curDate <= $endDate) {
@@ -1479,7 +1481,7 @@ function handleDashboardData($input, $returnData = false) {
             case 'D.P':
                 $statusKeyMap[$key] = 'present';
                 break;
-                
+
             case 'P':
                 $statusKeyMap[$key] = 'present';
                 break;
@@ -1522,17 +1524,6 @@ function handleDashboardData($input, $returnData = false) {
 
     foreach ($employees as $emp) {
         $eid = $emp['id'];
-
-        if (!isset($empUsualShift[$eid])) {
-            continue; // no reliable shift pattern for this employee
-        }
-        if (!isset($empPunchTimeline[$eid]) || empty($empPunchTimeline[$eid])) {
-            continue; // no raw punches at all in range
-        }
-
-        $shiftStart = $empUsualShift[$eid]['shiftStart'];
-        $shiftEnd = $empUsualShift[$eid]['shiftEnd'];
-        $isNightShift = $timeToMinutes($shiftEnd) <= $timeToMinutes($shiftStart);
         $empDoj = $emp['doj'] ?? null;
 
         $d = new DateTime($dayFrom);
@@ -1542,43 +1533,37 @@ function handleDashboardData($input, $returnData = false) {
             $key = $eid . '_' . $dateStr;
 
             $empStatus = $statusKeyMap[$key] ?? 'absent';
-            if ($empStatus !== 'absent') continue;   // only try to recover truly-absent days
+            if ($empStatus !== 'absent') continue;
             if ($empDoj && $dateStr < $empDoj) continue;
             if ($dateStr > date('Y-m-d')) continue;
 
-            $winStart = new DateTime("$dateStr $shiftStart");
-            $winStart->modify('-2 hours');
+            if (!isset($deviceEmployeeStats[$key])) continue;
 
-            $winEnd = new DateTime("$dateStr $shiftEnd");
-            if ($isNightShift) {
-                $winEnd->modify('+1 day');
-            }
-            $winEnd->modify('+2 hours');
+            $stat = $deviceEmployeeStats[$key];
+            $inCount = $stat['inCount'] ?? 0;
+            $outCount = $stat['outCount'] ?? 0;
 
-            $matches = [];
-            foreach ($empPunchTimeline[$eid] as $punch) {
-                if ($punch['ts'] < $winStart || $punch['ts'] > $winEnd) continue;
+            $hasIn = $inCount > 0;
+            $hasOut = $outCount > 0;
 
-                $tsKey = $punch['ts']->format('Y-m-d H:i');
-                if (isset($consumedTimestamps[$eid][$tsKey])) continue;
+            if ($hasIn && $hasOut) {
+                $stage2AmbiguousDays[] = $key;
+            } elseif ($hasIn || $hasOut) {
+                $isIn = $hasIn;
+                $punchTime = $isIn ? $stat['firstIn'] : $stat['lastOut'];
 
-                $matches[] = $punch;
-            }
-
-            if (count($matches) === 1) {
-                $p = $matches[0];
                 $singlePunch++;
                 $singlePunchKeys[] = $key;
                 $singlePunchData[$key] = [
-                    'time' => $p['ts']->format('H:i:s'),
-                    'direction' => $p['dir'],
-                    'shiftStart' => $shiftStart,
-                    'shiftEnd' => $shiftEnd,
+                    'time' => $punchTime ? $punchTime->format('H:i:s') : null,
+                    'direction' => $isIn ? 'in' : 'out',
+                    'shiftId' => 3,
+                    'shiftName' => 'No Shift',
+                    'shiftStart' => null,
+                    'shiftEnd' => null,
                 ];
                 $statusKeyMap[$key] = 'singlePunch';
                 $stage2SinglePunchCount++;
-            } elseif (count($matches) >= 2) {
-                $stage2AmbiguousDays[] = $key;
             }
         }
     }
