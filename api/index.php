@@ -749,7 +749,7 @@ function getEmployeeNightShiftInfo($conn, $employees) {
             }
             $empNightShiftInfo[$emp['id']] = ['isNight' => true, 'cutoffMinutes' => $cutoff];
         } else {
-            $empNightShiftInfo[$emp['id']] = ['isNight' => false, 'cutoffMinutes' => 12 * 60];
+            $empNightShiftInfo[$emp['id']] = ['isNight' => false, 'cutoffMinutes' => 0];
         }
     }
 
@@ -762,7 +762,6 @@ function recoverAbsentSinglePunches($employees, $statusKeyMap, $deviceEmployeeSt
     $stage2AmbiguousDays = [];
     $newSinglePunchData = [];
     $todayStr = date('Y-m-d');
-
     foreach ($employees as $emp) {
         $eid = $emp['id'];
         $empDoj = $emp['doj'] ?? null;
@@ -770,64 +769,86 @@ function recoverAbsentSinglePunches($employees, $statusKeyMap, $deviceEmployeeSt
         $cutoffMin = $nightInfo['cutoffMinutes'];
         $cutoffStr = sprintf('%02d:%02d:00', intdiv($cutoffMin, 60), $cutoffMin % 60);
 
+        $carryOpenIn = null;     
+        $carryOrphanOut = null;  
+
         $d = new DateTime($dayFrom);
         $dEnd = new DateTime($dayTo);
         for (; $d <= $dEnd; $d->modify('+1 day')) {
             $dateStr = $d->format('Y-m-d');
             $key = $eid . '_' . $dateStr;
 
-            $empStatus = $statusKeyMap[$key] ?? 'absent';
-            if ($empStatus !== 'absent') continue;
             if ($empDoj && $dateStr < $empDoj) continue;
             if ($dateStr > $todayStr) continue;
 
-            if ($nightInfo['isNight']) {
-                $winStart = new DateTime("$dateStr $cutoffStr");
-                $winEnd = (clone $winStart)->modify('+1 day')->modify('-1 second');
+            $winStart = new DateTime("$dateStr $cutoffStr");
+            $winEnd = (clone $winStart)->modify('+1 day')->modify('-1 second');
 
-                $hasIn = false; $hasOut = false;
-                $firstIn = null; $lastOut = null;
-
-                foreach (($empPunchTimeline[$eid] ?? []) as $p) {
-                    if ($p['ts'] < $winStart) continue;
-                    if ($p['ts'] > $winEnd) break; 
-                    if ($p['dir'] === 'in') {
-                        $hasIn = true;
-                        if ($firstIn === null || $p['ts'] < $firstIn) $firstIn = $p['ts'];
-                    } else {
-                        $hasOut = true;
-                        if ($lastOut === null || $p['ts'] > $lastOut) $lastOut = $p['ts'];
-                    }
-                }
-
-                if (!$hasIn && !$hasOut) continue;
-
-                if ($hasIn && $hasOut) {
-                    $stage2AmbiguousDays[] = $key;
-                    continue;
-                }
-
-                $isIn = $hasIn;
-                $punchTime = $isIn ? $firstIn : $lastOut;
-            } else {
-                if (!isset($deviceEmployeeStats[$key])) continue;
-
-                $stat = $deviceEmployeeStats[$key];
-                $hasIn = ($stat['inCount'] ?? 0) > 0;
-                $hasOut = ($stat['outCount'] ?? 0) > 0;
-
-                if ($hasIn && $hasOut) {
-                    $stage2AmbiguousDays[] = $key;
-                    continue;
-                }
-                if (!$hasIn && !$hasOut) continue;
-
-                $isIn = $hasIn;
-                $punchTime = $isIn ? $stat['firstIn'] : $stat['lastOut'];
+            $punchesInWindow = [];
+            foreach (($empPunchTimeline[$eid] ?? []) as $p) {
+                if ($p['ts'] < $winStart) continue;
+                if ($p['ts'] > $winEnd) break;
+                $punchesInWindow[] = $p;
             }
 
+            $openIn = $carryOpenIn ? [$carryOpenIn] : [];
+            $lastOrphanOut = $carryOrphanOut;
+            $carryOpenIn = null;
+            $carryOrphanOut = null;
+
+            if (empty($punchesInWindow)) {
+                if (!empty($openIn)) {
+                    $carryOpenIn = end($openIn);
+                } elseif ($lastOrphanOut !== null) {
+                    $carryOrphanOut = $lastOrphanOut;
+                }
+                continue;
+            }
+
+            foreach ($punchesInWindow as $p) {
+                if ($p['dir'] === 'in') {
+                    $openIn[] = $p;
+                    $lastOrphanOut = null; 
+                } else { 
+                    if (!empty($openIn)) {
+                        array_pop($openIn);
+                    } else {
+                        $lastOrphanOut = $p;
+                    }
+                }
+            }
+
+            if (count($openIn) > 1) {
+                $stage2AmbiguousDays[] = $key;
+                $carryOpenIn = end($openIn);
+                continue;
+            }
+
+            $dangling = null;
+            $isIn = null;
+            if (!empty($openIn)) {
+                $dangling = $openIn[0];
+                $isIn = true;
+            } elseif ($lastOrphanOut !== null) {
+                $dangling = $lastOrphanOut;
+                $isIn = false;
+            }
+
+            $empStatus = $statusKeyMap[$key] ?? 'absent';
+
+            if ($empStatus !== 'absent') {
+                if ($isIn === true) {
+                    $carryOpenIn = $dangling;
+                } elseif ($isIn === false) {
+                    $carryOrphanOut = $dangling;
+                }
+                continue;
+            }
+
+            if ($dangling === null) continue; 
+
             $newSinglePunchData[$key] = [
-                'time' => $punchTime ? $punchTime->format('H:i:s') : null,
+                'time' => $dangling['ts'] ? $dangling['ts']->format('H:i:s') : null,
                 'direction' => $isIn ? 'in' : 'out',
                 'shiftId' => 3,
                 'shiftName' => 'No Shift',
@@ -1837,10 +1858,6 @@ function handleDashboardData($input, $returnData = false) {
         'placeholderIds' => $placeholderIds,
         'singlePunchKeys' => $singlePunchKeys,
 		'singlePunchData' => $singlePunchData,
-        'stage2Recovery' => [
-            'singlePunchesFound' => $stage2SinglePunchCount,
-            'ambiguousDays' => $stage2AmbiguousDays,
-        ],
         'staffWorkerStats' => [
             'staffTotal' => count($staffEmpIds),
             'staffPresent' => $staffPresent,
