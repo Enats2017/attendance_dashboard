@@ -685,6 +685,169 @@ function getAllTeams($conn) {
 }
 
 
+function getEmployeeNightShiftInfo($conn, $employees) {
+    $parseShiftTime = function ($val) {
+        if ($val === null) return null;
+        if (is_object($val)) {
+            return intval($val->format('H')) * 60 + intval($val->format('i'));
+        }
+        $val = trim((string)$val);
+        if ($val === '') return null;
+        $parts = explode(':', $val);
+        return (intval($parts[0]) * 60) + intval($parts[1] ?? 0);
+    };
+
+    $shiftTimingMap = [];
+    $stmtShiftsT = sqlsrv_query($conn, "SELECT ShiftId, BeginTime, EndTime FROM Shifts");
+    if ($stmtShiftsT) {
+        while ($r = sqlsrv_fetch_array($stmtShiftsT, SQLSRV_FETCH_ASSOC)) {
+            $sid = intval($r['ShiftId']);
+            $begin = $parseShiftTime($r['BeginTime']);
+            $end = $parseShiftTime($r['EndTime']);
+            if ($begin === null || $end === null) continue;
+            $shiftTimingMap[$sid] = [
+                'begin' => $begin,
+                'end' => $end,
+                'isNight' => ($end <= $begin)
+            ];
+        }
+    }
+
+    $shiftGroupShiftsMap = [];
+    $stmtSG = sqlsrv_query($conn, "SELECT ShiftGroupId, ShiftIds FROM ShiftGroups");
+    if ($stmtSG) {
+        while ($r = sqlsrv_fetch_array($stmtSG, SQLSRV_FETCH_ASSOC)) {
+            $gid = intval($r['ShiftGroupId']);
+            $raw = trim($r['ShiftIds'] ?? '', ", \t\n\r\0\x0B");
+            $ids = [];
+            if ($raw !== '') {
+                foreach (explode(',', $raw) as $piece) {
+                    $piece = trim($piece);
+                    if ($piece !== '' && is_numeric($piece)) $ids[] = intval($piece);
+                }
+            }
+            $shiftGroupShiftsMap[$gid] = $ids;
+        }
+    }
+
+    $empNightShiftInfo = [];
+    foreach ($employees as $emp) {
+        $shiftIds = $shiftGroupShiftsMap[$emp['shiftGroupId']] ?? [];
+
+        $nightShift = null;
+        foreach ($shiftIds as $sid) {
+            if (!empty($shiftTimingMap[$sid]['isNight'])) {
+                $nightShift = $shiftTimingMap[$sid];
+                break;
+            }
+        }
+
+        if ($nightShift) {
+            $cutoff = intval(($nightShift['end'] + $nightShift['begin']) / 2);
+            if ($cutoff <= $nightShift['end'] || $cutoff >= $nightShift['begin']) {
+                $cutoff = 12 * 60; 
+            }
+            $empNightShiftInfo[$emp['id']] = ['isNight' => true, 'cutoffMinutes' => $cutoff];
+        } else {
+            $empNightShiftInfo[$emp['id']] = ['isNight' => false, 'cutoffMinutes' => 12 * 60];
+        }
+    }
+
+    return $empNightShiftInfo;
+}
+
+
+function recoverAbsentSinglePunches($employees, $statusKeyMap, $deviceEmployeeStats, $empPunchTimeline, $empNightShiftInfo, $dayFrom, $dayTo) {
+    $stage2SinglePunchCount = 0;
+    $stage2AmbiguousDays = [];
+    $newSinglePunchData = [];
+    $todayStr = date('Y-m-d');
+
+    foreach ($employees as $emp) {
+        $eid = $emp['id'];
+        $empDoj = $emp['doj'] ?? null;
+        $nightInfo = $empNightShiftInfo[$eid] ?? ['isNight' => false, 'cutoffMinutes' => 12 * 60];
+        $cutoffMin = $nightInfo['cutoffMinutes'];
+        $cutoffStr = sprintf('%02d:%02d:00', intdiv($cutoffMin, 60), $cutoffMin % 60);
+
+        $d = new DateTime($dayFrom);
+        $dEnd = new DateTime($dayTo);
+        for (; $d <= $dEnd; $d->modify('+1 day')) {
+            $dateStr = $d->format('Y-m-d');
+            $key = $eid . '_' . $dateStr;
+
+            $empStatus = $statusKeyMap[$key] ?? 'absent';
+            if ($empStatus !== 'absent') continue;
+            if ($empDoj && $dateStr < $empDoj) continue;
+            if ($dateStr > $todayStr) continue;
+
+            if ($nightInfo['isNight']) {
+                $winStart = new DateTime("$dateStr $cutoffStr");
+                $winEnd = (clone $winStart)->modify('+1 day')->modify('-1 second');
+
+                $hasIn = false; $hasOut = false;
+                $firstIn = null; $lastOut = null;
+
+                foreach (($empPunchTimeline[$eid] ?? []) as $p) {
+                    if ($p['ts'] < $winStart) continue;
+                    if ($p['ts'] > $winEnd) break; 
+                    if ($p['dir'] === 'in') {
+                        $hasIn = true;
+                        if ($firstIn === null || $p['ts'] < $firstIn) $firstIn = $p['ts'];
+                    } else {
+                        $hasOut = true;
+                        if ($lastOut === null || $p['ts'] > $lastOut) $lastOut = $p['ts'];
+                    }
+                }
+
+                if (!$hasIn && !$hasOut) continue;
+
+                if ($hasIn && $hasOut) {
+                    $stage2AmbiguousDays[] = $key;
+                    continue;
+                }
+
+                $isIn = $hasIn;
+                $punchTime = $isIn ? $firstIn : $lastOut;
+            } else {
+                if (!isset($deviceEmployeeStats[$key])) continue;
+
+                $stat = $deviceEmployeeStats[$key];
+                $hasIn = ($stat['inCount'] ?? 0) > 0;
+                $hasOut = ($stat['outCount'] ?? 0) > 0;
+
+                if ($hasIn && $hasOut) {
+                    $stage2AmbiguousDays[] = $key;
+                    continue;
+                }
+                if (!$hasIn && !$hasOut) continue;
+
+                $isIn = $hasIn;
+                $punchTime = $isIn ? $stat['firstIn'] : $stat['lastOut'];
+            }
+
+            $newSinglePunchData[$key] = [
+                'time' => $punchTime ? $punchTime->format('H:i:s') : null,
+                'direction' => $isIn ? 'in' : 'out',
+                'shiftId' => 3,
+                'shiftName' => 'No Shift',
+                'shiftStart' => null,
+                'shiftEnd' => null,
+            ];
+            $statusKeyMap[$key] = 'singlePunch';
+            $stage2SinglePunchCount++;
+        }
+    }
+
+    return [
+        'statusKeyMap' => $statusKeyMap,
+        'singlePunchData' => $newSinglePunchData,
+        'stage2SinglePunchCount' => $stage2SinglePunchCount,
+        'stage2AmbiguousDays' => $stage2AmbiguousDays,
+    ];
+}
+
+
 /**
  * Handle Dashboard Data Fetch (Employees, Logs, Counts)
  */
@@ -1519,53 +1682,18 @@ function handleDashboardData($input, $returnData = false) {
         return (intval($parts[0]) * 60) + intval($parts[1] ?? 0);
     };
 
-    $stage2SinglePunchCount = 0;
-    $stage2AmbiguousDays = [];
+    $empNightShiftInfo = getEmployeeNightShiftInfo($conn, $employees);
 
-    foreach ($employees as $emp) {
-        $eid = $emp['id'];
-        $empDoj = $emp['doj'] ?? null;
+    $stage2Result = recoverAbsentSinglePunches($employees, $statusKeyMap, $deviceEmployeeStats, $empPunchTimeline, $empNightShiftInfo, $dayFrom, $dayTo);
 
-        $d = new DateTime($dayFrom);
-        $dEnd = new DateTime($dayTo);
-        for (; $d <= $dEnd; $d->modify('+1 day')) {
-            $dateStr = $d->format('Y-m-d');
-            $key = $eid . '_' . $dateStr;
+    $statusKeyMap = $stage2Result['statusKeyMap'];
+    $stage2SinglePunchCount = $stage2Result['stage2SinglePunchCount'];
+    $stage2AmbiguousDays = $stage2Result['stage2AmbiguousDays'];
 
-            $empStatus = $statusKeyMap[$key] ?? 'absent';
-            if ($empStatus !== 'absent') continue;
-            if ($empDoj && $dateStr < $empDoj) continue;
-            if ($dateStr > date('Y-m-d')) continue;
-
-            if (!isset($deviceEmployeeStats[$key])) continue;
-
-            $stat = $deviceEmployeeStats[$key];
-            $inCount = $stat['inCount'] ?? 0;
-            $outCount = $stat['outCount'] ?? 0;
-
-            $hasIn = $inCount > 0;
-            $hasOut = $outCount > 0;
-
-            if ($hasIn && $hasOut) {
-                $stage2AmbiguousDays[] = $key;
-            } elseif ($hasIn || $hasOut) {
-                $isIn = $hasIn;
-                $punchTime = $isIn ? $stat['firstIn'] : $stat['lastOut'];
-
-                $singlePunch++;
-                $singlePunchKeys[] = $key;
-                $singlePunchData[$key] = [
-                    'time' => $punchTime ? $punchTime->format('H:i:s') : null,
-                    'direction' => $isIn ? 'in' : 'out',
-                    'shiftId' => 3,
-                    'shiftName' => 'No Shift',
-                    'shiftStart' => null,
-                    'shiftEnd' => null,
-                ];
-                $statusKeyMap[$key] = 'singlePunch';
-                $stage2SinglePunchCount++;
-            }
-        }
+    foreach ($stage2Result['singlePunchData'] as $key => $data) {
+        $singlePunch++;
+        $singlePunchKeys[] = $key;
+        $singlePunchData[$key] = $data;
     }
 
     $rangeStart = new DateTime($dayFrom);
