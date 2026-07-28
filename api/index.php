@@ -685,171 +685,75 @@ function getAllTeams($conn) {
 }
 
 
-function getEmployeeNightShiftInfo($conn, $employees) {
-    $parseShiftTime = function ($val) {
-        if ($val === null) return null;
-        if (is_object($val)) {
-            return intval($val->format('H')) * 60 + intval($val->format('i'));
-        }
-        $val = trim((string)$val);
-        if ($val === '') return null;
-        $parts = explode(':', $val);
-        return (intval($parts[0]) * 60) + intval($parts[1] ?? 0);
-    };
-
-    $shiftTimingMap = [];
-    $stmtShiftsT = sqlsrv_query($conn, "SELECT ShiftId, BeginTime, EndTime FROM Shifts");
-    if ($stmtShiftsT) {
-        while ($r = sqlsrv_fetch_array($stmtShiftsT, SQLSRV_FETCH_ASSOC)) {
-            $sid = intval($r['ShiftId']);
-            $begin = $parseShiftTime($r['BeginTime']);
-            $end = $parseShiftTime($r['EndTime']);
-            if ($begin === null || $end === null) continue;
-            $shiftTimingMap[$sid] = [
-                'begin' => $begin,
-                'end' => $end,
-                'isNight' => ($end <= $begin)
-            ];
-        }
-    }
-
-    $shiftGroupShiftsMap = [];
-    $stmtSG = sqlsrv_query($conn, "SELECT ShiftGroupId, ShiftIds FROM ShiftGroups");
-    if ($stmtSG) {
-        while ($r = sqlsrv_fetch_array($stmtSG, SQLSRV_FETCH_ASSOC)) {
-            $gid = intval($r['ShiftGroupId']);
-            $raw = trim($r['ShiftIds'] ?? '', ", \t\n\r\0\x0B");
-            $ids = [];
-            if ($raw !== '') {
-                foreach (explode(',', $raw) as $piece) {
-                    $piece = trim($piece);
-                    if ($piece !== '' && is_numeric($piece)) $ids[] = intval($piece);
-                }
-            }
-            $shiftGroupShiftsMap[$gid] = $ids;
-        }
-    }
-
-    $empNightShiftInfo = [];
-    foreach ($employees as $emp) {
-        $shiftIds = $shiftGroupShiftsMap[$emp['shiftGroupId']] ?? [];
-
-        $nightShift = null;
-        foreach ($shiftIds as $sid) {
-            if (!empty($shiftTimingMap[$sid]['isNight'])) {
-                $nightShift = $shiftTimingMap[$sid];
-                break;
-            }
-        }
-
-        if ($nightShift) {
-            $cutoff = intval(($nightShift['end'] + $nightShift['begin']) / 2);
-            if ($cutoff <= $nightShift['end'] || $cutoff >= $nightShift['begin']) {
-                $cutoff = 12 * 60; 
-            }
-            $empNightShiftInfo[$emp['id']] = ['isNight' => true, 'cutoffMinutes' => $cutoff];
-        } else {
-            $empNightShiftInfo[$emp['id']] = ['isNight' => false, 'cutoffMinutes' => 0];
-        }
-    }
-
-    return $empNightShiftInfo;
-}
-
-
-function recoverAbsentSinglePunches($employees, $statusKeyMap, $deviceEmployeeStats, $empPunchTimeline, $empNightShiftInfo, $dayFrom, $dayTo) {
+function recoverAbsentSinglePunches($employees, $statusKeyMap, $empPunchTimeline, $dayFrom, $dayTo, $morningCutoffMinutes = 12 * 60) {
     $stage2SinglePunchCount = 0;
-    $stage2AmbiguousDays = [];
     $newSinglePunchData = [];
     $todayStr = date('Y-m-d');
+ 
     foreach ($employees as $emp) {
         $eid = $emp['id'];
         $empDoj = $emp['doj'] ?? null;
-        $nightInfo = $empNightShiftInfo[$eid] ?? ['isNight' => false, 'cutoffMinutes' => 12 * 60];
-        $cutoffMin = $nightInfo['cutoffMinutes'];
-        $cutoffStr = sprintf('%02d:%02d:00', intdiv($cutoffMin, 60), $cutoffMin % 60);
-
-        $carryOpenIn = null;     
-        $carryOrphanOut = null;  
-
+ 
         $d = new DateTime($dayFrom);
         $dEnd = new DateTime($dayTo);
+ 
         for (; $d <= $dEnd; $d->modify('+1 day')) {
             $dateStr = $d->format('Y-m-d');
             $key = $eid . '_' . $dateStr;
-
+ 
+            $prevDateStr = (clone $d)->modify('-1 day')->format('Y-m-d');
+            $prevKey = $eid . '_' . $prevDateStr;
+ 
             if ($empDoj && $dateStr < $empDoj) continue;
             if ($dateStr > $todayStr) continue;
-
-            $winStart = new DateTime("$dateStr $cutoffStr");
-            $winEnd = (clone $winStart)->modify('+1 day')->modify('-1 second');
-
-            $punchesInWindow = [];
+ 
+            $dayStart = new DateTime("$dateStr 00:00:00");
+            $dayEnd   = (clone $dayStart)->modify('+1 day')->modify('-1 second');
+ 
+            $punchesToday = [];
             foreach (($empPunchTimeline[$eid] ?? []) as $p) {
-                if ($p['ts'] < $winStart) continue;
-                if ($p['ts'] > $winEnd) break;
-                $punchesInWindow[] = $p;
+                if ($p['ts'] < $dayStart) continue;
+                if ($p['ts'] > $dayEnd) break;
+                $punchesToday[] = $p;
             }
-
-            $openIn = $carryOpenIn ? [$carryOpenIn] : [];
-            $lastOrphanOut = $carryOrphanOut;
-            $carryOpenIn = null;
-            $carryOrphanOut = null;
-
-            if (empty($punchesInWindow)) {
-                if (!empty($openIn)) {
-                    $carryOpenIn = end($openIn);
-                } elseif ($lastOrphanOut !== null) {
-                    $carryOrphanOut = $lastOrphanOut;
-                }
-                continue;
-            }
-
-            foreach ($punchesInWindow as $p) {
-                if ($p['dir'] === 'in') {
-                    $openIn[] = $p;
-                    $lastOrphanOut = null; 
-                } else { 
-                    if (!empty($openIn)) {
-                        array_pop($openIn);
-                    } else {
-                        $lastOrphanOut = $p;
+ 
+            // Step 1: subah wala leading OUT hamesha exclude, unconditionally
+            if (!empty($punchesToday)) {
+                $first = $punchesToday[0];
+                $firstMinutes = intval($first['ts']->format('H')) * 60 + intval($first['ts']->format('i'));
+ 
+                if ($first['dir'] === 'out' && $firstMinutes < $morningCutoffMinutes) {
+                    $morningOut = array_shift($punchesToday); // hamesha nikaal do, koi condition nahi
+ 
+                    // Step 2: sirf D-1 ko do agar D-1 absent hai
+                    if ($prevDateStr >= $dayFrom) {
+                        $prevStatus = $statusKeyMap[$prevKey] ?? 'absent';
+                        if ($prevStatus === 'absent' && !isset($newSinglePunchData[$prevKey])) {
+                            $newSinglePunchData[$prevKey] = [
+                                'time' => $morningOut['ts']->format('H:i:s'),
+                                'direction' => 'out',
+                                'shiftId' => 3,
+                                'shiftName' => 'No Shift',
+                                'shiftStart' => null,
+                                'shiftEnd' => null,
+                            ];
+                            $statusKeyMap[$prevKey] = 'singlePunch';
+                            $stage2SinglePunchCount++;
+                        }
+                        // else: D-1 already resolved -> yeh punch discard, koi fallback nahi
                     }
                 }
             }
-
-            if (count($openIn) > 1) {
-                $stage2AmbiguousDays[] = $key;
-                $carryOpenIn = end($openIn);
-                continue;
-            }
-
-            $dangling = null;
-            $isIn = null;
-            if (!empty($openIn)) {
-                $dangling = $openIn[0];
-                $isIn = true;
-            } elseif ($lastOrphanOut !== null) {
-                $dangling = $lastOrphanOut;
-                $isIn = false;
-            }
-
+ 
+            // Step 3: D ke bache hue punches — IN kabhi bhi, OUT sirf subah ke baad wala
             $empStatus = $statusKeyMap[$key] ?? 'absent';
-
-            if ($empStatus !== 'absent') {
-                if ($isIn === true) {
-                    $carryOpenIn = $dangling;
-                } elseif ($isIn === false) {
-                    $carryOrphanOut = $dangling;
-                }
-                continue;
-            }
-
-            if ($dangling === null) continue; 
-
+            if ($empStatus !== 'absent') continue;
+            if (count($punchesToday) !== 1) continue;
+ 
+            $p = $punchesToday[0];
             $newSinglePunchData[$key] = [
-                'time' => $dangling['ts'] ? $dangling['ts']->format('H:i:s') : null,
-                'direction' => $isIn ? 'in' : 'out',
+                'time' => $p['ts']->format('H:i:s'),
+                'direction' => $p['dir'],
                 'shiftId' => 3,
                 'shiftName' => 'No Shift',
                 'shiftStart' => null,
@@ -859,12 +763,11 @@ function recoverAbsentSinglePunches($employees, $statusKeyMap, $deviceEmployeeSt
             $stage2SinglePunchCount++;
         }
     }
-
+ 
     return [
         'statusKeyMap' => $statusKeyMap,
         'singlePunchData' => $newSinglePunchData,
         'stage2SinglePunchCount' => $stage2SinglePunchCount,
-        'stage2AmbiguousDays' => $stage2AmbiguousDays,
     ];
 }
 
@@ -878,7 +781,7 @@ function handleDashboardData($input, $returnData = false) {
         $dayFrom = $input['date_from'];
         $dayTo = $input['date_to'];
         $deviceFrom = $dayFrom;
-        $deviceTo = $dayTo;
+        $deviceTo = (new DateTime($dayTo))->modify('+1 day')->format('Y-m-d');
     } else {
         // Backward-compatible fallback for any old caller still using month/year/day_from/day_to
         $month = isset($input['month']) ? intval($input['month']) : intval(date('n'));
@@ -887,6 +790,8 @@ function handleDashboardData($input, $returnData = false) {
         $toDay = isset($input['day_to']) ? intval($input['day_to']) : date('t', strtotime("$year-$month-01"));
         $dayFrom = "$year-" . sprintf("%02d", $month) . "-" . sprintf("%02d", $fromDay);
         $dayTo = "$year-" . sprintf("%02d", $month) . "-" . sprintf("%02d", $toDay);
+        $deviceFrom = $dayFrom;
+        $deviceTo = (new DateTime($dayTo))->modify('+1 day')->format('Y-m-d');
     }
     
     $deptName = isset($input['dept']) && $input['dept'] !== 'All' ? $input['dept'] : null;
@@ -1209,7 +1114,7 @@ function handleDashboardData($input, $returnData = false) {
     $devTables = [];
 
     $curDate = new DateTime(date('Y-m-01', strtotime($dayFrom)));
-    $endDate = new DateTime(date('Y-m-01', strtotime($dayTo)));
+    $endDate = new DateTime(date('Y-m-01', strtotime($deviceTo))); 
     
     $empPunchTimeline = [];
 
@@ -1705,7 +1610,7 @@ function handleDashboardData($input, $returnData = false) {
 
     $empNightShiftInfo = getEmployeeNightShiftInfo($conn, $employees);
 
-    $stage2Result = recoverAbsentSinglePunches($employees, $statusKeyMap, $deviceEmployeeStats, $empPunchTimeline, $empNightShiftInfo, $dayFrom, $dayTo);
+    $stage2Result = recoverAbsentSinglePunches($employees, $statusKeyMap, $empPunchTimeline, $dayFrom, $dayTo);
 
     $statusKeyMap = $stage2Result['statusKeyMap'];
     $stage2SinglePunchCount = $stage2Result['stage2SinglePunchCount'];
