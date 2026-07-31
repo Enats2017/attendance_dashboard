@@ -8,6 +8,8 @@ const DASH_URL = "/attendance-dashboard/index.html";
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 export default function DeptAttendance() {
+    const [locationId, setLocationId] = useState(null);
+    const [locationList, setLocationList] = useState([]);
     const [month, setMonth] = useState(() => new Date().getMonth() + 1);
     const [year, setYear] = useState(() => new Date().getFullYear());
     const [dayFrom, setDayFrom] = useState(1);
@@ -20,6 +22,9 @@ export default function DeptAttendance() {
     const [deptList, setDeptList] = useState([]);
     const [showSettings, setShowSettings] = useState(false);
     const [editHc, setEditHc] = useState({});
+    const [desigStdHcMap, setDesigStdHcMap] = useState({});       
+    const [desigList, setDesigList] = useState([]);           
+    const [editDesigHc, setEditDesigHc] = useState({});
     const [loading, setLoading] = useState(true);
     const [toast, setToast] = useState(null);
     const [unitCapacity, setUnitCapacity] = useState("150 Tons");
@@ -41,12 +46,35 @@ export default function DeptAttendance() {
             window.location.replace("/attendance-dashboard/login");
             return;
         }
-        fetchStdHc();
+        fetchLocations();
     }, []);
 
     useEffect(() => {
-        loadReport(); 
-    }, [month, year, dayFrom, dayTo, stdHcMap]);
+        if (locationId) {
+            fetchStdHc();
+            fetchDesignationStdHc();
+        }
+    }, [locationId]);
+
+    useEffect(() => {
+        if (locationId) loadReport();
+    }, [month, year, dayFrom, dayTo, stdHcMap, locationId]);
+
+    async function fetchLocations() {
+        try {
+            const res = await fetch(API_BASE, {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "get_locations" }),
+            });
+            const data = await res.json();
+            if (data.success && data.data && data.data.length > 0) {
+                setLocationList(data.data);
+                setLocationId(data.data[0].location_id);
+            }
+        } catch {}
+    }
 
     async function fetchStdHc() {
         try {
@@ -54,7 +82,7 @@ export default function DeptAttendance() {
                 method: "POST",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "get_std_hc" }),
+                body: JSON.stringify({ action: "get_std_hc", location_id: locationId }),
             });
             const data = await res.json();
             if (data.success && data.data) {
@@ -72,6 +100,27 @@ export default function DeptAttendance() {
         } catch {}
     }
 
+    async function fetchDesignationStdHc() {
+        try {
+            const res = await fetch(API_BASE, {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "get_designation_std_hc", location_id: locationId }),
+            });
+            const data = await res.json();
+            if (data.success && data.data) {
+                const map = {};
+                data.data.forEach((d) => {
+                    if (!map[d.dept_id]) map[d.dept_id] = {};
+                    map[d.dept_id][d.designation_id] = parseInt(d.std_hc, 10);
+                });
+                setDesigStdHcMap(map);
+                setDesigList(data.data);
+            }
+        } catch {}
+    }
+
     async function loadReport() {
 		setLoading(true);
 		try {
@@ -79,7 +128,7 @@ export default function DeptAttendance() {
 				method: "POST",
 				credentials: "include",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ action: "get_report", month, year, day_from: dayFrom, day_to: dayTo }),
+                body: JSON.stringify({ action: "get_report", month, year, day_from: dayFrom, day_to: dayTo, location_id: locationId }),
 			});
 			
 			const data = await res.json();
@@ -102,7 +151,7 @@ export default function DeptAttendance() {
 	}
 
     async function saveStdHc() {
-        const items = Object.entries(editHc).map(([id, hc]) => ({ dept_id: id, std_hc: hc }));
+        const items = Object.entries(editHc).map(([id, hc]) => ({ dept_id: id, location_id: locationId, std_hc: hc }));
         try {
             await fetch(API_BASE, {
                 method: "POST",
@@ -115,6 +164,25 @@ export default function DeptAttendance() {
         setDeptList((prev) => prev.map((d) => ({ ...d, std_hc: editHc[d.dept_id] || 0 })));
         setShowSettings(false);
         showToast("STD HC values saved successfully!", "success");
+    }
+
+    async function saveDesigStdHc() {
+        const items = [];
+        Object.entries(editDesigHc).forEach(([deptId, desigMap]) => {
+            Object.entries(desigMap).forEach(([desigId, hc]) => {
+                items.push({ dept_id: deptId, designation_id: desigId, location_id: locationId, std_hc: hc });
+            });
+        });
+        try {
+            await fetch(API_BASE, {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "bulk_update_designation_std_hc", items }),
+            });
+        } catch {}
+        setDesigStdHcMap({ ...editDesigHc });
+        showToast("Designation STD HC values saved!", "success");
     }
 
     function exportExcel() {
@@ -177,6 +245,16 @@ export default function DeptAttendance() {
 
             <div className="da-filter-bar">
                 <div className="da-filter-group">
+                    <label>Location</label>
+                    <select value={locationId || ""} onChange={(e) => setLocationId(Number(e.target.value))}>
+                        {locationList.map((loc) => (
+                            <option key={loc.location_id} value={loc.location_id}>
+                                {loc.location_name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+                <div className="da-filter-group">
                     <label>Month</label>
                     <select value={month} onChange={(e) => setMonth(Number(e.target.value))}>
                         {MONTH_NAMES.map((m, i) => (
@@ -225,6 +303,7 @@ export default function DeptAttendance() {
                         className="da-btn da-btn-warning"
                         onClick={() => {
                             setEditHc({ ...stdHcMap });
+                            setEditDesigHc(JSON.parse(JSON.stringify(desigStdHcMap))); 
                             setShowSettings(true);
                         }}
                     >
@@ -269,7 +348,21 @@ export default function DeptAttendance() {
                 )}
             </div>
 
-            {showSettings && <SettingsModal editHc={editHc} setEditHc={setEditHc} onSave={saveStdHc} onClose={() => setShowSettings(false)} deptList={deptList} />}
+            {showSettings && (
+                <SettingsModal
+                    editHc={editHc}
+                    setEditHc={setEditHc}
+                    deptList={deptList}
+                    editDesigHc={editDesigHc}
+                    setEditDesigHc={setEditDesigHc}
+                    desigList={desigList}
+                    onSave={async () => {
+                        await saveStdHc();
+                        await saveDesigStdHc();
+                    }}
+                    onClose={() => setShowSettings(false)}
+                />
+            )}
         </div>
     );
 }
@@ -370,7 +463,7 @@ function ReportTable({ data, days, unitName, unitCapacity, month, year, expanded
 													style={{ cursor: hasEmployees ? "pointer" : "default" }}
 												>
 													<td className="da-designation-cell">{desig.designationName}</td>
-													<td>–</td>
+													<td>{desig.std_hc ?? 0}</td>
 													{days.map((d) => {
 														const val = desig.days && desig.days[d] !== undefined ? desig.days[d] : "";
 														return (
@@ -521,7 +614,7 @@ function SummaryRow({ label, stdValue, dayValues, avgValue, days, className, sta
     );
 }
 
-function SettingsModal({ editHc, setEditHc, onSave, onClose, deptList }) {
+function SettingsModal({ editHc, setEditHc, onSave, onClose, deptList, editDesigHc, setEditDesigHc, desigList }) {
     const total = Object.values(editHc).reduce((a, b) => a + (parseInt(b, 10) || 0), 0);
     return (
         <div
@@ -565,9 +658,45 @@ function SettingsModal({ editHc, setEditHc, onSave, onClose, deptList }) {
                         </tbody>
                     </table>
                 </div>
+                
                 <div className="da-settings-total">
                     <span>Total STD Head Count</span>
                     <span>{total}</span>
+                </div>
+
+                <h3 className="da-settings-section-title">Designation-Level STD HC</h3>
+                <div className="da-settings-table-wrap">
+                    <table className="da-settings-table">
+                        <thead>
+                            <tr>
+                                <th style={{ width: "40%" }}>Department</th>
+                                <th style={{ width: "35%" }}>Designation</th>
+                                <th style={{ width: "25%" }}>STD HC</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {desigList.map((d) => (
+                                <tr key={`${d.dept_id}-${d.designation_id}`}>
+                                    <td>{deptList.find((dep) => dep.dept_id === d.dept_id)?.department_name ?? d.dept_id}</td>
+                                    <td style={{ fontWeight: 600 }}>{d.designation_name}</td>
+                                    <td>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            value={(editDesigHc[d.dept_id] && editDesigHc[d.dept_id][d.designation_id]) || 0}
+                                            onChange={(e) => {
+                                                const val = parseInt(e.target.value, 10) || 0;
+                                                setEditDesigHc((prev) => ({
+                                                    ...prev,
+                                                    [d.dept_id]: { ...(prev[d.dept_id] || {}), [d.designation_id]: val },
+                                                }));
+                                            }}
+                                        />
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
                 <div className="da-modal-footer">
                     <button className="da-btn da-btn-sm" style={{ background: "#e2e8f0", color: "#475569" }} onClick={onClose}>
