@@ -20,7 +20,8 @@ export default function DeptAttendance() {
     const [reportData, setReportData] = useState(null);
     const [stdHcMap, setStdHcMap] = useState({});
     const [deptList, setDeptList] = useState([]);
-    const [showSettings, setShowSettings] = useState(false);
+    const [showDeptSettings, setShowDeptSettings] = useState(false);
+    const [showDesigSettings, setShowDesigSettings] = useState(false);
     const [editHc, setEditHc] = useState({});
     const [desigStdHcMap, setDesigStdHcMap] = useState({});       
     const [desigList, setDesigList] = useState([]);           
@@ -29,6 +30,7 @@ export default function DeptAttendance() {
     const [toast, setToast] = useState(null);
     const [unitCapacity, setUnitCapacity] = useState("150 Tons");
     const [unitName, setUnitName] = useState("PSF");
+    const [loginName, setLoginName] = useState("");
     const [expandedDept, setExpandedDept] = useState(null);
 	const [expandedDesig, setExpandedDesig] = useState(null);
 	const [expandedSummary, setExpandedSummary] = useState(null);
@@ -96,6 +98,7 @@ export default function DeptAttendance() {
                     if (data.unit_config.unit_capacity) setUnitCapacity(data.unit_config.unit_capacity);
                     if (data.unit_config.unit_name) setUnitName(data.unit_config.unit_name);
                 }
+                if (data.login_name) setLoginName(data.login_name);
             }
         } catch {}
     }
@@ -153,36 +156,77 @@ export default function DeptAttendance() {
     async function saveStdHc() {
         const items = Object.entries(editHc).map(([id, hc]) => ({ dept_id: id, location_id: locationId, std_hc: hc }));
         try {
-            await fetch(API_BASE, {
+            const res = await fetch(API_BASE, {
                 method: "POST",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ action: "bulk_update_std_hc", items }),
             });
-        } catch {}
+            const data = await res.json();
+            if (!data.success) {
+                showToast(data.message || "Failed to save department STD HC", "error");
+                return false;
+            }
+        } catch (err) {
+            console.error("saveStdHc error:", err);
+            showToast("Network error saving department STD HC", "error");
+            return false;
+        }
         setStdHcMap({ ...editHc });
         setDeptList((prev) => prev.map((d) => ({ ...d, std_hc: editHc[d.dept_id] || 0 })));
-        setShowSettings(false);
-        showToast("STD HC values saved successfully!", "success");
+        return true;
     }
 
     async function saveDesigStdHc() {
         const items = [];
         Object.entries(editDesigHc).forEach(([deptId, desigMap]) => {
+            const deptCap = parseInt(stdHcMap[deptId], 10) || 0;
+            if (deptCap <= 0) return;
             Object.entries(desigMap).forEach(([desigId, hc]) => {
                 items.push({ dept_id: deptId, designation_id: desigId, location_id: locationId, std_hc: hc });
             });
         });
+
+        if (items.length === 0) {
+            showToast("No departments with STD HC set — nothing to save.", "error");
+            return false;
+        }
+
         try {
-            await fetch(API_BASE, {
+            const res = await fetch(API_BASE, {
                 method: "POST",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ action: "bulk_update_designation_std_hc", items }),
             });
-        } catch {}
-        setDesigStdHcMap({ ...editDesigHc });
-        showToast("Designation STD HC values saved!", "success");
+            const data = await res.json();
+
+            // Regardless of success/partial/failure, re-pull the real saved state from the server
+            // — some departments may have been committed even if others failed.
+            await fetchDesignationStdHc();
+
+            if (data.errors && data.errors.length > 0) {
+                const deptNames = data.errors.map((e) => {
+                    const dept = deptList.find((d) => String(d.dept_id) === String(e.dept_id));
+                    const name = dept ? dept.department_name : "Dept " + e.dept_id;
+                    if (e.reason === "department_std_hc_not_set") {
+                        return `${name}: department STD HC not set`;
+                    }
+                    return `${name}: total ${e.designation_total} > cap ${e.department_std_hc}`;
+                });
+                showToast(
+                    (data.partial ? "Saved valid departments. Failed: " : "Failed: ") + deptNames.join(" | "),
+                    "error"
+                );
+                return false; 
+            }
+
+            return true; 
+        } catch (err) {
+            console.error("saveDesigStdHc error:", err);
+            showToast("Network error saving designation STD HC", "error");
+            return false;
+        }
     }
 
     function exportExcel() {
@@ -303,11 +347,19 @@ export default function DeptAttendance() {
                         className="da-btn da-btn-warning"
                         onClick={() => {
                             setEditHc({ ...stdHcMap });
-                            setEditDesigHc(JSON.parse(JSON.stringify(desigStdHcMap))); 
-                            setShowSettings(true);
+                            setShowDeptSettings(true);
                         }}
                     >
-                        ⚙️ STD HC Settings
+                        ⚙️ Department STD HC
+                    </button>
+                    <button
+                        className="da-btn da-btn-warning"
+                        onClick={() => {
+                            setEditDesigHc(JSON.parse(JSON.stringify(desigStdHcMap)));
+                            setShowDesigSettings(true);
+                        }}
+                    >
+                        ⚙️ Designation STD HC
                     </button>
                     <button className="da-btn da-btn-success" onClick={exportExcel}>
                         ⬇ Excel
@@ -330,6 +382,7 @@ export default function DeptAttendance() {
 						days={days}
 						unitName={unitName}
 						unitCapacity={unitCapacity}
+                        loginName={loginName}
 						month={month}
 						year={year}
 						expandedDept={expandedDept}
@@ -348,19 +401,36 @@ export default function DeptAttendance() {
                 )}
             </div>
 
-            {showSettings && (
-                <SettingsModal
+            {showDeptSettings && (
+                <DeptSettingsModal
                     editHc={editHc}
                     setEditHc={setEditHc}
                     deptList={deptList}
+                    onSave={async () => {
+                        const deptOk = await saveStdHc();
+                        if (!deptOk) return;
+                        setShowDeptSettings(false);
+                        showToast("Department STD HC saved successfully!", "success");
+                    }}
+                    onClose={() => setShowDeptSettings(false)}
+                />
+            )}
+
+            {showDesigSettings && (
+                <DesigSettingsModal
+                    deptList={deptList}
+                    stdHcMap={stdHcMap}
                     editDesigHc={editDesigHc}
                     setEditDesigHc={setEditDesigHc}
                     desigList={desigList}
                     onSave={async () => {
-                        await saveStdHc();
-                        await saveDesigStdHc();
+                        const desigOk = await saveDesigStdHc();
+                        if (desigOk) {
+                            setShowDesigSettings(false);
+                            showToast("Designation STD HC saved successfully!", "success");
+                        }
                     }}
-                    onClose={() => setShowSettings(false)}
+                    onClose={() => setShowDesigSettings(false)}
                 />
             )}
         </div>
@@ -398,7 +468,7 @@ function DeptSummaryRows({ summary, days }) {
     );
 }
 
-function ReportTable({ data, days, unitName, unitCapacity, month, year, expandedDept, onToggleDept, expandedDesig, onToggleDesig, expandedSummary, onToggleSummary, expandedStatus, onToggleStatus }) {
+function ReportTable({ data, days, unitName, unitCapacity, loginName, month, year, expandedDept, onToggleDept, expandedDesig, onToggleDesig, expandedSummary, onToggleSummary, expandedStatus, onToggleStatus }) {
     if (!data || !data.departments) return null;
     const departments = data.departments || [];
     const summary = data.summary || {};
@@ -410,7 +480,7 @@ function ReportTable({ data, days, unitName, unitCapacity, month, year, expanded
     return (
         <div className="da-report-card">
             <div className="da-report-title">
-                {unitName} Unit Per Day Actual Head Count (HC) Report {MONTH_NAMES[month - 1]} {year}
+                {loginName} Unit Per Day Actual Head Count (HC) Report {MONTH_NAMES[month - 1]} {year}
             </div>
             <div className="da-table-scroll">
                 <table className="da-table" id="da-report-table">
@@ -614,8 +684,9 @@ function SummaryRow({ label, stdValue, dayValues, avgValue, days, className, sta
     );
 }
 
-function SettingsModal({ editHc, setEditHc, onSave, onClose, deptList, editDesigHc, setEditDesigHc, desigList }) {
+function DeptSettingsModal({ editHc, setEditHc, onSave, onClose, deptList }) {
     const total = Object.values(editHc).reduce((a, b) => a + (parseInt(b, 10) || 0), 0);
+
     return (
         <div
             className="da-modal-overlay"
@@ -625,12 +696,14 @@ function SettingsModal({ editHc, setEditHc, onSave, onClose, deptList, editDesig
         >
             <div className="da-modal">
                 <div className="da-modal-header">
-                    <h2>⚙️ STD Head Count Settings</h2>
+                    <h2>⚙️ Department STD Head Count Settings</h2>
                     <button className="da-modal-close" onClick={onClose}>
                         ✕
                     </button>
                 </div>
-                <p style={{ color: "#64748b", fontSize: 13, marginBottom: 16 }}>Set the standard headcount for each department. These values are mapped to live Department IDs.</p>
+                <p style={{ color: "#64748b", fontSize: 13, marginBottom: 16 }}>
+                    Set the standard headcount for each department at this location.
+                </p>
                 <div className="da-settings-table-wrap">
                     <table className="da-settings-table">
                         <thead>
@@ -650,7 +723,12 @@ function SettingsModal({ editHc, setEditHc, onSave, onClose, deptList, editDesig
                                             type="number"
                                             min={0}
                                             value={editHc[dept.dept_id] || 0}
-                                            onChange={(e) => setEditHc((prev) => ({ ...prev, [dept.dept_id]: parseInt(e.target.value, 10) || 0 }))}
+                                            onChange={(e) =>
+                                                setEditHc((prev) => ({
+                                                    ...prev,
+                                                    [dept.dept_id]: parseInt(e.target.value, 10) || 0,
+                                                }))
+                                            }
                                         />
                                     </td>
                                 </tr>
@@ -658,47 +736,174 @@ function SettingsModal({ editHc, setEditHc, onSave, onClose, deptList, editDesig
                         </tbody>
                     </table>
                 </div>
-                
+
                 <div className="da-settings-total">
                     <span>Total STD Head Count</span>
                     <span>{total}</span>
                 </div>
 
-                <h3 className="da-settings-section-title">Designation-Level STD HC</h3>
-                <div className="da-settings-table-wrap">
-                    <table className="da-settings-table">
-                        <thead>
-                            <tr>
-                                <th style={{ width: "40%" }}>Department</th>
-                                <th style={{ width: "35%" }}>Designation</th>
-                                <th style={{ width: "25%" }}>STD HC</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {desigList.map((d) => (
-                                <tr key={`${d.dept_id}-${d.designation_id}`}>
-                                    <td>{deptList.find((dep) => dep.dept_id === d.dept_id)?.department_name ?? d.dept_id}</td>
-                                    <td style={{ fontWeight: 600 }}>{d.designation_name}</td>
-                                    <td>
-                                        <input
-                                            type="number"
-                                            min={0}
-                                            value={(editDesigHc[d.dept_id] && editDesigHc[d.dept_id][d.designation_id]) || 0}
-                                            onChange={(e) => {
-                                                const val = parseInt(e.target.value, 10) || 0;
-                                                setEditDesigHc((prev) => ({
-                                                    ...prev,
-                                                    [d.dept_id]: { ...(prev[d.dept_id] || {}), [d.designation_id]: val },
-                                                }));
-                                            }}
-                                        />
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
                 <div className="da-modal-footer">
+                    <button className="da-btn da-btn-sm" style={{ background: "#e2e8f0", color: "#475569" }} onClick={onClose}>
+                        Cancel
+                    </button>
+                    <button className="da-btn da-btn-sm da-btn-primary" onClick={onSave}>
+                        💾 Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function DesigSettingsModal({ deptList, stdHcMap, editDesigHc, setEditDesigHc, desigList, onSave, onClose }) {
+    // Group designations under their parent department
+    const desigByDept = {};
+    desigList.forEach((d) => {
+        if (!desigByDept[d.dept_id]) desigByDept[d.dept_id] = [];
+        desigByDept[d.dept_id].push(d);
+    });
+
+    function getDesigTotal(deptId) {
+        const map = editDesigHc[deptId] || {};
+        return Object.values(map).reduce((a, b) => a + (parseInt(b, 10) || 0), 0);
+    }
+
+    // Only departments that actually have designations are relevant here
+    const relevantDepts = deptList.filter((dept) => (desigByDept[dept.dept_id] || []).length > 0);
+
+    const anyOverCap = relevantDepts.some((dept) => {
+        const deptCap = parseInt(stdHcMap[dept.dept_id], 10) || 0;
+        const desigTotal = getDesigTotal(dept.dept_id);
+        return desigTotal > deptCap;
+    });
+
+    return (
+        <div
+            className="da-modal-overlay"
+            onClick={(e) => {
+                if (e.target === e.currentTarget) onClose();
+            }}
+        >
+            <div className="da-modal" style={{ maxWidth: 720 }}>
+                <div className="da-modal-header">
+                    <h2>⚙️ Designation STD Head Count Settings</h2>
+                    <button className="da-modal-close" onClick={onClose}>
+                        ✕
+                    </button>
+                </div>
+                <p style={{ color: "#64748b", fontSize: 13, marginBottom: 16 }}>
+                    Each department's designation total cannot exceed that department's own saved STD HC
+                    for this location. Set the department's STD HC first (in the Department STD HC screen)
+                    before assigning designation values here.
+                </p>
+
+                <div className="da-settings-grouped-wrap" style={{ maxHeight: 480, overflowY: "auto" }}>
+                    {relevantDepts.length === 0 && (
+                        <p style={{ color: "#94a3b8", fontSize: 13 }}>No designations found for this location.</p>
+                    )}
+
+                    {relevantDepts.map((dept) => {
+                        const deptCap = parseInt(stdHcMap[dept.dept_id], 10) || 0;
+                        const desigs = desigByDept[dept.dept_id] || [];
+                        const desigTotal = getDesigTotal(dept.dept_id);
+                        const isOver = desigTotal > deptCap;
+                        const capMissing = deptCap <= 0;
+
+                        return (
+                            <div
+                                key={dept.dept_id}
+                                style={{
+                                    border: "1px solid #e2e8f0",
+                                    borderRadius: 10,
+                                    marginBottom: 14,
+                                    overflow: "hidden",
+                                }}
+                            >
+                                {/* Department header — read-only here, just for context */}
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "space-between",
+                                        padding: "10px 14px",
+                                        background: "#f8fafc",
+                                        borderBottom: "1px solid #e2e8f0",
+                                    }}
+                                >
+                                    <div style={{ fontWeight: 700, fontSize: 14 }}>
+                                        {dept.department_name}
+                                        <span style={{ fontSize: 11, color: "#94a3b8", marginLeft: 8 }}>
+                                            (ID: {dept.dept_id})
+                                        </span>
+                                    </div>
+                                    <div style={{ fontSize: 12, color: "#64748b" }}>
+                                        Dept STD HC: <b>{deptCap}</b>
+                                    </div>
+                                </div>
+
+                                <div style={{ padding: "8px 14px 12px 28px" }}>
+                                    {capMissing && (
+                                        <div style={{ fontSize: 12, color: "#dc2626", marginBottom: 8, fontWeight: 600 }}>
+                                            ⚠ This department has no STD HC set. Set it in "Department STD HC" first.
+                                        </div>
+                                    )}
+                                    {desigs.map((d) => (
+                                        <div
+                                            key={d.designation_id}
+                                            style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "space-between",
+                                                padding: "6px 0",
+                                                fontSize: 13,
+                                            }}
+                                        >
+                                            <span>{d.designation_name}</span>
+                                            <input
+                                                type="number"
+                                                min={0}
+                                                disabled={capMissing}
+                                                style={{ width: 70, opacity: capMissing ? 0.5 : 1 }}
+                                                value={
+                                                    (editDesigHc[dept.dept_id] &&
+                                                        editDesigHc[dept.dept_id][d.designation_id]) || 0
+                                                }
+                                                onChange={(e) => {
+                                                    const val = parseInt(e.target.value, 10) || 0;
+                                                    setEditDesigHc((prev) => ({
+                                                        ...prev,
+                                                        [dept.dept_id]: {
+                                                            ...(prev[dept.dept_id] || {}),
+                                                            [d.designation_id]: val,
+                                                        },
+                                                    }));
+                                                }}
+                                            />
+                                        </div>
+                                    ))}
+
+                                    <div
+                                        style={{
+                                            marginTop: 8,
+                                            paddingTop: 8,
+                                            borderTop: "1px dashed #e2e8f0",
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            fontSize: 12,
+                                            fontWeight: 600,
+                                            color: isOver ? "#dc2626" : "#16a34a",
+                                        }}
+                                    >
+                                        <span>Designations Total: {desigTotal} / {deptCap}</span>
+                                        {isOver && <span>⚠ Exceeds department cap</span>}
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                <div className="da-modal-footer" style={{ marginTop: 16 }}>
                     <button className="da-btn da-btn-sm" style={{ background: "#e2e8f0", color: "#475569" }} onClick={onClose}>
                         Cancel
                     </button>

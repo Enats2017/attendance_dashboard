@@ -183,6 +183,7 @@ class AttendanceModel {
                 this.state.requiredHeadcount = data.requiredHeadcount ?? 0;
                 this.state.gapHeadcount = data.gapHeadcount ?? 0;
                 this.state.requiredHeadcountByDept = data.requiredHeadcountByDept || {};
+                this.state.requiredHeadcountByLocation = data.requiredHeadcountByLocation || [];
                 this.state.teamConfig = data.teamConfig || { staffTeamId: 7, workerTeamId: 6 };
                 this.state.placeholderIds = data.placeholderIds || {
                     designation: [], department: [], company: [], shiftGroup: [], location: []
@@ -587,6 +588,9 @@ class AttendanceModel {
         return (this.state.requiredHeadcountByDept || {})[dept] || { required: 0, available: 0, gap: 0 };
     }
 
+    getRequiredHeadcountByLocation() {
+        return this.state.requiredHeadcountByLocation || [];
+    }
 
     getFilterOptions() {
         const emps = this.state.data.employees || [];

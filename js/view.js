@@ -803,6 +803,8 @@ class AttendanceView {
                     ${headcountCard}
                 </div>
 
+                <div id="dashboard-headcount-drilldown" style="margin-top:8px;"></div>
+
                 ${sectionLabel("By Companies")}
                 ${companySectionsHtml}
                 <div id="dashboard-company-category-drilldown" style="margin-top:8px;"></div>
