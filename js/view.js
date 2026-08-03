@@ -54,13 +54,27 @@ class AttendanceView {
             Charts.destroyAll();
         }
 
-        let stats = model.getSummaryStats();
+        let stats, logs, emps, empMap;
 
-        if (state.activeTab === "night") {
-            stats = model.getNightShiftStats();
+        if (state.activeTab === "feature") {
+            const dash = model.state.dashboardData || { employees: [], attendanceLogs: [] };
+            emps = dash.employees || [];
+            logs = dash.attendanceLogs || [];
+            empMap = {};
+            emps.forEach((e) => { empMap[e.id] = e; });
+            stats = dash.todayStats || {
+                present: 0, halfPresent: 0, weeklyOffPresent: 0, weeklyOffHalfPresent: 0,
+                weeklyOff: 0, absent: 0, total: emps.length, singlePunch: 0,
+                lateIn: 0, earlyOut: 0, avgHours: 0, resigned: 0, newJoined: 0
+            };
+        } else {
+            stats = model.getSummaryStats();
+            if (state.activeTab === "night") {
+                stats = model.getNightShiftStats();
+            }
+            ({ logs, emps, empMap } = model.getFilteredData());
         }
 
-        const { logs, emps, empMap } = model.getFilteredData();
         const filterOpts = model.getFilterOptions();
 
         this._staffWorkerStats = state.staffWorkerStats || {};
@@ -485,19 +499,9 @@ class AttendanceView {
         const workerTeamId = model.state.teamConfig?.workerTeamId ?? 6;
 
         const sectionLabel = (text) => `
-            <div style="
-                font-size:13px;font-weight:600;text-transform:uppercase;
-                letter-spacing:0.06em;color:#334155;margin:24px 0 12px;
-                display:flex;align-items:center;gap:8px;
-            ">
+            <div style="font-size:13px;font-weight:600;text-transform:uppercase; letter-spacing:0.06em;color:#334155;margin:24px 0 12px; display:flex;align-items:center;gap:8px;">
                 ${text}
-                <span style="
-                    flex:1;
-                    height:1px;
-                    background:#64748b;
-                    display:block;
-                    border-radius:2px;
-                "></span>
+                <span style="flex:1; height:1px; background:#64748b; display:block; border-radius:2px;"></span>
             </div>
         `;
 
@@ -575,7 +579,7 @@ class AttendanceView {
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
             </div>
-            <div class="stat-card success stat-card-clickable" data-card-key="totalHeadcount">
+            <div class="stat-card success stat-card-clickable" data-headcount="available" onclick="AppController.view._handleAvailableCardClick()">
                 <div class="stat-icon"><i class="ph ph-users"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">Available</span>
@@ -701,7 +705,7 @@ class AttendanceView {
 
         // --- Staff / Workmen ---
         const swCards = `
-            <div class="stat-card info stat-card-clickable" data-card-key="staffList">
+            <div class="stat-card info stat-card-clickable" data-workforce="Staff" onclick="AppController.view._showWorkforceSelected('Staff')">
                 <div class="stat-icon"><i class="ph ph-identification-badge"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">Staff</span>
@@ -709,7 +713,7 @@ class AttendanceView {
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
             </div>
-            <div class="stat-card warning stat-card-clickable" data-card-key="workerList">
+            <div class="stat-card warning stat-card-clickable" data-workforce="Workmen" onclick="AppController.view._showWorkforceSelected('Workmen')">
                 <div class="stat-icon"><i class="ph ph-hard-hat"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">Workmen</span>
@@ -804,33 +808,40 @@ class AttendanceView {
                 </div>
 
                 <div id="dashboard-headcount-drilldown" style="margin-top:8px;"></div>
+                <div id="dashboard-location-drilldown" style="margin-top:8px;"></div>
 
                 ${sectionLabel("By Companies")}
                 ${companySectionsHtml}
                 <div id="dashboard-company-category-drilldown" style="margin-top:8px;"></div>
+                <div id="dashboard-company-location-drilldown" style="margin-top:8px;"></div>
 
                 ${sectionLabel("Gender & Workforce Type")}
                 <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
                     ${genderCards}
                     ${swCards}
                 </div>
+                <div id="dashboard-gender-location-drilldown" style="margin-top:8px;"></div>
+                <div id="dashboard-workforce-location-drilldown" style="margin-top:8px;"></div>
 
                 ${sectionLabel("By Age Group")}
                 <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));">
                     ${ageCards}
                 </div>
+                <div id="dashboard-age-location-drilldown" style="margin-top:8px;"></div>
 
                 ${sectionLabel("By Department")}
                 <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
                     ${dashDeptCards}
                 </div>
                 <div id="dashboard-dept-drilldown" style="margin-top:8px;"></div>
+                <div id="dashboard-dept-location-drilldown" style="margin-top:8px;"></div>
 
                 ${dashFamilies.length ? `
                     ${sectionLabel("By Designation Family")}
                     <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
                         ${familyCardsHtml}
                     </div>
+                    <div id="dashboard-family-location-drilldown" style="margin-top:8px;"></div>
                 ` : ""}
             </div>
         `;
@@ -2456,29 +2467,94 @@ class AttendanceView {
 
     _showGenderSummaryDrilldown(gender) {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-gender="${gender}"]`,);
+        const card = this.app.querySelector(`.stat-card-clickable[data-gender="${gender}"]`);
         if (card) card.classList.add("active");
 
         const data = this._currentGenderSummaryData;
         if (!data) return;
 
-        let items;
         if (data.isDashboard) {
-            items = data.emps.filter((e) => e.gender === gender).map((emp) => ({ log: null, emp, date: null }));
-        } else {
-            items = data.dayLogs.filter((l) => {
-                const e = data.empMap[l.empId];
-                if (!e || e.gender !== gender) return false;
-                return (this._matchesStatus(l, "Present") ||
-                    this._matchesStatus(l, "Half Present"));
-            }).map((l) => ({
-                log: l,
-                emp: data.empMap[l.empId],
-                date: l.date,
-            }));
+            this._closeStatCardDrilldown();
+            this._closeWorkforceLocationCards();   
+            this._closeAgeGroupLocationCards();    
+            this._closeCompanyLocationCards();  
+            const scope = AppController.model.getLocationScope();
+            if (!scope || scope.count <= 1) {
+                this._closeGenderLocationCards();
+                const items = data.emps.filter((e) => e.gender === gender).map((emp) => ({ log: null, emp, date: null }));
+                this._renderStatCardDrilldown("genderSummary_" + gender, items, 1);
+                return;
+            }
+            this._showGenderLocationCards(gender);
+            return;
         }
 
+        const items = data.dayLogs.filter((l) => {
+            const e = data.empMap[l.empId];
+            if (!e || e.gender !== gender) return false;
+            return (this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present"));
+        }).map((l) => ({ log: l, emp: data.empMap[l.empId], date: l.date }));
+
         this._renderStatCardDrilldown("genderSummary_" + gender, items, 1);
+    }
+
+
+    _showGenderLocationCards(gender) {
+        const data = this._currentGenderSummaryData;
+        if (!data) return;
+        const genderEmps = data.emps.filter(e => e.gender === gender);
+
+        const locations = [...new Set(genderEmps.map(e => e.location || 'Unassigned'))];
+        const colorCls = ["info", "success", "warning", "accent", "danger"];
+        const counts = {};
+        locations.forEach(l => counts[l] = 0);
+        genderEmps.forEach(e => counts[e.location || 'Unassigned']++);
+
+        this._currentGenderLocationData = { gender, emps: genderEmps };
+
+        const cardsHtml = locations.map((loc, i) => `
+            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
+                data-gender-location="${this._escapeAttr(loc)}"
+                onclick="AppController.view._showGenderLocationDrilldown('${this._escapeAttr(loc)}')">
+                <div class="stat-icon"><i class="ph ph-map-pin"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">${this._escapeAttr(loc)}</span>
+                    <span class="stat-value">${counts[loc]}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+        `).join("");
+
+        const panel = document.getElementById("dashboard-gender-location-drilldown");
+        if (!panel) return;
+        panel.style.display = "block";
+        panel.innerHTML = `
+            <div style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#334155;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
+                ${gender.toUpperCase()} — BY LOCATION
+                <span style="flex:1;height:1px;background:#64748b;display:block;border-radius:2px;"></span>
+            </div>
+            <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                ${cardsHtml}
+            </div>
+        `;
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    _showGenderLocationDrilldown(location) {
+        document.querySelectorAll('[data-gender-location]').forEach(c => c.classList.remove('active'));
+        const card = this.app.querySelector(`[data-gender-location="${location}"]`);
+        if (card) card.classList.add('active');
+
+        const data = this._currentGenderLocationData;
+        if (!data) return;
+        const items = data.emps.filter(e => (e.location || 'Unassigned') === location).map(emp => ({ log: null, emp, date: null }));
+        this._renderStatCardDrilldown("genderLocation_" + data.gender + "_" + location, items, 1);
+    }
+
+    _closeGenderLocationCards() {
+        const panel = document.getElementById("dashboard-gender-location-drilldown");
+        if (panel) { panel.style.display = "none"; panel.innerHTML = ""; }
+        document.querySelectorAll("[data-gender-location]").forEach(c => c.classList.remove("active"));
     }
 
 
@@ -2596,9 +2672,15 @@ class AttendanceView {
 
 
     _showCompanyCategoryDrilldown(category) {
-        document.querySelectorAll(".stat-card-clickable[data-company-category]").forEach((c) => c.classList.remove("active"));
+        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
         const card = this.app.querySelector(`.stat-card-clickable[data-company-category="${category}"]`);
         if (card) card.classList.add("active");
+
+        this._closeCompanyLocationCards();   
+        this._closeStatCardDrilldown();
+        this._closeGenderLocationCards();      
+        this._closeWorkforceLocationCards();   
+        this._closeAgeGroupLocationCards();    
 
         const data = this._currentCompanyData;
         if (!data) return;
@@ -2635,17 +2717,16 @@ class AttendanceView {
         
         if (!panel) return;
 
-        // Sirf 1 company hai category me (subadmin ka ON-ROLL/CC single-company case) -> seedha employee list dikhao
         if (companies.length === 1) {
             panel.innerHTML = "";
-            this._showCompanyDrilldown(companies[0]);
+            this._showCompanySelected(companies[0]);   
             return;
         }
 
         const cardsHtml = companies.map((c, i) => `
             <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
                 data-company="${this._escapeAttr(c)}"
-                onclick="AppController.view._showCompanyDrilldown('${this._escapeAttr(c)}')">
+                onclick="AppController.view._showCompanySelected('${this._escapeAttr(c)}')">   
                 <div class="stat-icon"><i class="ph ph-buildings"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">${c}</span>
@@ -2677,6 +2758,100 @@ class AttendanceView {
     }
 
 
+    _showCompanySelected(company) {
+        const data = this._currentCompanyData;
+        if (!data || !data.isDashboard) {
+            this._showCompanyDrilldown(company);
+            return;
+        }
+
+        this._closeGenderLocationCards();      
+        this._closeWorkforceLocationCards();   
+        this._closeAgeGroupLocationCards();    
+
+        const scope = AppController.model.getLocationScope();
+        if (!scope || scope.count <= 1) {
+            this._closeCompanyLocationCards();
+            this._showCompanyDrilldown(company);
+            return;
+        }
+
+        this._showCompanyLocationCards(company);
+    }
+
+
+    _closeCompanyLocationCards() {
+        const panel = document.getElementById("dashboard-company-location-drilldown");
+        if (panel) { panel.style.display = "none"; panel.innerHTML = ""; }
+        document.querySelectorAll("[data-company-location]").forEach((c) => c.classList.remove("active"));
+    }
+
+
+    _showCompanyLocationCards(company) {
+        document.querySelectorAll(".stat-card-clickable[data-company]").forEach((c) => c.classList.remove("active"));
+        const companyCard = this.app.querySelector(`.stat-card-clickable[data-company="${company}"]`);
+        if (companyCard) companyCard.classList.add("active");
+        this._closeStatCardDrilldown();
+
+        const data = this._currentCompanyData;
+        if (!data) return;
+        const { emps } = data;
+
+        const companyEmps = emps.filter((e) => e.company === company);
+        const locations = [...new Set(companyEmps.map((e) => e.location || "Unassigned"))];
+        const colorCls = ["info", "success", "warning", "accent", "danger"];
+        const counts = {};
+        locations.forEach((l) => (counts[l] = 0));
+        companyEmps.forEach((e) => { counts[e.location || "Unassigned"]++; });
+
+        this._currentCompanyLocationData = { company, emps: companyEmps };
+
+        const cardsHtml = locations.map((loc, i) => `
+            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
+                data-company-location="${this._escapeAttr(loc)}"
+                onclick="AppController.view._showCompanyLocationDrilldown('${this._escapeAttr(loc)}')">
+                <div class="stat-icon"><i class="ph ph-map-pin"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">${this._escapeAttr(loc)}</span>
+                    <span class="stat-value">${counts[loc]}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+        `).join("");
+
+        const panel = document.getElementById("dashboard-company-location-drilldown");
+        if (!panel) return;
+
+        panel.style.display = "block";
+        panel.innerHTML = `
+            <div style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#334155;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
+                ${this._escapeAttr(company)} — BY LOCATION
+                <span style="flex:1;height:1px;background:#64748b;display:block;border-radius:2px;"></span>
+            </div>
+            <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                ${cardsHtml}
+            </div>
+        `;
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+
+    _showCompanyLocationDrilldown(location) {
+        document.querySelectorAll("[data-company-location]").forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(`[data-company-location="${location}"]`);
+        if (card) card.classList.add("active");
+
+        const data = this._currentCompanyLocationData;
+        if (!data) return;
+        const { emps } = data;
+
+        const items = emps.filter((e) => (e.location || "Unassigned") === location).map((emp) => ({ log: null, emp, date: null }));
+
+        // default containerId "stat-card-drilldown" → bottom panel, same place the table always lands
+        this._renderStatCardDrilldown("companyLocation_" + data.company + "_" + location, items, 1);
+    }
+
+
     _showAvgHoursDrilldown() {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
         const card = this.app.querySelector(`.stat-card-clickable[data-card-key="avgHours"]`,);
@@ -2694,68 +2869,200 @@ class AttendanceView {
 
     _showAgeGroupDrilldown(group) {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-age-group="${group}"]`,);
+        const card = this.app.querySelector(`.stat-card-clickable[data-age-group="${group}"]`);
         if (card) card.classList.add("active");
 
         const data = this._currentAgeData;
         if (!data) return;
 
-        let items;
         if (data.isDashboard) {
-            items = data.emps.filter((e) => data.model.getAgeGroup(e.dob) === group).map((emp) => ({ log: null, emp, date: null }));
-        } else {
-            items = data.dayLogs.filter((l) => {
-                const e = data.empMap[l.empId];
-                if (!e || data.model.getAgeGroup(e.dob) !== group)
-                    return false;
-                return (this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "Single Punch"));
-            }).map((l) => ({
-                log: l,
-                emp: data.empMap[l.empId],
-                date: l.date,
-            }));
+            this._closeStatCardDrilldown();
+            this._closeGenderLocationCards();      
+            this._closeWorkforceLocationCards();   
+            this._closeCompanyLocationCards();  
+            const scope = AppController.model.getLocationScope();
+            if (!scope || scope.count <= 1) {
+                this._closeAgeGroupLocationCards();
+                const items = data.emps.filter((e) => data.model.getAgeGroup(e.dob) === group).map((emp) => ({ log: null, emp, date: null }));
+                this._renderStatCardDrilldown("ageGroup_" + group, items, 1);
+                return;
+            }
+            this._showAgeGroupLocationCards(group);
+            return;
         }
+
+        const items = data.dayLogs.filter((l) => {
+            const e = data.empMap[l.empId];
+            if (!e || data.model.getAgeGroup(e.dob) !== group) return false;
+            return (this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "Single Punch"));
+        }).map((l) => ({ log: l, emp: data.empMap[l.empId], date: l.date }));
 
         this._renderStatCardDrilldown("ageGroup_" + group, items, 1);
     }
 
-
-    _showDashboardDeptDrilldown(dept) {
-        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-dashboard-dept="${dept}"]`,);
-        if (card) card.classList.add("active");
-
-        const data = this._currentDashboardDeptData;
+    _showAgeGroupLocationCards(group) {
+        const data = this._currentAgeData;
         if (!data) return;
-        const { emps, dayLogs, empMap } = data;
+        const groupEmps = data.emps.filter(e => data.model.getAgeGroup(e.dob) === group);
 
-        const deptEmps = emps.filter((e) => e.dept === dept);
+        const locations = [...new Set(groupEmps.map(e => e.location || 'Unassigned'))];
+        const colorCls = ["info", "success", "warning", "accent", "danger"];
+        const counts = {};
+        locations.forEach(l => counts[l] = 0);
+        groupEmps.forEach(e => counts[e.location || 'Unassigned']++);
 
+        this._currentAgeGroupLocationData = { group, emps: groupEmps };
+
+        const cardsHtml = locations.map((loc, i) => `
+            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
+                data-age-location="${this._escapeAttr(loc)}"
+                onclick="AppController.view._showAgeGroupLocationDrilldown('${this._escapeAttr(loc)}')">
+                <div class="stat-icon"><i class="ph ph-map-pin"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">${this._escapeAttr(loc)}</span>
+                    <span class="stat-value">${counts[loc]}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+        `).join("");
+
+        const panel = document.getElementById("dashboard-age-location-drilldown");
+        if (!panel) return;
+        panel.style.display = "block";
+        panel.innerHTML = `
+            <div style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#334155;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
+                ${group.toUpperCase()} — BY LOCATION
+                <span style="flex:1;height:1px;background:#64748b;display:block;border-radius:2px;"></span>
+            </div>
+            <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                ${cardsHtml}
+            </div>
+        `;
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    _showAgeGroupLocationDrilldown(location) {
+        document.querySelectorAll('[data-age-location]').forEach(c => c.classList.remove('active'));
+        const card = this.app.querySelector(`[data-age-location="${location}"]`);
+        if (card) card.classList.add('active');
+
+        const data = this._currentAgeGroupLocationData;
+        if (!data) return;
+        const items = data.emps.filter(e => (e.location || 'Unassigned') === location).map(emp => ({ log: null, emp, date: null }));
+        this._renderStatCardDrilldown("ageLocation_" + data.group + "_" + location, items, 1);
+    }
+
+    _closeAgeGroupLocationCards() {
+        const panel = document.getElementById("dashboard-age-location-drilldown");
+        if (panel) { panel.style.display = "none"; panel.innerHTML = ""; }
+        document.querySelectorAll("[data-age-location]").forEach(c => c.classList.remove("active"));
+    }
+
+
+    _showWorkforceSelected(type) {
+        document.querySelectorAll(".stat-card-clickable").forEach(c => c.classList.remove("active"));
+        const card = this.app.querySelector(`.stat-card-clickable[data-workforce="${type}"]`);
+        if (card) card.classList.add('active');
+        this._closeStatCardDrilldown();
+        this._closeGenderLocationCards();      
+        this._closeAgeGroupLocationCards();    
+        this._closeCompanyLocationCards();     
+
+        const data = type === 'Staff' ? this._currentStaffSummaryData : this._currentWorkerSummaryData;
+        if (!data) return;
+
+        const scope = AppController.model.getLocationScope();
+        if (!scope || scope.count <= 1) {
+            this._closeWorkforceLocationCards();
+            const items = data.emps.map(emp => ({ log: null, emp, date: null }));
+            this._renderStatCardDrilldown(type === 'Staff' ? 'staffList' : 'workerList', items, 1);
+            return;
+        }
+        this._showWorkforceLocationCards(type);
+    }
+
+    _showWorkforceLocationCards(type) {
+        const data = type === 'Staff' ? this._currentStaffSummaryData : this._currentWorkerSummaryData;
+        if (!data) return;
+        const { emps } = data;
+
+        const locations = [...new Set(emps.map(e => e.location || 'Unassigned'))];
+        const colorCls = ["info", "success", "warning", "accent", "danger"];
+        const counts = {};
+        locations.forEach(l => counts[l] = 0);
+        emps.forEach(e => counts[e.location || 'Unassigned']++);
+
+        this._currentWorkforceLocationData = { type, emps };
+
+        const cardsHtml = locations.map((loc, i) => `
+            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
+                data-workforce-location="${this._escapeAttr(loc)}"
+                onclick="AppController.view._showWorkforceLocationDrilldown('${this._escapeAttr(loc)}')">
+                <div class="stat-icon"><i class="ph ph-map-pin"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">${this._escapeAttr(loc)}</span>
+                    <span class="stat-value">${counts[loc]}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+        `).join("");
+
+        const panel = document.getElementById("dashboard-workforce-location-drilldown");
+        if (!panel) return;
+        panel.style.display = "block";
+        panel.innerHTML = `
+            <div style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#334155;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
+                ${type.toUpperCase()} — BY LOCATION
+                <span style="flex:1;height:1px;background:#64748b;display:block;border-radius:2px;"></span>
+            </div>
+            <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                ${cardsHtml}
+            </div>
+        `;
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    _showWorkforceLocationDrilldown(location) {
+        document.querySelectorAll('[data-workforce-location]').forEach(c => c.classList.remove('active'));
+        const card = this.app.querySelector(`[data-workforce-location="${location}"]`);
+        if (card) card.classList.add('active');
+
+        const data = this._currentWorkforceLocationData;
+        if (!data) return;
+        const items = data.emps.filter(e => (e.location || 'Unassigned') === location).map(emp => ({ log: null, emp, date: null }));
+        this._renderStatCardDrilldown((data.type === 'Staff' ? 'staffList' : 'workerList') + '_' + location, items, 1);
+    }
+
+    _closeWorkforceLocationCards() {
+        const panel = document.getElementById("dashboard-workforce-location-drilldown");
+        if (panel) { panel.style.display = "none"; panel.innerHTML = ""; }
+        document.querySelectorAll("[data-workforce-location]").forEach(c => c.classList.remove("active"));
+    }
+
+
+    _showDashboardDeptDesigCards(dept, deptEmpsScoped, empMap, location) {
         const desigMap = {};
-        deptEmps.forEach((e) => {
+        deptEmpsScoped.forEach((e) => {
             const name = e.designation || "Staff";
             const order = e.designationSortOrder || 0;
-            if (!desigMap[name] || order < desigMap[name].order) {
-                desigMap[name] = { name, order };
-            }
+            if (!desigMap[name] || order < desigMap[name].order) desigMap[name] = { name, order };
         });
-        const desigs = Object.values(desigMap).sort((a, b) => a.order !== b.order ? a.order - b.order : a.name.localeCompare(b.name),).map((d) => d.name);
+        const desigs = Object.values(desigMap)
+            .sort((a, b) => a.order !== b.order ? a.order - b.order : a.name.localeCompare(b.name))
+            .map((d) => d.name);
 
         const desigCounts = {};
         desigs.forEach((d) => (desigCounts[d] = 0));
-        deptEmps.forEach((e) => {
+        deptEmpsScoped.forEach((e) => {
             const name = e.designation || "Staff";
             if (desigCounts[name] !== undefined) desigCounts[name]++;
         });
 
-        this._currentDashboardDesigData = { dept, deptEmps, empMap };
+        this._currentDashboardDesigData = { dept, deptEmps: deptEmpsScoped, empMap, location };
 
         const colorCls = ["info", "success", "warning", "accent", "danger"];
         const desigCardsHtml = desigs.map((d, i) => `
-            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
-                style="flex: 0 1 180px;"
-                data-dashboard-desig="${this._escapeAttr(d)}"
-                onclick="AppController.view._showDashboardDesigDrilldown('${this._escapeAttr(d)}')">
+            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable" style="flex: 0 1 180px;" data-dashboard-desig="${this._escapeAttr(d)}" onclick="AppController.view._showDashboardDesigDrilldown('${this._escapeAttr(d)}')">
                 <div class="stat-icon"><i class="ph ph-identification-badge"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">${d}</span>
@@ -2763,19 +3070,15 @@ class AttendanceView {
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
             </div>
-        `,).join("");
+        `).join("");
 
-        const panel = document.getElementById("dashboard-dept-drilldown");
+        const panel = document.getElementById("dashboard-dept-location-drilldown");
         if (!panel) return;
         panel.style.display = "block";
         panel.innerHTML = `
-            <div style="
-                font-size:13px;font-weight:600;text-transform:uppercase;
-                letter-spacing:0.06em;color:#334155;margin:24px 0 12px;
-                display:flex;align-items:center;gap:8px;
-            ">
-                BY ${dept.toUpperCase()} DEPARTMENT DESIGNATIONS
-                <span style="flex:1;height:1px;background:#64748b;display:block;border-radius:2px;"></span>
+            <div style="font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#334155; margin:24px 0 12px; display:flex; align-items:center; gap:8px;">
+                BY ${dept.toUpperCase()}${location ? " — " + this._escapeAttr(location.toUpperCase()) : ""} DESIGNATIONS
+                <span style="flex:1; height:1px; background:#64748b; display:block; border-radius:2px;"></span>
             </div>
             <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
                 ${desigCardsHtml || '<p style="padding:16px;color:#94a3b8;">No designations found.</p>'}
@@ -2786,22 +3089,177 @@ class AttendanceView {
     }
 
 
+    _showDashboardDeptDrilldown(dept) {
+        document.querySelectorAll(".stat-card-clickable[data-dashboard-dept]").forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(`.stat-card-clickable[data-dashboard-dept="${dept}"]`);
+        if (card) card.classList.add("active");
+
+        this._closeStatCardDrilldown();
+        this._closeDashboardDeptLocationCards(); 
+
+        const data = this._currentDashboardDeptData;
+        if (!data) return;
+        const { emps, empMap } = data;
+        const deptEmps = emps.filter((e) => e.dept === dept);
+
+        const scope = AppController.model.getLocationScope();
+        if (!scope || scope.count <= 1) {
+            this._showDashboardDeptDesigCards(dept, deptEmps, empMap, null);
+            return;
+        }
+
+        this._showDashboardDeptLocationCards(dept, deptEmps, empMap);
+    }
+
+
+    _showDashboardDeptLocationCards(dept, deptEmps, empMap) {
+        const locations = [...new Set(deptEmps.map(e => e.location || 'Unassigned'))];
+        const colorCls = ["info", "success", "warning", "accent", "danger"];
+        const counts = {};
+        locations.forEach(l => counts[l] = 0);
+        deptEmps.forEach(e => counts[e.location || 'Unassigned']++);
+
+        this._currentDashboardDeptLocationData = { dept, deptEmps, empMap };
+
+        const cardsHtml = locations.map((loc, i) => `
+            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
+                data-dept-location="${this._escapeAttr(loc)}"
+                onclick="AppController.view._showDashboardDeptLocationSelected('${this._escapeAttr(loc)}')">
+                <div class="stat-icon"><i class="ph ph-map-pin"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">${this._escapeAttr(loc)}</span>
+                    <span class="stat-value">${counts[loc]}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+        `).join("");
+
+        const panel = document.getElementById("dashboard-dept-drilldown");
+        if (!panel) return;
+        panel.style.display = "block";
+        panel.innerHTML = `
+            <div style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#334155;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
+                ${dept.toUpperCase()} — BY LOCATION
+                <span style="flex:1;height:1px;background:#64748b;display:block;border-radius:2px;"></span>
+            </div>
+            <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                ${cardsHtml}
+            </div>
+        `;
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+
+    _showDashboardDeptLocationSelected(location) {
+        document.querySelectorAll("[data-dept-location]").forEach(c => c.classList.remove("active"));
+        const card = this.app.querySelector(`[data-dept-location="${location}"]`);
+        if (card) card.classList.add("active");
+        this._closeStatCardDrilldown();
+
+        const data = this._currentDashboardDeptLocationData;
+        if (!data) return;
+        const { dept, deptEmps, empMap } = data;
+
+        const locEmps = deptEmps.filter(e => (e.location || 'Unassigned') === location);
+        this._showDashboardDeptDesigCards(dept, locEmps, empMap, location);
+    }
+
+
+    _closeDashboardDeptLocationCards() {
+        const panel = document.getElementById("dashboard-dept-location-drilldown");
+        if (panel) { panel.style.display = "none"; panel.innerHTML = ""; }
+        document.querySelectorAll("[data-dashboard-desig]").forEach(c => c.classList.remove("active"));
+    }
+
+
     _showDashboardFamilyDrilldown(familyId) {
         document.querySelectorAll(".stat-card-clickable[data-dashboard-family-id]").forEach((c) => c.classList.remove("active"));
         const card = this.app.querySelector(`.stat-card-clickable[data-dashboard-family-id="${familyId}"]`);
         if (card) card.classList.add("active");
 
+        this._closeStatCardDrilldown();
+        this._closeFamilyLocationCards();
+        this._closeGenderLocationCards();
+        this._closeWorkforceLocationCards();
+        this._closeAgeGroupLocationCards();
+        this._closeCompanyLocationCards();
+        this._closeDashboardDeptLocationCards();
+
         const data = this._currentDashboardFamilyData;
         if (!data) return;
-
         const { emps, famMap } = data;
 
-        const items = emps.filter((e) => {
+        const famEmps = emps.filter((e) => {
             const famInfo = famMap[e.designationId];
             return famInfo && famInfo.familyId === familyId;
-        }).map((emp) => ({ log: null, emp, date: null }));
+        });
 
-        this._renderStatCardDrilldown("dashboardFamily_" + familyId, items, 1);
+        const scope = AppController.model.getLocationScope();
+        if (!scope || scope.count <= 1) {
+            const items = famEmps.map((emp) => ({ log: null, emp, date: null }));
+            this._renderStatCardDrilldown("dashboardFamily_" + familyId, items, 1);
+            return;
+        }
+
+        this._showFamilyLocationCards(familyId, famEmps);
+    }
+
+
+    _showFamilyLocationCards(familyId, famEmps) {
+        const locations = [...new Set(famEmps.map(e => e.location || 'Unassigned'))];
+        const colorCls = ["info", "success", "warning", "accent", "danger"];
+        const counts = {};
+        locations.forEach(l => counts[l] = 0);
+        famEmps.forEach(e => counts[e.location || 'Unassigned']++);
+
+        this._currentFamilyLocationData = { familyId, famEmps };
+
+        const cardsHtml = locations.map((loc, i) => `
+            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
+                data-family-location="${this._escapeAttr(loc)}"
+                onclick="AppController.view._showFamilyLocationDrilldown('${this._escapeAttr(loc)}')">
+                <div class="stat-icon"><i class="ph ph-map-pin"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">${this._escapeAttr(loc)}</span>
+                    <span class="stat-value">${counts[loc]}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+        `).join("");
+
+        const panel = document.getElementById("dashboard-family-location-drilldown");
+        if (!panel) return;
+        panel.style.display = "block";
+        panel.innerHTML = `
+            <div style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#334155;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
+                BY LOCATION
+                <span style="flex:1;height:1px;background:#64748b;display:block;border-radius:2px;"></span>
+            </div>
+            <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                ${cardsHtml}
+            </div>
+        `;
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+
+    _showFamilyLocationDrilldown(location) {
+        document.querySelectorAll('[data-family-location]').forEach(c => c.classList.remove('active'));
+        const card = this.app.querySelector(`[data-family-location="${location}"]`);
+        if (card) card.classList.add('active');
+
+        const data = this._currentFamilyLocationData;
+        if (!data) return;
+        const items = data.famEmps.filter(e => (e.location || 'Unassigned') === location).map(emp => ({ log: null, emp, date: null }));
+
+        this._renderStatCardDrilldown("familyLocation_" + data.familyId + "_" + location, items, 1);
+    }
+
+
+    _closeFamilyLocationCards() {
+        const panel = document.getElementById("dashboard-family-location-drilldown");
+        if (panel) { panel.style.display = "none"; panel.innerHTML = ""; }
+        document.querySelectorAll("[data-family-location]").forEach(c => c.classList.remove("active"));
     }
 
 
@@ -8209,28 +8667,93 @@ class AttendanceView {
 
 
     _showHeadcountBreakdownDrilldown(type) {
-        document.querySelectorAll("[data-headcount]").forEach((c) => c.classList.remove("active"));
-
         const card = this.app.querySelector(`[data-headcount="${type}"]`);
+        const wasActive = card && card.classList.contains("active");
+
+        document.querySelectorAll("[data-headcount]").forEach((c) => c.classList.remove("active"));
+        this._closeAvailableLocationCards();
+        this._closeStatCardDrilldown();
+
+        if (wasActive) return;
+
         if (card) card.classList.add("active");
 
-        const byDept = AppController.model.state.requiredHeadcountByDept || {};
-        const depts = Object.keys(byDept).sort();
+        const scope = AppController.model.getLocationScope();
 
-        let totalRequired = 0;
-        let totalAvailable = 0;
-        let totalGap = 0;
+        if (!scope || scope.count <= 1) {
+            this._showHeadcountDeptTable(type, null);
+            return;
+        }
+
+        this._showHeadcountLocationCards(type);
+    }
+
+
+    _showHeadcountLocationCards(type) {
+        const byLocation = AppController.model.getRequiredHeadcountByLocation();
+        const panel = document.getElementById("dashboard-location-drilldown");
+        if (!panel) return;
+
+        const colorCls = ["info", "success", "warning", "accent", "danger"];
+        const cardsHtml = byLocation.map((loc, i) => {
+            const val = type === "required" ? loc.required : loc.gap;
+            return `
+                <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
+                    data-headcount-location="${loc.locationId}"
+                    onclick="AppController.view._showHeadcountDeptTable('${type}', ${loc.locationId})">
+                    <div class="stat-icon"><i class="ph ph-map-pin"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">${this._escapeAttr(loc.locationName)}</span>
+                        <span class="stat-value">${val}</span>
+                        <span class="stat-card-hint">↓ click to view</span>
+                    </div>
+                </div>
+            `;
+        }).join("");
+
+        panel.style.display = "block";
+        panel.innerHTML = `
+            <div style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#334155;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
+                BY LOCATION ${type === "required" ? "REQUIRED" : "GAP"}
+                <span style="flex:1;height:1px;background:#64748b;display:block;border-radius:2px;"></span>
+            </div>
+            <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                ${cardsHtml}
+            </div>
+        `;
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+
+    _showHeadcountDeptTable(type, locationId) {
+        document.querySelectorAll("[data-headcount-location]").forEach((c) => c.classList.remove("active"));
+        if (locationId !== null) {
+            const card = this.app.querySelector(`[data-headcount-location="${locationId}"]`);
+            if (card) card.classList.add("active");
+        }
+
+        let byDept, locationName;
+        if (locationId === null) {
+            byDept = (AppController.model.state.dashboardData?.requiredHeadcountByDept) || {};
+            locationName = null;
+        } else {
+            const byLocation = AppController.model.getRequiredHeadcountByLocation();
+            const loc = byLocation.find((l) => l.locationId === locationId);
+            byDept = loc ? loc.departments : {};
+            locationName = loc ? loc.locationName : "";
+        }
+
+        const depts = Object.keys(byDept).sort();
+        let totalRequired = 0, totalAvailable = 0, totalGap = 0;
 
         const rows = depts.map((d) => {
             const info = byDept[d];
             const required = Number(info.required || 0);
             const available = Number(info.available || 0);
             const gap = Number(info.gap || 0);
-
             totalRequired += required;
             totalAvailable += available;
             totalGap += gap;
-
             return `
                 <tr>
                     <td><b>${this._escapeAttr(d)}</b></td>
@@ -8245,58 +8768,102 @@ class AttendanceView {
         if (!panel) return;
 
         panel.style.display = "block";
-
         panel.innerHTML = `
-            <div class="drilldown-box">
-                <div class="drilldown-header">
-                    <div class="drilldown-title">
-                        ${type === "required" ? "🎯 Required Headcount" : "⚖️ Headcount Gap"} — By Department
-                        <small>${depts.length} departments</small>
-                    </div>
-                    <div class="drilldown-btn-group">
-                        <button class="btn-drill btn-drill-back"
-                            onclick="AppController.view._closeStatCardDrilldown()">
-                            ✕ Close
-                        </button>
-                    </div>
-                </div>
-
-                <div style="overflow-x:auto;">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Department</th>
-                                <th>Required</th>
-                                <th>Available</th>
-                                <th>Gap</th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-                            ${rows ||
-                                `<tr>
-                                    <td colspan="4" style="text-align:center;padding:32px;color:#94a3b8;">
-                                        No department data found
-                                    </td>
-                                </tr>`
-                            }
-
-                            <tr style=" background:#f8fafc; border-top:2px solid #cbd5e1; font-weight:700;">
-                                <td><b>Total</b></td>
-                                <td><b>${totalRequired}</b></td>
-                                <td><b>${totalAvailable}</b></td>
-                                <td style="color:${totalGap > 0 ? "#f43f5e" : "#10b981"}; font-weight:700;"><b>${totalGap}</b></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+            <div style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#334155;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
+                ${type === "required" ? "REQUIRED" : "GAP"} — BY DEPARTMENT${locationName ? ` (${this._escapeAttr(locationName)})` : ""}
+                <span style="flex:1;height:1px;background:#64748b;display:block;border-radius:2px;"></span>
+            </div>
+            <div style="overflow-x:auto;">
+                <table class="data-table">
+                    <thead>
+                        <tr><th>Department</th><th>Required</th><th>Available</th><th>Gap</th></tr>
+                    </thead>
+                    <tbody>
+                        ${rows || `<tr><td colspan="4" style="text-align:center;padding:32px;color:#94a3b8;">No department data found</td></tr>`}
+                        <tr style="background:#f8fafc;border-top:2px solid #cbd5e1;font-weight:700;">
+                            <td><b>Total</b></td>
+                            <td><b>${totalRequired}</b></td>
+                            <td><b>${totalAvailable}</b></td>
+                            <td style="color:${totalGap > 0 ? "#f43f5e" : "#10b981"};font-weight:700;"><b>${totalGap}</b></td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         `;
 
-        panel.scrollIntoView({
-            behavior: "smooth",
-            block: "start",
-        });
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+
+    _handleAvailableCardClick() {
+        const card = this.app.querySelector('[data-headcount="available"]');
+        const wasActive = card && card.classList.contains('active');
+
+        document.querySelectorAll('.stat-card-clickable').forEach(c => c.classList.remove('active'));
+        this._closeStatCardDrilldown();
+        this._closeAvailableLocationCards();
+
+        if (wasActive) return;
+        if (card) card.classList.add('active');
+
+        const scope = AppController.model.getLocationScope();
+
+        if (!scope || scope.count <= 1) {
+            const items = (AppController.model.state.dashboardData?.employees || []).map(emp => ({ log: null, emp, date: null }));
+            this._renderStatCardDrilldown('totalHeadcount', items, 1);
+            return;
+        }
+
+        this._showAvailableLocationCards();
+    }
+
+    _showAvailableLocationCards() {
+        const byLocation = AppController.model.getRequiredHeadcountByLocation();
+        const panel = document.getElementById('dashboard-location-drilldown');
+        if (!panel) return;
+
+        const colorCls = ["info", "success", "warning", "accent", "danger"];
+        const cardsHtml = byLocation.map((loc, i) => `
+            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
+                data-available-location="${loc.locationId}"
+                onclick="AppController.view._showAvailableLocationEmployees(${loc.locationId})">
+                <div class="stat-icon"><i class="ph ph-map-pin"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">${this._escapeAttr(loc.locationName)}</span>
+                    <span class="stat-value">${loc.available}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+        `).join('');
+
+        panel.style.display = 'block';
+        panel.innerHTML = `
+            <div style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#334155;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
+                BY LOCATION AVAILABLE
+                <span style="flex:1;height:1px;background:#64748b;display:block;border-radius:2px;"></span>
+            </div>
+            <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                ${cardsHtml}
+            </div>
+        `;
+        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    _showAvailableLocationEmployees(locationId) {
+        document.querySelectorAll('[data-available-location]').forEach(c => c.classList.remove('active'));
+        const card = this.app.querySelector(`[data-available-location="${locationId}"]`);
+        if (card) card.classList.add('active');
+
+        const emps = (AppController.model.state.dashboardData?.employees || []).filter(e => e.locationId === locationId);
+        const items = emps.map(emp => ({ log: null, emp, date: null }));
+
+        this._renderStatCardDrilldown('availableLocation_' + locationId, items, 1);
+    }
+
+    _closeAvailableLocationCards() {
+        const panel = document.getElementById('dashboard-location-drilldown');
+        if (panel) { panel.style.display = 'none'; panel.innerHTML = ''; }
+        document.querySelectorAll('[data-available-location]').forEach(c => c.classList.remove('active'));
     }
 
 

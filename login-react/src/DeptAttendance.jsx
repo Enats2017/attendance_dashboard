@@ -37,6 +37,14 @@ export default function DeptAttendance() {
 
 	const [expandedStatus, setExpandedStatus] = useState(null); 
 
+    const [machineStd, setMachineStd] = useState(0);
+    const [editMachineStd, setEditMachineStd] = useState(0);
+    const [showMachineStdSettings, setShowMachineStdSettings] = useState(false);
+
+    const [dailyMachines, setDailyMachines] = useState({});
+    const [editDailyMachines, setEditDailyMachines] = useState({});
+    const [showDailyMachineSettings, setShowDailyMachineSettings] = useState(false);
+
     const showToast = useCallback((msg, type = "success") => {
         setToast({ msg, type });
         setTimeout(() => setToast(null), 3000);
@@ -55,11 +63,15 @@ export default function DeptAttendance() {
         if (locationId) {
             fetchStdHc();
             fetchDesignationStdHc();
+            fetchMachineStd();
         }
     }, [locationId]);
 
     useEffect(() => {
-        if (locationId) loadReport();
+        if (locationId) {
+            loadReport();
+            fetchDailyMachines();
+        }
     }, [month, year, dayFrom, dayTo, stdHcMap, locationId]);
 
     async function fetchLocations() {
@@ -122,6 +134,89 @@ export default function DeptAttendance() {
                 setDesigList(data.data);
             }
         } catch {}
+    }
+
+    async function fetchMachineStd() {
+        try {
+            const res = await fetch(API_BASE, {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "get_machine_std", location_id: locationId }),
+            });
+            const data = await res.json();
+            if (data.success && data.data) setMachineStd(data.data.total_machines || 0);
+        } catch {}
+    }
+
+    async function saveMachineStd() {
+        try {
+            const res = await fetch(API_BASE, {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "update_machine_std", location_id: locationId, total_machines: editMachineStd }),
+            });
+            const data = await res.json();
+            if (!data.success) {
+                showToast(data.message || "Failed to save total machines", "error");
+                return false;
+            }
+        } catch (err) {
+            console.error("saveMachineStd error:", err);
+            showToast("Network error saving total machines", "error");
+            return false;
+        }
+        setMachineStd(editMachineStd);
+        return true;
+    }
+
+    function dateStr(y, m, d) {
+        return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    }
+
+    async function fetchDailyMachines() {
+        try {
+            const res = await fetch(API_BASE, {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    action: "get_daily_machines",
+                    location_id: locationId,
+                    date_from: dateStr(year, month, dayFrom),
+                    date_to: dateStr(year, month, dayTo),
+                }),
+            });
+            const data = await res.json();
+            if (data.success && data.data) setDailyMachines(data.data);
+        } catch {}
+    }
+
+    async function saveDailyMachines() {
+        const items = Object.entries(editDailyMachines).map(([date, count]) => ({
+            date,
+            running_machines: count,
+        }));
+        try {
+            const res = await fetch(API_BASE, {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "bulk_update_daily_machines", location_id: locationId, items }),
+            });
+            const data = await res.json();
+            if (!data.success) {
+                showToast(data.message || "Failed to save daily machine counts", "error");
+                return false;
+            }
+        } catch (err) {
+            console.error("saveDailyMachines error:", err);
+            showToast("Network error saving daily machine counts", "error");
+            return false;
+        }
+        setDailyMachines({ ...editDailyMachines });
+        return true;
     }
 
     async function loadReport() {
@@ -361,6 +456,29 @@ export default function DeptAttendance() {
                     >
                         ⚙️ Designation STD HC
                     </button>
+                    <button
+                        className="da-btn da-btn-warning"
+                        onClick={() => {
+                            setEditMachineStd(machineStd);
+                            setShowMachineStdSettings(true);
+                        }}
+                    >
+                        ⚙️ Total Machines
+                    </button>
+                    <button
+                        className="da-btn da-btn-warning"
+                        onClick={() => {
+                            const initial = {};
+                            for (let d = clampedFrom; d <= clampedTo; d++) {
+                                const ds = dateStr(year, month, d);
+                                initial[ds] = dailyMachines[ds] ?? 0;
+                            }
+                            setEditDailyMachines(initial);
+                            setShowDailyMachineSettings(true);
+                        }}
+                    >
+                        ⚙️ Daily Running Machines
+                    </button>
                     <button className="da-btn da-btn-success" onClick={exportExcel}>
                         ⬇ Excel
                     </button>
@@ -416,21 +534,36 @@ export default function DeptAttendance() {
                 />
             )}
 
-            {showDesigSettings && (
-                <DesigSettingsModal
-                    deptList={deptList}
-                    stdHcMap={stdHcMap}
-                    editDesigHc={editDesigHc}
-                    setEditDesigHc={setEditDesigHc}
-                    desigList={desigList}
+            {showMachineStdSettings && (
+                <MachineStdModal
+                    value={editMachineStd}
+                    setValue={setEditMachineStd}
                     onSave={async () => {
-                        const desigOk = await saveDesigStdHc();
-                        if (desigOk) {
-                            setShowDesigSettings(false);
-                            showToast("Designation STD HC saved successfully!", "success");
+                        const ok = await saveMachineStd();
+                        if (ok) {
+                            setShowMachineStdSettings(false);
+                            showToast("Total machines saved successfully!", "success");
                         }
                     }}
-                    onClose={() => setShowDesigSettings(false)}
+                    onClose={() => setShowMachineStdSettings(false)}
+                />
+            )}
+
+            {showDailyMachineSettings && (
+                <DailyMachineModal
+                    year={year}
+                    month={month}
+                    days={days}
+                    editDailyMachines={editDailyMachines}
+                    setEditDailyMachines={setEditDailyMachines}
+                    onSave={async () => {
+                        const ok = await saveDailyMachines();
+                        if (ok) {
+                            setShowDailyMachineSettings(false);
+                            showToast("Daily running machine counts saved successfully!", "success");
+                        }
+                    }}
+                    onClose={() => setShowDailyMachineSettings(false)}
                 />
             )}
         </div>
@@ -475,6 +608,7 @@ function ReportTable({ data, days, unitName, unitCapacity, loginName, month, yea
     const summary_avg = data.summary_avg || {};
     const summary_employees = data.summary_employees || {};
     const total_std_hc = data.total_std_hc || 0;
+    const total_running_machines = data.total_running_machines || 0;   
     const colSpan = days.length + 3;
 
     return (
@@ -489,7 +623,7 @@ function ReportTable({ data, days, unitName, unitCapacity, loginName, month, yea
                             <th>Department</th>
                             <th>
                                 STD
-                                <br />({unitCapacity})
+                                <br />({total_running_machines} M/C's)
                             </th>
                             {days.map((d) => (
                                 <th key={d}>{d}</th>
@@ -590,6 +724,8 @@ function ReportTable({ data, days, unitName, unitCapacity, loginName, month, yea
                     </tbody>
                     <tfoot>
                         <SummaryRow label="Total Present" stdValue={total_std_hc} dayValues={summary.total_present} avgValue={summary_avg.total_present} days={days} className="da-row-combined" />
+                        <SummaryRow label="No. of Running Machines" stdValue="" dayValues={summary.running_machines} avgValue={summary_avg.running_machines} days={days} className="da-row-heading" />
+                        <SummaryRow label="Labor Per Machine Per Day" stdValue="" dayValues={summary.labor_per_machine} avgValue={summary_avg.labor_per_machine} days={days} className="da-row-heading da-row-labor-border" />
                         <SummaryRow label="Total Present" stdValue="" dayValues={summary.present} avgValue={summary_avg.present} days={days} className="da-row-total" statusKey="present" expandedStatus={expandedStatus} onToggleStatus={onToggleStatus} summaryEmployeesByDay={summary_employees} colSpan={colSpan} />
                         <SummaryRow label="Total Half Present" stdValue="" dayValues={summary.half_present} avgValue={summary_avg.half_present} days={days} className="da-row-heading" statusKey="half_present" expandedStatus={expandedStatus} onToggleStatus={onToggleStatus} summaryEmployeesByDay={summary_employees} colSpan={colSpan} />
                         <SummaryRow label="Total Weekly-Off Present" stdValue="" dayValues={summary.wo_present} avgValue={summary_avg.wo_present} days={days} className="da-row-heading" statusKey="wo_present" expandedStatus={expandedStatus} onToggleStatus={onToggleStatus} summaryEmployeesByDay={summary_employees} colSpan={colSpan} />
@@ -904,6 +1040,114 @@ function DesigSettingsModal({ deptList, stdHcMap, editDesigHc, setEditDesigHc, d
                 </div>
 
                 <div className="da-modal-footer" style={{ marginTop: 16 }}>
+                    <button className="da-btn da-btn-sm" style={{ background: "#e2e8f0", color: "#475569" }} onClick={onClose}>
+                        Cancel
+                    </button>
+                    <button className="da-btn da-btn-sm da-btn-primary" onClick={onSave}>
+                        💾 Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function MachineStdModal({ value, setValue, onSave, onClose }) {
+    return (
+        <div
+            className="da-modal-overlay"
+            onClick={(e) => {
+                if (e.target === e.currentTarget) onClose();
+            }}
+        >
+            <div className="da-modal" style={{ maxWidth: 360 }}>
+                <div className="da-modal-header">
+                    <h2>⚙️ Total Machines</h2>
+                    <button className="da-modal-close" onClick={onClose}>✕</button>
+                </div>
+                <p style={{ color: "#64748b", fontSize: 13, marginBottom: 16 }}>
+                    Fixed total machine count for this location. Shown in the report header.
+                </p>
+                <input
+                    type="number"
+                    min={0}
+                    value={value}
+                    onChange={(e) => setValue(parseInt(e.target.value, 10) || 0)}
+                    style={{ width: "100%", padding: "8px 10px", fontSize: 14 }}
+                />
+                <div className="da-modal-footer" style={{ marginTop: 16 }}>
+                    <button className="da-btn da-btn-sm" style={{ background: "#e2e8f0", color: "#475569" }} onClick={onClose}>
+                        Cancel
+                    </button>
+                    <button className="da-btn da-btn-sm da-btn-primary" onClick={onSave}>
+                        💾 Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function DailyMachineModal({ year, month, days, editDailyMachines, setEditDailyMachines, onSave, onClose }) {
+    function dateStr(y, m, d) {
+        return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    }
+
+    const total = Object.values(editDailyMachines).reduce((a, b) => a + (parseInt(b, 10) || 0), 0);
+
+    return (
+        <div
+            className="da-modal-overlay"
+            onClick={(e) => {
+                if (e.target === e.currentTarget) onClose();
+            }}
+        >
+            <div className="da-modal" style={{ maxWidth: 480 }}>
+                <div className="da-modal-header">
+                    <h2>⚙️ Daily Running Machines</h2>
+                    <button className="da-modal-close" onClick={onClose}>✕</button>
+                </div>
+                <p style={{ color: "#64748b", fontSize: 13, marginBottom: 16 }}>
+                    Set the actual number of running machines for each day in the selected range.
+                </p>
+                <div className="da-settings-table-wrap" style={{ maxHeight: 400, overflowY: "auto" }}>
+                    <table className="da-settings-table">
+                        <thead>
+                            <tr>
+                                <th style={{ width: "50%" }}>Date</th>
+                                <th style={{ width: "50%" }}>Running Machines</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {days.map((d) => {
+                                const ds = dateStr(year, month, d);
+                                return (
+                                    <tr key={ds}>
+                                        <td style={{ fontWeight: 600 }}>{ds}</td>
+                                        <td>
+                                            <input
+                                                type="number"
+                                                min={0}
+                                                value={editDailyMachines[ds] ?? 0}
+                                                onChange={(e) =>
+                                                    setEditDailyMachines((prev) => ({
+                                                        ...prev,
+                                                        [ds]: parseInt(e.target.value, 10) || 0,
+                                                    }))
+                                                }
+                                            />
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+                <div className="da-settings-total">
+                    <span>Total (sum across days)</span>
+                    <span>{total}</span>
+                </div>
+                <div className="da-modal-footer">
                     <button className="da-btn da-btn-sm" style={{ background: "#e2e8f0", color: "#475569" }} onClick={onClose}>
                         Cancel
                     </button>

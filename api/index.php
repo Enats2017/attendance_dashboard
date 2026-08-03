@@ -117,6 +117,18 @@ switch ($action) {
     case 'bulk_update_designation_std_hc':
         handleBulkUpdateDesignationStdHC($input);
         break;
+    case 'get_machine_std':
+        handleGetMachineStd($input);
+        break;
+    case 'update_machine_std':
+        handleUpdateMachineStd($input);
+        break;
+    case 'get_daily_machines':
+        handleGetDailyMachines($input);
+        break;
+    case 'bulk_update_daily_machines':
+        handleBulkUpdateDailyMachines($input);
+        break;
     case 'get_report':
         handleGetReport($input);
         break;
@@ -770,11 +782,28 @@ function handleDashboardData($input, $returnData = false) {
         }
     }
 
+    $desigLocHcMap = []; 
+    $sqlDesigLocHc = "SELECT DepartmentId, DesignationId, LocationId, StandardHeadCount FROM DepartmentDesignationLocationHeadCount WITH (NOLOCK) WHERE LocationId IN ($locationList) AND DepartmentId IN ($departmentList)";
+    $stmtDesigLocHc = sqlsrv_query($conn, $sqlDesigLocHc);
+    if ($stmtDesigLocHc) {
+        while ($row = sqlsrv_fetch_array($stmtDesigLocHc, SQLSRV_FETCH_ASSOC)) {
+            $desigLocHcMap[intval($row['DepartmentId'])][intval($row['DesignationId'])][intval($row['LocationId'])] = intval($row['StandardHeadCount']);
+        }
+    }
+
     $deptNameMap = [];
     $stmtDeptNames = sqlsrv_query($conn, "SELECT DepartmentId, DepartmentFName FROM Departments WITH (NOLOCK) WHERE DepartmentId IN ($departmentList)");
     if ($stmtDeptNames) {
         while ($row = sqlsrv_fetch_array($stmtDeptNames, SQLSRV_FETCH_ASSOC)) {
             $deptNameMap[intval($row['DepartmentId'])] = $row['DepartmentFName'];
+        }
+    }
+
+    $designationNameMap = [];
+    $stmtDesigNames = sqlsrv_query($conn, "SELECT DesignationId, DesignationsName FROM Designations WITH (NOLOCK)");
+    if ($stmtDesigNames) {
+        while ($row = sqlsrv_fetch_array($stmtDesigNames, SQLSRV_FETCH_ASSOC)) {
+            $designationNameMap[intval($row['DesignationId'])] = $row['DesignationsName'];
         }
     }
 
@@ -785,6 +814,16 @@ function handleDashboardData($input, $returnData = false) {
             $locationNameMap[intval($row['LocationId'])] = $row['LocationName'];
         }
     }
+
+    $locationScope = [
+        'count' => count($userLocations),
+        'locations' => array_map(function ($locId) use ($locationNameMap) {
+            return [
+                'locationId' => intval($locId),
+                'locationName' => $locationNameMap[intval($locId)] ?? ('Location ' . $locId)
+            ];
+        }, $userLocations)
+    ];
 
     $sqlEmp = "SELECT E.EmployeeId, E.DepartmentId, E.Location as locationId, E.ShiftGroupId, E.EmployeeName, E.EmployeeCode, E.Gender, E.DOB, E.CategoryId, E.Designation, E.DOJ, E.Team, DG.DesignationsName as DesignationName, ISNULL(DSO.SortOrder, 0) as designationSortOrder, ISNULL(DG.SortOrder, 0) as designationGlobalSortOrder, C.CompanyFName as company, C.CompanyeMail as companyEmail, Z.ZoneName as zoneName, L.LocationName as location, D.DepartmentFName as dept, D.std_hc FROM Employees E WITH (NOLOCK) LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Zones Z WITH (NOLOCK) ON C.ZoneId = Z.ZoneId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId LEFT JOIN departmentDeginationSortOrder DSO WITH (NOLOCK) ON E.DepartmentId = DSO.DepartmentId AND E.Designation = DSO.DesignationId WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.DOJ <= ? AND (E.Status = 'Working' OR (E.Status = 'Resigned' AND E.DOR > ?))";
 
@@ -1258,6 +1297,38 @@ function handleDashboardData($input, $returnData = false) {
         $deptLocHeadcountMap[$deptId][$locId]['available']++;
     }
 
+    // Designation-level headcount, per dept + location
+    $desigLocHeadcountMap = []; 
+    foreach ($desigLocHcMap as $deptId => $desigMap) {
+        foreach ($desigMap as $desigId => $locMap) {
+            foreach ($locMap as $locId => $req) {
+                $desigLocHeadcountMap[$deptId][$desigId][$locId] = [
+                    'deptName' => $deptNameMap[$deptId] ?? ('Dept ' . $deptId),
+                    'designationName' => $designationNameMap[$desigId] ?? ('Designation ' . $desigId),
+                    'locationName' => $locationNameMap[$locId] ?? ('Location ' . $locId),
+                    'required' => $req,
+                    'available' => 0
+                ];
+            }
+        }
+    }
+
+    foreach ($employees as $emp) {
+        $deptId  = $emp['deptId'];
+        $desigId = $emp['designationId'];
+        $locId   = $emp['locationId'];
+        if (!isset($desigLocHeadcountMap[$deptId][$desigId][$locId])) {
+            $desigLocHeadcountMap[$deptId][$desigId][$locId] = [
+                'deptName' => $emp['dept'],
+                'designationName' => $emp['designation'],
+                'locationName' => $emp['location'],
+                'required' => 0,
+                'available' => 0
+            ];
+        }
+        $desigLocHeadcountMap[$deptId][$desigId][$locId]['available']++;
+    }
+
     $totalRequiredHeadcount = 0;
     $requiredHeadcountByDept = [];      
     $requiredHeadcountByLocation = [];  
@@ -1298,8 +1369,28 @@ function handleDashboardData($input, $returnData = false) {
         ];
     }
 
+    // Roll designation-level data into requiredHeadcountByLocation too
+    $requiredHeadcountByLocationDesignation = []; 
+    foreach ($desigLocHeadcountMap as $deptId => $desigMap) {
+        foreach ($desigMap as $desigId => $locMap) {
+            foreach ($locMap as $locId => $info) {
+                if (!isset($requiredHeadcountByLocationDesignation[$locId])) {
+                    $requiredHeadcountByLocationDesignation[$locId] = [];
+                }
+                $requiredHeadcountByLocationDesignation[$locId][] = [
+                    'deptName' => $info['deptName'],
+                    'designationName' => $info['designationName'],
+                    'required' => $info['required'],
+                    'available' => $info['available'],
+                    'gap' => $info['required'] - $info['available']
+                ];
+            }
+        }
+    }
+
     foreach ($requiredHeadcountByLocation as $locId => &$locData) {
         $locData['gap'] = $locData['required'] - $locData['available'];
+        $locData['designations'] = $requiredHeadcountByLocationDesignation[$locId] ?? [];
     }
     unset($locData);
     $requiredHeadcountByLocation = array_values($requiredHeadcountByLocation);
@@ -1713,6 +1804,7 @@ function handleDashboardData($input, $returnData = false) {
         'shiftStats' => $shiftStats,
         'resignedEmployees' => $resignedEmployees,
         'newJoinedEmployees' => $newJoinedEmployees,
+        'locationScope' => $locationScope,
         'timestamp' => date('Y-m-d H:i:s'),
         'dataSource' => $dataSource
     ]);
@@ -2081,6 +2173,23 @@ function handleGetReport($input) {
     $companyList = !empty($scope['companies']) ? implode(',', array_map('intval', $scope['companies'])) : '0';
     $departmentList = !empty($scope['departments']) ? implode(',', array_map('intval', $scope['departments'])) : '0';
     $allLocationsList = !empty($scope['locations']) ? implode(',', array_map('intval', $scope['locations'])) : '0';
+
+    $totalStdMachines = 0;
+    $sqlMachStd = "SELECT SUM(TotalMachines) as total FROM LocationMachineStdCount WITH (NOLOCK) WHERE LocationId IN ($locationList)";
+    $stmtMachStd = sqlsrv_query($sqlConn, $sqlMachStd);
+    if ($stmtMachStd && $rowMS = sqlsrv_fetch_array($stmtMachStd, SQLSRV_FETCH_ASSOC)) {
+        $totalStdMachines = intval($rowMS['total']);
+    }
+
+    $dailyMachMap = [];
+    $sqlMachDaily = "SELECT MachineDate, SUM(RunningMachines) as total FROM LocationDailyMachineCount WITH (NOLOCK) WHERE LocationId IN ($locationList) AND MachineDate >= '$dayFrom' AND MachineDate <= '$dayTo' GROUP BY MachineDate";
+    $stmtMachDaily = sqlsrv_query($sqlConn, $sqlMachDaily);
+    if ($stmtMachDaily) {
+        while ($rowMD = sqlsrv_fetch_array($stmtMachDaily, SQLSRV_FETCH_ASSOC)) {
+            $d = intval(date('j', strtotime($rowMD['MachineDate']->format('Y-m-d'))));
+            $dailyMachMap[$d] = intval($rowMD['total']);
+        }
+    }
  
     $sqlD = "SELECT D.DepartmentId, D.DepartmentFName as DepartmentName, D.SortOrder FROM Departments D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON D.DepartmentId = E.DepartmentId WHERE E.Location IN ($allLocationsList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working' GROUP BY D.DepartmentId, D.DepartmentFName, D.SortOrder ORDER BY CASE WHEN D.SortOrder IS NULL THEN 1 ELSE 0 END, D.SortOrder ASC, D.DepartmentFName ASC";
  
@@ -2164,7 +2273,9 @@ function handleGetReport($input) {
         'on_leave' => array_fill($fromDay, $numDays, 0),
         'new_joinee' => array_fill($fromDay, $numDays, 0),
         'left' => array_fill($fromDay, $numDays, 0),
-        'recruited_hc' => array_fill($fromDay, $numDays, 0)   
+        'recruited_hc' => array_fill($fromDay, $numDays, 0),
+        'running_machines' => array_fill($fromDay, $numDays, 0),   
+        'labor_per_machine' => array_fill($fromDay, $numDays, 0),  
     ];
 
     $employees = [];
@@ -2271,7 +2382,7 @@ function handleGetReport($input) {
     $liveDataByDesig = [];
     $empDayStatus = [];
     if ($tableExists) {
-        $sqlEmpDayStatus = "SELECT A.EmployeeId, DAY(A.AttendanceDate) as AttDay, A.DetailedStatusCode, A.WeeklyOff, A.InTime, A.OutTime, A.ReportPunchRecords, A.Present, A.Absent, A.OverTime, A.IsOnLeave FROM $tableName A WITH (NOLOCK) JOIN Employees E WITH (NOLOCK) ON A.EmployeeId = E.EmployeeId WHERE A.AttendanceDate >= '$dayFrom' AND A.AttendanceDate <= '$dayTo 23:59:59' AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working'";
+        $sqlEmpDayStatus = "SELECT A.EmployeeId, DAY(A.AttendanceDate) as AttDay, A.DetailedStatusCode, A.WeeklyOff, A.InTime, A.OutTime, A.ReportPunchRecords, A.Present, A.Absent, A.OverTime, A.IsOnLeave, A.InDeviceId, A.OutDeviceId FROM $tableName A WITH (NOLOCK) JOIN Employees E WITH (NOLOCK) ON A.EmployeeId = E.EmployeeId WHERE A.AttendanceDate >= '$dayFrom' AND A.AttendanceDate <= '$dayTo 23:59:59' AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working'";
  
         $stmtEmpDayStatus = sqlsrv_query($sqlConn, $sqlEmpDayStatus);
         if ($stmtEmpDayStatus) {
@@ -2285,7 +2396,9 @@ function handleGetReport($input) {
                     'present' => floatval($row['Present'] ?? 0), 
                     'absent' => floatval($row['Absent'] ?? 0),
                     'ot' => floatval($row['OverTime'] ?? 0),
-                    'onLeave' => intval($row['IsOnLeave'] ?? 0)
+                    'onLeave' => intval($row['IsOnLeave'] ?? 0),
+                    'inDeviceId' => $row['InDeviceId'] ?? null,      
+                    'outDeviceId' => $row['OutDeviceId'] ?? null,    
                 ];
             }
         }
@@ -2295,7 +2408,7 @@ function handleGetReport($input) {
     $statusEmployeesByDay = [];
     $otEmployeesByDay = [];
     $leaveEmployeesByDay = [];
- 
+
     $statusKeyMap = [
         'P' => 'present',
         'HD' => 'half_present',
@@ -2312,8 +2425,7 @@ function handleGetReport($input) {
         $desigId = $empMeta[$empId]['desig'];
  
         foreach ($days as $day => $rec) {
-            $status = resolveDayStatus($rec);
- 
+            $status = resolveDayStatus($rec);       
             if (!isset($liveData[$deptId][$day])) {
                 $liveData[$deptId][$day] = ['present' => 0, 'ot' => 0, 'wo' => 0, 'leave' => 0];
             }
@@ -2467,8 +2579,7 @@ function handleGetReport($input) {
         $deptActiveToday = [];
         foreach ($empDateRows as $emp) {
             if (!$emp['doj'] || $emp['doj'] > $dateStr) continue;
-            $wasActive = ($emp['status'] === 'Working')
-                || ($emp['status'] === 'Resigned' && $emp['dor'] && $emp['dor'] > $dateStr);
+            $wasActive = ($emp['status'] === 'Working') || ($emp['status'] === 'Resigned' && $emp['dor'] && $emp['dor'] > $dateStr);
             if ($wasActive) {
                 $deptActiveToday[$emp['deptId']] = true;
                 $deptHeadcountByDay[$emp['deptId']][$d] = ($deptHeadcountByDay[$emp['deptId']][$d] ?? 0) + 1;
@@ -2644,6 +2755,8 @@ function handleGetReport($input) {
     for ($d = $fromDay; $d <= $toDay; $d++) {
         $summary['overtime_paid'][$d] = count($otEmployeesByDay[$d] ?? []);
         $summary['on_leave'][$d] = count($leaveEmployeesByDay[$d] ?? []);
+        $summary['running_machines'][$d] = $dailyMachMap[$d] ?? 0;
+        $summary['labor_per_machine'][$d] = $summary['running_machines'][$d] > 0 ? round($summary['total_present'][$d] / $summary['running_machines'][$d], 1) : 0;
     }
  
     $summary_avg = [];
@@ -2676,10 +2789,106 @@ function handleGetReport($input) {
         'summary' => $summary,
         'summary_avg' => $summary_avg,
         'summary_employees' => $summary_employees,
-        'total_std_hc' => array_sum($hcMap)
+        'total_std_hc' => array_sum($hcMap),
+        'total_running_machines' => $totalStdMachines
     ]);
 }
- 
+
+
+/**
+ * GET fixed STD machine total for a location
+ */
+function handleGetMachineStd($input) {
+    $locationId = intval($input['location_id']);
+    $sqlConn = getSQLServer();
+
+    $sql = "SELECT TotalMachines FROM LocationMachineStdCount WHERE LocationId = ?";
+    $stmt = sqlsrv_query($sqlConn, $sql, array($locationId));
+
+    $total = 0;
+    if ($stmt && $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+        $total = intval($row['TotalMachines']);
+    }
+
+    echo json_encode([
+        'success' => true,
+        'data' => ['location_id' => $locationId, 'total_machines' => $total]
+    ]);
+}
+
+/**
+ * SAVE fixed STD machine total for a location (upsert)
+ */
+function handleUpdateMachineStd($input) {
+    $locationId = intval($input['location_id']);
+    $totalMachines = intval($input['total_machines']);
+    $sqlConn = getSQLServer();
+
+    $sql = "MERGE LocationMachineStdCount AS target USING (SELECT ? AS LocationId, ? AS TotalMachines) AS src ON target.LocationId = src.LocationId WHEN MATCHED THEN UPDATE SET TotalMachines = src.TotalMachines, UpdatedAt = GETDATE() WHEN NOT MATCHED THEN INSERT (LocationId, TotalMachines, UpdatedAt) VALUES (src.LocationId, src.TotalMachines, GETDATE());";
+
+    $stmt = sqlsrv_query($sqlConn, $sql, array($locationId, $totalMachines));
+
+    if (!$stmt) {
+        echo json_encode(['success' => false, 'message' => 'Failed to save total machines', 'errors' => sqlsrv_errors()]);
+        return;
+    }
+
+    echo json_encode(['success' => true]);
+}
+
+/**
+ * GET per-day running machine values for a location + date range
+ */
+function handleGetDailyMachines($input) {
+    $locationId = intval($input['location_id']);
+    $dateFrom = $input['date_from']; 
+    $dateTo = $input['date_to'];     
+    $sqlConn = getSQLServer();
+
+    $sql = "SELECT MachineDate, RunningMachines FROM LocationDailyMachineCount WHERE LocationId = ? AND MachineDate >= ? AND MachineDate <= ? ORDER BY MachineDate ASC";
+    $stmt = sqlsrv_query($sqlConn, $sql, array($locationId, $dateFrom, $dateTo));
+
+    $data = [];
+    if ($stmt) {
+        while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+            $dateStr = $row['MachineDate']->format('Y-m-d');
+            $data[$dateStr] = intval($row['RunningMachines']);
+        }
+    }
+
+    echo json_encode(['success' => true, 'data' => $data]);
+}
+
+/**
+ * SAVE per-day running machine values (bulk upsert)
+ * items: [{ date: 'YYYY-MM-DD', running_machines: N }, ...]
+ */
+function handleBulkUpdateDailyMachines($input) {
+    $locationId = intval($input['location_id']);
+    $items = $input['items'] ?? [];
+    $sqlConn = getSQLServer();
+
+    $errors = [];
+    foreach ($items as $item) {
+        $date = $item['date'];
+        $count = intval($item['running_machines']);
+
+        $sql = "MERGE LocationDailyMachineCount AS target USING (SELECT ? AS LocationId, ? AS MachineDate, ? AS RunningMachines) AS src ON target.LocationId = src.LocationId AND target.MachineDate = src.MachineDate WHEN MATCHED THEN UPDATE SET RunningMachines = src.RunningMachines, UpdatedAt = GETDATE() WHEN NOT MATCHED THEN INSERT (LocationId, MachineDate, RunningMachines, UpdatedAt) VALUES (src.LocationId, src.MachineDate, src.RunningMachines, GETDATE());";
+
+        $stmt = sqlsrv_query($sqlConn, $sql, array($locationId, $date, $count));
+        if (!$stmt) {
+            $errors[] = ['date' => $date, 'errors' => sqlsrv_errors()];
+        }
+    }
+
+    if (!empty($errors)) {
+        echo json_encode(['success' => false, 'message' => 'Some dates failed to save', 'errors' => $errors]);
+        return;
+    }
+
+    echo json_encode(['success' => true]);
+}
+
 
 /**
  * Get simple list of Locations assigned to the logged-in admin

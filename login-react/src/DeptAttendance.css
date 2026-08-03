@@ -64,6 +64,7 @@
 .da-row-sub td { color: #64748b; font-size: 12px; background: rgba(248,250,252,0.6); }
 .da-row-sub td:first-child { padding-left: 26px !important; font-weight: 500; }
 .da-row-heading td { color: #374151; font-size: 13px; background: rgba(248,250,252,0.5); }
+.da-row-labor-border td { border-bottom: 2px solid #1e293b; }
 .da-row-absent-total td { color: #b91c1c; font-weight: 700; background: rgba(254,226,226,0.3); }
 
 /* FIX: sirf row label click hota hai — value cells ab plain read-only numbers hain. */

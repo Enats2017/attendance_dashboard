@@ -134,7 +134,11 @@ class AttendanceController {
             await this.model.fetchSubAdmins();
         }
 
-        const result = await this.model.fetchData();
+        const [result] = await Promise.all([
+            this.model.fetchData(),
+            this.model.fetchDashboardData()
+        ]);
+
         if (!result.success) {
             alert('Error loading data: ' + result.error);
         }

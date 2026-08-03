@@ -188,6 +188,7 @@ class AttendanceModel {
                 this.state.placeholderIds = data.placeholderIds || {
                     designation: [], department: [], company: [], shiftGroup: [], location: []
                 };
+                this.state.locationScope = data.locationScope || { count: 0, locations: [] };
                 this.state.isMaster = (data.isMaster !== undefined) ? !!data.isMaster : (window.HRMS_USER?.isMaster ?? true);
 
                 this.state.lastUpdated = new Date().toLocaleTimeString();
@@ -203,6 +204,38 @@ class AttendanceModel {
             }
         } catch (error) {
             console.error('Fetch Error:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+
+    async fetchDashboardData() {
+        try {
+            const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
+            url.searchParams.set('action', 'dashboard_data');
+            url.searchParams.set('userId', (window.HRMS_USER || {}).id || 0);
+            url.searchParams.set('date_from', this._getMonthStart());
+            url.searchParams.set('date_to', this._getToday());
+
+            const response = await fetch(url.toString(), { credentials: 'include' });
+            const data = await response.json();
+
+            if (data.success) {
+                this.state.dashboardData = {
+                    employees: data.employees,
+                    attendanceLogs: data.attendanceLogs,
+                    todayStats: data.todayStats || {},
+                    requiredHeadcount: data.requiredHeadcount ?? 0,
+                    gapHeadcount: data.gapHeadcount ?? 0,
+                    requiredHeadcountByDept: data.requiredHeadcountByDept || {},
+                    requiredHeadcountByLocation: data.requiredHeadcountByLocation || [],
+                    locationScope: data.locationScope || { count: 0, locations: [] },
+                };
+                this._commit();
+            }
+            return data;
+        } catch (error) {
+            console.error('Fetch Dashboard Data Error:', error);
             return { success: false, error: error.message };
         }
     }
@@ -577,19 +610,23 @@ class AttendanceModel {
 
  
     getRequiredHeadcount() {
-        return this.state.requiredHeadcount || 0;
+        return (this.state.dashboardData?.requiredHeadcount) || 0;
     }
 
     getGapHeadcount() {
-        return this.state.gapHeadcount || 0;
+        return (this.state.dashboardData?.gapHeadcount) || 0;
     }
 
     getRequiredHeadcountByDept(dept) {
-        return (this.state.requiredHeadcountByDept || {})[dept] || { required: 0, available: 0, gap: 0 };
+        return ((this.state.dashboardData?.requiredHeadcountByDept) || {})[dept] || { required: 0, available: 0, gap: 0 };
     }
 
     getRequiredHeadcountByLocation() {
-        return this.state.requiredHeadcountByLocation || [];
+        return (this.state.dashboardData?.requiredHeadcountByLocation) || [];
+    }
+
+    getLocationScope() {
+        return (this.state.dashboardData?.locationScope) || { count: 0, locations: [] };
     }
 
     getFilterOptions() {
