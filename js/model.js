@@ -272,7 +272,7 @@ class AttendanceModel {
         if (this.state.activeTab === tabId) {
             return;
         }
-        if ((tabId === 'sort_order' || tabId === 'units') && !(window.HRMS_USER && window.HRMS_USER.isMaster)) {
+        if ((tabId === 'sort_order' || tabId === 'units' || tabId === 'dept_designation_mapping') && !(window.HRMS_USER && window.HRMS_USER.isMaster)) {
             return;
         }
         this.state.activeTab = tabId;
@@ -622,7 +622,13 @@ class AttendanceModel {
     }
 
     getRequiredHeadcountByLocation() {
-        return (this.state.dashboardData?.requiredHeadcountByLocation) || [];
+        return ((this.state.dashboardData?.requiredHeadcountByLocation) || []).slice().sort((a, b) =>
+            (a.locationName || "").localeCompare(b.locationName || "", undefined, { numeric: true, sensitivity: "base" })
+        );
+    }
+
+    sortLocations(locations) {
+        return [...locations].sort((a, b) => (a || "").localeCompare(b || "", undefined, { numeric: true, sensitivity: "base" }));
     }
 
     getLocationScope() {
@@ -1436,6 +1442,66 @@ class AttendanceModel {
         } catch (error) {
             console.error('Save Designation Global Order Error:', error);
             return { success: false, error: error.message };
+        }
+    }
+
+
+    async fetchDepartmentDesignationMapping() {
+        try {
+            const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
+            url.searchParams.set('action', 'get_department_designation_mapping');
+            const response = await fetch(url.toString(), { credentials: 'include' });
+            return await response.json();
+        } catch (error) {
+            console.error('Fetch Dept-Designation Mapping Error:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+
+    async saveDepartmentDesignationMapping(items) {
+        try {
+            const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
+            url.searchParams.set('action', 'save_department_designation_mapping');
+            const response = await fetch(url.toString(), {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'save_department_designation_mapping', items })
+            });
+            return await response.json();
+        } catch (error) {
+            console.error('Save Dept-Designation Mapping Error:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+
+    async deleteDepartmentDesignationMapping(departmentId, designationId) {
+        try {
+            const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
+            url.searchParams.set('action', 'delete_department_designation_mapping');
+
+            const response = await fetch(url.toString(), {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    action: 'delete_department_designation_mapping',
+                    departmentId,
+                    designationId
+                })
+            });
+
+            return await response.json();
+        } catch (error) {
+            console.error('Delete Dept-Designation Mapping Error:', error);
+            return {
+                success: false,
+                error: error.message
+            };
         }
     }
 }

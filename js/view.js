@@ -7,6 +7,7 @@ class AttendanceView {
         this.TABS = [
             { id: "feature", label: "Dashboard", icon: "ph-house" },
             { id: "units", label: "Units List", icon: "ph-buildings", roles: ["master"] }, 
+            { id: "dept_designation_mapping", label: "Dept-Designation Mapping", icon: "ph-map-trifold", roles: ["master"] },
             { id: "all", label: "Attendance Logs", icon: "ph-list-dashes" },
             { id: "age", label: "Age Analysis", icon: "ph-user-circle" },
             { id: "company", label: "Company Stats", icon: "ph-buildings" },
@@ -33,8 +34,50 @@ class AttendanceView {
         this._lastData = {};
         this._renderToken = 0;
         this.LATE_THRESHOLD = 3;
+        this._fullAvailableItems = [];
     }
 
+    showToast(message, type = "success") {
+        const oldToast = document.getElementById("attendance-toast");
+        if (oldToast) {
+            oldToast.remove();
+        }
+
+        const toast = document.createElement("div");
+        toast.id = "attendance-toast";
+        toast.innerHTML = message;
+
+        toast.style.position = "fixed";
+        toast.style.top = "20px";
+        toast.style.right = "20px";
+        toast.style.padding = "12px 18px";
+        toast.style.borderRadius = "8px";
+        toast.style.fontSize = "14px";
+        toast.style.fontWeight = "600";
+        toast.style.color = "#fff";
+        toast.style.zIndex = "99999";
+        toast.style.boxShadow = "0 8px 20px rgba(0,0,0,.2)";
+        toast.style.transition = "all .3s ease";
+
+        if (type === "success") {
+            toast.style.background = "#16a34a";
+        } else if (type === "error") {
+            toast.style.background = "#dc2626";
+        } else {
+            toast.style.background = "#2563eb";
+        }
+
+        document.body.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.opacity = "0";
+            toast.style.transform = "translateY(-10px)";
+        }, 2500);
+
+        setTimeout(() => {
+            toast.remove();
+        }, 3000);
+    }
 
     _getVisibleTabs() {
         const isMaster = !!(window.HRMS_USER && window.HRMS_USER.isMaster);
@@ -85,7 +128,7 @@ class AttendanceView {
 				<div class="main-content">
 					${this._renderTopbar(state)}
 					<div class="content-body">
-                        ${(state.activeTab !== "feature" && state.activeTab !== "units") ? this._renderFilters(state.filters, filterOpts, state) : ""}
+                        ${(state.activeTab !== "feature" && state.activeTab !== "units" && state.activeTab !== "dept_designation_mapping") ? this._renderFilters(state.filters, filterOpts, state) : ""}
                         ${
                             state.activeTab === "designation"
                                 ? this._renderDesignationFamilySummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "age"
@@ -106,6 +149,7 @@ class AttendanceView {
                                 ? "" : state.activeTab === "designation_order"
                                 ? "" : state.activeTab === "sort_order"
                                 ? "" : state.activeTab === "designation_families"
+                                ? "" : state.activeTab === "dept_designation_mapping"
                                 ? "" : state.activeTab === "overtime"
                                 ? "" : state.activeTab === "units"
                                 ? "" : state.activeTab === "feature"
@@ -351,9 +395,7 @@ class AttendanceView {
 
 
     _renderFilters(filters, opts, state) {
-        const selectOpts = (arr) => (
-            '<option value="All">All</option>' + arr.map((v) => `<option value="${v}">${v}</option>`).join("")
-        );
+        const selectOpts = (arr) => ('<option value="All">All</option>' + arr.map((v) => `<option value="${v}">${v}</option>`).join(""));
 
         const isMaster = !!(window.HRMS_USER && window.HRMS_USER.isMaster);
         const subAdminList = (state && state.subAdminList) || [];
@@ -531,14 +573,7 @@ class AttendanceView {
         const dashFamilies = model.state.data.designationFamilies || [];
         const dashFamMap = model.state.data.designationToFamilyMap || {};
 
-        this._currentDashboardFamilyData = {
-            emps,
-            model,
-            empMap,
-            famMap: dashFamMap,
-            families: dashFamilies,
-            isDashboard: true,
-        };
+        this._currentDashboardFamilyData = { emps, model, empMap, famMap: dashFamMap, families: dashFamilies, isDashboard: true, };
 
         const famColorCls = ["info", "success", "warning", "accent", "danger"];
         const famCounts = {};
@@ -551,9 +586,7 @@ class AttendanceView {
         });
 
         const familyCardsHtml = dashFamilies.map((f, i) => `
-            <div class="stat-card ${famColorCls[i % famColorCls.length]} stat-card-clickable"
-                data-dashboard-family-id="${f.id}"
-                onclick="AppController.view._showDashboardFamilyDrilldown(${f.id})">
+            <div class="stat-card ${famColorCls[i % famColorCls.length]} stat-card-clickable" data-dashboard-family-id="${f.id}" onclick="AppController.view._showDashboardFamilyDrilldown(${f.id})">
                 <div class="stat-icon"><i class="ph ph-cards"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">${this._escapeAttr(f.name)}</span>
@@ -569,10 +602,10 @@ class AttendanceView {
         const gapCount = model.getGapHeadcount();
 
         const headcountCard = `
-            <div class="stat-card info stat-card-clickable"
-                data-headcount="required"
-                onclick="AppController.view._showHeadcountBreakdownDrilldown('required')">
-                <div class="stat-icon"><i class="ph ph-target"></i></div>
+            <div class="stat-card info stat-card-clickable" data-headcount="required" onclick="AppController.view._showHeadcountBreakdownDrilldown('required')">
+                <div class="stat-icon">
+                    <i class="ph ph-target"></i>
+                </div>
                 <div class="stat-content">
                     <span class="stat-label">Required</span>
                     <span class="stat-value">${requiredCount}</span>
@@ -587,9 +620,7 @@ class AttendanceView {
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
             </div>
-            <div class="stat-card ${gapCount > 0 ? "danger" : "success"} stat-card-clickable"
-                data-headcount="gap"
-                onclick="AppController.view._showHeadcountBreakdownDrilldown('gap')">
+            <div class="stat-card ${gapCount > 0 ? "danger" : "success"} stat-card-clickable" data-headcount="gap" onclick="AppController.view._showHeadcountBreakdownDrilldown('gap')">
                 <div class="stat-icon"><i class="ph ${gapCount > 0 ? "ph-warning" : "ph-check-circle"}"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">Gap</span>
@@ -602,11 +633,7 @@ class AttendanceView {
         this._currentCompanyData = { emps, model, dayLogs, empMap, isDashboard: true, };
 
         const categoryOrder = ["ON-ROLL", "CC", "CONTRACTOR"];
-        const categoryLabels = {
-            "ON-ROLL": "ON-ROLL",
-            "CC": "COMPANY CONTRACT (CC)",
-            "CONTRACTOR": "CONTRACTOR",
-        };
+        const categoryLabels = { "ON-ROLL": "ON-ROLL", "CC": "COMPANY CONTRACT (CC)", "CONTRACTOR": "CONTRACTOR", };
         const compColorCls = ["info", "success", "warning", "accent", "danger"];
 
         const mergeCat = (rawCat) => {
@@ -648,9 +675,7 @@ class AttendanceView {
             }
 
             return `
-                <div class="stat-card ${compColorCls[i % compColorCls.length]} stat-card-clickable"
-                    data-company-category="${cat}"
-                    onclick="AppController.view._showCompanyCategoryDrilldown('${cat}')">
+                <div class="stat-card ${compColorCls[i % compColorCls.length]} stat-card-clickable" data-company-category="${cat}" onclick="AppController.view._showCompanyCategoryDrilldown('${cat}')">
                     ${topLabel}
                     <div class="stat-icon"><i class="ph ph-buildings"></i></div>
                     <div class="stat-content">
@@ -677,9 +702,7 @@ class AttendanceView {
         });
 
         const genderCards = `
-            <div class="stat-card info stat-card-clickable"
-                data-gender="Male"
-                onclick="AppController.view._showGenderSummaryDrilldown('Male')">
+            <div class="stat-card info stat-card-clickable" data-gender="Male" onclick="AppController.view._showGenderSummaryDrilldown('Male')">
                 <div class="stat-icon"><i class="ph ph-gender-male"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">Male</span>
@@ -687,9 +710,7 @@ class AttendanceView {
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
             </div>
-            <div class="stat-card accent stat-card-clickable"
-                data-gender="Female"
-                onclick="AppController.view._showGenderSummaryDrilldown('Female')">
+            <div class="stat-card accent stat-card-clickable" data-gender="Female" onclick="AppController.view._showGenderSummaryDrilldown('Female')">
                 <div class="stat-icon"><i class="ph ph-gender-female"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">Female</span>
@@ -721,8 +742,7 @@ class AttendanceView {
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
             </div>
-            <div class="stat-card danger stat-card-clickable"
-                data-card-key="unassignedList">
+            <div class="stat-card danger stat-card-clickable" data-card-key="unassignedList">
                 <div class="stat-icon">
                     <i class="ph ph-warning-circle"></i>
                 </div>
@@ -762,9 +782,7 @@ class AttendanceView {
             if (ageCounts[g] !== undefined) ageCounts[g]++;
         });
         const ageCards = ageGroups.map((g) => `
-            <div class="stat-card ${ageGroupCls[g]} stat-card-clickable"
-                data-age-group="${this._escapeAttr(g)}"
-                onclick="AppController.view._showAgeGroupDrilldown('${this._escapeAttr(g)}')">
+            <div class="stat-card ${ageGroupCls[g]} stat-card-clickable" data-age-group="${this._escapeAttr(g)}" onclick="AppController.view._showAgeGroupDrilldown('${this._escapeAttr(g)}')">
                 <div class="stat-icon">
                     <span class="material-symbols-outlined">
                         ${ageGroupIcons[g]}
@@ -788,9 +806,7 @@ class AttendanceView {
         });
         const dashDeptColorCls = ["info", "success", "warning", "accent", "danger"];
         const dashDeptCards = dashDepts.map((d, i) => `
-            <div class="stat-card ${dashDeptColorCls[i % dashDeptColorCls.length]} stat-card-clickable"
-                data-dashboard-dept="${this._escapeAttr(d)}"
-                onclick="AppController.view._showDashboardDeptDrilldown('${this._escapeAttr(d)}')">
+            <div class="stat-card ${dashDeptColorCls[i % dashDeptColorCls.length]} stat-card-clickable" data-dashboard-dept="${this._escapeAttr(d)}" onclick="AppController.view._showDashboardDeptDrilldown('${this._escapeAttr(d)}')">
                 <div class="stat-icon"><i class="ph ph-briefcase"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">${d}</span>
@@ -877,9 +893,7 @@ class AttendanceView {
         console.log("Raw Logs :", logs.length);
         console.log("Day Logs :", dayLogs.length);
 
-        const uniqueEmpDate = new Set(
-            dayLogs.map(l => `${l.empId}_${l.date}`)
-        );
+        const uniqueEmpDate = new Set(dayLogs.map(l => `${l.empId}_${l.date}`));
 
         console.log("Unique Employee-Date :", uniqueEmpDate.size);
         console.log("Duplicate Employee-Date :", dayLogs.length - uniqueEmpDate.size);
@@ -937,18 +951,6 @@ class AttendanceView {
             if (counts[g] !== undefined) counts[g]++;
         });
 
-        console.table(debugStatusCounts);
-
-        console.log(
-            "Status Total :",
-            debugStatusCounts.present +
-            debugStatusCounts.halfPresent +
-            debugStatusCounts.woPresent +
-            debugStatusCounts.woHalfPresent +
-            debugStatusCounts.weeklyOff +
-            debugStatusCounts.absent
-        );
-
         const totalPresentHalf = groups.reduce((sum, g) => sum + counts[g], 0);
 
         const cards = [
@@ -965,8 +967,7 @@ class AttendanceView {
                         ${c.key === "presentHeadcount" ? `data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()"` : ""}
                         ${c.ageGroup ? `data-age-group="${this._escapeAttr(c.ageGroup)}" onclick="AppController.view._showAgeGroupDrilldown('${this._escapeAttr(c.ageGroup)}')"` : ""}>
                         <div class="stat-icon">
-                            ${c.ageGroup ? `<span class="material-symbols-outlined">${c.icon}</span>` : `<i class="ph ${c.icon}"></i>`
-            }
+                            ${c.ageGroup ? `<span class="material-symbols-outlined">${c.icon}</span>` : `<i class="ph ${c.icon}"></i>`}
                         </div>
                         <div class="stat-content" style="align-items:center; text-align:center;">
                             <span class="stat-label">${c.label}</span>
@@ -990,11 +991,7 @@ class AttendanceView {
         this._currentDesigFamilySummaryData = { emps, model, dayLogs, empMap, famMap, families };
 
         this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
-            this._matchesStatus(l, "Present") ||
-            this._matchesStatus(l, "Half Present") ||
-            this._matchesStatus(l, "WO Present") ||
-            this._matchesStatus(l, "WO Half Present") ||
-            this._matchesStatus(l, "Single Punch")
+            this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch")
         ).map((l) => ({
             log: l,
             emp: empMap[l.empId],
@@ -1046,9 +1043,7 @@ class AttendanceView {
                 ${cards.map((c) => {
             if (c.type === "family") {
                 return `
-                    <div class="stat-card ${c.cls} stat-card-clickable"
-                        data-family-id="${c.familyId}"
-                        onclick="AppController.view._showDesignationFamilyDrilldown(${c.familyId})">
+                    <div class="stat-card ${c.cls} stat-card-clickable" data-family-id="${c.familyId}" onclick="AppController.view._showDesignationFamilyDrilldown(${c.familyId})">
                         <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                         <div class="stat-content">
                             <span class="stat-label">${c.label}</span>
@@ -1061,22 +1056,26 @@ class AttendanceView {
             if (c.type === "avgHours") {
                 return `
                     <div class="stat-card">
-                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                            <div class="stat-content">
-                                <span class="stat-label">${c.label}</span>
-                                <span class="stat-value">${c.val}</span>
-                            </div>
+                        <div class="stat-icon"><i class="ph ${c.icon}">
+                            </i>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-label">${c.label}</span>
+                            <span class="stat-value">${c.val}</span>
+                        </div>
                     </div>
                 `;
             }
             return `
                 <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
-                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                        <div class="stat-content">
-                            <span class="stat-label">${c.label}</span>
-                            <span class="stat-value">${c.val}</span>
-                            <span class="stat-card-hint">↓ click to view</span>
-                        </div>
+                    <div class="stat-icon"><i class="ph ${c.icon}">
+                        </i>
+                    </div>
+                    <div class="stat-content">
+                        <span class="stat-label">${c.label}</span>
+                        <span class="stat-value">${c.val}</span>
+                        <span class="stat-card-hint">↓ click to view</span>
+                    </div>
                 </div>
             `;
         }).join("")}
@@ -1091,11 +1090,7 @@ class AttendanceView {
         this._currentCompanyData = { emps, model, dayLogs, empMap };
 
         const sectionLabel = (text) => `
-            <div style="
-                font-size:10px;font-weight:700;text-transform:uppercase;
-                letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px;
-                display:flex;align-items:center;gap:8px;
-            ">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase; letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px; display:flex;align-items:center;gap:8px;">
                 ${text}
                 <span style="flex:1;height:1px;background:#e5e7eb;display:block;"></span>
             </div>
@@ -1116,11 +1111,7 @@ class AttendanceView {
         const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) + (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0) + (stats.singlePunch || 0);
 
         this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
-            this._matchesStatus(l, "Present") ||
-            this._matchesStatus(l, "Half Present") ||
-            this._matchesStatus(l, "WO Present") ||
-            this._matchesStatus(l, "WO Half Present") ||
-            this._matchesStatus(l, "Single Punch")
+            this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch")
         ).map((l) => ({
             log: l,
             emp: empMap[l.empId],
@@ -1151,11 +1142,7 @@ class AttendanceView {
         this._currentCompanyData = { emps, model, dayLogs, empMap };
 
         const sectionLabelCS = (text) => `
-            <div style="
-                font-size:10px;font-weight:700;text-transform:uppercase;
-                letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px;
-                display:flex;align-items:center;gap:8px;
-            ">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase; letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px; display:flex;align-items:center;gap:8px;">
                 ${text}
                 <span style="flex:1;height:1px;background:#e5e7eb;display:block;"></span>
             </div>
@@ -1207,9 +1194,7 @@ class AttendanceView {
             const catPresentTotal = companyNames.reduce((sum, c) => sum + (counts[c] || 0), 0);
 
             return `
-                <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
-                    data-company-category="${cat}"
-                    onclick="AppController.view._showCompanyCategoryDrilldown('${cat}')">
+                <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable" data-company-category="${cat}" onclick="AppController.view._showCompanyCategoryDrilldown('${cat}')">
                     ${topLabel}
                     <div class="stat-icon"><i class="ph ph-buildings"></i></div>
                     <div class="stat-content">
@@ -1255,12 +1240,8 @@ class AttendanceView {
         // const totalPresentHalf = depts.reduce((sum, d) => sum + counts[d], 0);
         const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) + (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0) + (stats.singlePunch || 0);
 
-        this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
-            this._matchesStatus(l, "Present") ||
-            this._matchesStatus(l, "Half Present") ||
-            this._matchesStatus(l, "WO Present") ||
-            this._matchesStatus(l, "WO Half Present") ||
-            this._matchesStatus(l, "Single Punch")
+        this._currentTabPresentHeadcountItems = dayLogs.filter((l) => 
+            this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch")
         ).map((l) => ({
             log: l,
             emp: empMap[l.empId],
@@ -1276,46 +1257,48 @@ class AttendanceView {
         return `
             <div class="summary-grid">
                 ${cards.map((c) => {
-            if (c.type === "dept") {
-                return `
-                    <div class="stat-card ${c.cls} stat-card-clickable"
-                        data-dept="${this._escapeAttr(c.dept)}"
-                        onclick="AppController.view._showDeptSummaryDrilldown('${this._escapeAttr(c.dept)}')">
-                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                        <div class="stat-content">
-                            <span class="stat-label">${c.label}</span>
-                            <span class="stat-value">${c.val}</span>
-                            <span class="stat-card-hint">↓ click to view</span>
+                    if (c.type === "dept") {
+                        return `
+                            <div class="stat-card ${c.cls} stat-card-clickable" data-dept="${this._escapeAttr(c.dept)}" onclick="AppController.view._showDeptSummaryDrilldown('${this._escapeAttr(c.dept)}')">
+                                <div class="stat-icon"><i class="ph ${c.icon}">
+                                    </i>
+                                </div>
+                                <div class="stat-content">
+                                    <span class="stat-label">${c.label}</span>
+                                    <span class="stat-value">${c.val}</span>
+                                    <span class="stat-card-hint">↓ click to view</span>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    if (c.type === "avgHours") {
+                        return `
+                            <div class="stat-card">
+                                <div class="stat-icon">
+                                    <i class="ph ${c.icon}"></i>
+                                </div>
+                                <div class="stat-content">
+                                    <span class="stat-label">${c.label}</span>
+                                    <span class="stat-value">${c.val}</span>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    // headcount
+                    return `
+                        <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
+                            <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                            <div class="stat-content">
+                                <span class="stat-label">${c.label}</span>
+                                <span class="stat-value">${c.val}</span>
+                                <span class="stat-card-hint">↓ click to view</span>
+                            </div>
                         </div>
-                    </div>
-                `;
-            }
-            if (c.type === "avgHours") {
-                return `
-                    <div class="stat-card">
-                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                        <div class="stat-content">
-                            <span class="stat-label">${c.label}</span>
-                            <span class="stat-value">${c.val}</span>
-                        </div>
-                    </div>
-                `;
-            }
-            // headcount
-            return `
-                <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
-                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                    <div class="stat-content">
-                        <span class="stat-label">${c.label}</span>
-                        <span class="stat-value">${c.val}</span>
-                        <span class="stat-card-hint">↓ click to view</span>
-                    </div>
-                </div>
-            `;
-            }).join("")}
-        </div>
-    `;
-}
+                    `;  
+                }).join("")}
+            </div>
+        `;
+    }
 
     _renderGenderSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
@@ -1349,42 +1332,42 @@ class AttendanceView {
         return `
             <div class="summary-grid">
                 ${cards.map((c) => {
-            if (c.type === "gender") {
-                return `
-                    <div class="stat-card ${c.cls} stat-card-clickable"
-                        data-gender="${this._escapeAttr(c.gender)}"
-                        onclick="AppController.view._showGenderSummaryDrilldown('${this._escapeAttr(c.gender)}')">
-                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                        <div class="stat-content">
-                            <span class="stat-label">${c.label}</span>
-                            <span class="stat-value">${c.val}</span>
-                            <span class="stat-card-hint">↓ click to view</span>
+                    if (c.type === "gender") {
+                        return `
+                            <div class="stat-card ${c.cls} stat-card-clickable" data-gender="${this._escapeAttr(c.gender)}" onclick="AppController.view._showGenderSummaryDrilldown('${this._escapeAttr(c.gender)}')">
+                                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                                <div class="stat-content">
+                                    <span class="stat-label">${c.label}</span>
+                                    <span class="stat-value">${c.val}</span>
+                                    <span class="stat-card-hint">↓ click to view</span>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    if (c.type === "avgHours") {
+                        return `
+                            <div class="stat-card">
+                                <div class="stat-icon"><i class="ph ${c.icon}">
+                                    </i>
+                                </div>
+                                <div class="stat-content">
+                                    <span class="stat-label">${c.label}</span>
+                                    <span class="stat-value">${c.val}</span>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    return `
+                        <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
+                            <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                                <div class="stat-content">
+                                    <span class="stat-label">${c.label}</span>
+                                    <span class="stat-value">${c.val}</span>
+                                    <span class="stat-card-hint">↓ click to view</span>
+                                </div>
                         </div>
-                    </div>
-                `;
-            }
-            if (c.type === "avgHours") {
-                return `
-                    <div class="stat-card">
-                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                            <div class="stat-content">
-                                <span class="stat-label">${c.label}</span>
-                                <span class="stat-value">${c.val}</span>
-                        </div>
-                    </div>
-                `;
-            }
-            return `
-                <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
-                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                        <div class="stat-content">
-                            <span class="stat-label">${c.label}</span>
-                            <span class="stat-value">${c.val}</span>
-                            <span class="stat-card-hint">↓ click to view</span>
-                        </div>
-                </div>
-            `;
-        }).join("")}
+                    `;
+                }).join("")}
             </div>
         `;
     }
@@ -1395,11 +1378,7 @@ class AttendanceView {
         const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo,);
 
         this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
-            this._matchesStatus(l, "Present") ||
-            this._matchesStatus(l, "Half Present") ||
-            this._matchesStatus(l, "WO Present") ||
-            this._matchesStatus(l, "WO Half Present") ||
-            this._matchesStatus(l, "Single Punch")
+            this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch")
         ).map((l) => ({
             log: l,
             emp: empMap[l.empId],
@@ -1417,8 +1396,7 @@ class AttendanceView {
         return `
             <div class="summary-grid">
                 ${cards.map((c) => `
-                    <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
-                        ${c.key ? `data-card-key="${c.key}"` : ""}>
+                    <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}" ${c.key === "presentHeadcount" ? `data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()"` : c.key ? `data-card-key="${c.key}"` : ""}>
                         <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                         <div class="stat-content">
                             <span class="stat-label">${c.label}</span>
@@ -1435,7 +1413,7 @@ class AttendanceView {
     _renderEarlyOutSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
         const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
-        const totalPresentHalf = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present")).length;
+        const totalPresentHalf = this._currentTabPresentHeadcountItems.length;
 
         const cards = [
             { key: "presentHeadcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
@@ -1446,8 +1424,7 @@ class AttendanceView {
         return `
             <div class="summary-grid">
                 ${cards.map((c) => `
-                    <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
-                        ${c.key ? `data-card-key="${c.key}"` : ""}>
+                    <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}" ${c.key === "presentHeadcount" ? `data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()"` : c.key ? `data-card-key="${c.key}"` : ""}>
                         <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                         <div class="stat-content">
                             <span class="stat-label">${c.label}</span>
@@ -1491,11 +1468,7 @@ class AttendanceView {
         const resEmps = resignedItems.map((it) => it.emp);
 
         const sectionLabel = (text) => `
-            <div style="
-                font-size:10px;font-weight:700;text-transform:uppercase;
-                letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px;
-                display:flex;align-items:center;gap:8px;
-            ">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase; letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px; display:flex;align-items:center;gap:8px;">
                 ${text}
                 <span style="flex:1;height:1px;background:#e5e7eb;display:block;"></span>
             </div>
@@ -1519,9 +1492,7 @@ class AttendanceView {
             if (companyCounts[e.company] !== undefined) companyCounts[e.company]++;
         });
         const companyCards = companies.map((c, i) => `
-            <div class="stat-card ${compColorCls[i % compColorCls.length]} stat-card-clickable"
-                data-res-company="${this._escapeAttr(c)}"
-                onclick="AppController.view._showResignedBreakdownDrilldown('company', '${this._escapeAttr(c)}')">
+            <div class="stat-card ${compColorCls[i % compColorCls.length]} stat-card-clickable" data-res-company="${this._escapeAttr(c)}" onclick="AppController.view._showResignedBreakdownDrilldown('company', '${this._escapeAttr(c)}')">
                 <div class="stat-icon"><i class="ph ph-buildings"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">${c}</span>
@@ -1537,9 +1508,7 @@ class AttendanceView {
             if (genderCounts[e.gender] !== undefined) genderCounts[e.gender]++;
         });
         const genderCards = `
-            <div class="stat-card info stat-card-clickable"
-                data-res-gender="Male"
-                onclick="AppController.view._showResignedBreakdownDrilldown('gender', 'Male')">
+            <div class="stat-card info stat-card-clickable" data-res-gender="Male" onclick="AppController.view._showResignedBreakdownDrilldown('gender', 'Male')">
                 <div class="stat-icon"><i class="ph ph-gender-male"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">Male</span>
@@ -1547,9 +1516,7 @@ class AttendanceView {
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
             </div>
-            <div class="stat-card accent stat-card-clickable"
-                data-res-gender="Female"
-                onclick="AppController.view._showResignedBreakdownDrilldown('gender', 'Female')">
+            <div class="stat-card accent stat-card-clickable" data-res-gender="Female" onclick="AppController.view._showResignedBreakdownDrilldown('gender', 'Female')">
                 <div class="stat-icon"><i class="ph ph-gender-female"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">Female</span>
@@ -1566,9 +1533,7 @@ class AttendanceView {
         const workerCount = resEmps.filter((e) => e.team === workerTeamId).length;
 
         const swCards = `
-            <div class="stat-card info stat-card-clickable"
-                data-res-workforce="Staff"
-                onclick="AppController.view._showResignedBreakdownDrilldown('workforce', 'Staff')">
+            <div class="stat-card info stat-card-clickable" data-res-workforce="Staff" onclick="AppController.view._showResignedBreakdownDrilldown('workforce', 'Staff')">
                 <div class="stat-icon"><i class="ph ph-identification-badge"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">Staff</span>
@@ -1711,11 +1676,7 @@ class AttendanceView {
         const njEmps = newJoinedItems.map((it) => it.emp);
 
         const sectionLabel = (text) => `
-            <div style="
-                font-size:10px;font-weight:700;text-transform:uppercase;
-                letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px;
-                display:flex;align-items:center;gap:8px;
-            ">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase; letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px; display:flex;align-items:center;gap:8px;">
                 ${text}
                 <span style="flex:1;height:1px;background:#e5e7eb;display:block;"></span>
             </div>
@@ -1740,9 +1701,7 @@ class AttendanceView {
             if (companyCounts[e.company] !== undefined) companyCounts[e.company]++;
         });
         const companyCards = companies.map((c, i) => `
-            <div class="stat-card ${compColorCls[i % compColorCls.length]} stat-card-clickable"
-                data-nj-company="${this._escapeAttr(c)}"
-                onclick="AppController.view._showNewJoinedBreakdownDrilldown('company', '${this._escapeAttr(c)}')">
+            <div class="stat-card ${compColorCls[i % compColorCls.length]} stat-card-clickable" data-nj-company="${this._escapeAttr(c)}" onclick="AppController.view._showNewJoinedBreakdownDrilldown('company', '${this._escapeAttr(c)}')">
                 <div class="stat-icon"><i class="ph ph-buildings"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">${c}</span>
@@ -1758,9 +1717,7 @@ class AttendanceView {
             if (genderCounts[e.gender] !== undefined) genderCounts[e.gender]++;
         });
         const genderCards = `
-            <div class="stat-card info stat-card-clickable"
-                data-nj-gender="Male"
-                onclick="AppController.view._showNewJoinedBreakdownDrilldown('gender', 'Male')">
+            <div class="stat-card info stat-card-clickable" data-nj-gender="Male" onclick="AppController.view._showNewJoinedBreakdownDrilldown('gender', 'Male')">
                 <div class="stat-icon"><i class="ph ph-gender-male"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">Male</span>
@@ -1768,9 +1725,7 @@ class AttendanceView {
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
             </div>
-            <div class="stat-card accent stat-card-clickable"
-                data-nj-gender="Female"
-                onclick="AppController.view._showNewJoinedBreakdownDrilldown('gender', 'Female')">
+            <div class="stat-card accent stat-card-clickable" data-nj-gender="Female" onclick="AppController.view._showNewJoinedBreakdownDrilldown('gender', 'Female')">
                 <div class="stat-icon"><i class="ph ph-gender-female"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">Female</span>
@@ -1787,9 +1742,7 @@ class AttendanceView {
         const workerCount = njEmps.filter((e) => e.team === workerTeamId).length;
 
         const swCards = `
-            <div class="stat-card info stat-card-clickable"
-                data-nj-workforce="Staff"
-                onclick="AppController.view._showNewJoinedBreakdownDrilldown('workforce', 'Staff')">
+            <div class="stat-card info stat-card-clickable" data-nj-workforce="Staff" onclick="AppController.view._showNewJoinedBreakdownDrilldown('workforce', 'Staff')">
                 <div class="stat-icon"><i class="ph ph-identification-badge"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">Staff</span>
@@ -1797,9 +1750,7 @@ class AttendanceView {
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
             </div>
-            <div class="stat-card warning stat-card-clickable"
-                data-nj-workforce="Workmen"
-                onclick="AppController.view._showNewJoinedBreakdownDrilldown('workforce', 'Workmen')">
+            <div class="stat-card warning stat-card-clickable" data-nj-workforce="Workmen" onclick="AppController.view._showNewJoinedBreakdownDrilldown('workforce', 'Workmen')">
                 <div class="stat-icon"><i class="ph ph-hard-hat"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">Workmen</span>
@@ -1836,9 +1787,7 @@ class AttendanceView {
             if (ageCounts[g] !== undefined) ageCounts[g]++;
         });
         const ageCards = ageGroups.map((g) => `
-            <div class="stat-card ${ageGroupCls[g]} stat-card-clickable"
-                data-nj-age="${this._escapeAttr(g)}"
-                onclick="AppController.view._showNewJoinedBreakdownDrilldown('age', '${this._escapeAttr(g)}')">
+            <div class="stat-card ${ageGroupCls[g]} stat-card-clickable" data-nj-age="${this._escapeAttr(g)}" onclick="AppController.view._showNewJoinedBreakdownDrilldown('age', '${this._escapeAttr(g)}')">
                 <div class="stat-icon"><i class="ph ${ageGroupIcons[g]}"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">${g}</span>
@@ -1859,9 +1808,7 @@ class AttendanceView {
         this._currentNewJoinedDeptData = { njEmps };
 
         const njDeptCards = njDepts.map((d, i) => `
-            <div class="stat-card ${njDeptColorCls[i % njDeptColorCls.length]} stat-card-clickable"
-                data-newjoined-dept="${this._escapeAttr(d)}"
-                onclick="AppController.view._showNewJoinedDeptDrilldown('${this._escapeAttr(d)}')">
+            <div class="stat-card ${njDeptColorCls[i % njDeptColorCls.length]} stat-card-clickable" data-newjoined-dept="${this._escapeAttr(d)}" onclick="AppController.view._showNewJoinedDeptDrilldown('${this._escapeAttr(d)}')">
                 <div class="stat-icon"><i class="ph ph-briefcase"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">${d}</span>
@@ -1914,23 +1861,14 @@ class AttendanceView {
         shifts.forEach((s) => (counts[s] = 0));
 
         dayLogs.forEach((l) => {
-            const isPresentOrHalf =
-                this._matchesStatus(l, "Present") ||
-                this._matchesStatus(l, "Half Present") ||
-                this._matchesStatus(l, "WO Present") ||
-                this._matchesStatus(l, "WO Half Present") ||
-                this._matchesStatus(l, "Single Punch");
+            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch");
             if (!isPresentOrHalf) return;
             const s = l.shiftName || "No Shift";
             if (counts[s] !== undefined) counts[s]++;
         });
 
         this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
-            this._matchesStatus(l, "Present") ||
-            this._matchesStatus(l, "Half Present") ||
-            this._matchesStatus(l, "WO Present") ||
-            this._matchesStatus(l, "WO Half Present") ||
-            this._matchesStatus(l, "Single Punch")
+            this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch")
         ).map((l) => ({
             log: l,
             emp: empMap[l.empId],
@@ -1957,9 +1895,7 @@ class AttendanceView {
                 ${cards.map((c) => {
                     if (c.type === "shift") {
                         return `
-                            <div class="stat-card ${c.cls} stat-card-clickable"
-                                data-shift="${this._escapeAttr(c.shift)}"
-                                onclick="AppController.view._showShiftSummaryDrilldown('${this._escapeAttr(c.shift)}')">
+                            <div class="stat-card ${c.cls} stat-card-clickable" data-shift="${this._escapeAttr(c.shift)}" onclick="AppController.view._showShiftSummaryDrilldown('${this._escapeAttr(c.shift)}')">
                                 <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                                 <div class="stat-content">
                                     <span class="stat-label">${c.label}</span>
@@ -2004,9 +1940,7 @@ class AttendanceView {
         const colorCls = ["info", "success", "warning", "accent", "danger"];
 
         const totalCard = `
-            <div class="stat-card warning stat-card-clickable"
-                data-mp-total="all"
-                onclick="AppController.view._showManualPunchShiftDrilldown(null)">
+            <div class="stat-card warning stat-card-clickable" data-mp-total="all" onclick="AppController.view._showManualPunchShiftDrilldown(null)">
                 <div class="stat-icon"><i class="ph ph-pencil-simple"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">Total Manual Punches</span>
@@ -2017,9 +1951,7 @@ class AttendanceView {
         `;
 
         const shiftCards = shiftMP.map((s, i) => `
-            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
-                data-mp-shift="${this._escapeAttr(s.shiftName)}"
-                onclick="AppController.view._showManualPunchShiftDrilldown('${this._escapeAttr(s.shiftName)}')">
+            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable" data-mp-shift="${this._escapeAttr(s.shiftName)}" onclick="AppController.view._showManualPunchShiftDrilldown('${this._escapeAttr(s.shiftName)}')">
                 <div class="stat-icon"><i class="ph ph-clock-clockwise"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">${s.shiftName}</span>
@@ -2034,8 +1966,7 @@ class AttendanceView {
 
 
     _showManualPunchShiftDrilldown(shiftName) {
-        document.querySelectorAll(".stat-card-clickable[data-mp-shift],.stat-card-clickable[data-mp-total]")
-            .forEach(c => c.classList.remove("active"));
+        document.querySelectorAll(".stat-card-clickable[data-mp-shift],.stat-card-clickable[data-mp-total]").forEach(c => c.classList.remove("active"));
 
         const card = shiftName
             ? this.app.querySelector(`.stat-card-clickable[data-mp-shift="${shiftName}"]`)
@@ -2076,11 +2007,7 @@ class AttendanceView {
         });
 
         this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
-            this._matchesStatus(l, "Present") || 
-            this._matchesStatus(l, "Half Present") ||
-            this._matchesStatus(l, "WO Present") || 
-            this._matchesStatus(l, "WO Half Present") ||
-            this._matchesStatus(l, "Single Punch")
+            this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch")
         ).map((l) => ({ log: l, emp: nEmpMap[l.empId], date: l.date }));
 
         const totalPresentHalf = this._currentTabPresentHeadcountItems.length;
@@ -2096,9 +2023,7 @@ class AttendanceView {
                 ${cards.map((c) => {
             if (c.type === "shift") {
                 return `
-                    <div class="stat-card ${c.cls} stat-card-clickable"
-                        data-night-shift="${this._escapeAttr(c.shift)}"
-                        onclick="AppController.view._showNightSummaryDrilldown('${this._escapeAttr(c.shift)}')">
+                    <div class="stat-card ${c.cls} stat-card-clickable" data-night-shift="${this._escapeAttr(c.shift)}" onclick="AppController.view._showNightSummaryDrilldown('${this._escapeAttr(c.shift)}')">
                         <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                         <div class="stat-content">
                             <span class="stat-label">${c.label}</span>
@@ -2179,11 +2104,7 @@ class AttendanceView {
         const totalPresentHalf = depts.reduce((sum, d) => sum + counts[d], 0);
 
         this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
-            this._matchesStatus(l, "Present") ||
-            this._matchesStatus(l, "Half Present") ||
-            this._matchesStatus(l, "WO Present") ||
-            this._matchesStatus(l, "WO Half Present") ||
-            this._matchesStatus(l, "Single Punch")
+            this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch")
         ).map((l) => ({
             log: l,
             emp: empMap[l.empId],
@@ -2201,9 +2122,7 @@ class AttendanceView {
                 ${cards.map((c) => {
             if (c.type === "dept") {
                 return `
-                    <div class="stat-card ${c.cls} stat-card-clickable"
-                        data-staff-dept="${this._escapeAttr(c.dept)}"
-                        onclick="AppController.view._showStaffSummaryDrilldown('${this._escapeAttr(c.dept)}')">
+                    <div class="stat-card ${c.cls} stat-card-clickable" data-staff-dept="${this._escapeAttr(c.dept)}" onclick="AppController.view._showStaffSummaryDrilldown('${this._escapeAttr(c.dept)}')">
                         <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                         <div class="stat-content">
                             <span class="stat-label">${c.label}</span>
@@ -2264,11 +2183,7 @@ class AttendanceView {
         });
 
         this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
-            this._matchesStatus(l, "Present") ||
-            this._matchesStatus(l, "Half Present") ||
-            this._matchesStatus(l, "WO Present") ||
-            this._matchesStatus(l, "WO Half Present") ||
-            this._matchesStatus(l, "Single Punch")
+            this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch")
         ).map((l) => ({
             log: l,
             emp: empMap[l.empId],
@@ -2288,9 +2203,7 @@ class AttendanceView {
                 ${cards.map((c) => {
             if (c.type === "dept") {
                 return `
-                    <div class="stat-card ${c.cls} stat-card-clickable"
-                        data-worker-dept="${this._escapeAttr(c.dept)}"
-                        onclick="AppController.view._showWorkerSummaryDrilldown('${this._escapeAttr(c.dept)}')">
+                    <div class="stat-card ${c.cls} stat-card-clickable" data-worker-dept="${this._escapeAttr(c.dept)}" onclick="AppController.view._showWorkerSummaryDrilldown('${this._escapeAttr(c.dept)}')">
                         <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                         <div class="stat-content">
                             <span class="stat-label">${c.label}</span>
@@ -2433,11 +2346,7 @@ class AttendanceView {
         const shiftLogs = dayLogs.filter((l) => {
             const e = empMap[l.empId];
             if (!e || (l.shiftName || "No Shift") !== shiftName) return false;
-            return this._matchesStatus(l, "Present") ||
-                this._matchesStatus(l, "Half Present") ||
-                this._matchesStatus(l, "WO Present") ||
-                this._matchesStatus(l, "WO Half Present") ||
-                this._matchesStatus(l, "Single Punch");
+            return this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch");
         });
 
         const items = shiftLogs.map((l) => ({
@@ -2478,6 +2387,8 @@ class AttendanceView {
             this._closeWorkforceLocationCards();   
             this._closeAgeGroupLocationCards();    
             this._closeCompanyLocationCards();  
+            this._closeCategoryLocationCards();
+            this._closeCategoryCompanyCards();
             const scope = AppController.model.getLocationScope();
             if (!scope || scope.count <= 1) {
                 this._closeGenderLocationCards();
@@ -2492,7 +2403,7 @@ class AttendanceView {
         const items = data.dayLogs.filter((l) => {
             const e = data.empMap[l.empId];
             if (!e || e.gender !== gender) return false;
-            return (this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present"));
+            return (this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch"));
         }).map((l) => ({ log: l, emp: data.empMap[l.empId], date: l.date }));
 
         this._renderStatCardDrilldown("genderSummary_" + gender, items, 1);
@@ -2504,7 +2415,7 @@ class AttendanceView {
         if (!data) return;
         const genderEmps = data.emps.filter(e => e.gender === gender);
 
-        const locations = [...new Set(genderEmps.map(e => e.location || 'Unassigned'))];
+        const locations = AppController.model.sortLocations([...new Set(genderEmps.map(e => e.location || 'Unassigned'))]);
         const colorCls = ["info", "success", "warning", "accent", "danger"];
         const counts = {};
         locations.forEach(l => counts[l] = 0);
@@ -2513,9 +2424,7 @@ class AttendanceView {
         this._currentGenderLocationData = { gender, emps: genderEmps };
 
         const cardsHtml = locations.map((loc, i) => `
-            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
-                data-gender-location="${this._escapeAttr(loc)}"
-                onclick="AppController.view._showGenderLocationDrilldown('${this._escapeAttr(loc)}')">
+            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable" data-gender-location="${this._escapeAttr(loc)}" onclick="AppController.view._showGenderLocationDrilldown('${this._escapeAttr(loc)}')">
                 <div class="stat-icon"><i class="ph ph-map-pin"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">${this._escapeAttr(loc)}</span>
@@ -2681,6 +2590,8 @@ class AttendanceView {
         this._closeGenderLocationCards();      
         this._closeWorkforceLocationCards();   
         this._closeAgeGroupLocationCards();    
+        this._closeCategoryLocationCards();
+        this._closeCategoryCompanyCards();
 
         const data = this._currentCompanyData;
         if (!data) return;
@@ -2723,10 +2634,15 @@ class AttendanceView {
             return;
         }
 
+        const scope = isDashboard ? AppController.model.getLocationScope() : null;
+        if (scope && scope.count > 1) {
+            this._currentCategoryData = { category, catEmps };
+            this._showCategoryLocationCards(category, catEmps);
+            return;
+        }
+
         const cardsHtml = companies.map((c, i) => `
-            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
-                data-company="${this._escapeAttr(c)}"
-                onclick="AppController.view._showCompanySelected('${this._escapeAttr(c)}')">   
+            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable" data-company="${this._escapeAttr(c)}" onclick="AppController.view._showCompanySelected('${this._escapeAttr(c)}')">   
                 <div class="stat-icon"><i class="ph ph-buildings"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">${c}</span>
@@ -2755,6 +2671,132 @@ class AttendanceView {
         `;
 
         panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+
+    _showCategoryLocationCards(category, catEmps) {
+        const locations = AppController.model.sortLocations([...new Set(catEmps.map(e => e.location || 'Unassigned'))]);
+        const colorCls = ["info", "success", "warning", "accent", "danger"];
+
+        const counts = {};
+        locations.forEach(l => counts[l] = 0);
+
+        const locationCompanies = {};
+        locations.forEach(loc => {
+            locationCompanies[loc] = new Set();
+        });
+
+        catEmps.forEach(e => {
+            const loc = e.location || "Unassigned";
+            counts[loc]++;
+            locationCompanies[loc].add(e.company);
+        });
+
+        this._currentCategoryLocationData = { category, catEmps };
+
+        const cardsHtml = locations.map((loc, i) => `
+            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable" data-category-location="${this._escapeAttr(loc)}" onclick="AppController.view._showCategoryLocationSelected('${this._escapeAttr(loc)}')">
+                <div class="stat-icon"><i class="ph ph-map-pin"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">${this._escapeAttr(loc)}</span>
+                    <span class="stat-value">${counts[loc]}</span>
+                    <span style="font-size:12px;color:#64748b;">(${locationCompanies[loc].size} Companies)</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+        `).join("");
+
+        const categoryLabelsForDrilldown = { "ON-ROLL": "ON-ROLL", "CC": "COMPANY CONTRACT (CC)", "CONTRACTOR": "CONTRACTOR" };
+        const panel = document.getElementById("dashboard-company-category-drilldown") || document.getElementById("company-category-drilldown");
+        if (!panel) return;
+        panel.style.display = "block";
+        panel.innerHTML = `
+            <div style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#334155;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
+                ${categoryLabelsForDrilldown[category] || category} — BY LOCATION
+                <span style="flex:1;height:1px;background:#64748b;display:block;border-radius:2px;"></span>
+            </div>
+            <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                ${cardsHtml}
+            </div>
+            <div id="dashboard-category-company-drilldown" style="margin-top:8px;"></div>
+        `;
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+
+    _showCategoryLocationSelected(location) {
+        document.querySelectorAll("[data-category-location]").forEach(c => c.classList.remove("active"));
+        const card = this.app.querySelector(`[data-category-location="${location}"]`);
+        if (card) card.classList.add("active");
+        this._closeStatCardDrilldown();
+
+        const data = this._currentCategoryLocationData;
+        if (!data) return;
+        const { category, catEmps } = data;
+
+        const locEmps = catEmps.filter(e => (e.location || 'Unassigned') === location);
+        this._showCategoryCompanyCards(category, location, locEmps);
+    }
+
+
+    _showCategoryCompanyCards(category, location, locEmps) {
+        const companyCounts = {};
+        locEmps.forEach(e => { companyCounts[e.company] = (companyCounts[e.company] || 0) + 1; });
+        const companies = Object.keys(companyCounts);
+        const colorCls = ["info", "success", "warning", "accent", "danger"];
+
+        this._currentCategoryCompanyData = { category, location, locEmps };
+
+        const cardsHtml = companies.map((c, i) => `
+            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable" data-category-company="${this._escapeAttr(c)}" onclick="AppController.view._showCategoryCompanyDrilldown('${this._escapeAttr(c)}')">
+                <div class="stat-icon"><i class="ph ph-buildings"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">${this._escapeAttr(c)}</span>
+                    <span class="stat-value">${companyCounts[c]}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+        `).join("");
+
+        const panel = document.getElementById("dashboard-category-company-drilldown");
+        if (!panel) return;
+        panel.style.display = "block";
+        panel.innerHTML = `
+            <div style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#334155;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
+                ${this._escapeAttr(location)} — COMPANIES
+                <span style="flex:1;height:1px;background:#64748b;display:block;border-radius:2px;"></span>
+            </div>
+            <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                ${cardsHtml}
+            </div>
+        `;
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+
+    _showCategoryCompanyDrilldown(company) {
+        document.querySelectorAll("[data-category-company]").forEach(c => c.classList.remove("active"));
+        const card = this.app.querySelector(`[data-category-company="${company}"]`);
+        if (card) card.classList.add("active");
+
+        const data = this._currentCategoryCompanyData;
+        if (!data) return;
+        const { category, location, locEmps } = data;
+
+        const items = locEmps.filter(e => e.company === company).map(emp => ({ log: null, emp, date: null }));
+        this._renderStatCardDrilldown("categoryCompany_" + category + "_" + location + "_" + company, items, 1);
+    }
+
+
+    _closeCategoryLocationCards() {
+        document.querySelectorAll("[data-category-location]").forEach(c => c.classList.remove("active"));
+    }
+
+
+    _closeCategoryCompanyCards() {
+        const panel = document.getElementById("dashboard-category-company-drilldown");
+        if (panel) { panel.style.display = "none"; panel.innerHTML = ""; }
+        document.querySelectorAll("[data-category-company]").forEach(c => c.classList.remove("active"));
     }
 
 
@@ -2798,7 +2840,7 @@ class AttendanceView {
         const { emps } = data;
 
         const companyEmps = emps.filter((e) => e.company === company);
-        const locations = [...new Set(companyEmps.map((e) => e.location || "Unassigned"))];
+        const locations = AppController.model.sortLocations([...new Set(companyEmps.map((e) => e.location || "Unassigned"))]);
         const colorCls = ["info", "success", "warning", "accent", "danger"];
         const counts = {};
         locations.forEach((l) => (counts[l] = 0));
@@ -2905,7 +2947,7 @@ class AttendanceView {
         if (!data) return;
         const groupEmps = data.emps.filter(e => data.model.getAgeGroup(e.dob) === group);
 
-        const locations = [...new Set(groupEmps.map(e => e.location || 'Unassigned'))];
+        const locations = AppController.model.sortLocations([...new Set(groupEmps.map(e => e.location || 'Unassigned'))]);
         const colorCls = ["info", "success", "warning", "accent", "danger"];
         const counts = {};
         locations.forEach(l => counts[l] = 0);
@@ -2986,7 +3028,7 @@ class AttendanceView {
         if (!data) return;
         const { emps } = data;
 
-        const locations = [...new Set(emps.map(e => e.location || 'Unassigned'))];
+        const locations = AppController.model.sortLocations([...new Set(emps.map(e => e.location || 'Unassigned'))]);
         const colorCls = ["info", "success", "warning", "accent", "danger"];
         const counts = {};
         locations.forEach(l => counts[l] = 0);
@@ -3113,7 +3155,7 @@ class AttendanceView {
 
 
     _showDashboardDeptLocationCards(dept, deptEmps, empMap) {
-        const locations = [...new Set(deptEmps.map(e => e.location || 'Unassigned'))];
+        const locations = AppController.model.sortLocations([...new Set(deptEmps.map(e => e.location || 'Unassigned'))]);
         const colorCls = ["info", "success", "warning", "accent", "danger"];
         const counts = {};
         locations.forEach(l => counts[l] = 0);
@@ -3206,7 +3248,7 @@ class AttendanceView {
 
 
     _showFamilyLocationCards(familyId, famEmps) {
-        const locations = [...new Set(famEmps.map(e => e.location || 'Unassigned'))];
+        const locations = AppController.model.sortLocations([...new Set(famEmps.map(e => e.location || 'Unassigned'))]);
         const colorCls = ["info", "success", "warning", "accent", "danger"];
         const counts = {};
         locations.forEach(l => counts[l] = 0);
@@ -3632,6 +3674,21 @@ class AttendanceView {
                     `,
                 };
                 break;
+            case "dept_designation_mapping":
+                content = {
+                    html: `
+                        <div class="designation-order-container">
+                            <h2 class="section-title"><i class="ph-fill ph-map-trifold"></i> Department – Designation Mapping</h2>
+                            <div id="dept-designation-mapping-content">
+                                <div style="display:flex; align-items:center; gap:12px; padding:32px; color:#64748b;">
+                                    <div class="auth-spinner" style="width:24px; height:24px; border-width:2px; border-top-color:#6366f1;"></div>
+                                    <span>Loading mapping data...</span>
+                                </div>
+                            </div>
+                        </div>
+                    `,
+                };
+                break;            
             case "designation_families":
                 content = {
                     html: `
@@ -3673,6 +3730,10 @@ class AttendanceView {
         }
         if (tabId === "designation_families") {
             this._initDesignationFamiliesTab(model);
+            return;
+        }
+        if (tabId === "dept_designation_mapping") {
+            setTimeout(() => this._initDeptDesignationMappingTab(model), 50);
             return;
         }
 
@@ -3863,6 +3924,25 @@ class AttendanceView {
 
         XLSX.utils.book_append_sheet(wb, ws, "Report");
         XLSX.writeFile(wb, `${filename}.xlsx`);
+    }
+
+
+    downloadFullAvailableExcel() {
+        const exportData = this._fullAvailableItems.map(({ log, emp, date }) => ({
+            Code: emp?.code,
+            Name: emp?.name,
+            Dept: emp?.dept,
+            Company: emp?.company,
+            Designation: emp?.designation,
+            TeamName: emp?.teamName,
+            shiftGroupName: emp?.shiftGroupName,
+            Shift: emp?.shift,
+            ShiftStart: emp?.shiftStart || "",
+            ShiftEnd: emp?.shiftEnd || "",
+            Location: emp?.location || ""
+        }));
+
+        this.exportExcel(exportData, "available-all-locations");
     }
 
 
@@ -7082,12 +7162,15 @@ class AttendanceView {
 						<small>${items.length} records</small>
 					</div>
 					<div class="drilldown-btn-group">
-						<button class="btn-drill btn-drill-excel"
-							onclick="AppController.view.exportExcel(AppController.view._statCardExportData, '${key}-employees')">
+						<button class="btn-drill btn-drill-excel" onclick="AppController.view.exportExcel(AppController.view._statCardExportData, '${key}-employees')">
 							↓ Excel
 						</button>
-						<button class="btn-drill btn-drill-back"
-                            onclick="${closeHandler}">
+                        ${key.startsWith("availableLocation_") ? `
+                            <button class="btn-drill btn-drill-excel" onclick="AppController.view.downloadFullAvailableExcel()">
+                                ↓ Full Excel
+                            </button>
+                        ` : ""}
+						<button class="btn-drill btn-drill-back" onclick="${closeHandler}">
                             ✕ Close
                         </button>
 					</div>
@@ -7517,7 +7600,7 @@ class AttendanceView {
 
         const companies = compRes.data || [];
         const departments = deptRes.data || [];
-        
+
         const designations = desigRes.data || [];
 
         contentEl.innerHTML = `
@@ -7555,7 +7638,7 @@ class AttendanceView {
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
-                    margin-bottom: 20px;
+                    margin-bottom: 16px;
                     padding-bottom: 16px;
                     border-bottom: 1px solid var(--border-color);
                 }
@@ -7569,6 +7652,49 @@ class AttendanceView {
                     color: var(--text-muted);
                     margin-top: 2px;
                 }
+                .sort-order-toolbar {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    margin-bottom: 16px;
+                    flex-wrap: wrap;
+                }
+                .sort-order-search {
+                    flex: 1 1 200px;
+                    padding: 9px 14px;
+                    border: 1px solid #cbd5e1;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    color: #0f172a;
+                    outline: none;
+                    transition: border-color 0.15s, box-shadow 0.15s;
+                }
+                .sort-order-search::placeholder { color: #94a3b8; }
+                .sort-order-search:focus {
+                    border-color: var(--primary);
+                    box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+                }
+                .sort-order-toolbar-actions {
+                    display: flex;
+                    gap: 8px;
+                    flex-shrink: 0;
+                }
+                .btn-order-sort {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    padding: 9px 16px;
+                    border-radius: 8px;
+                    border: 1px solid #cbd5e1;
+                    background: var(--white);
+                    color: #334155;
+                    font-size: 13px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: background 0.15s, border-color 0.15s;
+                    white-space: nowrap;
+                }
+                .btn-order-sort:hover { background: #f1f5f9; border-color: #94a3b8; }
                 .sort-order-item {
                     display: flex;
                     align-items: center;
@@ -7667,9 +7793,17 @@ class AttendanceView {
                             <h3>Company Sort Order</h3>
                             <p>Set priority order for companies. Lower number = appears first. Leave blank for alphabetical.</p>
                         </div>
-                        <button class="btn-order-save" id="btn-save-companies">
-                            <i class="ph-bold ph-floppy-disk"></i> Save
-                        </button>
+                    </div>
+                    <div class="sort-order-toolbar">
+                        <input type="text" class="sort-order-search" id="search-companies" placeholder="Search companies...">
+                        <div class="sort-order-toolbar-actions">
+                            <button class="btn-order-sort" id="btn-sort-companies" type="button">
+                                <i class="ph-bold ph-sort-ascending"></i> Sort
+                            </button>
+                            <button class="btn-order-save" id="btn-save-companies" type="button">
+                                <i class="ph-bold ph-floppy-disk"></i> Save
+                            </button>
+                        </div>
                     </div>
                     <div id="companies-list">
                         ${companies.map((c) => `
@@ -7706,9 +7840,17 @@ class AttendanceView {
                             <h3>Department Sort Order</h3>
                             <p>Set priority order for departments. Lower number = appears first. Leave blank for alphabetical.</p>
                         </div>
-                        <button class="btn-order-save" id="btn-save-departments">
-                            <i class="ph-bold ph-floppy-disk"></i> Save
-                        </button>
+                    </div>
+                    <div class="sort-order-toolbar">
+                        <input type="text" class="sort-order-search" id="search-departments" placeholder="Search departments...">
+                        <div class="sort-order-toolbar-actions">
+                            <button class="btn-order-sort" id="btn-sort-departments" type="button">
+                                <i class="ph-bold ph-sort-ascending"></i> Sort
+                            </button>
+                            <button class="btn-order-save" id="btn-save-departments" type="button">
+                                <i class="ph-bold ph-floppy-disk"></i> Save
+                            </button>
+                        </div>
                     </div>
                     <div id="departments-list">
                         ${departments.map((d) => `
@@ -7745,9 +7887,17 @@ class AttendanceView {
                             <h3>Designation Sort Order</h3>
                             <p>Set priority order for designations globally, independent of department. Lower number = appears first in Designation Stats.</p>
                         </div>
-                        <button class="btn-order-save" id="btn-save-designations">
-                            <i class="ph-bold ph-floppy-disk"></i> Save
-                        </button>
+                    </div>
+                    <div class="sort-order-toolbar">
+                        <input type="text" class="sort-order-search" id="search-designations" placeholder="Search designations...">
+                        <div class="sort-order-toolbar-actions">
+                            <button class="btn-order-sort" id="btn-sort-designations" type="button">
+                                <i class="ph-bold ph-sort-ascending"></i> Sort
+                            </button>
+                            <button class="btn-order-save" id="btn-save-designations" type="button">
+                                <i class="ph-bold ph-floppy-disk"></i> Save
+                            </button>
+                        </div>
                     </div>
                     <div id="designations-list">
                         ${designations.map((d) => `
@@ -7786,21 +7936,41 @@ class AttendanceView {
             });
         });
 
+        // ---- Edit-priority tracking ----
+        // Whenever the user actually changes a row's number (typing directly,
+        // or the +/- buttons), we stamp that input with an increasing
+        // "edit sequence" number. When Sort has to break a tie between two
+        // rows holding the same number, the row the user edited more
+        // recently wins the tie and keeps that number; the row that used to
+        // hold it (and everything after) gets pushed down instead of the
+        // other way around.
+        let editSeqCounter = 0;
+        const markEdited = (input) => {
+            if (!input) return;
+            editSeqCounter += 1;
+            input.dataset.editSeq = String(editSeqCounter);
+        };
+
         contentEl.querySelectorAll(".sort-order-item").forEach((item) => {
             const dec = item.querySelector(".btn-dec");
             const inc = item.querySelector(".btn-inc");
             const input = item.querySelector(".sort-order-input");
             if (!input) return;
 
+            // Direct typing into the box also counts as an edit.
+            input.addEventListener("input", () => markEdited(input));
+
             dec.addEventListener("click", () => {
                 const val = input.value === "" ? null : parseInt(input.value);
                 if (val === null) return;
                 input.value = Math.max(1, val - 1);
+                markEdited(input);
             });
 
             inc.addEventListener("click", () => {
                 const val = input.value === "" ? 1 : parseInt(input.value) + 1;
                 input.value = val;
+                markEdited(input);
             });
         });
 
@@ -7808,8 +7978,89 @@ class AttendanceView {
             btn.addEventListener("click", () => {
                 const item = btn.closest(".sort-order-item");
                 const input = item.querySelector(".sort-order-input");
-                if (input) input.value = "";
+                if (input) {
+                    input.value = "";
+                    delete input.dataset.editSeq; // blank has no priority; it always sorts last
+                }
             });
+        });
+
+        // ---- Feature 1: Search Filter ----
+        // For each tab, typing in the search box hides any row whose name
+        // doesn't include the typed text (case-insensitive substring match).
+        const attachSearchFilter = (searchInputId, listContainerId) => {
+            const searchInput = document.getElementById(searchInputId);
+            const listContainer = document.getElementById(listContainerId);
+            if (!searchInput || !listContainer) return;
+
+            searchInput.addEventListener("input", () => {
+                const term = searchInput.value.trim().toLowerCase();
+                listContainer.querySelectorAll(".sort-order-item").forEach((item) => {
+                    const nameEl = item.querySelector(".sort-order-item-name");
+                    const name = nameEl ? nameEl.textContent.toLowerCase() : "";
+                    item.style.display = name.includes(term) ? "" : "none";
+                });
+            });
+        };
+
+        attachSearchFilter("search-companies", "companies-list");
+        attachSearchFilter("search-departments", "departments-list");
+        attachSearchFilter("search-designations", "designations-list");
+
+        // ---- Feature 2: Automatic Sort ----
+        // Reads every row's current input value (blank = treated as lowest
+        // priority / last), sorts them, then reassigns 1..N sequentially so
+        // there are never duplicates or gaps. Rows are also re-ordered in the
+        // DOM to match, so the visible list reflects the new order right away.
+        // Nothing is sent to the server here — this only updates the input
+        // boxes; the existing Save button/API persists them unchanged.
+        //
+        // Tie-break rule: if two rows end up with the same number (e.g. you
+        // typed 3 into a row that used to be 52, and another row already had
+        // 3), the row you just edited keeps that number. The row that
+        // previously held it — and everything after — shifts down by one.
+        // Rows that haven't been touched at all tie-break by their current
+        // on-screen order, same as before.
+        const performAutoSort = (listContainerId) => {
+            const listContainer = document.getElementById(listContainerId);
+            if (!listContainer) return;
+
+            const items = Array.from(listContainer.querySelectorAll(".sort-order-item"));
+
+            const withMeta = items.map((item, idx) => {
+                const input = item.querySelector(".sort-order-input");
+                const raw = input && input.value !== "" ? parseInt(input.value, 10) : null;
+                const editSeq = input && input.dataset.editSeq ? parseInt(input.dataset.editSeq, 10) : 0;
+                return { item, input, val: Number.isNaN(raw) ? null : raw, idx, editSeq };
+            });
+
+            withMeta.sort((a, b) => {
+                const av = a.val === null ? Infinity : a.val;
+                const bv = b.val === null ? Infinity : b.val;
+                if (av !== bv) return av - bv;
+                // Tie: the more recently edited row wins and goes first.
+                if (a.editSeq !== b.editSeq) return b.editSeq - a.editSeq;
+                // Neither was edited (or both edited at once, e.g. bulk load):
+                // fall back to current on-screen order.
+                return a.idx - b.idx;
+            });
+
+            withMeta.forEach((entry, i) => {
+                if (entry.input) entry.input.value = i + 1;
+                const badge = entry.item.querySelector(".sort-order-null-badge");
+                if (badge) badge.remove();
+                listContainer.appendChild(entry.item); // moves existing node -> reorders DOM
+            });
+        };
+
+        document.getElementById("btn-sort-companies").addEventListener("click", () => {
+            performAutoSort("companies-list");
+        });
+        document.getElementById("btn-sort-departments").addEventListener("click", () => {
+            performAutoSort("departments-list");
+        });
+        document.getElementById("btn-sort-designations").addEventListener("click", () => {
+            performAutoSort("designations-list");
         });
 
         document.getElementById("btn-save-companies").addEventListener("click", async () => {
@@ -8041,6 +8292,296 @@ class AttendanceView {
     }
 
     
+    async _initDeptDesignationMappingTab(model) {
+        const contentEl = document.getElementById("dept-designation-mapping-content");
+        if (!contentEl) return;
+
+        const res = await model.fetchDepartmentDesignationMapping();
+
+        if (!res || !res.success) {
+            contentEl.innerHTML = `
+                <div style = "background:#fff1f2; color:#dc2626; padding:18px; border-radius:10px; border:1px solid #fecdd3; font-weight:600;">
+                    Error loading mapping
+                </div>
+            `;
+            return;
+        }
+
+        const { departments, designations, mappingByDept } = res;
+
+        const pageSize = 25;
+        let currentPage = 1;
+
+        let filteredDepartments = [...departments];
+
+        let searchText = "";
+
+        this._currentDeptDesigMappingData = { departments, designations, mappingByDept };
+
+        this._ddmModel = model;
+
+        contentEl.innerHTML = `<div id="ddm-main-container"></div>`;
+
+        const mainContainer = document.getElementById("ddm-main-container");
+
+        const renderTable = () => {
+            const start = (currentPage - 1) * pageSize;
+            const end = start + pageSize;
+            const pageDepartments = filteredDepartments.slice(start, end);
+            
+            mainContainer.innerHTML = `
+                <div style="background:#ffffff; border-radius:14px; border:1px solid #e5e7eb; box-shadow:0 4px 12px rgba(0,0,0,.06); overflow:hidden;">
+                    <div style="padding:22px 25px; border-bottom:1px solid #e5e7eb; display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <h2 style="margin:0; font-size:24px; font-weight:700; color:#111827;">
+                                Department Designation Mapping
+                            </h2>
+                            <p style="margin:6px 0 0; color:#6b7280; font-size:14px;">
+                                Manage designation mapping department wise.
+                            </p>
+                        </div>
+                    </div>
+                    <div style="padding:20px; border-bottom:1px solid #e5e7eb;">
+                        <input type="text" value="${searchText}" id="ddm-department-search" placeholder="Search Department..." style="width:320px; padding:10px 14px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; outline:none;">
+                    </div>
+                    <div style="overflow:auto;">
+                        <table style="width:100%; border-collapse:collapse;">
+                            <thead>
+                                <tr style="background:#f8fafc; border-bottom:1px solid #e5e7eb;">
+                                    <th style="padding:16px; text-align:left; font-size:14px; font-weight:700; color:#374151;">Department</th>
+                                    <th style="padding:16px; text-align:center; font-size:14px; font-weight:700; color:#374151;">Assigned</th>
+                                    <th style="padding:16px; text-align:center; font-size:14px; font-weight:700; color:#374151; width:150px;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${
+                                    pageDepartments.length > 0 ? pageDepartments.map(dept => {
+                                        const assigned = mappingByDept[dept.id] || [];
+                                        return `
+                                            <tr class="ddm-row" style="border-bottom:1px solid #f1f5f9;">
+                                                <td class="ddm-department-name" style="padding:18px 16px;font-size:15px;font-weight:600;color:#1f2937;">
+                                                    ${this._escapeAttr(dept.name)}
+                                                </td>
+                                                <td style="text-align:center;padding:18px;">
+                                                    <span style="display:inline-flex;justify-content:center;align-items:center;min-width:38px;height:38px;padding:0 12px; border-radius:999px;background:#eef2ff;color:#4338ca;font-weight:700;">
+                                                        ${assigned.length}
+                                                    </span>
+                                                </td>
+                                                <td style="text-align:center;padding:18px;">
+                                                    <button class="ddm-edit-btn" data-id="${dept.id}" style="background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;">
+                                                        Edit
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        `;
+                                    }).join("")
+                                    : `
+                                        <tr>
+                                            <td colspan="3" style="padding:30px;text-align:center;color:#6b7280;">
+                                                No departments found.
+                                            </td>
+                                        </tr>
+                                    `
+                                }
+                            </tbody>
+                        </table>
+
+                        <div style="display:flex; justify-content:center; align-items:center; gap:12px; padding:20px;">
+                            <button id="prev-page" ${currentPage === 1 ? "disabled" : ""} style="padding:8px 16px; cursor:pointer;">
+                                Previous
+                            </button>
+
+                            <span>Page ${currentPage} of ${Math.ceil(filteredDepartments.length / pageSize)}</span>
+
+                            <button id="next-page" ${currentPage === Math.ceil(filteredDepartments.length / pageSize) ? "disabled" : ""} style="padding:8px 16px; cursor:pointer;">
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            mainContainer.querySelectorAll(".ddm-edit-btn").forEach(btn => {
+                btn.onclick = () => {
+                    const deptId = Number(btn.dataset.id);
+                    this._renderDeptDesigMappingCheckboxes(deptId);
+                };
+            });
+
+            const deptSearch = document.getElementById("ddm-department-search");
+            
+            deptSearch.focus();
+            deptSearch.setSelectionRange(searchText.length, searchText.length);
+
+            deptSearch.addEventListener("input", (e) => {
+                searchText = e.target.value.toLowerCase().trim();
+                filteredDepartments = departments.filter(dept => dept.name.toLowerCase().includes(searchText));
+                currentPage = 1;
+                renderTable();
+            });
+
+            document.getElementById("prev-page")?.addEventListener("click", () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    renderTable();
+                }
+            });
+
+            document.getElementById("next-page")?.addEventListener("click", () => {
+                if (currentPage < Math.ceil(filteredDepartments.length / pageSize)) {
+                    currentPage++;
+                    renderTable();
+                }
+            });
+        }
+
+        renderTable();
+    }
+
+
+    _renderDeptDesigMappingCheckboxes(deptId) {
+        const data = this._currentDeptDesigMappingData;
+        if (!data) return;
+
+        const { departments, designations, mappingByDept } = data;
+
+        const department = departments.find(d => Number(d.id) === Number(deptId));
+
+        const existing = mappingByDept[deptId] || [];
+
+        const existingMap = {};
+
+        existing.forEach(m => {
+            existingMap[m.designationId] = true;
+        });
+
+        const rowsHtml = designations.map(d => {
+            const checked = existingMap.hasOwnProperty(d.id);
+            
+            return `
+                <label style = "display:flex; align-items:center; gap:10px; padding:14px 16px; border:1px solid ${checked ? "#4f46e5" : "#dbe4f0"}; background:${checked ? "#eef2ff" : "#fff"}; border-radius:10px; cursor:pointer; transition:.2s; font-size:14px; font-weight:500;" class="ddm-item">
+                    <input type="checkbox" class="ddm-checkbox" value="${d.id}" ${checked ? "checked" : ""}>
+                    <span>${this._escapeAttr(d.name)}</span>
+                </label>
+            `;
+        }).join("");
+
+        const mainContainer = document.getElementById("ddm-main-container");
+
+        mainContainer.innerHTML = `
+            <button id="ddm-back-btn" style = "border:none; background:#fff; border:1px solid #dbe4f0; padding:10px 18px; border-radius:8px; cursor:pointer; margin-bottom:20px; font-weight:600;">
+                ← Back
+            </button>
+
+            <div style = "background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:24px; box-shadow:0 4px 12px rgba(0,0,0,.05);">
+                <div style = "display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <div>
+                        <h2 style="margin:0;font-size:26px;">${this._escapeAttr(department.name)}</h2>
+                        <div style="margin-top:6px;color:#64748b;">
+                            ${existing.length}
+                            designation${existing.length != 1 ? "s" : ""} assigned
+                        </div>
+                    </div>
+                    <button id="ddm-save-btn" style="background:#4f46e5; color:#fff; border:none; padding:10px 18px; border-radius:8px; cursor:pointer; font-weight:600;">
+                        Save Changes
+                    </button>
+                </div>
+                
+                <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px;">
+                    ${
+                        existing.map(m => {
+                            const des = designations.find(d => Number(d.id) === Number(m.designationId));
+                            if (!des) return "";
+                            return `
+                                <div style="display:flex; align-items:center; gap:8px; background:#eef2ff; color:#4f46e5; padding:8px 14px; border-radius:20px; font-size:13px; font-weight:600;" >
+                                    <span>${this._escapeAttr(des.name)}</span>
+                                    <button class="ddm-remove-chip" data-dept="${deptId}" data-designation="${des.id}" style="border:none; background:transparent; color:#ef4444; cursor:pointer; font-size:16px; font-weight:bold; line-height:1;" >
+                                        ×
+                                    </button>
+                                </div>
+                            `;
+                        }).join("")
+                    }
+                </div>
+                
+                <input id="ddm-search"placeholder="Search Designation..." style=" width:100%; padding:12px 14px; border:1px solid #dbe4f0; border-radius:8px; margin-bottom:20px; box-sizing:border-box;">
+                
+                <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:14px;">
+                    ${rowsHtml}
+                </div>
+            </div>
+        `;
+
+        mainContainer.querySelectorAll(".ddm-remove-chip").forEach(btn => {
+            btn.onclick = async () => {
+                this.showOverlay("Removing...");
+                const res = await this._ddmModel.deleteDepartmentDesignationMapping(Number(btn.dataset.dept), Number(btn.dataset.designation));
+                this.hideOverlay();
+                if (res.success) {
+                    this.showToast("Designation removed successfully", "success");
+                    const dept = Number(btn.dataset.dept);
+                    const desig = Number(btn.dataset.designation);
+                    this._currentDeptDesigMappingData.mappingByDept[dept] = (this._currentDeptDesigMappingData.mappingByDept[dept] || []).filter(x => x.designationId !== desig);
+                    await this._refreshDepartmentDesignationMapping(Number(btn.dataset.dept));
+                } else {
+                    this.showToast(res.message, "error");
+                }
+            };
+        });
+
+        document.getElementById("ddm-search").addEventListener("input", function () {
+            const value = this.value.toLowerCase();
+            mainContainer.querySelectorAll(".ddm-item").forEach(item => {
+                item.style.display = item.innerText.toLowerCase().includes(value) ? "flex" : "none";
+            });
+        });
+
+        document.getElementById("ddm-back-btn").onclick = () => {
+            this._initDeptDesignationMappingTab(this._ddmModel);
+        };
+
+        document.getElementById("ddm-save-btn").onclick = async () => {
+            const items = [];
+            mainContainer.querySelectorAll(".ddm-item").forEach(row => {
+                const cb = row.querySelector(".ddm-checkbox");
+                items.push({
+                    departmentId: deptId,
+                    designationId: Number(cb.value),
+                    isActive: cb.checked
+                });
+            });
+
+            this.showOverlay("Saving mapping...");
+            const saveRes = await this._ddmModel.saveDepartmentDesignationMapping(items);
+            this.hideOverlay();
+
+            if (saveRes.success) {
+                this.showToast("Mapping saved successfully", "success");
+                await this._refreshDepartmentDesignationMapping(deptId);
+            } else {
+                this.showToast(saveRes.message, "error");
+            }
+        };
+    }
+
+
+    async _refreshDepartmentDesignationMapping(deptId) {
+        const res = await this._ddmModel.fetchDepartmentDesignationMapping();
+        if (res.success) {
+
+            console.log(res.mappingByDept[deptId]);
+
+            this._currentDeptDesigMappingData = {
+                departments: res.departments,
+                designations: res.designations,
+                mappingByDept: res.mappingByDept
+            };
+
+            this._renderDeptDesigMappingCheckboxes(deptId);
+        }
+    }
+
+
     _toggleDesigFamilyDetail(familyId) {
         const el = document.getElementById(`desig-fam-detail-${familyId}`);
         if (!el) return;
@@ -8654,9 +9195,7 @@ class AttendanceView {
     _showPresentHeadcountDrilldown() {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
 
-        const card = this.app.querySelector(
-            '.stat-card-clickable[data-card-key="presentHeadcount"]'
-        );
+        const card = this.app.querySelector('.stat-card-clickable[data-card-key="presentHeadcount"]');
         if (card) card.classList.add("active");
 
         const items = this._currentTabPresentHeadcountItems;
@@ -8810,10 +9349,12 @@ class AttendanceView {
 
         if (!scope || scope.count <= 1) {
             const items = (AppController.model.state.dashboardData?.employees || []).map(emp => ({ log: null, emp, date: null }));
+            this._fullAvailableItems = items;
             this._renderStatCardDrilldown('totalHeadcount', items, 1);
             return;
         }
 
+        this._fullAvailableItems = (AppController.model.state.dashboardData?.employees || []).map(emp => ({ log: null, emp, date: null }));
         this._showAvailableLocationCards();
     }
 
