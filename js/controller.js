@@ -107,6 +107,24 @@ class AttendanceController {
                     }
                     break;
                 }
+                case "contractList": {
+                    const data = this.view._currentContractSummaryData;
+                    if (data && data.isDashboard) {
+                        items = data.emps.map(emp => ({ log: null, emp, date: null }));
+                    } else {
+                        items = this.model.getContractEmployees();
+                    }
+                    break;
+                }
+                case "consultantList": {
+                    const data = this.view._currentConsultantSummaryData;
+                    if (data && data.isDashboard) {
+                        items = data.emps.map(emp => ({ log: null, emp, date: null }));
+                    } else {
+                        items = this.model.getConsultantEmployees();
+                    }
+                    break;
+                }
                 case "unassignedList": {
                     items = this.model.getUnassignedEmployees();
                     break;
@@ -134,10 +152,7 @@ class AttendanceController {
             await this.model.fetchSubAdmins();
         }
 
-        const [result] = await Promise.all([
-            this.model.fetchData(),
-            this.model.fetchDashboardData()
-        ]);
+        const result = await this.model.fetchData();
 
         if (!result.success) {
             alert('Error loading data: ' + result.error);

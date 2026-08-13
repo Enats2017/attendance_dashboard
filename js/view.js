@@ -464,15 +464,24 @@ class AttendanceView {
         if (emps && logs && empMap && model) {
             const { dateFrom, dateTo } = model.state.filters;
             const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
+            
             const staffTeamId = model.state.teamConfig?.staffTeamId ?? 7;
             const workerTeamId = model.state.teamConfig?.workerTeamId ?? 6;
+            const contractTeamId = model.state.teamConfig?.contractTeamId ?? 8;
+            const consultantTeamId = model.state.teamConfig?.consultantTeamId ?? 9;
             const staffEmps = emps.filter((e) => e.team === staffTeamId);
             const workerEmps = emps.filter((e) => e.team === workerTeamId);
+            const contractEmps = emps.filter((e) => e.team === contractTeamId);
+            const consultantEmps = emps.filter((e) => e.team === consultantTeamId);
 
             this._currentStaffSummaryData = { emps: staffEmps, model, dayLogs, empMap, isDashboard: false, };
             this._currentWorkerSummaryData = { emps: workerEmps, model, dayLogs, empMap, isDashboard: false, };
+            this._currentContractSummaryData = { emps: contractEmps, model, dayLogs, empMap, isDashboard: false, };
+            this._currentConsultantSummaryData = { emps: consultantEmps, model, dayLogs, empMap, isDashboard: false, };
 
-            let staffPresent = 0, staffHalf = 0, workerPresent = 0, workerHalf = 0; totalPresentHalf = 0;
+            let staffPresent = 0, staffHalf = 0, workerPresent = 0, workerHalf = 0;
+            let contractPresent = 0, contractHalf = 0, consultantPresent = 0, consultantHalf = 0;
+            totalPresentHalf = 0;
 
             dayLogs.forEach((l) => {
                 const e = empMap[l.empId];
@@ -488,12 +497,24 @@ class AttendanceView {
                     if (isPresent) workerPresent++;
                     if (isHalf) workerHalf++;
                 }
+                if (e.team === contractTeamId) {
+                    if (isPresent) contractPresent++;
+                    if (isHalf) contractHalf++;
+                }
+                if (e.team === consultantTeamId) {
+                    if (isPresent) consultantPresent++;
+                    if (isHalf) consultantHalf++;
+                }
             });
 
             staffWorkerStats.staffPresent = staffPresent;
             staffWorkerStats.staffHalfPresent = staffHalf;
             staffWorkerStats.workerPresent = workerPresent;
             staffWorkerStats.workerHalfPresent = workerHalf;
+            staffWorkerStats.contractPresent = contractPresent;
+            staffWorkerStats.contractHalfPresent = contractHalf;
+            staffWorkerStats.consultantPresent = consultantPresent;
+            staffWorkerStats.consultantHalfPresent = consultantHalf;
         }
 
         const cards = [
@@ -511,6 +532,8 @@ class AttendanceView {
             { key: null, label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", },
             { key: "staffList", label: "Staff Present", val: (staffWorkerStats.staffPresent || 0) + (staffWorkerStats.staffHalfPresent || 0) + (staffWorkerStats.staffWeeklyOffPresent || 0) + (staffWorkerStats.staffWeeklyOffHalfPresent || 0), icon: "ph-identification-badge", cls: "info", },
             { key: "workerList", label: "Workmen Present", val: (staffWorkerStats.workerPresent || 0) + (staffWorkerStats.workerHalfPresent || 0) + (staffWorkerStats.workerWeeklyOffPresent || 0) + (staffWorkerStats.workerWeeklyOffHalfPresent || 0), icon: "ph-hard-hat", cls: "warning", },
+            { key: "contractList", label: "Contract Present", val: (staffWorkerStats.contractPresent || 0) + (staffWorkerStats.contractHalfPresent || 0), icon: "ph-handshake", cls: "accent", },
+            { key: "consultantList", label: "Consultant Present", val: (staffWorkerStats.consultantPresent || 0) + (staffWorkerStats.consultantHalfPresent || 0), icon: "ph-briefcase-metal", cls: "info", },
             { key: "newJoined", label: "New Join", val: stats.newJoined || 0, icon: "ph-user-plus", cls: "success", },
             { key: "resigned", label: "Resigned", val: stats.resigned || 0, icon: "ph-user-minus", cls: "danger", },
         ];
@@ -537,8 +560,11 @@ class AttendanceView {
         const { dateFrom, dateTo } = model.state.filters;
         const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
         const staffWorkerStats = this._staffWorkerStats || {};
+        
         const staffTeamId = model.state.teamConfig?.staffTeamId ?? 7;
         const workerTeamId = model.state.teamConfig?.workerTeamId ?? 6;
+        const contractTeamId = model.state.teamConfig?.contractTeamId ?? 8;
+        const consultantTeamId = model.state.teamConfig?.consultantTeamId ?? 9;
 
         const sectionLabel = (text) => `
             <div style="font-size:13px;font-weight:600;text-transform:uppercase; letter-spacing:0.06em;color:#334155;margin:24px 0 12px; display:flex;align-items:center;gap:8px;">
@@ -547,27 +573,11 @@ class AttendanceView {
             </div>
         `;
 
-        this._currentStaffSummaryData = {
-            emps: emps.filter((e) => e.team === staffTeamId),
-            model,
-            dayLogs,
-            empMap,
-            isDashboard: true,
-        };
-        this._currentWorkerSummaryData = {
-            emps: emps.filter((e) => e.team === workerTeamId),
-            model,
-            dayLogs,
-            empMap,
-            isDashboard: true,
-        };
-        this._currentUnassignedSummaryData = {
-            emps: emps.filter(e => e.team !== staffTeamId && e.team !== workerTeamId),
-            model,
-            dayLogs,
-            empMap,
-            isDashboard: true,
-        };
+        this._currentStaffSummaryData = { emps: emps.filter((e) => e.team === staffTeamId), model, dayLogs, empMap, isDashboard: true, };
+        this._currentWorkerSummaryData = { emps: emps.filter((e) => e.team === workerTeamId), model, dayLogs, empMap, isDashboard: true, };
+        this._currentContractSummaryData = { emps: emps.filter((e) => e.team === contractTeamId), model, dayLogs, empMap, isDashboard: true, };
+        this._currentConsultantSummaryData = { emps: emps.filter((e) => e.team === consultantTeamId), model, dayLogs, empMap, isDashboard: true, };
+        this._currentUnassignedSummaryData = { emps: emps.filter(e => e.team !== staffTeamId && e.team !== workerTeamId && e.team !== contractTeamId && e.team !== consultantTeamId), model, dayLogs, empMap, isDashboard: true, };
 
         // --- Designation Family cards (headcount-based, not attendance-based) ---
         const dashFamilies = model.state.data.designationFamilies || [];
@@ -598,6 +608,7 @@ class AttendanceView {
 
         // --- Headcount: Required / Available / Gap ---
         const requiredCount = model.getRequiredHeadcount();
+        const totalMachines = model.getTotalMachines(); 
         const availableCount = stats.total;
         const gapCount = model.getGapHeadcount();
 
@@ -609,6 +620,7 @@ class AttendanceView {
                 <div class="stat-content">
                     <span class="stat-label">Required</span>
                     <span class="stat-value">${requiredCount}</span>
+                    <span class="stat-card-sub" style="color:#334155;font-weight:600;">(${totalMachines} m/c's)</span>
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
             </div>
@@ -632,13 +644,18 @@ class AttendanceView {
 
         this._currentCompanyData = { emps, model, dayLogs, empMap, isDashboard: true, };
 
-        const categoryOrder = ["ON-ROLL", "CC", "CONTRACTOR"];
-        const categoryLabels = { "ON-ROLL": "ON-ROLL", "CC": "COMPANY CONTRACT (CC)", "CONTRACTOR": "CONTRACTOR", };
+        const categoryOrder = ["ON-ROLL", "CC", "CONTRACTOR", "OUTSOURCE", "OTHER"];
+        const categoryLabels = { 
+            "ON-ROLL": "ON-ROLL", 
+            "CC": "COMPANY CONTRACT (CC)", 
+            "CONTRACTOR": "CONTRACTOR", 
+            "OUTSOURCE": "OUTSOURCE",
+            "OTHER": "UNASSIGNED"
+        };
         const compColorCls = ["info", "success", "warning", "accent", "danger"];
 
         const mergeCat = (rawCat) => {
-            const c = rawCat || "OTHER";
-            return (c === "OUTSOURCE" || c === "OTHER") ? "CONTRACTOR" : c;
+            return rawCat || "OTHER";
         };
 
         const companiesByCategory = {};
@@ -649,7 +666,13 @@ class AttendanceView {
             companiesByCategory[cat][e.company]++;
         });
 
-        const catCardsHtml = categoryOrder.map((cat, i) => {
+        const catCardsHtml = categoryOrder.filter((cat) => {
+            if (cat === "OTHER") {
+                const companiesInCat = companiesByCategory[cat] || {};
+                return Object.keys(companiesInCat).length > 0;
+            }
+            return true;
+        }).map((cat, i) => {
             const companiesInCat = companiesByCategory[cat] || {};
             const companyNames = Object.keys(companiesInCat);
             const totalCount = companyNames.reduce((sum, c) => sum + companiesInCat[c], 0);
@@ -688,8 +711,10 @@ class AttendanceView {
             `;
         }).join("");
 
+        const hasUnassigned = Object.keys(companiesByCategory["OTHER"] || {}).length > 0;
+        const companyColumnCount = hasUnassigned ? 5 : 4;
         const companySectionsHtml = `
-            <div class="summary-grid" style="grid-template-columns: repeat(3, minmax(0,1fr));">
+            <div class="summary-grid" style="grid-template-columns: repeat(${companyColumnCount}, minmax(0,1fr));">
                 ${catCardsHtml}
             </div>
         `;
@@ -720,9 +745,11 @@ class AttendanceView {
             </div>
         `;
 
-        const staffTotal = staffWorkerStats.staffTotal || 0;
-        const workerTotal = staffWorkerStats.workerTotal || 0;
-        const unassignedTotal = availableCount - staffTotal - workerTotal;
+        const staffTotal = this._currentStaffSummaryData.emps.length;
+        const workerTotal = this._currentWorkerSummaryData.emps.length;
+        const contractTotal = this._currentContractSummaryData.emps.length;
+        const consultantTotal = this._currentConsultantSummaryData.emps.length;
+        const unassignedTotal = this._currentUnassignedSummaryData.emps.length;
 
         // --- Staff / Workmen ---
         const swCards = `
@@ -730,7 +757,7 @@ class AttendanceView {
                 <div class="stat-icon"><i class="ph ph-identification-badge"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">Staff</span>
-                    <span class="stat-value">${staffWorkerStats.staffTotal || 0}</span>
+                    <span class="stat-value">${staffTotal}</span>
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
             </div>
@@ -738,10 +765,27 @@ class AttendanceView {
                 <div class="stat-icon"><i class="ph ph-hard-hat"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">Workmen</span>
-                    <span class="stat-value">${staffWorkerStats.workerTotal || 0}</span>
+                    <span class="stat-value">${workerTotal}</span>
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
             </div>
+            <div class="stat-card accent stat-card-clickable" data-workforce="Contract" onclick="AppController.view._showWorkforceSelected('Contract')">
+                <div class="stat-icon"><i class="ph ph-handshake"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">Contract</span>
+                    <span class="stat-value">${contractTotal}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+            <div class="stat-card info stat-card-clickable" data-workforce="Consultant" onclick="AppController.view._showWorkforceSelected('Consultant')">
+                <div class="stat-icon"><i class="ph ph-briefcase-metal"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">Consultant</span>
+                    <span class="stat-value">${consultantTotal}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+            ${unassignedTotal > 0 ? `
             <div class="stat-card danger stat-card-clickable" data-card-key="unassignedList">
                 <div class="stat-icon">
                     <i class="ph ph-warning-circle"></i>
@@ -752,6 +796,7 @@ class AttendanceView {
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
             </div>
+            ` : ""}
         `;
 
         // --- Age cards ---
@@ -1148,16 +1193,17 @@ class AttendanceView {
             </div>
         `;
 
-        const categoryOrder = ["ON-ROLL", "CC", "CONTRACTOR"];
+        const categoryOrder = ["ON-ROLL", "CC", "CONTRACTOR", "OUTSOURCE", "OTHER"];
         const categoryLabels = {
             "ON-ROLL": "ON-ROLL",
             "CC": "COMPANY CONTRACT (CC)",
             "CONTRACTOR": "CONTRACTOR",
+            "OUTSOURCE": "OUTSOURCE",
+            "OTHER": "UNASSIGNED",
         };
 
         const mergeCat = (rawCat) => {
-            const c = rawCat || "OTHER";
-            return (c === "OUTSOURCE" || c === "OTHER") ? "CONTRACTOR" : c;
+            return rawCat || "OTHER";          // stop folding OUTSOURCE/OTHER into CONTRACTOR
         };
 
         const companiesByCategory = {};
@@ -1854,7 +1900,7 @@ class AttendanceView {
         const dayLogs = this._buildShiftStatsLogs(emps, logs, dateFrom, dateTo);
         this._currentShiftSummaryData = { emps, model, dayLogs, empMap };
 
-        const shifts = [...new Set(dayLogs.map((l) => l.shiftName || "No Shift"))];
+        const shifts = [...new Set(dayLogs.map((l) => this._normalizeShiftName(l.shiftName)))];
         const colorCls = ["info", "success", "warning", "accent", "danger"];
 
         const counts = {};
@@ -1863,7 +1909,7 @@ class AttendanceView {
         dayLogs.forEach((l) => {
             const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch");
             if (!isPresentOrHalf) return;
-            const s = l.shiftName || "No Shift";
+            const s = this._normalizeShiftName(l.shiftName);
             if (counts[s] !== undefined) counts[s]++;
         });
 
@@ -2257,7 +2303,7 @@ class AttendanceView {
             const deptLogs = dayLogs.filter((l) => {
                 const e = empMap[l.empId];
                 if (!e || e.dept !== dept) return false;
-                return (this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present"));
+                return (this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch"));
             });
             items = deptLogs.map((l) => ({
                 log: l,
@@ -2304,7 +2350,7 @@ class AttendanceView {
             const deptLogs = dayLogs.filter((l) => {
                 const e = empMap[l.empId];
                 if (!e || e.dept !== dept) return false;
-                return (this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present"));
+                return (this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch"));
             });
             items = deptLogs.map((l) => ({
                 log: l,
@@ -2345,7 +2391,7 @@ class AttendanceView {
         const { dayLogs, empMap } = data;
         const shiftLogs = dayLogs.filter((l) => {
             const e = empMap[l.empId];
-            if (!e || (l.shiftName || "No Shift") !== shiftName) return false;
+            if (!e || this._normalizeShiftName(l.shiftName) !== shiftName) return false;
             return this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch");
         });
 
@@ -2598,8 +2644,7 @@ class AttendanceView {
         const { emps, dayLogs, empMap, isDashboard } = data;
 
         const mergeCat = (rawCat) => {
-            const c = rawCat || "OTHER";
-            return (c === "OUTSOURCE" || c === "OTHER") ? "CONTRACTOR" : c;
+            return rawCat || "OTHER";
         };
 
         const catEmps = emps.filter((e) => mergeCat(e.companyCategory) === category);
@@ -2656,6 +2701,7 @@ class AttendanceView {
             "ON-ROLL": "ON-ROLL",
             "CC": "COMPANY CONTRACT (CC)",
             "CONTRACTOR": "CONTRACTOR",
+            "OUTSOURCE": "OUTSOURCE"
         };
 
         panel.style.display = "block";
@@ -3010,22 +3056,37 @@ class AttendanceView {
         this._closeAgeGroupLocationCards();    
         this._closeCompanyLocationCards();     
 
-        const data = type === 'Staff' ? this._currentStaffSummaryData : this._currentWorkerSummaryData;
+        const dataMap = {
+            Staff: this._currentStaffSummaryData,
+            Workmen: this._currentWorkerSummaryData,
+            Contract: this._currentContractSummaryData,
+            Consultant: this._currentConsultantSummaryData,
+        };
+        const data = dataMap[type];
         if (!data) return;
 
         const scope = AppController.model.getLocationScope();
         if (!scope || scope.count <= 1) {
             this._closeWorkforceLocationCards();
             const items = data.emps.map(emp => ({ log: null, emp, date: null }));
-            this._renderStatCardDrilldown(type === 'Staff' ? 'staffList' : 'workerList', items, 1);
+            const keyMap = { Staff: 'staffList', Workmen: 'workerList', Contract: 'contractList', Consultant: 'consultantList' };
+            this._renderStatCardDrilldown(keyMap[type] || 'workforceList', items, 1);
             return;
         }
         this._showWorkforceLocationCards(type);
     }
 
     _showWorkforceLocationCards(type) {
-        const data = type === 'Staff' ? this._currentStaffSummaryData : this._currentWorkerSummaryData;
+        const dataMap = {
+            Staff: this._currentStaffSummaryData,
+            Workmen: this._currentWorkerSummaryData,
+            Contract: this._currentContractSummaryData,
+            Consultant: this._currentConsultantSummaryData,
+        };
+    
+        const data = dataMap[type];
         if (!data) return;
+    
         const { emps } = data;
 
         const locations = AppController.model.sortLocations([...new Set(emps.map(e => e.location || 'Unassigned'))]);
@@ -3071,8 +3132,9 @@ class AttendanceView {
 
         const data = this._currentWorkforceLocationData;
         if (!data) return;
+        const keyMap = { Staff: 'staffList', Workmen: 'workerList', Contract: 'contractList', Consultant: 'consultantList' };
         const items = data.emps.filter(e => (e.location || 'Unassigned') === location).map(emp => ({ log: null, emp, date: null }));
-        this._renderStatCardDrilldown((data.type === 'Staff' ? 'staffList' : 'workerList') + '_' + location, items, 1);
+        this._renderStatCardDrilldown((keyMap[data.type] || 'workforceList') + '_' + location, items, 1);
     }
 
     _closeWorkforceLocationCards() {
@@ -5410,47 +5472,66 @@ class AttendanceView {
             return seriesName === "Single Punch";
         }
 
+        const bucketMap = {
+            present: "Present",
+            weeklyOffPresent: "WO Present",
+            halfPresent: "Half Present",
+            weeklyOffHalfPresent: "WO Half Present",
+            weeklyOff: "Weekly Off",
+            singlePunch: "Single Punch",
+            absent: "Absent",
+        };
+
+        const bucket = log.displayStatus ? (bucketMap[log.displayStatus] || "Absent") : this._deriveDisplayStatusFromCode(log);
+
+        return seriesName === bucket;
+    }
+
+
+    _getDisplayStatus(log) {
+        if (log.status === "Single Punch") {
+            return "Single Punch";
+        }
+
+        const bucketMap = {
+            present: "Present",
+            weeklyOffPresent: "WO Present",
+            halfPresent: "Half Present",
+            weeklyOffHalfPresent: "WO Half Present",
+            weeklyOff: "Weekly Off",
+            singlePunch: "Single Punch",
+            absent: "Absent",
+        };
+
+        return log.displayStatus ? (bucketMap[log.displayStatus] || "Absent") : this._deriveDisplayStatusFromCode(log);
+    }
+
+
+    _deriveDisplayStatusFromCode(log) {
         const code = (log.detailedStatusCode || "").toUpperCase().trim();
         const isWeeklyOff = parseInt(log.weeklyOff ?? 0) === 1;
-        let bucket;
 
         switch (code) {
             case "D.P":
-                bucket = "Present";
-                break;
-
             case "P":
-                bucket = "Present";
-                break;
-
+                return "Present";
             case "½PLD":
             case "L_CL":
             case "½PCL":
             case "½PLD(HO)":
-                bucket = "Half Present";
-                break;
-
+                return "Half Present";
             case "WO":
-                bucket = "Weekly Off";
-                break;
-
+                return "Weekly Off";
             case "WOP":
-                bucket = isWeeklyOff ? "WO Present" : "Present";
-                break;
-
+                return isWeeklyOff ? "WO Present" : "Present";
             case "½PLD(WO)":
-                bucket = isWeeklyOff ? "WO Half Present" : "Half Present";
-                break;
-
+                return isWeeklyOff ? "WO Half Present" : "Half Present";
             case "A":
             case "ALD":
             case "WOA":
             default:
-                bucket = "Absent";
-                break;
+                return "Absent";
         }
-
-        return seriesName === bucket;
     }
 
 
@@ -6436,14 +6517,71 @@ class AttendanceView {
         content.renderCharts();
     }
 
-    
+
     _renderShiftWise(logs, emps, empMap, model, page = 1) {
         this._currentShiftWiseLogs = logs;
         this._currentShiftWiseEmps = emps;
         this._currentShiftWiseEmpMap = empMap;
         this._currentShiftWiseModel = model;
-        const shiftStats = model.state.data.shiftStats || [];
+
         const { dateFrom, dateTo } = model.state.filters;
+        const fullLogs = this._buildShiftStatsLogs(emps, logs, dateFrom, dateTo);
+
+        const shiftGroups = {};
+        fullLogs.forEach((l) => {
+            const shiftName = this._normalizeShiftName(l.shiftName);
+            if (!shiftGroups[shiftName]) {
+                shiftGroups[shiftName] = {
+                    shiftName, total: 0, present: 0, halfPresent: 0,
+                    weeklyOffPresent: 0, weeklyOffHalfPresent: 0,
+                    weeklyOff: 0, singlePunch: 0, absent: 0
+                };
+            }
+            const g = shiftGroups[shiftName];
+            g.total++;
+
+            if (l.status === "Single Punch") {
+                g.singlePunch++;
+                return;
+            }
+
+            const code = (l.detailedStatusCode || "").toUpperCase().trim();
+            const isWeeklyOff = parseInt(l.weeklyOff ?? 0) === 1;
+
+            switch (code) {
+                case "D.P":
+                case "P":
+                    g.present++;
+                    break;
+                case "½PLD":
+                case "L_CL":
+                case "½PCL":
+                case "½PLD(HO)":
+                    g.halfPresent++;
+                    break;
+                case "WO":
+                    g.weeklyOff++;
+                    break;
+                case "WOP":
+                    isWeeklyOff ? g.weeklyOffPresent++ : g.present++;
+                    break;
+                case "½PLD(WO)":
+                    isWeeklyOff ? g.weeklyOffHalfPresent++ : g.halfPresent++;
+                    break;
+                case "A":
+                case "ALD":
+                case "WOA":
+                default:
+                    g.absent++;
+                    break;
+            }
+        });
+
+        const shiftStats = Object.values(shiftGroups).map((g) => ({
+            ...g,
+            rate: g.total > 0 ? Math.round((g.present / g.total) * 100) : 0
+        }));
+
         const rows = shiftStats.map((s) => [s.shiftName, s.total, s.present, s.halfPresent, s.weeklyOffPresent || 0, s.weeklyOffHalfPresent || 0, s.weeklyOff, s.singlePunch || 0, s.absent, s.rate + "%"]);
 
         this._lastData["shift-wise"] = rows.map((r) => ({
@@ -6475,20 +6613,18 @@ class AttendanceView {
             `;
         }
 
-        const fullLogs = this._buildShiftStatsLogs(emps, logs, dateFrom, dateTo);
-
         return {
             html: `
-				<h2 class="section-title">
-					<i class="ph-fill ph-clock-clockwise"></i>
-					Shift Statistics
-				</h2>
-				
+                <h2 class="section-title">
+                    <i class="ph-fill ph-clock-clockwise"></i>
+                    Shift Statistics
+                </h2>
+                
                 <div class="charts-grid">
-					${this._chartCard("ch-shift-bar", '<i class="ph-fill ph-chart-bar"></i>', "amber", "Present by Shift", "Click to view records")}
-				</div>
-				
-               <div id="main-table-wrap">
+                    ${this._chartCard("ch-shift-bar", '<i class="ph-fill ph-chart-bar"></i>', "amber", "Present by Shift", "Click to view records")}
+                </div>
+                
+            <div id="main-table-wrap">
                     ${this._tableHTML("tbl-shift", ["Shift", "Total", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Single Punch", "Absent", "Rate"], pageRows, "shift-wise", (currentPage - 1) * pageSize)}
                     <div class="pagination-bar">
                         <div class="pagination-text">
@@ -6504,8 +6640,8 @@ class AttendanceView {
                     </div>
                 </div>
 
-				<div id="drilldown-table" style="margin-top:16px"></div>
-			`,
+                <div id="drilldown-table" style="margin-top:16px"></div>
+            `,
 
             renderCharts: () => {
                 Charts.stacked(
@@ -6523,7 +6659,7 @@ class AttendanceView {
                     "Shift Attendance",
                     (shiftName, index, seriesIndex, seriesName) => {
                         const filteredLogs = fullLogs.filter((l) => {
-                            if ((l.shiftName || "No Shift") !== shiftName) { return false; }
+                            if (this._normalizeShiftName(l.shiftName) !== shiftName) { return false; }
                             return this._matchesStatus(l, seriesName);
                         });
 
@@ -6917,6 +7053,8 @@ class AttendanceView {
             earlyOut: "🚪 Early Out Employees",
             staffList: "👔 Staff Employees",
             workerList: "🔧 Workmen Employees",
+            contractList: "🤝 Contract Employees",
+            consultantList: "💼 Consultant Employees",
             avgHours: "⏱️ Avg Hours Records",
             avgHoursDept: "⏱️ Avg Hours Records",
             avgHoursGender: "⏱️ Avg Hours Records",
@@ -6945,6 +7083,8 @@ class AttendanceView {
         const isJoinExitRelated = isNewJoinedRelated || isResignedRelated;
         const isStaffList = key === "staffList";
         const isWorkerList = key === "workerList";
+        const isContractList = key === "contractList";
+        const isConsultantList = key === "consultantList";
         const isTotalHeadcount = key === "totalHeadcount";
         const isHalfPresent = key === "halfPresent";
         const isWeeklyOff = key === "weeklyOff";
@@ -8825,6 +8965,7 @@ class AttendanceView {
         const workerEmps = emps.filter((e) => e.team === workerTeamId);
         const workerGroups = this._computeGroupedDayStats(workerEmps, logs, dateFrom, dateTo, (e) => e.dept);
         const workerDepts = [...new Set(workerEmps.map((e) => e.dept))].sort();
+        const dayLogs = this._buildEmployeeDayLogs(workerEmps, logs, dateFrom, dateTo);  
 
         const workerRows = workerDepts.map((d) => {
             const g = workerGroups[d] || {};
@@ -8897,7 +9038,7 @@ class AttendanceView {
                     ],
                     "Workmen by Department",
                     (dept, index, seriesIndex, seriesName) => {
-                        const filtered = logs.filter((l) => {
+                        const filtered = dayLogs.filter((l) => {
                             const e = empMap[l.empId];
                             if (!e || e.dept !== dept) return false;
                             if (e.team !== workerTeamId) return false;
@@ -9236,6 +9377,7 @@ class AttendanceView {
         const colorCls = ["info", "success", "warning", "accent", "danger"];
         const cardsHtml = byLocation.map((loc, i) => {
             const val = type === "required" ? loc.required : loc.gap;
+            const machinesLine = type === "required" ? `<span class="stat-card-sub" style="color:#334155;font-weight:600;">(${loc.machines || 0} m/c's)</span>` : "";
             return `
                 <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
                     data-headcount-location="${loc.locationId}"
@@ -9244,6 +9386,7 @@ class AttendanceView {
                     <div class="stat-content">
                         <span class="stat-label">${this._escapeAttr(loc.locationName)}</span>
                         <span class="stat-value">${val}</span>
+                        ${machinesLine}
                         <span class="stat-card-hint">↓ click to view</span>
                     </div>
                 </div>
@@ -9289,16 +9432,41 @@ class AttendanceView {
             const info = byDept[d];
             const required = Number(info.required || 0);
             const available = Number(info.available || 0);
-            const gap = Number(info.gap || 0);
+
+            let gapDisplay = 0;
+            let gapColor = "#6b7280";
+            let gapValue = 0;
+
+            if (required === 0 && available === 0) {
+                gapDisplay = 0;
+                gapValue = 0;
+                gapColor = "#6b7280";
+            } else if (required > available) {
+                gapValue = required - available;
+                gapDisplay = gapValue;
+                gapColor = "#10b981";
+            } else if (available > required) {
+                gapValue = available - required;
+                gapDisplay = `+${gapValue}`;
+                gapColor = "#ef4444";
+            } else {
+                gapDisplay = 0;
+                gapValue = 0;
+                gapColor = "#6b7280";
+            }
+
             totalRequired += required;
             totalAvailable += available;
-            totalGap += gap;
+            totalGap += gapValue;
+
             return `
                 <tr>
                     <td><b>${this._escapeAttr(d)}</b></td>
                     <td>${required}</td>
                     <td>${available}</td>
-                    <td style="color:${gap > 0 ? "#f43f5e" : "#10b981"};font-weight:700;">${gap}</td>
+                    <td style="color:${gapColor};font-weight:700;">
+                        ${gapDisplay}
+                    </td>
                 </tr>
             `;
         }).join("");
@@ -9359,23 +9527,28 @@ class AttendanceView {
     }
 
     _showAvailableLocationCards() {
-        const byLocation = AppController.model.getRequiredHeadcountByLocation();
-        const panel = document.getElementById('dashboard-location-drilldown');
-        if (!panel) return;
-
+        const emps = AppController.model.state.dashboardData?.employees || [];
+        const locations = AppController.model.sortLocations([...new Set(emps.map(e => e.location || 'Unassigned'))]);
         const colorCls = ["info", "success", "warning", "accent", "danger"];
-        const cardsHtml = byLocation.map((loc, i) => `
+        const counts = {};
+        locations.forEach(l => counts[l] = 0);
+        emps.forEach(e => counts[e.location || 'Unassigned']++);
+
+        const cardsHtml = locations.map((loc, i) => `
             <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
-                data-available-location="${loc.locationId}"
-                onclick="AppController.view._showAvailableLocationEmployees(${loc.locationId})">
+                data-available-location="${this._escapeAttr(loc)}"
+                onclick="AppController.view._showAvailableLocationEmployees('${this._escapeAttr(loc)}')">
                 <div class="stat-icon"><i class="ph ph-map-pin"></i></div>
                 <div class="stat-content">
-                    <span class="stat-label">${this._escapeAttr(loc.locationName)}</span>
-                    <span class="stat-value">${loc.available}</span>
+                    <span class="stat-label">${this._escapeAttr(loc)}</span>
+                    <span class="stat-value">${counts[loc]}</span>
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
             </div>
         `).join('');
+
+        const panel = document.getElementById('dashboard-location-drilldown');
+        if (!panel) return;
 
         panel.style.display = 'block';
         panel.innerHTML = `
@@ -9390,15 +9563,15 @@ class AttendanceView {
         panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    _showAvailableLocationEmployees(locationId) {
+    _showAvailableLocationEmployees(location) {
         document.querySelectorAll('[data-available-location]').forEach(c => c.classList.remove('active'));
-        const card = this.app.querySelector(`[data-available-location="${locationId}"]`);
+        const card = this.app.querySelector(`[data-available-location="${location}"]`);
         if (card) card.classList.add('active');
 
-        const emps = (AppController.model.state.dashboardData?.employees || []).filter(e => e.locationId === locationId);
+        const emps = (AppController.model.state.dashboardData?.employees || []).filter(e => (e.location || 'Unassigned') === location);
         const items = emps.map(emp => ({ log: null, emp, date: null }));
 
-        this._renderStatCardDrilldown('availableLocation_' + locationId, items, 1);
+        this._renderStatCardDrilldown('availableLocation_' + location, items, 1);
     }
 
     _closeAvailableLocationCards() {
@@ -9579,6 +9752,17 @@ class AttendanceView {
     _getAgeSortValue(dobRaw) {
         const age = this._calculateAge(dobRaw);
         return typeof age === "number" ? age : -Infinity; 
+    }
+
+    _normalizeShiftName(name) {
+        if (!name) return "No Shift";
+ 
+        const trimmed = String(name).trim();
+ 
+        if (trimmed.toLowerCase().replace(/\s+/g, '') === 'noshift') {
+            return "No Shift";
+        }
+        return trimmed;
     }
 }
 

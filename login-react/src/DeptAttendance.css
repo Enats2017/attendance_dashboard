@@ -148,6 +148,8 @@
 
 .da-settings-section-title { margin: 20px 0 8px; font-size: 13px; font-weight: 800; color: #4f46e5; text-transform: uppercase; letter-spacing: 0.5px; }
 
+.da-row-separator td { border-top: 2px solid #000 !important; }
+
 @keyframes toastIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
 .da-toast-success { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
 .da-toast-error { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }

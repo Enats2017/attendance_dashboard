@@ -1328,6 +1328,9 @@ html {
     margin: 20px 0 8px;
     text-transform: uppercase;
 }
+.da-row-separator td {
+    border-top: 2px solid #000 !important;
+}
 @keyframes toastIn {
     0% {
         opacity: 0;
@@ -1388,4 +1391,4 @@ html {
         padding: 4px 6px;
     }
 }
-/*# sourceMappingURL=main.aab952c8.css.map*/
+/*# sourceMappingURL=main.a2a82f9f.css.map*/

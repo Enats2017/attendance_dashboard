@@ -61,7 +61,7 @@ export default function DeptAttendance() {
     }, []);
 
     useEffect(() => {
-        if (locationId) {
+        if (locationId !== null) {
             fetchStdHc();
             fetchDesignationStdHc();
             fetchMachineStd();
@@ -69,7 +69,7 @@ export default function DeptAttendance() {
     }, [locationId]);
 
     useEffect(() => {
-        if (locationId) {
+        if (locationId !== null) {
             loadReport();
             fetchDailyMachines();
         }
@@ -86,7 +86,7 @@ export default function DeptAttendance() {
             const data = await res.json();
             if (data.success && data.data && data.data.length > 0) {
                 setLocationList(data.data);
-                setLocationId(data.data[0].location_id);
+                setLocationId(0);
             }
         } catch {}
     }
@@ -108,8 +108,8 @@ export default function DeptAttendance() {
                 setStdHcMap(map);
                 setDeptList(data.data);
                 if (data.unit_config) {
-                    if (data.unit_config.unit_capacity) setUnitCapacity(data.unit_config.unit_capacity);
-                    if (data.unit_config.unit_name) setUnitName(data.unit_config.unit_name);
+                    setUnitCapacity(data.unit_config.unit_capacity || "");
+                    setUnitName(data.unit_config.unit_name || "All Locations");
                 }
                 if (data.login_name) setLoginName(data.login_name);
             }
@@ -351,7 +351,8 @@ export default function DeptAttendance() {
             <div className="da-filter-bar">
                 <div className="da-filter-group">
                     <label>Location</label>
-                    <select value={locationId || ""} onChange={(e) => setLocationId(Number(e.target.value))}>
+                    <select value={locationId ?? ""} onChange={(e) => setLocationId(Number(e.target.value))}>
+                        <option value={0}>All Locations</option>
                         {locationList.map((loc) => (
                             <option key={loc.location_id} value={loc.location_id}>
                                 {loc.location_name}
@@ -397,13 +398,13 @@ export default function DeptAttendance() {
                     <button className="da-btn da-btn-primary" onClick={loadReport}>
                         🔍 Generate
                     </button>
-                    <button className="da-btn da-btn-warning" onClick={() => { setEditDesigHc(JSON.parse(JSON.stringify(desigStdHcMap))); setShowDesigSettings(true); }}>
+                    <button className="da-btn da-btn-warning" disabled={!locationId} onClick={() => { setEditDesigHc(JSON.parse(JSON.stringify(desigStdHcMap))); setShowDesigSettings(true); }}>
                         ⚙️ Designation STD HC
                     </button>
-                    <button className="da-btn da-btn-warning" onClick={() => { setEditMachineStd(machineStd); setShowMachineStdSettings(true); }}>
+                    <button className="da-btn da-btn-warning" disabled={!locationId} onClick={() => { setEditMachineStd(machineStd); setShowMachineStdSettings(true); }}>
                         ⚙️ Total Machines
                     </button>
-                    <button className="da-btn da-btn-warning"
+                    <button className="da-btn da-btn-warning" disabled={!locationId}
                         onClick={() => {
                             const initial = {};
                             for (let d = clampedFrom; d <= clampedTo; d++) {
@@ -509,6 +510,7 @@ function DeptSummaryRows({ summary, days }) {
         { key: "total_half_present", label: "Total Half Present", cls: "da-dsum-half" },
         { key: "total_wo_present", label: "Total Weekly-Off Present", cls: "da-dsum-wop" },
         { key: "total_wo_half_present", label: "Total Weekly-Off Half Present", cls: "da-dsum-wohp" },
+        { key: "total_single_punch", label: "Total Single Punches", cls: "da-dsum-single-punch" },
         { key: "total_weekly_off", label: "Total Weekly Off", cls: "da-dsum-wo" },
         { key: "total_absent", label: "Total Absent", cls: "da-dsum-absent" },
     ];
@@ -663,11 +665,10 @@ function ReportTable({ data, days, unitName, unitCapacity, loginName, month, yea
                         <SummaryRow label="Total Half Present" stdValue="" dayValues={summary.half_present} avgValue={summary_avg.half_present} days={days} className="da-row-heading" statusKey="half_present" expandedStatus={expandedStatus} onToggleStatus={onToggleStatus} summaryEmployeesByDay={summary_employees} colSpan={colSpan} />
                         <SummaryRow label="Total Weekly-Off Present" stdValue="" dayValues={summary.wo_present} avgValue={summary_avg.wo_present} days={days} className="da-row-heading" statusKey="wo_present" expandedStatus={expandedStatus} onToggleStatus={onToggleStatus} summaryEmployeesByDay={summary_employees} colSpan={colSpan} />
                         <SummaryRow label="Total Weekly-Off Half Present" stdValue="" dayValues={summary.wo_half_present} avgValue={summary_avg.wo_half_present} days={days} className="da-row-heading" statusKey="wo_half_present" expandedStatus={expandedStatus} onToggleStatus={onToggleStatus} summaryEmployeesByDay={summary_employees} colSpan={colSpan} />
+                        <SummaryRow label="Total Single Punches" stdValue="" dayValues={summary.single_punch} avgValue={summary_avg.single_punch} days={days} className="da-row-heading" statusKey="single_punch" expandedStatus={expandedStatus} onToggleStatus={onToggleStatus} summaryEmployeesByDay={summary_employees} colSpan={colSpan} />
                         <SummaryRow label="Total Weekly Off" stdValue="" dayValues={summary.weekly_off} avgValue={summary_avg.weekly_off} days={days} className="da-row-heading" statusKey="weekly_off" expandedStatus={expandedStatus} onToggleStatus={onToggleStatus} summaryEmployeesByDay={summary_employees} colSpan={colSpan} />
                         <SummaryRow label="Total Absent" stdValue="" dayValues={summary.total_absent} avgValue={summary_avg.total_absent} days={days} className="da-row-absent-total" statusKey="absent" expandedStatus={expandedStatus} onToggleStatus={onToggleStatus} summaryEmployeesByDay={summary_employees} colSpan={colSpan} />
-                        <SummaryRow label="Total Single Punches" stdValue="" dayValues={summary.single_punch} avgValue={summary_avg.single_punch} days={days} className="da-row-heading" statusKey="single_punch" expandedStatus={expandedStatus} onToggleStatus={onToggleStatus} summaryEmployeesByDay={summary_employees} colSpan={colSpan} />
-                        <SummaryRow label="Over-Time Paid" stdValue="" dayValues={summary.overtime_paid} avgValue={summary_avg.overtime_paid} days={days} className="da-row-ot" statusKey="overtime_paid" expandedStatus={expandedStatus} onToggleStatus={onToggleStatus} summaryEmployeesByDay={summary_employees} colSpan={colSpan} />
-                        <SummaryRow label="Weekly-Off / PH" stdValue="" dayValues={summary.weekly_off_ph} avgValue={summary_avg.weekly_off_ph} days={days} className="da-row-weekoff" />
+                        <SummaryRow label="Over-Time Paid" stdValue="" dayValues={summary.overtime_paid} avgValue={summary_avg.overtime_paid} days={days} className="da-row-ot da-row-separator" statusKey="overtime_paid" expandedStatus={expandedStatus} onToggleStatus={onToggleStatus} summaryEmployeesByDay={summary_employees} colSpan={colSpan} />
                         <SummaryRow label="On Leave" stdValue="" dayValues={summary.on_leave} avgValue={summary_avg.on_leave} days={days} className="da-row-leave" statusKey="on_leave" expandedStatus={expandedStatus} onToggleStatus={onToggleStatus} summaryEmployeesByDay={summary_employees} colSpan={colSpan} />
                         <SummaryRow label="Total New Joinee" stdValue="" dayValues={summary.new_joinee} avgValue={summary_avg.new_joinee} days={days} className="da-row-joinee" statusKey="new_joinee" expandedStatus={expandedStatus} onToggleStatus={onToggleStatus} summaryEmployeesByDay={summary_employees} colSpan={colSpan} />
                         <SummaryRow label="Total Resigned" stdValue="" dayValues={summary.left} avgValue={summary_avg.left} days={days} className="da-row-left" statusKey="left" expandedStatus={expandedStatus} onToggleStatus={onToggleStatus} summaryEmployeesByDay={summary_employees} colSpan={colSpan} />
