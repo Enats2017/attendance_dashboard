@@ -457,6 +457,8 @@
 
             const staffTeamId = this.state.teamConfig?.staffTeamId ?? 7;
             const workerTeamId = this.state.teamConfig?.workerTeamId ?? 6;
+            const contractTeamId = this.state.teamConfig?.contractTeamId ?? 8;
+            const consultantTeamId = this.state.teamConfig?.consultantTeamId ?? 9;
             const placeholderIds = this.state.placeholderIds || {
                 designation: [], department: [], company: [], shiftGroup: [], location: []
             };
@@ -475,11 +477,10 @@
                 if (emp.categoryIdRaw === null || emp.categoryIdRaw === undefined || emp.categoryIdRaw === '') {
                     addIssue('Category', 'missing', emp.categoryIdRaw);
                 }
-
-                if (emp.team === null || emp.team === undefined || (emp.team !== staffTeamId && emp.team !== workerTeamId)) {
+                const validTeamIds = [staffTeamId, workerTeamId, contractTeamId, consultantTeamId];
+                if (emp.team === null || emp.team === undefined || !validTeamIds.includes(emp.team)) {
                     addIssue('Team', 'unassigned/invalid', emp.team);
                 }
-
                 if (!emp.designationRaw) {
                     addIssue('Designation', 'missing id', emp.designationRaw);
                 } else if (!emp.designationNameRaw) {
@@ -487,13 +488,18 @@
                 } else if (this._isPlaceholderValue(emp.designationNameRaw) || (placeholderIds.designation || []).includes(emp.designationId)) {
                     addIssue('Designation', 'placeholder value', emp.designationId);
                 }
-
                 if (!emp.shiftGroupId || (placeholderIds.shiftGroup || []).includes(emp.shiftGroupId)) {
                     addIssue('Shift Group', 'not set', emp.shiftGroupId);
                 }
-
-                if (!emp.doj) addIssue('DOJ', 'missing', emp.doj);
-
+                if (!emp.doj) {
+                    addIssue('DOJ', 'missing', emp.doj);
+                }
+                if (emp.dobRaw && emp.dobRaw.slice(0, 4) === '1900') {
+                    addIssue('DOB', 'invalid placeholder year (1900)', emp.dobRaw);
+                } else if (emp.dobRaw && emp.doj && emp.dobRaw.slice(0, 10) === emp.doj.slice(0, 10)) {
+                    addIssue('DOB', 'same as DOJ', emp.dobRaw);
+                    addIssue('DOJ', 'same as DOB', emp.doj);
+                }
                 if (this._isPlaceholderValue(emp.company) || (placeholderIds.company || []).includes(emp.companyId)) {
                     addIssue('Company', 'not set', emp.companyId);
                 }

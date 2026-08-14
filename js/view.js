@@ -595,7 +595,10 @@ class AttendanceView {
             }
         });
 
-        const familyCardsHtml = dashFamilies.map((f, i) => `
+        const isOtherFamily = (f) => (f.name || "").trim().toLowerCase().includes("other");
+        const dashFamiliesWithCount = dashFamilies.filter((f) => !isOtherFamily(f) || famCounts[f.id] > 0);
+
+        const familyCardsHtml = dashFamiliesWithCount.map((f, i) => `
             <div class="stat-card ${famColorCls[i % famColorCls.length]} stat-card-clickable" data-dashboard-family-id="${f.id}" onclick="AppController.view._showDashboardFamilyDrilldown(${f.id})">
                 <div class="stat-icon"><i class="ph ph-cards"></i></div>
                 <div class="stat-content">
@@ -749,7 +752,7 @@ class AttendanceView {
         const workerTotal = this._currentWorkerSummaryData.emps.length;
         const contractTotal = this._currentContractSummaryData.emps.length;
         const consultantTotal = this._currentConsultantSummaryData.emps.length;
-        const unassignedTotal = this._currentUnassignedSummaryData.emps.length;
+        // const unassignedTotal = this._currentUnassignedSummaryData.emps.length;
 
         // --- Staff / Workmen ---
         const swCards = `
@@ -785,18 +788,6 @@ class AttendanceView {
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
             </div>
-            ${unassignedTotal > 0 ? `
-            <div class="stat-card danger stat-card-clickable" data-card-key="unassignedList">
-                <div class="stat-icon">
-                    <i class="ph ph-warning-circle"></i>
-                </div>
-                <div class="stat-content">
-                    <span class="stat-label">Unassigned</span>
-                    <span class="stat-value">${unassignedTotal}</span>
-                    <span class="stat-card-hint">↓ click to view</span>
-                </div>
-            </div>
-            ` : ""}
         `;
 
         // --- Age cards ---
@@ -897,7 +888,7 @@ class AttendanceView {
                 <div id="dashboard-dept-drilldown" style="margin-top:8px;"></div>
                 <div id="dashboard-dept-location-drilldown" style="margin-top:8px;"></div>
 
-                ${dashFamilies.length ? `
+                ${dashFamiliesWithCount.length ? `
                     ${sectionLabel("By Designation Family")}
                     <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
                         ${familyCardsHtml}
@@ -2503,7 +2494,8 @@ class AttendanceView {
         const data = this._currentGenderLocationData;
         if (!data) return;
         const items = data.emps.filter(e => (e.location || 'Unassigned') === location).map(emp => ({ log: null, emp, date: null }));
-        this._renderStatCardDrilldown("genderLocation_" + data.gender + "_" + location, items, 1);
+        const fullItems = data.emps.map(emp => ({ log: null, emp, date: null }));
+        this._renderStatCardDrilldown("genderLocation_" + data.gender + "_" + location, items, 1, "stat-card-drilldown", "AppController.view._closeStatCardDrilldown()", fullItems, data.gender + "_all_locations");
     }
 
     _closeGenderLocationCards() {
@@ -2830,7 +2822,11 @@ class AttendanceView {
         const { category, location, locEmps } = data;
 
         const items = locEmps.filter(e => e.company === company).map(emp => ({ log: null, emp, date: null }));
-        this._renderStatCardDrilldown("categoryCompany_" + category + "_" + location + "_" + company, items, 1);
+
+        const catData = this._currentCategoryData;
+        const fullItems = catData ? catData.catEmps.filter(e => e.company === company).map(emp => ({ log: null, emp, date: null })) : items;
+
+        this._renderStatCardDrilldown("categoryCompany_" + category + "_" + location + "_" + company, items, 1, "stat-card-drilldown", "AppController.view._closeStatCardDrilldown()", fullItems, company + "_" + category + "_all_locations");
     }
 
 
@@ -2934,9 +2930,9 @@ class AttendanceView {
         const { emps } = data;
 
         const items = emps.filter((e) => (e.location || "Unassigned") === location).map((emp) => ({ log: null, emp, date: null }));
+        const fullItems = emps.map((emp) => ({ log: null, emp, date: null }));
 
-        // default containerId "stat-card-drilldown" → bottom panel, same place the table always lands
-        this._renderStatCardDrilldown("companyLocation_" + data.company + "_" + location, items, 1);
+        this._renderStatCardDrilldown("companyLocation_" + data.company + "_" + location, items, 1, "stat-card-drilldown", "AppController.view._closeStatCardDrilldown()", fullItems, data.company + "_all_locations");
     }
 
 
@@ -3037,7 +3033,8 @@ class AttendanceView {
         const data = this._currentAgeGroupLocationData;
         if (!data) return;
         const items = data.emps.filter(e => (e.location || 'Unassigned') === location).map(emp => ({ log: null, emp, date: null }));
-        this._renderStatCardDrilldown("ageLocation_" + data.group + "_" + location, items, 1);
+        const fullItems = data.emps.map(emp => ({ log: null, emp, date: null }));
+        this._renderStatCardDrilldown("ageLocation_" + data.group + "_" + location, items, 1, "stat-card-drilldown", "AppController.view._closeStatCardDrilldown()", fullItems, data.group + "_all_locations");
     }
 
     _closeAgeGroupLocationCards() {
@@ -3045,6 +3042,7 @@ class AttendanceView {
         if (panel) { panel.style.display = "none"; panel.innerHTML = ""; }
         document.querySelectorAll("[data-age-location]").forEach(c => c.classList.remove("active"));
     }
+
 
 
     _showWorkforceSelected(type) {
@@ -3075,6 +3073,21 @@ class AttendanceView {
         }
         this._showWorkforceLocationCards(type);
     }
+
+
+    _showUnassignedDrilldown() {
+        document.querySelectorAll(".stat-card-clickable").forEach(c => c.classList.remove("active"));
+        const card = this.app.querySelector('[data-workforce="Unassigned"]');
+        if (card) card.classList.add("active");
+        this._closeStatCardDrilldown();
+
+        const data = this._currentUnassignedSummaryData;
+        if (!data) return;
+
+        const items = data.emps.map(emp => ({ log: null, emp, date: null }));
+        this._renderStatCardDrilldown("unassignedList", items, 1);
+    }
+
 
     _showWorkforceLocationCards(type) {
         const dataMap = {
@@ -3134,7 +3147,9 @@ class AttendanceView {
         if (!data) return;
         const keyMap = { Staff: 'staffList', Workmen: 'workerList', Contract: 'contractList', Consultant: 'consultantList' };
         const items = data.emps.filter(e => (e.location || 'Unassigned') === location).map(emp => ({ log: null, emp, date: null }));
-        this._renderStatCardDrilldown((keyMap[data.type] || 'workforceList') + '_' + location, items, 1);
+        const fullItems = data.emps.map(emp => ({ log: null, emp, date: null }));
+
+        this._renderStatCardDrilldown((keyMap[data.type] || 'workforceList') + '_' + location, items, 1,  "stat-card-drilldown", "AppController.view._closeStatCardDrilldown()", fullItems, data.type + "_all_locations");
     }
 
     _closeWorkforceLocationCards() {
@@ -3355,8 +3370,9 @@ class AttendanceView {
         const data = this._currentFamilyLocationData;
         if (!data) return;
         const items = data.famEmps.filter(e => (e.location || 'Unassigned') === location).map(emp => ({ log: null, emp, date: null }));
+        const fullItems = data.famEmps.map(emp => ({ log: null, emp, date: null }));
 
-        this._renderStatCardDrilldown("familyLocation_" + data.familyId + "_" + location, items, 1);
+        this._renderStatCardDrilldown("familyLocation_" + data.familyId + "_" + location, items, 1, "stat-card-drilldown", "AppController.view._closeStatCardDrilldown()", fullItems, "family_" + data.familyId + "_all_locations");
     }
 
 
@@ -4005,6 +4021,24 @@ class AttendanceView {
         }));
 
         this.exportExcel(exportData, "available-all-locations");
+    }
+
+
+    downloadFullExcel() {
+        const items = this._statCardFullItems || [];
+        if (!items.length) return;
+        const exportData = items.map(({ log, emp, date }) => ({
+            Code: emp?.code,
+            Name: emp?.name,
+            Dept: emp?.dept,
+            Company: emp?.company,
+            Designation: emp?.designation,
+            TeamName: emp?.teamName,
+            shiftGroupName: emp?.shiftGroupName,
+            Shift: emp?.shift,
+            Location: emp?.location || ""
+        }));
+        this.exportExcel(exportData, this._statCardFullExportName || "full-export");
     }
 
 
@@ -7031,9 +7065,11 @@ class AttendanceView {
     }
 
     
-    _renderStatCardDrilldown(key, items, page = 1, containerId = "stat-card-drilldown", closeHandler = "AppController.view._closeStatCardDrilldown()") {
+    _renderStatCardDrilldown(key, items, page = 1, containerId = "stat-card-drilldown", closeHandler = "AppController.view._closeStatCardDrilldown()", fullItems = null, fullExportName = null) {
         this._statCardKey = key;
         this._statCardItems = items;
+        this._statCardFullItems = fullItems;
+        this._statCardFullExportName = fullExportName || (key + "-all-locations");
 
         const panel = document.getElementById(containerId);
 
@@ -7177,7 +7213,7 @@ class AttendanceView {
         for (let i = startP; i <= endP; i++) {
             pageButtons += `
                 <button class="btn-page ${i === currentPage ? "btn-page-active" : ""}"
-                    onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, ${i}, '${containerId}', '${closeHandler}')">
+                    onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, ${i}, '${containerId}', '${closeHandler}', AppController.view._statCardFullItems, AppController.view._statCardFullExportName)">
                     ${i}
                 </button>
             `;
@@ -7305,8 +7341,8 @@ class AttendanceView {
 						<button class="btn-drill btn-drill-excel" onclick="AppController.view.exportExcel(AppController.view._statCardExportData, '${key}-employees')">
 							↓ Excel
 						</button>
-                        ${key.startsWith("availableLocation_") ? `
-                            <button class="btn-drill btn-drill-excel" onclick="AppController.view.downloadFullAvailableExcel()">
+                        ${this._statCardFullItems && this._statCardFullItems.length ? `
+                            <button class="btn-drill btn-drill-excel" onclick="AppController.view.downloadFullExcel()">
                                 ↓ Full Excel
                             </button>
                         ` : ""}
@@ -7332,14 +7368,14 @@ class AttendanceView {
 					</div>
 					<div class="pagination-buttons">
 						<button class="btn-page" ${currentPage === 1 ? "disabled" : ""}
-                            onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, 1, '${containerId}', '${closeHandler}')">«</button>
+                            onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, 1, '${containerId}', '${closeHandler}', AppController.view._statCardFullItems, AppController.view._statCardFullExportName)">«</button>
 						<button class="btn-page" ${currentPage === 1 ? "disabled" : ""}
-							onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, ${currentPage - 1})">‹</button>
+                            onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, ${currentPage - 1}, '${containerId}', '${closeHandler}', AppController.view._statCardFullItems, AppController.view._statCardFullExportName)">‹</button>
 						${pageButtons}
+                        <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""}
+							onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, ${currentPage + 1}, '${containerId}', '${closeHandler}', AppController.view._statCardFullItems, AppController.view._statCardFullExportName)">›</button>
 						<button class="btn-page" ${currentPage === totalPages ? "disabled" : ""}
-							onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, ${currentPage + 1})">›</button>
-						<button class="btn-page" ${currentPage === totalPages ? "disabled" : ""}
-							onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, ${totalPages})">»</button>
+							onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, ${totalPages}, '${containerId}', '${closeHandler}', AppController.view._statCardFullItems, AppController.view._statCardFullExportName)">»</button>
 					</div>
 				</div>
 			</div>
