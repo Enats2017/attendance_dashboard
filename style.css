@@ -1452,6 +1452,26 @@ body {
 }
 .units-eye-btn:hover { background: #eef2ff; }
 
+.stat-card-download-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 26px;
+    height: 26px;
+    border: none;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.7);
+    color: #334155;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 2;
+}
+.stat-card-download-btn:hover {
+    background: #6366f1;
+    color: #fff;
+}
 
 /* Responsive */
 

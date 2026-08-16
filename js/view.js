@@ -701,7 +701,11 @@ class AttendanceView {
             }
 
             return `
-                <div class="stat-card ${compColorCls[i % compColorCls.length]} stat-card-clickable" data-company-category="${cat}" onclick="AppController.view._showCompanyCategoryDrilldown('${cat}')">
+                <div class="stat-card ${compColorCls[i % compColorCls.length]} stat-card-clickable" data-company-category="${cat}" onclick="AppController.view._showCompanyCategoryDrilldown('${cat}')" style="position:relative;">
+                    <button class="stat-card-download-btn" title="Download ${this._escapeAttr(catLabel)} Excel"
+                        onclick="event.stopPropagation(); AppController.view._downloadCategoryExcel('${cat}')">
+                        <i class="ph ph-download-simple"></i>
+                    </button>
                     ${topLabel}
                     <div class="stat-icon"><i class="ph ph-buildings"></i></div>
                     <div class="stat-content">
@@ -842,7 +846,11 @@ class AttendanceView {
         });
         const dashDeptColorCls = ["info", "success", "warning", "accent", "danger"];
         const dashDeptCards = dashDepts.map((d, i) => `
-            <div class="stat-card ${dashDeptColorCls[i % dashDeptColorCls.length]} stat-card-clickable" data-dashboard-dept="${this._escapeAttr(d)}" onclick="AppController.view._showDashboardDeptDrilldown('${this._escapeAttr(d)}')">
+            <div class="stat-card ${dashDeptColorCls[i % dashDeptColorCls.length]} stat-card-clickable" data-dashboard-dept="${this._escapeAttr(d)}" onclick="AppController.view._showDashboardDeptDrilldown('${this._escapeAttr(d)}')" style="position:relative;">
+                <button class="stat-card-download-btn" title="Download ${this._escapeAttr(d)} Excel"
+                    onclick="event.stopPropagation(); AppController.view._downloadDeptExcel('${this._escapeAttr(d)}')">
+                    <i class="ph ph-download-simple"></i>
+                </button>
                 <div class="stat-icon"><i class="ph ph-briefcase"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">${d}</span>
@@ -4039,6 +4047,69 @@ class AttendanceView {
             Location: emp?.location || ""
         }));
         this.exportExcel(exportData, this._statCardFullExportName || "full-export");
+    }
+
+
+    _downloadCategoryExcel(category) {
+        const data = this._currentCompanyData;
+        if (!data) return;
+        const { emps } = data;
+
+        const mergeCat = (rawCat) => rawCat || "OTHER";
+        const catEmps = emps.filter((e) => mergeCat(e.companyCategory) === category);
+
+        if (!catEmps.length) return;
+
+        const categoryLabelsForExport = {
+            "ON-ROLL": "ON-ROLL",
+            "CC": "COMPANY-CONTRACT",
+            "CONTRACTOR": "CONTRACTOR",
+            "OUTSOURCE": "OUTSOURCE",
+            "OTHER": "UNASSIGNED",
+        };
+
+        const exportData = catEmps.map((emp) => ({
+            Code: emp.code,
+            Name: emp.name,
+            Dept: emp.dept,
+            Company: emp.company,
+            Designation: emp.designation,
+            TeamName: emp.teamName,
+            shiftGroupName: emp.shiftGroupName,
+            Shift: emp.shift,
+            ShiftStart: emp.shiftStart || "",
+            ShiftEnd: emp.shiftEnd || "",
+            Location: emp.location || "",
+        }));
+
+        const filename = (categoryLabelsForExport[category] || category) + "-all-locations";
+        this.exportExcel(exportData, filename);
+    }
+
+
+    _downloadDeptExcel(dept) {
+        const data = this._currentDashboardDeptData;
+        if (!data) return;
+        const { emps } = data;
+
+        const deptEmps = emps.filter((e) => e.dept === dept);
+        if (!deptEmps.length) return;
+
+        const exportData = deptEmps.map((emp) => ({
+            Code: emp.code,
+            Name: emp.name,
+            Dept: emp.dept,
+            Company: emp.company,
+            Designation: emp.designation,
+            TeamName: emp.teamName,
+            shiftGroupName: emp.shiftGroupName,
+            Shift: emp.shift,
+            ShiftStart: emp.shiftStart || "",
+            ShiftEnd: emp.shiftEnd || "",
+            Location: emp.location || "",
+        }));
+
+        this.exportExcel(exportData, dept + "-all-locations");
     }
 
 
