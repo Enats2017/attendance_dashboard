@@ -793,42 +793,99 @@ function resolveAgeGroup($dobRaw) {
 
 // Shift detection
 function findNearShiftPunch(array $employeePunches, string $empId, string $attendanceDate, array $shiftIds, array $shiftDetailsMap): ?array {
+    $previousAttendanceDate = date('Y-m-d', strtotime($attendanceDate . ' -1 day'));
+    $nextAttendanceDate = date('Y-m-d', strtotime($attendanceDate . ' +1 day'));
+
+    $firstAttendanceDayPunch = null;
     foreach ($employeePunches as $punch) {
+        $punchDate = $punch['dateTime']->format('Y-m-d');
+        if ($punchDate !== $attendanceDate) {
+            continue;
+        }
+        if ($firstAttendanceDayPunch === null || $punch['dateTime'] < $firstAttendanceDayPunch['dateTime']) {
+            $firstAttendanceDayPunch = $punch;
+        }
+    }
+
+    $firstNextDayPunch = null;
+    foreach ($employeePunches as $punch) {
+        $punchDate = $punch['dateTime']->format('Y-m-d');
+        if ($punchDate !== $nextAttendanceDate) {
+            continue;
+        }
+        if ($firstNextDayPunch === null || $punch['dateTime'] < $firstNextDayPunch['dateTime']) {
+            $firstNextDayPunch = $punch;
+        }
+    }
+
+    $firstOutBelongsToPreviousNight = false;
+    if ($firstAttendanceDayPunch !== null && strtoupper($firstAttendanceDayPunch['direction']) === 'OUT') {
+        $firstPunchTs = $firstAttendanceDayPunch['dateTime']->getTimestamp();
         foreach ($shiftIds as $sid) {
             if (!isset($shiftDetailsMap[$sid])) {
                 continue;
             }
+
             $shift = $shiftDetailsMap[$sid];
             if (empty($shift['begin']) || empty($shift['end'])) {
                 continue;
             }
 
             $beginMinutes = (int)substr($shift['begin'], 0, 2) * 60 + (int)substr($shift['begin'], 3, 2);
-            $endMinutes   = (int)substr($shift['end'], 0, 2) * 60 + (int)substr($shift['end'], 3, 2);
-            $crossesMidnight = $shift['flexiNextDay'] || ($endMinutes <= $beginMinutes);        
+            $endMinutes = (int)substr($shift['end'], 0, 2) * 60 + (int)substr($shift['end'], 3, 2);
+            $crossesMidnight = !empty($shift['flexiNextDay']) || ($endMinutes <= $beginMinutes);
 
-            $punchDate = $punch['dateTime']->format('Y-m-d');
-            $punchTime = $punch['dateTime']->format('H:i:s');
-            $direction = strtoupper($punch['direction']);
+            if (!$crossesMidnight) {
+                continue;
+            }
 
-            $punchTs = $punch['dateTime']->getTimestamp();
-            $nextAttendanceDate = date('Y-m-d', strtotime($attendanceDate . ' +1 day'));
+            $previousNightShiftEndTs = strtotime($attendanceDate . ' ' . $shift['end']);
+            $previousNightWindowStart = $previousNightShiftEndTs - 3600;
+            $previousNightWindowEnd = $previousNightShiftEndTs + 7200;
 
+            if ($firstPunchTs >= $previousNightWindowStart && $firstPunchTs <= $previousNightWindowEnd) {
+                $firstOutBelongsToPreviousNight = true;
+                break;
+            }
+        }
+    }
+
+    foreach ($employeePunches as $punch) {
+        $punchDate = $punch['dateTime']->format('Y-m-d');
+        $punchTime = $punch['dateTime']->format('H:i:s');
+        $direction = strtoupper($punch['direction']);
+        $punchTs = $punch['dateTime']->getTimestamp();
+
+        if ($punchDate === $attendanceDate && $direction === 'OUT' && $firstAttendanceDayPunch !== null && $punchTs === $firstAttendanceDayPunch['dateTime']->getTimestamp() && $firstOutBelongsToPreviousNight) {
+            continue;
+        }
+
+        foreach ($shiftIds as $sid) {
+            if (!isset($shiftDetailsMap[$sid])) {
+                continue;
+            }
+
+            $shift = $shiftDetailsMap[$sid];
+            if (empty($shift['begin']) || empty($shift['end'])) {
+                continue;
+            }
+
+            $beginMinutes = (int)substr($shift['begin'], 0, 2) * 60 + (int)substr($shift['begin'], 3, 2);
+            $endMinutes = (int)substr($shift['end'], 0, 2) * 60 + (int)substr($shift['end'], 3, 2);
+            $crossesMidnight = !empty($shift['flexiNextDay']) || ($endMinutes <= $beginMinutes);
             $shiftBeginTs = strtotime($attendanceDate . ' ' . $shift['begin']);
-
             $shiftEndTsCurrent = strtotime($attendanceDate . ' ' . $shift['end']);
-            $shiftEndTsNext    = strtotime($nextAttendanceDate . ' ' . $shift['end']);
+            $shiftEndTsNext = strtotime($nextAttendanceDate . ' ' . $shift['end']);
 
             if ($direction === 'OUT') {
-                if ($punchDate == $attendanceDate) {
+                if ($punchDate === $attendanceDate) {
                     $windowStart = $shiftEndTsCurrent - 3600;
-                    $windowEnd   = $shiftEndTsCurrent + 7200;
+                    $windowEnd = $shiftEndTsCurrent + 7200;
 
                     if ($punchTs >= $windowStart && $punchTs <= $windowEnd) {
                         if ($crossesMidnight) {
                             continue;
                         }
-
                         return [
                             'direction' => 'out',
                             'time' => $punchTime,
@@ -838,19 +895,26 @@ function findNearShiftPunch(array $employeePunches, string $empId, string $atten
                             'shiftName' => $shift['name'] ?? null,
                         ];
                     }
-                }
-
-                else if ($punchDate == $nextAttendanceDate) {
+                } else if ($punchDate === $nextAttendanceDate) {
                     if (!$crossesMidnight) {
+                        continue;
+                    }
+                    if ($firstNextDayPunch === null) {
+                        continue;
+                    }
+
+                    $firstPunchTs = $firstNextDayPunch['dateTime']->getTimestamp();
+                    $firstPunchDirection = strtoupper($firstNextDayPunch['direction']);
+
+                    if ($punchTs !== $firstPunchTs) {
+                        continue;
+                    }
+                    if ($firstPunchDirection !== 'OUT') {
                         continue;
                     }
 
                     $windowStart = $shiftEndTsNext - 3600;
-                    $windowEnd   = $shiftEndTsNext + 7200;
-                    
-                    if ($punchTs > $windowEnd) {
-                        continue;
-                    }
+                    $windowEnd = $shiftEndTsNext + 7200;
 
                     if ($punchTs >= $windowStart && $punchTs <= $windowEnd) {
                         return [
@@ -864,13 +928,12 @@ function findNearShiftPunch(array $employeePunches, string $empId, string $atten
                     }
                 }
             } else if ($direction === 'IN') {
-                // Only attendance date IN punch
-                if ($punchDate != $attendanceDate) {
+                if ($punchDate !== $attendanceDate) {
                     continue;
                 }
 
-                $windowStart = $shiftBeginTs - 3600; // Begin - 1 hour
-                $windowEnd = $shiftBeginTs + 3600; // Begin + 1 hour
+                $windowStart = $shiftBeginTs - 3600;
+                $windowEnd = $shiftBeginTs + 3600;
 
                 if ($punchTs >= $windowStart && $punchTs <= $windowEnd) {
                     return [
@@ -884,6 +947,53 @@ function findNearShiftPunch(array $employeePunches, string $empId, string $atten
                 }
             }
         }
+    }
+
+    $nearestShift = null;
+    $nearestDifference = PHP_INT_MAX;
+
+    foreach ($employeePunches as $punch) {
+        $punchDate = $punch['dateTime']->format('Y-m-d');
+        $punchTime = $punch['dateTime']->format('H:i:s');
+        $direction = strtoupper($punch['direction']);
+        $punchTs = $punch['dateTime']->getTimestamp();
+
+        if ($direction !== 'IN') {
+            continue;
+        }
+        if ($punchDate !== $attendanceDate) {
+            continue;
+        }
+
+        foreach ($shiftIds as $sid) {
+            if (!isset($shiftDetailsMap[$sid])) {
+                continue;
+            }
+
+            $shift = $shiftDetailsMap[$sid];
+            if (empty($shift['begin']) || empty($shift['end'])) {
+                continue;
+            }
+
+            $shiftReferenceTs = strtotime($attendanceDate . ' ' . $shift['begin']);
+            $difference = abs($punchTs - $shiftReferenceTs);
+
+            if ($difference < $nearestDifference) {
+                $nearestDifference = $difference;
+                $nearestShift = [
+                    'direction' => 'in',
+                    'time' => $punchTime,
+                    'matchedShiftId' => $sid,
+                    'shiftStart' => $shift['begin'],
+                    'shiftEnd' => $shift['end'],
+                    'shiftName' => $shift['name'] ?? null,
+                ];
+            }
+        }
+    }
+
+    if ($nearestShift !== null) {
+        return $nearestShift;
     }
 
     return null;

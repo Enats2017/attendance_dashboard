@@ -561,6 +561,8 @@ class AttendanceView {
         const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
         const staffWorkerStats = this._staffWorkerStats || {};
         
+        this._fullAvailableItems = emps.map(emp => ({ log: null, emp, date: null }));
+
         const staffTeamId = model.state.teamConfig?.staffTeamId ?? 7;
         const workerTeamId = model.state.teamConfig?.workerTeamId ?? 6;
         const contractTeamId = model.state.teamConfig?.contractTeamId ?? 8;
@@ -627,7 +629,11 @@ class AttendanceView {
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
             </div>
-            <div class="stat-card success stat-card-clickable" data-headcount="available" onclick="AppController.view._handleAvailableCardClick()">
+            <div class="stat-card success stat-card-clickable" data-headcount="available" onclick="AppController.view._handleAvailableCardClick()" style="position:relative;">
+                <button class="stat-card-download-btn" title="Download Available Employees Excel"
+                    onclick="event.stopPropagation(); AppController.view.downloadFullAvailableExcel()">
+                    <i class="ph ph-download-simple"></i>
+                </button>
                 <div class="stat-icon"><i class="ph ph-users"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">Available</span>
