@@ -597,8 +597,7 @@ class AttendanceView {
             }
         });
 
-        const isOtherFamily = (f) => (f.name || "").trim().toLowerCase().includes("other");
-        const dashFamiliesWithCount = dashFamilies.filter((f) => !isOtherFamily(f) || famCounts[f.id] > 0);
+        const dashFamiliesWithCount = dashFamilies.filter((f) => famCounts[f.id] > 0);
 
         const familyCardsHtml = dashFamiliesWithCount.map((f, i) => `
             <div class="stat-card ${famColorCls[i % famColorCls.length]} stat-card-clickable" data-dashboard-family-id="${f.id}" onclick="AppController.view._showDashboardFamilyDrilldown(${f.id})">
@@ -675,16 +674,16 @@ class AttendanceView {
             companiesByCategory[cat][e.company]++;
         });
 
-        const catCardsHtml = categoryOrder.filter((cat) => {
-            if (cat === "OTHER") {
-                const companiesInCat = companiesByCategory[cat] || {};
-                return Object.keys(companiesInCat).length > 0;
-            }
-            return true;
-        }).map((cat, i) => {
+        const catCardsHtml = categoryOrder.map((cat, i) => {
             const companiesInCat = companiesByCategory[cat] || {};
             const companyNames = Object.keys(companiesInCat);
+
             const totalCount = companyNames.reduce((sum, c) => sum + companiesInCat[c], 0);
+
+            if (totalCount === 0) {
+                return "";
+            }
+
             const catLabel = categoryLabels[cat] || cat;
 
             const topLabel = `
@@ -693,39 +692,42 @@ class AttendanceView {
                 </div>
             `;
 
-            if (companyNames.length === 0) {
-                return `
-                    <div class="stat-card ${compColorCls[i % compColorCls.length]}">
-                        ${topLabel}
-                        <div class="stat-icon"><i class="ph ph-buildings"></i></div>
-                        <div class="stat-content">
-                            <span class="stat-label">Total Companies</span>
-                            <span class="stat-value">0</span>
-                        </div>
-                    </div>
-                `;
-            }
-
             return `
                 <div class="stat-card ${compColorCls[i % compColorCls.length]} stat-card-clickable" data-company-category="${cat}" onclick="AppController.view._showCompanyCategoryDrilldown('${cat}')" style="position:relative;">
-                    <button class="stat-card-download-btn" title="Download ${this._escapeAttr(catLabel)} Excel"
-                        onclick="event.stopPropagation(); AppController.view._downloadCategoryExcel('${cat}')">
+                    <button class="stat-card-download-btn" title="Download ${this._escapeAttr(catLabel)} Excel" onclick="event.stopPropagation(); AppController.view._downloadCategoryExcel('${cat}')">
                         <i class="ph ph-download-simple"></i>
                     </button>
+
                     ${topLabel}
-                    <div class="stat-icon"><i class="ph ph-buildings"></i></div>
+
+                    <div class="stat-icon">
+                        <i class="ph ph-buildings"></i>
+                    </div>
+
                     <div class="stat-content">
-                        ${companyNames.length === 1
-                            ? `<span class="stat-label">${this._escapeAttr(companyNames[0])}</span><span class="stat-value">${totalCount}</span>`
-                            : `<span class="stat-label">Total Headcount</span><span class="stat-value">${totalCount}</span><span class="stat-card-sub">(${companyNames.length} Companies)</span>`
+                        ${
+                            companyNames.length === 1
+                            ? `
+                                <span class="stat-label">${this._escapeAttr(companyNames[0])}</span>
+                                <span class="stat-value">${totalCount}</span>
+                            `
+                            : `
+                                <span class="stat-label">Total Headcount</span>
+                                <span class="stat-value">${totalCount}</span>
+                                <span class="stat-card-sub">(${companyNames.length} Companies)</span>
+                            `
                         }
                     </div>
                 </div>
             `;
         }).join("");
 
-        const hasUnassigned = Object.keys(companiesByCategory["OTHER"] || {}).length > 0;
-        const companyColumnCount = hasUnassigned ? 5 : 4;
+        const visibleCompanyCardCount = categoryOrder.filter((cat) => {
+        const companiesInCat = companiesByCategory[cat] || {};
+            return Object.values(companiesInCat).reduce((sum, count) => sum + count, 0) > 0;
+        }).length;
+
+        const companyColumnCount = Math.max(1, visibleCompanyCardCount);
         const companySectionsHtml = `
             <div class="summary-grid" style="grid-template-columns: repeat(${companyColumnCount}, minmax(0,1fr));">
                 ${catCardsHtml}
@@ -827,7 +829,8 @@ class AttendanceView {
             const g = model.getAgeGroup(e.dob);
             if (ageCounts[g] !== undefined) ageCounts[g]++;
         });
-        const ageCards = ageGroups.map((g) => `
+
+        const ageCards = ageGroups.filter((g) => ageCounts[g] > 0).map((g) => `
             <div class="stat-card ${ageGroupCls[g]} stat-card-clickable" data-age-group="${this._escapeAttr(g)}" onclick="AppController.view._showAgeGroupDrilldown('${this._escapeAttr(g)}')">
                 <div class="stat-icon">
                     <span class="material-symbols-outlined">
@@ -851,7 +854,7 @@ class AttendanceView {
             if (dashDeptCounts[e.dept] !== undefined) dashDeptCounts[e.dept]++;
         });
         const dashDeptColorCls = ["info", "success", "warning", "accent", "danger"];
-        const dashDeptCards = dashDepts.map((d, i) => `
+        const dashDeptCards = dashDepts.filter((d) => dashDeptCounts[d] > 0).map((d, i) => `
             <div class="stat-card ${dashDeptColorCls[i % dashDeptColorCls.length]} stat-card-clickable" data-dashboard-dept="${this._escapeAttr(d)}" onclick="AppController.view._showDashboardDeptDrilldown('${this._escapeAttr(d)}')" style="position:relative;">
                 <button class="stat-card-download-btn" title="Download ${this._escapeAttr(d)} Excel"
                     onclick="event.stopPropagation(); AppController.view._downloadDeptExcel('${this._escapeAttr(d)}')">
@@ -1464,6 +1467,11 @@ class AttendanceView {
     _renderEarlyOutSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
         const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
+        this._currentTabPresentHeadcountItems = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch")).map((l) => ({
+            log: l,
+            emp: empMap[l.empId],
+            date: l.date,
+        }));
         const totalPresentHalf = this._currentTabPresentHeadcountItems.length;
 
         const cards = [
@@ -6940,76 +6948,522 @@ class AttendanceView {
 
     
     _renderSpecial(logs, emps, empMap, filters, model, npPage = 1, spPage = 1) {
-        const noPunch = model.findNoPunchEmployees();
-        const singlePunchItems = model.getSinglePunchEmployees();
+        const noPunchGroups = model.findNoPunchEmployees();
+        const singlePunchGroups = model.getSinglePunchEmployeesGrouped();
+        const noPunchPageSize = 10;
+        const noPunchCurrentPage = npPage;
+        const totalNoPunchPages = Math.max(1, Math.ceil(noPunchGroups.length / noPunchPageSize));
+        const noPunchPageGroups = noPunchGroups.slice((noPunchCurrentPage - 1) * noPunchPageSize, noPunchCurrentPage * noPunchPageSize);
 
-        const npRows = noPunch.map((x) => [
-            x.emp.code || "-",
-            x.emp.name || "-",
-            x.emp.dept || "-",
-            x.emp.designation || "-",
-            x.emp.shift || "-",
-            x.emp.company || "-",
-            x.maxGap,
-            this._formatDate(x.gapStart),
-        ]);
+        const noPunchRowsHtml = noPunchPageGroups.map((g) => {
+            const severityStyle = this._getSeverityStyle(g.count);
+            return `
+                <tr style="cursor:pointer;${severityStyle}" onclick="AppController.view._showNoPunchEmployeeDrilldown('${g.emp.id}')">
+                    <td><b>${g.emp.code || "-"}</b></td>
+                    <td>${g.emp.name || "-"}</td>
+                    <td>${g.emp.dept || "-"}</td>
+                    <td>${g.emp.designation || "-"}</td>
+                    <td>${g.emp.shift || "-"}</td>
+                    <td>${g.emp.company || "-"}</td>
+                    <td>
+                        <span class="badge ${g.count >= 5 ? "badge-danger" : "badge-info"}">
+                            ${g.count}
+                            No Punch Day${g.count > 1 ? "s" : ""}
+                        </span>
+                    </td>
+                </tr>
+            `;
+        }).join("");
 
-        const spRows = singlePunchItems.map(({ log, emp, date }) => [
-            emp.code || "-",
-            emp.name || "-",
-            emp.dept || "-",
-            emp.designation || "-",
-            emp.shift || "-",
-            emp.company || "-",
-            this._formatDate(date),
-            log?.inTime || log?.outTime || "-",
-        ]);
+        this._currentNoPunchGroups = noPunchGroups;
+        this._currentNoPunchPage = noPunchCurrentPage;
 
-        this._currentNoPunchRows = npRows;
-        this._currentSinglePunchRows = spRows;
+        let noPunchPageButtons = "";
+        const npStartPage = Math.max(1, noPunchCurrentPage - 2);
+        const npEndPage = Math.min(totalNoPunchPages, noPunchCurrentPage + 2);
 
-        const npHeaders = ["Code", "Name", "Dept", "Designation", "Shift", "Company", "Gap", "Start"];
-        const spHeaders = ["Code", "Name", "Dept", "Designation", "Shift", "Company", "Date", "Time"];
-        const pageSize = 10;
+        for (let i = npStartPage; i <= npEndPage; i++) {
+            noPunchPageButtons += `
+                <button class="btn-page ${i === noPunchCurrentPage ? "btn-page-active" : ""}" onclick="AppController.view._reRenderNoPunchPage(${i})">
+                    ${i}
+                </button>
+            `;
+        }
+
+        const singlePunchPageSize = 10;
+        const singlePunchCurrentPage = spPage;
+        const totalSinglePunchPages = Math.max(1, Math.ceil(singlePunchGroups.length / singlePunchPageSize));
+        const singlePunchPageGroups = singlePunchGroups.slice((singlePunchCurrentPage - 1) * singlePunchPageSize, singlePunchCurrentPage * singlePunchPageSize);
+
+        const singlePunchRowsHtml = singlePunchPageGroups.map((g) => {
+            const severityStyle = this._getSeverityStyle(g.count);
+            return `
+                <tr style="cursor:pointer;${severityStyle}" onclick="AppController.view._showSinglePunchEmployeeDrilldown('${g.emp.id}')">
+                    <td><b>${g.emp.code || "-"}</b></td>
+                    <td>${g.emp.name || "-"}</td>
+                    <td>${g.emp.dept || "-"}</td>
+                    <td>${g.emp.designation || "-"}</td>
+                    <td>${g.emp.shift || "-"}</td>
+                    <td>${g.emp.company || "-"}</td>
+                    <td>
+                        <span class="badge ${g.count >= 3 ? "badge-danger" : "badge-info"}">
+                            ${g.count}
+                            Single Punch Day${g.count > 1 ? "s" : ""}
+                        </span>
+                    </td>
+                </tr>
+            `;
+        }).join("");
+
+        this._currentSinglePunchGroups = singlePunchGroups;
+        this._currentSinglePunchPage = singlePunchCurrentPage;
+
+        let singlePunchPageButtons = "";
+        const spStartPage = Math.max(1, singlePunchCurrentPage - 2);
+        const spEndPage = Math.min(totalSinglePunchPages, singlePunchCurrentPage + 2);
+
+        for (let i = spStartPage; i <= spEndPage; i++) {
+            singlePunchPageButtons += `
+                <button class="btn-page ${i === singlePunchCurrentPage ? "btn-page-active" : ""}" onclick="AppController.view._reRenderSinglePunchPage(${i})">
+                    ${i}
+                </button>
+            `;
+        }
 
         return {
             html: `
-				<h2 class="section-title"><i class="ph-fill ph-warning-circle"></i> Critical Alerts</h2>
-				<div class="table-wrap" style="margin-bottom:20px">
-					<div class="table-header"><h3>🚩 No Punch ≥ 5 Days</h3></div>
-					<div id="special-np-table-wrap" style="overflow-x:auto">
-						${this._buildPaginatedTable(npRows, npHeaders, npPage, pageSize, "tbl-np", "_reRenderNoPunchPage")}
-					</div>
-				</div>
-				<div class="table-wrap">
-					<div class="table-header"><h3>⚡ Single Punch</h3></div>
-					<div id="special-sp-table-wrap" style="overflow-x:auto">
-						${this._buildPaginatedTable(spRows, spHeaders, spPage, pageSize, "tbl-sp", "_reRenderSinglePunchPage")}
-					</div>
-				</div>
-			`,
-            renderCharts: () => { },
+                <h2 class="section-title">
+                    <i class="ph-fill ph-warning-circle"></i>
+                    Critical Alerts
+                </h2>
+
+                <div class="table-wrap" id="special-np-section" style="margin-bottom:20px">
+                    <div class="table-header">
+                        <h3>🚩 No Punch ≥ 5 Days</h3>
+                    </div>
+                    <div id="special-np-table-wrap">
+                        <div style="overflow-x:auto">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Code</th>
+                                        <th>Name</th>
+                                        <th>Dept</th>
+                                        <th>Designation</th>
+                                        <th>Shift</th>
+                                        <th>Company</th>
+                                        <th>No Punch Days</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${noPunchRowsHtml}
+                                </tbody>
+                            </table>
+                        </div>
+
+
+                        <div class="pagination-bar">
+                            <div class="pagination-text">
+                                Showing ${(noPunchCurrentPage - 1) * noPunchPageSize + 1} – ${Math.min(noPunchCurrentPage * noPunchPageSize, noPunchGroups.length)} of ${noPunchGroups.length} employees &nbsp;·&nbsp; Page ${noPunchCurrentPage} of ${totalNoPunchPages}
+                            </div>
+                            <div class="pagination-buttons">
+                                <button class="btn-page" ${noPunchCurrentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderNoPunchPage(1)">
+                                    «
+                                </button>
+                                <button class="btn-page" ${noPunchCurrentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderNoPunchPage(${noPunchCurrentPage - 1})">
+                                    ‹
+                                </button>
+
+                                ${noPunchPageButtons}
+
+                                <button class="btn-page" ${noPunchCurrentPage === totalNoPunchPages ? "disabled" : ""} onclick="AppController.view._reRenderNoPunchPage(${noPunchCurrentPage + 1})">
+                                    ›
+                                </button>
+
+                                <button class="btn-page" ${noPunchCurrentPage === totalNoPunchPages ? "disabled" : ""} onclick="AppController.view._reRenderNoPunchPage(${totalNoPunchPages})">
+                                    »
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-wrap" id="special-sp-section">
+                    <div class="table-header">
+                        <h3>⚡ Single Punch</h3>
+                    </div>
+                    <div id="special-sp-table-wrap">
+                        <div style="overflow-x:auto">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Code</th>
+                                        <th>Name</th>
+                                        <th>Dept</th>
+                                        <th>Designation</th>
+                                        <th>Shift</th>
+                                        <th>Company</th>
+                                        <th>Single Punch Days</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${singlePunchRowsHtml}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="pagination-bar">
+                            <div class="pagination-text">
+                                Showing ${(singlePunchCurrentPage - 1) * singlePunchPageSize + 1} – ${Math.min(singlePunchCurrentPage * singlePunchPageSize, singlePunchGroups.length)} of ${singlePunchGroups.length} employees &nbsp;·&nbsp; Page ${singlePunchCurrentPage} of ${totalSinglePunchPages}
+                            </div>
+                            <div class="pagination-buttons">
+                                <button class="btn-page" ${singlePunchCurrentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderSinglePunchPage(1)">
+                                    «
+                                </button>
+                                <button class="btn-page" ${singlePunchCurrentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderSinglePunchPage(${singlePunchCurrentPage - 1})">
+                                    ‹
+                                </button>
+
+                                ${singlePunchPageButtons}
+                                <button class="btn-page" ${singlePunchCurrentPage === totalSinglePunchPages ? "disabled" : ""} onclick="AppController.view._reRenderSinglePunchPage(${singlePunchCurrentPage + 1})">
+                                    ›
+                                </button>
+                                <button class="btn-page" ${singlePunchCurrentPage === totalSinglePunchPages ? "disabled" : ""} onclick="AppController.view._reRenderSinglePunchPage(${totalSinglePunchPages})">
+                                    »
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `,
+
+            renderCharts: () => {},
         };
+    }
+
+
+    _showNoPunchEmployeeDrilldown(empId) {
+        const groups = this._currentNoPunchGroups || [];
+
+        const group = groups.find((g) => String(g.emp.id) === String(empId));
+
+        if (!group) {
+            return;
+        }
+
+        const rows = group.logs.map(({ date, status }) => [
+            group.emp.code || "-",
+            group.emp.name || "-",
+            group.emp.company || "-",
+            group.emp.dept || "-",
+            group.emp.designation || "-",
+            group.emp.shift || "-",
+            this._formatDate(date),
+            status === "weeklyOff"
+                ? "Weekly Off"
+                : "Absent",
+        ]);
+
+        const headers = ["Code", "Name", "Company", "Department", "Designation", "Shift", "Date", "Status",]; 
+        const wrap = document.getElementById("special-np-section");
+
+        if (!wrap) {
+            return;
+        }
+
+        this._currentNoPunchDetailRows = rows;
+        this._currentNoPunchDetailHeaders = headers;
+
+        wrap.innerHTML = `
+            <div class="table-header no-punch-detail-header">
+                <h3>🚩 No Punch Details</h3>
+                <button class="single-punch-detail-back" onclick="AppController.view._restoreNoPunchGroups()">
+                    ← Back
+                </button>
+            </div>
+
+            <div class="no-punch-detail-table-wrap">
+                ${this._buildPaginatedTable(rows, headers, 1, 10, "tbl-no-punch-detail", "_reRenderNoPunchDetailPage")}
+            </div>
+        `;
+    }
+
+
+    _restoreNoPunchGroups() {
+        const groups = this._currentNoPunchGroups || [];
+        const pageSize = 10;
+        const currentPage = this._currentNoPunchPage || 1;
+        const totalPages = Math.max(1, Math.ceil(groups.length / pageSize));
+        const pageGroups = groups.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+        const rowsHtml = pageGroups.map((g) => {
+            const severityStyle = this._getSeverityStyle(g.count);
+            return `
+                <tr style="cursor:pointer;${severityStyle}" onclick="AppController.view._showNoPunchEmployeeDrilldown('${g.emp.id}')">
+                    <td><b>${g.emp.code || "-"}</b></td>
+                    <td>${g.emp.name || "-"}</td>
+                    <td>${g.emp.dept || "-"}</td>
+                    <td>${g.emp.designation || "-"}</td>
+                    <td>${g.emp.shift || "-"}</td>
+                    <td>${g.emp.company || "-"}</td>
+                    <td>
+                        <span class="badge ${g.count >= 5 ? "badge-danger" : "badge-info"}">${g.count}No Punch Day${g.count > 1 ? "s" : ""}</span>
+                    </td>
+                </tr>
+            `;
+        }).join("");
+
+
+        let pageButtons = "";
+        const startPage = Math.max(1, currentPage - 2);
+        const endPage = Math.min(totalPages, currentPage + 2);
+
+        for (let i = startPage; i <= endPage; i++) {
+            pageButtons += `
+                <button class="btn-page ${i === currentPage ? "btn-page-active" : ""}" onclick="AppController.view._reRenderNoPunchPage(${i})">
+                    ${i}
+                </button>
+            `;
+        }
+
+        const wrap = document.getElementById("special-np-section");
+
+        if (!wrap) {
+            return;
+        }
+
+
+        wrap.innerHTML = `
+            <div class="table-header">
+                <h3>🚩 No Punch ≥ 5 Days</h3>
+            </div>
+
+            <div id="special-np-table-wrap">
+                <div style="overflow-x:auto">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Code</th>
+                                <th>Name</th>
+                                <th>Dept</th>
+                                <th>Designation</th>
+                                <th>Shift</th>
+                                <th>Company</th>
+                                <th>No Punch Days</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHtml}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="pagination-bar">
+                    <div class="pagination-text">
+                        Showing ${(currentPage - 1) * pageSize + 1} – ${Math.min(currentPage * pageSize, groups.length)} of ${groups.length} employees &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
+                    </div>
+                    <div class="pagination-buttons">
+                        <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderNoPunchPage(1)">
+                            «
+                        </button>
+                        <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderNoPunchPage(${currentPage - 1})">
+                            ‹
+                        </button>
+
+                        ${pageButtons}
+
+                        <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderNoPunchPage(${currentPage + 1})">
+                            ›
+                        </button>
+                        <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderNoPunchPage(${totalPages})">
+                            »
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+
+    _showSinglePunchEmployeeDrilldown(empId) {
+        const groups = this._currentSinglePunchGroups || [];
+        const group = groups.find((g) => String(g.emp.id) === String(empId));
+        if (!group) {
+            return;
+        }
+
+        const rows = group.logs.map(({ log, date }) => [
+            group.emp.code || "-",
+            group.emp.name || "-",
+            group.emp.company || "-",
+            group.emp.dept || "-",
+            group.emp.designation || "-",
+            group.emp.shift || "-",
+            this._formatDate(date),
+            log?.inTime || "-",
+            log?.outTime || "-",
+            log?.inTime ? "OUT Punch Missing" : "IN Punch Missing",
+        ]);
+
+        const headers = ["Code", "Name", "Company", "Department", "Designation", "Shift", "Date", "In Time", "Out Time", "Missing Punch"];
+
+        const wrap = document.getElementById("special-sp-section");
+
+        if (!wrap) {
+            return;
+        }
+
+        this._currentSinglePunchDetailRows = rows;
+        this._currentSinglePunchDetailHeaders = headers;
+
+        wrap.innerHTML = `
+            <div class="table-header single-punch-detail-header">
+                <h3>⚡ Single Punch Details</h3>
+                <button class="single-punch-detail-back" onclick="AppController.view._restoreSinglePunchGroups()">← Back</button>
+            </div>
+            <div class="single-punch-detail-table-wrap">
+                ${this._buildPaginatedTable(rows, headers, 1, 10, "tbl-single-punch-detail", "_reRenderSinglePunchDetailPage")}
+            </div>
+        `;
+    }
+
+
+    _reRenderNoPunchDetailPage(page) {
+        const rows = this._currentNoPunchDetailRows || [];
+        const headers = this._currentNoPunchDetailHeaders || ["Code", "Name", "Company", "Department", "Designation", "Shift", "Date", "Status"];
+        const wrap = document.querySelector("#special-np-section .no-punch-detail-table-wrap");
+
+        if (!wrap) {
+            return;
+        }
+
+        wrap.innerHTML = this._buildPaginatedTable(rows, headers, page, 10, "tbl-no-punch-detail", "_reRenderNoPunchDetailPage");
+    }
+
+    
+    _restoreSinglePunchGroups() {
+        const groups = this._currentSinglePunchGroups || [];
+        const pageSize = 10;
+        const currentPage = this._currentSinglePunchPage || 1;
+        const totalPages = Math.max(1, Math.ceil(groups.length / pageSize));
+        const pageGroups = groups.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+        const rowsHtml = pageGroups.map((g) => {
+            const isRepeat = g.count >= 3;
+            const severityStyle = this._getSeverityStyle(g.count);
+
+            return `
+                <tr style="cursor:pointer;${severityStyle}" onclick="AppController.view._showSinglePunchEmployeeDrilldown('${g.emp.id}')">
+                    <td><b>${g.emp.code || "-"}</b></td>
+                    <td>${g.emp.name || "-"}</td>
+                    <td>${g.emp.dept || "-"}</td>
+                    <td>${g.emp.designation || "-"}</td>
+                    <td>${g.emp.shift || "-"}</td>
+                    <td>${g.emp.company || "-"}</td>
+                    <td>
+                        <span class="badge ${isRepeat ? "badge-danger" : "badge-info"}">
+                            ${g.count}
+                            Single Punch Day${g.count > 1 ? "s" : ""}
+                        </span>
+                    </td>
+                </tr>
+            `;
+        }).join("");
+
+        let pageButtons = "";
+
+        const startPage = Math.max(1, currentPage - 2);
+        const endPage = Math.min(totalPages, currentPage + 2);
+
+        for (let i = startPage; i <= endPage; i++) {
+            pageButtons += `
+                <button class="btn-page ${i === currentPage ? "btn-page-active" : ""}" onclick="AppController.view._reRenderSinglePunchPage(${i})">
+                    ${i}
+                </button>
+            `;
+        }
+
+        const wrap = document.getElementById("special-sp-section");
+
+        if (!wrap) {
+            return;
+        }
+
+        wrap.innerHTML = `
+            <div class="table-header">
+                <h3>⚡ Single Punch</h3>
+            </div>
+            <div style="overflow-x:auto">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Code</th>
+                            <th>Name</th>
+                            <th>Dept</th>
+                            <th>Designation</th>
+                            <th>Shift</th>
+                            <th>Company</th>
+                            <th>Single Punch Days</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        ${rowsHtml}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pagination-bar">
+                <div class="pagination-text">
+                    Showing ${(currentPage - 1) * pageSize + 1}– ${Math.min(currentPage * pageSize, groups.length)} of ${groups.length} employees &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
+                </div>
+
+                <div class="pagination-buttons">
+                    <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderSinglePunchPage(1)">
+                        «
+                    </button>
+
+                    <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderSinglePunchPage(${currentPage - 1})">
+                        ‹
+                    </button>
+
+                    ${pageButtons}
+
+                    <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderSinglePunchPage(${currentPage + 1})">
+                        ›
+                    </button>
+
+                    <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderSinglePunchPage(${totalPages})">
+                        »
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+
+    _reRenderSinglePunchDetailPage(page) {
+        const rows = this._currentSinglePunchDetailRows || [];
+        const headers = this._currentSinglePunchDetailHeaders || ["Code", "Name", "Company", "Department", "Designation", "Shift", "Date", "In Time", "Out Time", "Missing Punch"];
+        const wrap = document.querySelector("#special-sp-section .single-punch-detail-table-wrap");
+
+        if (!wrap) {
+            return;
+        }
+
+        wrap.innerHTML = this._buildPaginatedTable(rows, headers, page, 10, "tbl-single-punch-detail", "_reRenderSinglePunchDetailPage");
     }
 
     
     _reRenderNoPunchPage(page) {
-        const rows = this._currentNoPunchRows || [];
-        const headers = ["Code", "Name", "Dept", "Designation", "Shift", "Company", "Gap", "Start"];
-        const wrap = document.getElementById("special-np-table-wrap");
-        if (wrap) {
-            wrap.innerHTML = this._buildPaginatedTable(rows, headers, page, 10, "tbl-np", "_reRenderNoPunchPage");
-        }
+        this._currentNoPunchPage = page;
+        this._restoreNoPunchGroups();
     }
 
-    
+
     _reRenderSinglePunchPage(page) {
-        const rows = this._currentSinglePunchRows || [];
-        const headers = ["Code", "Name", "Dept", "Designation", "Shift", "Company", "Date", "Time"];
-        const wrap = document.getElementById("special-sp-table-wrap");
-        if (wrap) {
-            wrap.innerHTML = this._buildPaginatedTable(rows, headers, page, 10, "tbl-sp", "_reRenderSinglePunchPage");
-        }
+        this._currentSinglePunchPage = page;
+        this._restoreSinglePunchGroups();
     }
 
 
@@ -7221,11 +7675,31 @@ class AttendanceView {
         let headers, ths;
 
         if (isDashboardMode) {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "DOB", "Age", "Location"];
+            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Team", "Shift Group", "Location", "DOB", "Age", "Gender"];
+            if (isAgeGroup || key.startsWith("ageLocation_")) {
+                headers = ["Sr.No", "Code", "Name", "Age", "DOB", "Gender", "Dept", "Company", "Designation", "Team", "Shift Group", "Location"];
+            } else if (isGenderSummary || key.startsWith("genderLocation_") || key.startsWith("genderSummary_")) {
+                headers = ["Sr.No", "Code", "Name", "Gender", "Dept", "Company", "Designation", "Team", "Shift Group", "Location", "DOB", "Age"];
+            } else if (key === "staffList" || key === "workerList" || key === "contractList" || key === "consultantList" || key.startsWith("staffList_") || key.startsWith("workerList_") || key.startsWith("contractList_") || key.startsWith("consultantList_") || key.startsWith("workforce")) {
+                headers = ["Sr.No", "Code", "Name", "Team", "Dept", "Company", "Designation", "Shift Group", "Location", "DOB", "Age", "Gender"];
+            }
         } else {
             headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift", "In Time", "Out Time", "Status", "Action"];
             if (isAgeGroup) {
                 headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Age", "Shift", "In Time", "Out Time", "Status", "Action"];
+            } else if (key === "resigned") {
+                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "DOJ", "DOR", "Status", "Action"];
+            }
+            else if (key === "newJoined") {
+                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "DOJ", "Status", "Action"];
+            } else if (key === "lateIn") {
+                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift", "In Time", "Late By", "Out Time", "Status", "Action"];
+            } else if (key === "earlyOut") {
+                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift", "In Time", "Out Time", "Early By", "Status", "Action"];
+            } else if (key === "singlePunch") {
+                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift", "In Time", "Out Time", "Status", "Action"];
+            } else if (key === "staffList" || key === "workerList" || key === "contractList" || key === "consultantList") {
+                headers = ["Sr.No", "Code", "Name", "Team", "Dept", "Company", "Designation", "Shift", "In Time", "Out Time", "Status", "Action"];
             }
         }
 
@@ -7237,21 +7711,75 @@ class AttendanceView {
             const sr = (currentPage - 1) * pageSize + i + 1;
 
             if (isDashboardMode) {
-                return `
-                    <tr>
-                        <td>${sr}</td>
-                        <td><b>${emp.code || "–"}</b></td>
-                        <td>${emp.name || "–"}</td>
-                        <td>${emp.dept || "–"}</td>
-                        <td>${emp.company || "–"}</td>
-                        <td>${emp.designation || "–"}</td>
-                        <td>${emp.teamName || "-"}</td>
-                        <td>${emp.shiftGroupName || "–"}</td>
-                        <td>${this._formatDate(emp.dobRaw)}</td>
-                        <td>${this._calculateAge(emp.dobRaw)}</td>
-                        <td>${emp.location || "–"}</td>
-                    </tr>
-                `;
+                if (isAgeGroup || key.startsWith("ageLocation_")) {
+                    return `
+                        <tr>
+                            <td>${sr}</td>
+                            <td><b>${emp.code || "–"}</b></td>
+                            <td>${emp.name || "–"}</td>
+                            <td>${this._calculateAge(emp.dobRaw)}</td>
+                            <td>${this._formatDate(emp.dobRaw)}</td>
+                            <td>${emp.gender || "–"}</td>
+                            <td>${emp.dept || "–"}</td>
+                            <td>${emp.company || "–"}</td>
+                            <td>${emp.designation || "–"}</td>
+                            <td>${emp.teamName || "–"}</td>
+                            <td>${emp.shiftGroupName || "–"}</td>
+                            <td>${emp.location || "–"}</td>
+                        </tr>
+                    `;
+                } else if (isGenderSummary || key.startsWith("genderLocation_") || key.startsWith("genderSummary_")) {
+                    return `
+                        <tr>
+                            <td>${sr}</td>
+                            <td><b>${emp.code || "–"}</b></td>
+                            <td>${emp.name || "–"}</td>
+                            <td>${emp.gender || "–"}</td>
+                            <td>${emp.dept || "–"}</td>
+                            <td>${emp.company || "–"}</td>
+                            <td>${emp.designation || "–"}</td>
+                            <td>${emp.teamName || "–"}</td>
+                            <td>${emp.shiftGroupName || "–"}</td>
+                            <td>${emp.location || "–"}</td>
+                            <td>${this._formatDate(emp.dobRaw)}</td>
+                            <td>${this._calculateAge(emp.dobRaw)}</td>
+                        </tr>
+                    `;
+                } else if (key === "staffList" || key === "workerList" || key === "contractList" || key === "consultantList" || key.startsWith("staffList_") || key.startsWith("workerList_") || key.startsWith("contractList_") || key.startsWith("consultantList_") || key.startsWith("workforce")) {
+                    return `
+                        <tr>
+                            <td>${sr}</td>
+                            <td><b>${emp.code || "–"}</b></td>
+                            <td>${emp.name || "–"}</td>
+                            <td>${emp.teamName || "–"}</td>
+                            <td>${emp.dept || "–"}</td>
+                            <td>${emp.company || "–"}</td>
+                            <td>${emp.designation || "–"}</td>
+                            <td>${emp.shiftGroupName || "–"}</td>
+                            <td>${emp.location || "–"}</td>
+                            <td>${this._formatDate(emp.dobRaw)}</td>
+                            <td>${this._calculateAge(emp.dobRaw)}</td>
+                            <td>${emp.gender || "–"}</td>
+                        </tr>
+                    `;
+                } else {
+                    return `
+                        <tr>
+                            <td>${sr}</td>
+                            <td><b>${emp.code || "–"}</b></td>
+                            <td>${emp.name || "–"}</td>
+                            <td>${emp.dept || "–"}</td>
+                            <td>${emp.company || "–"}</td>
+                            <td>${emp.designation || "–"}</td>
+                            <td>${emp.teamName || "–"}</td>
+                            <td>${emp.shiftGroupName || "–"}</td>
+                            <td>${emp.location || "–"}</td>
+                            <td>${this._formatDate(emp.dobRaw)}</td>
+                            <td>${this._calculateAge(emp.dobRaw)}</td>
+                            <td>${emp.gender || "–"}</td>
+                        </tr>
+                    `;
+                }
             }
 
             let statusCell;
@@ -7266,22 +7794,120 @@ class AttendanceView {
                 statusCell = log?.status || "–";
             }
 
-            return `
-                <tr>
-                    <td>${sr}</td>
-                    <td><b>${emp.code || "–"}</b></td>
-                    <td>${emp.name || "–"}</td>
-                    <td>${emp.dept || "–"}</td>
-                    <td>${emp.company || "–"}</td>
-                    <td>${emp.designation || "–"}</td>
-                    ${isAgeGroup ? `<td>${this._calculateAge(emp.dobRaw)}</td>` : ""}
-                    <td>${log?.shiftName || emp?.shift || "–"}</td>
-                    <td>${log?.inTime || "–"}</td>
-                    <td>${log?.outTime || "–"}</td>
-                    <td>${statusCell}</td>
-                    <td>${this._actionViewLink(log, emp, date || log?.date)}</td>
-                </tr>
-            `;
+            if (isAgeGroup) {
+                return `
+                    <tr>
+                        <td>${sr}</td>
+                        <td><b>${emp.code || "–"}</b></td>
+                        <td>${emp.name || "–"}</td>
+                        <td>${emp.dept || "–"}</td>
+                        <td>${emp.company || "–"}</td>
+                        <td>${emp.designation || "–"}</td>
+                        <td>${this._calculateAge(emp.dobRaw)}</td>
+                        <td>${log?.shiftName || emp?.shift || "–"}</td>
+                        <td>${log?.inTime || "–"}</td>
+                        <td>${log?.outTime || "–"}</td>
+                        <td>${statusCell}</td>
+                        <td>${this._actionViewLink(log, emp, date || log?.date)}</td>
+                    </tr>
+                `;
+            } else if (key === "lateIn") {
+                return `
+                    <tr>
+                        <td>${sr}</td>
+                        <td><b>${emp.code || "–"}</b></td>
+                        <td>${emp.name || "–"}</td>
+                        <td>${emp.dept || "–"}</td>
+                        <td>${emp.company || "–"}</td>
+                        <td>${emp.designation || "–"}</td>
+                        <td>${log?.shiftName || emp?.shift || "–"}</td>
+                        <td>${log?.inTime || "–"}</td>
+                        <td>${log?.lateBy ? this._fmtMins(log.lateBy) : "–"}</td>
+                        <td>${log?.outTime || "–"}</td>
+                        <td>${statusCell}</td>
+                        <td>${this._actionViewLink(log, emp, date || log?.date)}</td>
+                    </tr>
+                `;
+            } else if (key === "earlyOut") {
+                return `
+                    <tr>
+                        <td>${sr}</td>
+                        <td><b>${emp.code || "–"}</b></td>
+                        <td>${emp.name || "–"}</td>
+                        <td>${emp.dept || "–"}</td>
+                        <td>${emp.company || "–"}</td>
+                        <td>${emp.designation || "–"}</td>
+                        <td>${log?.shiftName || emp?.shift || "–"}</td>
+                        <td>${log?.inTime || "–"}</td>
+                        <td>${log?.outTime || "–"}</td>
+                        <td>${log?.earlyBy ? this._fmtMins(log.earlyBy) : "–"}</td>
+                        <td>${statusCell}</td>
+                        <td>${this._actionViewLink(log, emp, date || log?.date)}</td>
+                    </tr>
+                `;
+            } else if (key === "staffList" || key === "workerList" || key === "contractList" || key === "consultantList") {
+                return `
+                    <tr>
+                        <td>${sr}</td>
+                        <td><b>${emp.code || "–"}</b></td>
+                        <td>${emp.name || "–"}</td>
+                        <td>${emp.teamName || "–"}</td>
+                        <td>${emp.dept || "–"}</td>
+                        <td>${emp.company || "–"}</td>
+                        <td>${emp.designation || "–"}</td>
+                        <td>${log?.shiftName || emp?.shift || "–"}</td>
+                        <td>${log?.inTime || "–"}</td>
+                        <td>${log?.outTime || "–"}</td>
+                        <td>${statusCell}</td>
+                        <td>${this._actionViewLink(log, emp, date || log?.date)}</td>
+                    </tr>
+                `;
+            } else if (key === "resigned") {
+                return `
+                    <tr>
+                        <td>${sr}</td>
+                        <td><b>${emp.code || "–"}</b></td>
+                        <td>${emp.name || "–"}</td>
+                        <td>${emp.dept || "–"}</td>
+                        <td>${emp.company || "–"}</td>
+                        <td>${emp.designation || "–"}</td>
+                        <td>${this._formatDate(emp.doj)}</td>
+                        <td>${this._formatDate(emp.dor)}</td>
+                        <td><span class="badge badge-danger">${emp.status || "Resigned"}</span></td>
+                        <td>${this._actionViewLink(null, emp, null)}</td>
+                    </tr>
+                `;
+            } else if (key === "newJoined") {
+                return `
+                    <tr>
+                        <td>${sr}</td>
+                        <td><b>${emp.code || "–"}</b></td>
+                        <td>${emp.name || "–"}</td>
+                        <td>${emp.dept || "–"}</td>
+                        <td>${emp.company || "–"}</td>
+                        <td>${emp.designation || "–"}</td>
+                        <td>${this._formatDate(emp.doj)}</td>
+                        <td><span class="badge badge-success">${emp.status || "Working"}</span></td>
+                        <td>${this._actionViewLink(null, emp, null)}</td>
+                    </tr>
+                `;
+            } else {
+                return `
+                    <tr>
+                        <td>${sr}</td>
+                        <td><b>${emp.code || "–"}</b></td>
+                        <td>${emp.name || "–"}</td>
+                        <td>${emp.dept || "–"}</td>
+                        <td>${emp.company || "–"}</td>
+                        <td>${emp.designation || "–"}</td>
+                        <td>${log?.shiftName || emp?.shift || "–"}</td>
+                        <td>${log?.inTime || "–"}</td>
+                        <td>${log?.outTime || "–"}</td>
+                        <td>${statusCell}</td>
+                        <td>${this._actionViewLink(log, emp, date || log?.date)}</td>
+                    </tr>
+                `;
+            }
         }).join("");
 
         let pageButtons = "";
@@ -7298,19 +7924,63 @@ class AttendanceView {
 
         this._statCardExportData = items.map(({ log, emp, date }) => {
             if (isDashboardMode) {
-                return {
-                    Code: emp?.code,
-                    Name: emp?.name,
-                    Dept: emp?.dept,
-                    Company: emp?.company,
-                    Designation: emp?.designation,
-                    TeamName: emp?.teamName,
-                    shiftGroupName: emp?.shiftGroupName,
-                    Shift: emp?.shift,
-                    ShiftStart: emp?.shiftStart || "",
-                    ShiftEnd: emp?.shiftEnd || "",
-                    Location: emp?.location || "",
-                };
+                if (isAgeGroup || key.startsWith("ageLocation_")) {
+                    return {
+                        Code: emp?.code,
+                        Name: emp?.name,
+                        Age: this._calculateAge(emp?.dobRaw),
+                        DOB: this._formatDate(emp?.dobRaw),
+                        Gender: emp?.gender || "",
+                        Dept: emp?.dept,
+                        Company: emp?.company,
+                        Designation: emp?.designation,
+                        TeamName: emp?.teamName,
+                        ShiftGroup: emp?.shiftGroupName || "",
+                        Location: emp?.location || "",
+                    };
+                } else if (isGenderSummary || key.startsWith("genderLocation_") || key.startsWith("genderSummary_")) {
+                    return {
+                        Code: emp?.code,
+                        Name: emp?.name,
+                        Gender: emp?.gender || "",
+                        Dept: emp?.dept,
+                        Company: emp?.company,
+                        Designation: emp?.designation,
+                        TeamName: emp?.teamName,
+                        ShiftGroup: emp?.shiftGroupName || "",
+                        Location: emp?.location || "",
+                        DOB: this._formatDate(emp?.dobRaw),
+                        Age: this._calculateAge(emp?.dobRaw),
+                    };
+                } else if (key === "staffList" || key === "workerList" || key === "contractList" || key === "consultantList" || key.startsWith("staffList_") || key.startsWith("workerList_") || key.startsWith("contractList_") || key.startsWith("consultantList_") || key.startsWith("workforce")) {
+                    return {
+                        Code: emp?.code,
+                        Name: emp?.name,
+                        TeamName: emp?.teamName,
+                        Dept: emp?.dept,
+                        Company: emp?.company,
+                        Designation: emp?.designation,
+                        ShiftGroup: emp?.shiftGroupName || "",
+                        Location: emp?.location || "",
+                        DOB: this._formatDate(emp?.dobRaw),
+                        Age: this._calculateAge(emp?.dobRaw),
+                        Gender: emp?.gender || "",
+                    };
+                } else {
+                    return {
+                        Code: emp?.code,
+                        Name: emp?.name,
+                        Dept: emp?.dept,
+                        Company: emp?.company,
+                        Designation: emp?.designation,
+                        TeamName: emp?.teamName,
+                        ShiftGroup: emp?.shiftGroupName || "",
+                        Location: emp?.location || "",
+                        DOB: this._formatDate(emp?.dobRaw),
+                        Age: this._calculateAge(emp?.dobRaw),
+                        Gender: emp?.gender || "",
+                    };
+                }
             }
             if (key === "resigned") {
                 return {
@@ -7341,19 +8011,6 @@ class AttendanceView {
                     Location: emp?.location || "",
                 };
             }
-            if (key === "staffList" || key === "workerList") {
-                return {
-                    Code: emp?.code,
-                    Name: emp?.name,
-                    Dept: emp?.dept,
-                    Company: emp?.company,
-                    Designation: emp?.designation,
-                    TeamName: emp?.teamName,
-                    shiftGroupName: emp?.shiftGroupName,
-                    Shift: emp?.shift,
-                    Location: emp?.location,
-                };
-            }
             if (key === "newJoined") {
                 return {
                     Code: emp?.code,
@@ -7368,17 +8025,51 @@ class AttendanceView {
                 };
             }
 
-            if (key === "staffList" || key === "workerList" || key === "totalHeadcount") {
+            if (key === "lateIn") {
                 return {
                     Code: emp?.code,
                     Name: emp?.name,
                     Dept: emp?.dept,
                     Company: emp?.company,
                     Designation: emp?.designation,
+                    Shift: log?.shiftName || emp?.shift || "",
+                    InTime: log?.inTime || "",
+                    LateBy: log?.lateBy ? this._fmtMins(log.lateBy) : "",
+                    OutTime: log?.outTime || "",
+                    Status: log?.status || "",
+                    Date: this._formatDate(date || log?.date),
+                };
+            }
+
+            if (key === "earlyOut") {
+                return {
+                    Code: emp?.code,
+                    Name: emp?.name,
+                    Dept: emp?.dept,
+                    Company: emp?.company,
+                    Designation: emp?.designation,
+                    Shift: log?.shiftName || emp?.shift || "",
+                    InTime: log?.inTime || "",
+                    OutTime: log?.outTime || "",
+                    EarlyBy: log?.earlyBy ? this._fmtMins(log.earlyBy) : "",
+                    Status: log?.status || "",
+                    Date: this._formatDate(date || log?.date),
+                };
+            }
+
+            if (key === "staffList" || key === "workerList" || key === "contractList" || key === "consultantList") {
+                return {
+                    Code: emp?.code,
+                    Name: emp?.name,
                     TeamName: emp?.teamName,
-                    shiftGroupName: emp?.shiftGroupName,
-                    Shift: emp?.shift,
-                    Location: emp?.location,
+                    Dept: emp?.dept,
+                    Company: emp?.company,
+                    Designation: emp?.designation,
+                    Shift: log?.shiftName || emp?.shift || "",
+                    InTime: log?.inTime || "",
+                    OutTime: log?.outTime || "",
+                    Status: log?.status || "",
+                    Date: this._formatDate(date || log?.date),
                 };
             }
 
@@ -8695,24 +9386,32 @@ class AttendanceView {
     _renderDeptDesigMappingCheckboxes(deptId) {
         const data = this._currentDeptDesigMappingData;
         if (!data) return;
-
         const { departments, designations, mappingByDept } = data;
-
         const department = departments.find(d => Number(d.id) === Number(deptId));
 
-        const existing = mappingByDept[deptId] || [];
+        if (!department) return;
 
+        const existing = mappingByDept[deptId] || [];
         const existingMap = {};
 
         existing.forEach(m => {
-            existingMap[m.designationId] = true;
+            existingMap[Number(m.designationId)] = {
+                assigned: true,
+                parentDesignationId: m.parentDesignationId !== null && m.parentDesignationId !== undefined ? Number(m.parentDesignationId) : null
+            };
+        });
+
+        const parentSelections = {};
+
+        Object.keys(existingMap).forEach(designationId => {
+            parentSelections[Number(designationId)] =
+                existingMap[designationId].parentDesignationId;
         });
 
         const rowsHtml = designations.map(d => {
-            const checked = existingMap.hasOwnProperty(d.id);
-            
+            const checked = existingMap.hasOwnProperty(Number(d.id));
             return `
-                <label style = "display:flex; align-items:center; gap:10px; padding:14px 16px; border:1px solid ${checked ? "#4f46e5" : "#dbe4f0"}; background:${checked ? "#eef2ff" : "#fff"}; border-radius:10px; cursor:pointer; transition:.2s; font-size:14px; font-weight:500;" class="ddm-item">
+                <label style=" display:flex; align-items:center; gap:10px; padding:14px 16px; border:1px solid ${checked ? "#4f46e5" : "#dbe4f0"}; background:${checked ? "#eef2ff" : "#fff"}; border-radius:10px; cursor:pointer; transition:.2s; font-size:14px; font-weight:500;" class="ddm-item">
                     <input type="checkbox" class="ddm-checkbox" value="${d.id}" ${checked ? "checked" : ""}>
                     <span>${this._escapeAttr(d.name)}</span>
                 </label>
@@ -8721,34 +9420,94 @@ class AttendanceView {
 
         const mainContainer = document.getElementById("ddm-main-container");
 
+        const renderParentChildMapping = () => {
+            const container = document.getElementById("ddm-parent-child-container");
+            if (!container) return;
+            const checkedIds = Array.from(mainContainer.querySelectorAll(".ddm-checkbox:checked")).map(cb => Number(cb.value));
+            const assignedDesignations = designations.filter(d => checkedIds.includes(Number(d.id)));
+
+            if (assignedDesignations.length === 0) {
+                container.innerHTML = `
+                    <div style="padding:20px; text-align:center; color:#64748b; font-size:14px;">
+                        No designations assigned.
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = assignedDesignations.map(d => {
+                const designationId = Number(d.id);
+                const selectedParentId = parentSelections[designationId] ?? null;
+
+                const parentOptions = assignedDesignations.filter(parent => Number(parent.id) !== designationId).map(parent => {
+                    const parentId = Number(parent.id);
+                    return `
+                        <option value="${parentId}" ${ Number(selectedParentId) === parentId ? "selected" : "" }>
+                            ${this._escapeAttr(parent.name)}
+                        </option>
+                    `;
+                }).join("");
+
+                return `
+                    <div class="ddm-parent-child-row" data-designation-id="${designationId}" style="display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:center; padding:12px 14px; border-bottom:1px solid #e5e7eb;">
+                        <div style="font-size:14px; font-weight:600; color:#1f2937;">
+                            ${this._escapeAttr(d.name)}
+                        </div>
+
+                        <select class="ddm-parent-select" data-designation-id="${designationId}" style="width:100%; padding:9px 12px; border:1px solid #dbe4f0; border-radius:8px; background:#fff; font-size:14px;">
+                            <option value="">
+                                -- None --
+                            </option>
+                            ${parentOptions}
+                        </select>
+                    </div>
+                `;
+            }).join("");
+
+            container.querySelectorAll(".ddm-parent-select").forEach(select => {
+                select.addEventListener("change", () => {
+                    const designationId = Number(select.dataset.designationId);
+                    parentSelections[designationId] = select.value !== "" ? Number(select.value) : null;
+                });
+            });
+        };
+
         mainContainer.innerHTML = `
-            <button id="ddm-back-btn" style = "border:none; background:#fff; border:1px solid #dbe4f0; padding:10px 18px; border-radius:8px; cursor:pointer; margin-bottom:20px; font-weight:600;">
+            <button id="ddm-back-btn" style="border:none; background:#fff; border:1px solid #dbe4f0; padding:10px 18px; border-radius:8px; cursor:pointer; margin-bottom:20px; font-weight:600;">
                 ← Back
             </button>
 
-            <div style = "background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:24px; box-shadow:0 4px 12px rgba(0,0,0,.05);">
-                <div style = "display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <div style="background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:24px; box-shadow:0 4px 12px rgba(0,0,0,.05);">
+                <!-- Header -->
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
                     <div>
-                        <h2 style="margin:0;font-size:26px;">${this._escapeAttr(department.name)}</h2>
-                        <div style="margin-top:6px;color:#64748b;">
-                            ${existing.length}
-                            designation${existing.length != 1 ? "s" : ""} assigned
+                        <h2 style="margin:0; font-size:26px;">
+                            ${this._escapeAttr(department.name)}
+                        </h2>
+                        <div style="margin-top:6px; color:#64748b;">
+                            <span id="ddm-assigned-count">
+                                ${existing.length}
+                            </span>
+                            designation${existing.length != 1 ? "s" : ""}
+                            assigned
                         </div>
                     </div>
+
                     <button id="ddm-save-btn" style="background:#4f46e5; color:#fff; border:none; padding:10px 18px; border-radius:8px; cursor:pointer; font-weight:600;">
                         Save Changes
                     </button>
                 </div>
-                
-                <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px;">
+
+                <!-- Existing assigned designation chips -->
+                <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:24px;">
                     ${
                         existing.map(m => {
                             const des = designations.find(d => Number(d.id) === Number(m.designationId));
                             if (!des) return "";
                             return `
-                                <div style="display:flex; align-items:center; gap:8px; background:#eef2ff; color:#4f46e5; padding:8px 14px; border-radius:20px; font-size:13px; font-weight:600;" >
+                                <div style="display:flex; align-items:center; gap:8px; background:#eef2ff; color:#4f46e5; padding:8px 14px; border-radius:20px; font-size:13px; font-weight:600;">
                                     <span>${this._escapeAttr(des.name)}</span>
-                                    <button class="ddm-remove-chip" data-dept="${deptId}" data-designation="${des.id}" style="border:none; background:transparent; color:#ef4444; cursor:pointer; font-size:16px; font-weight:bold; line-height:1;" >
+                                    <button class="ddm-remove-chip" data-dept="${deptId}" data-designation="${des.id}" style="border:none; background:transparent; color:#ef4444; cursor:pointer; font-size:16px; font-weight:bold; line-height:1;">
                                         ×
                                     </button>
                                 </div>
@@ -8756,31 +9515,77 @@ class AttendanceView {
                         }).join("")
                     }
                 </div>
-                
-                <input id="ddm-search"placeholder="Search Designation..." style=" width:100%; padding:12px 14px; border:1px solid #dbe4f0; border-radius:8px; margin-bottom:20px; box-sizing:border-box;">
-                
-                <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:14px;">
+
+                <!-- Parent Child Mapping -->
+                <div style="border:1px solid #e5e7eb; border-radius:10px; overflow:hidden; margin-bottom:20px;">
+                    <div style="padding:14px 16px; background:#f8fafc; border-bottom:1px solid #e5e7eb;">
+                        <div style="font-size:16px; font-weight:700; color:#111827;">
+                            Parent-Child Designation Mapping
+                        </div>
+
+                        <div style="margin-top:4px; font-size:13px; color:#64748b;">
+                            Select a parent designation for each
+                            assigned designation.
+                        </div>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; padding:12px 14px; background:#f8fafc; border-bottom:1px solid #e5e7eb; font-size:13px; font-weight:700; color:#475569;">
+                        <div>
+                            Designation
+                        </div>
+
+                        <div>
+                            Parent Designation
+                        </div>
+                    </div>
+
+                    <!-- Dynamic parent-child rows -->
+                    <div id="ddm-parent-child-container"></div>
+                </div>
+
+                <!-- Search -->
+                <input id="ddm-search" placeholder="Search Designation..." style="width:100%; padding:12px 14px; border:1px solid #dbe4f0; border-radius:8px; margin-bottom:20px; box-sizing:border-box;">
+
+                <!-- Designation checkbox grid -->
+                <div style="display:grid; grid-template-columns: repeat(auto-fill,minmax(230px,1fr)); gap:14px;">
                     ${rowsHtml}
                 </div>
             </div>
         `;
+
+        renderParentChildMapping();
 
         mainContainer.querySelectorAll(".ddm-remove-chip").forEach(btn => {
             btn.onclick = async () => {
                 this.showOverlay("Removing...");
                 const res = await this._ddmModel.deleteDepartmentDesignationMapping(Number(btn.dataset.dept), Number(btn.dataset.designation));
                 this.hideOverlay();
+
                 if (res.success) {
                     this.showToast("Designation removed successfully", "success");
                     const dept = Number(btn.dataset.dept);
                     const desig = Number(btn.dataset.designation);
-                    this._currentDeptDesigMappingData.mappingByDept[dept] = (this._currentDeptDesigMappingData.mappingByDept[dept] || []).filter(x => x.designationId !== desig);
-                    await this._refreshDepartmentDesignationMapping(Number(btn.dataset.dept));
+                    this._currentDeptDesigMappingData.mappingByDept[dept] = (this._currentDeptDesigMappingData.mappingByDept[dept] || []).filter(x => Number(x.designationId) !== desig);
+                    await this._refreshDepartmentDesignationMapping(dept);
                 } else {
                     this.showToast(res.message, "error");
                 }
             };
         });
+
+        mainContainer.querySelectorAll(".ddm-checkbox").forEach(cb => {
+                cb.addEventListener("change", () => {
+                    const designationId = Number(cb.value);
+                    if (cb.checked) {
+                        if (!Object.prototype.hasOwnProperty.call(parentSelections, designationId)) {
+                            parentSelections[designationId] = null;
+                        }
+                    } else {
+                        delete parentSelections[designationId];
+                    }
+                    renderParentChildMapping();
+                });
+            });
 
         document.getElementById("ddm-search").addEventListener("input", function () {
             const value = this.value.toLowerCase();
@@ -8797,12 +9602,23 @@ class AttendanceView {
             const items = [];
             mainContainer.querySelectorAll(".ddm-item").forEach(row => {
                 const cb = row.querySelector(".ddm-checkbox");
+                const designationId = Number(cb.value);
+                const parentDesignationId = cb.checked ? (parentSelections[designationId] ?? null) : null;
+
                 items.push({
-                    departmentId: deptId,
-                    designationId: Number(cb.value),
+                    departmentId: Number(deptId),
+                    designationId: designationId,
+                    parentDesignationId: parentDesignationId,
                     isActive: cb.checked
                 });
             });
+
+            const invalidSelfParent = items.find(item => item.parentDesignationId !== null && Number(item.parentDesignationId) === Number(item.designationId));
+
+            if (invalidSelfParent) {
+                this.showToast("A designation cannot be its own parent.", "error");
+                return;
+            }
 
             this.showOverlay("Saving mapping...");
             const saveRes = await this._ddmModel.saveDepartmentDesignationMapping(items);

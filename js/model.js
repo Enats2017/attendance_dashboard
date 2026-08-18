@@ -404,35 +404,47 @@
         findNoPunchEmployees() {
             const { filters } = this.state;
             const { logs, emps } = this.getFilteredData();
-            const empLogs = {};
-            logs.forEach(log => {
-                if (!empLogs[log.empId]) empLogs[log.empId] = [];
-                empLogs[log.empId].push(log.date);
-            });
+            const statusKeyMap = this._buildStatusKeyMap(logs);
 
             const result = [];
             emps.forEach(emp => {
-                const dates = (empLogs[emp.id] || []).sort();
-                const allDates = this._getDateRangeUTC(filters.dateFrom, filters.dateTo);
-                let maxGap = 0, gap = 0, gapStart = null, maxGapStart = null;
+                const doj = emp.doj ? String(emp.doj).slice(0, 10) : null;
+                const dor = emp.dor ? String(emp.dor).slice(0, 10) : null;
+                const effectiveStartDate = doj && doj > filters.dateFrom ? doj : filters.dateFrom;
+                const effectiveEndDate = dor && dor < filters.dateTo ? dor : filters.dateTo;
+
+                if (effectiveStartDate > effectiveEndDate) {
+                    return;
+                }
+
+                const allDates = this._getDateRangeUTC(effectiveStartDate, effectiveEndDate);
+
+                let noPunchDays = 0;
+                const noPunchLogs = [];
                 allDates.forEach(dt => {
-                    if (dates.indexOf(dt) === -1) {
-                        if (gap === 0) {
-                            gapStart = dt;
-                        }
-                        gap++;
-                        if (gap > maxGap) { 
-                            maxGap = gap; 
-                            maxGapStart = gapStart; 
-                        }
-                    } else {
-                        gap = 0; 
+                    const key = `${emp.id}_${dt}`;
+                    const status = statusKeyMap[key] || "absent";
+
+                    if (status === "absent" || status === "weeklyOff") {
+                        noPunchDays++;
+                        noPunchLogs.push({
+                            date: dt,
+                            status: status
+                        });
                     }
                 });
-                if (maxGap >= 5) {
-                    result.push({ emp: emp, maxGap: maxGap, gapStart: maxGapStart });
+
+                if (noPunchDays >= 5) {
+                    result.push({
+                        emp: emp,
+                        count: noPunchDays,
+                        noPunchDays: noPunchDays,
+                        logs: noPunchLogs
+                    });
                 }
             });
+
+            result.sort((a, b) => b.count - a.count);
             return result;
         }
 
@@ -807,6 +819,30 @@
             result.sort((a, b) => b.date.localeCompare(a.date));
             return result;
         }
+
+
+        getSinglePunchEmployeesGrouped() {
+            const items = this.getSinglePunchEmployees();
+            const grouped = {};
+            items.forEach(({ log, emp, date }) => {
+                if (!grouped[emp.id]) {
+                    grouped[emp.id] = {
+                        emp,
+                        count: 0,
+                        logs: [],
+                    };
+                }
+                grouped[emp.id].count++;
+                grouped[emp.id].logs.push({
+                    log,
+                    date,
+                });
+            });
+
+            return Object.values(grouped).sort((a, b) => {
+                return b.count - a.count;
+            });
+        }        
 
 
         getManualPunchEmployees() {

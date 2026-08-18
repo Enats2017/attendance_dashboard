@@ -2524,7 +2524,7 @@ function handleGetDepartmentDesignationMapping($input = []) {
     }
 
     $mappingByDept = [];
-    $sqlMap = "SELECT Id, DepartmentId, DesignationId, IsActive, SortOrder FROM DepartmentDesignationMapping WITH (NOLOCK) WHERE IsActive = 1";
+    $sqlMap = "SELECT Id, DepartmentId, DesignationId, ParentDesignationId, IsActive, SortOrder FROM DepartmentDesignationMapping WITH (NOLOCK) WHERE IsActive = 1";
     $stmtMap = sqlsrv_query($conn, $sqlMap);
     if ($stmtMap) {
         while ($row = sqlsrv_fetch_array($stmtMap, SQLSRV_FETCH_ASSOC)) {
@@ -2532,6 +2532,7 @@ function handleGetDepartmentDesignationMapping($input = []) {
             if (!isset($mappingByDept[$deptId])) $mappingByDept[$deptId] = [];
             $mappingByDept[$deptId][] = [
                 'designationId' => intval($row['DesignationId']),
+                'parentDesignationId' => $row['ParentDesignationId'] !== null ? intval($row['ParentDesignationId']) : null,
                 'sortOrder' => $row['SortOrder'] !== null ? intval($row['SortOrder']) : null
             ];
         }
@@ -2562,6 +2563,7 @@ function handleSaveDepartmentDesignationMapping($input) {
     foreach ($items as $item) {
         $deptId = intval($item['departmentId'] ?? 0);
         $desigId = intval($item['designationId'] ?? 0);
+        $parentDesigId = isset($item['parentDesignationId']) && $item['parentDesignationId'] !== '' && $item['parentDesignationId'] !== null ? intval($item['parentDesignationId']) : null;
         $isActive = !empty($item['isActive']) ? 1 : 0;
         $sortOrder = isset($item['sortOrder']) && $item['sortOrder'] !== '' ? intval($item['sortOrder']) : null;
 
@@ -2576,11 +2578,11 @@ function handleSaveDepartmentDesignationMapping($input) {
         $existingRow = $checkStmt ? sqlsrv_fetch_array($checkStmt, SQLSRV_FETCH_ASSOC) : null;
 
         if ($existingRow) {
-            $sql = "UPDATE DepartmentDesignationMapping SET IsActive = ?, SortOrder = ?, UpdatedAt = GETDATE() WHERE DepartmentId = ? AND DesignationId = ?";
-            $params = array($isActive, $sortOrder, $deptId, $desigId);
+            $sql = "UPDATE DepartmentDesignationMapping SET ParentDesignationId = ?, IsActive = ?, SortOrder = ?, UpdatedAt = GETDATE() WHERE DepartmentId = ? AND DesignationId = ?";
+            $params = array($parentDesigId, $isActive, $sortOrder, $deptId, $desigId);
         } else {
-            $sql = "INSERT INTO DepartmentDesignationMapping (DepartmentId, DesignationId, IsActive, SortOrder, CreatedAt) VALUES (?, ?, ?, ?, GETDATE())";
-            $params = array($deptId, $desigId, $isActive, $sortOrder);
+            $sql = "INSERT INTO DepartmentDesignationMapping (DepartmentId, DesignationId, ParentDesignationId, IsActive, SortOrder, CreatedAt) VALUES (?, ?, ?, ?, ?, GETDATE())";
+            $params = array($deptId, $desigId, $parentDesigId, $isActive, $sortOrder);
         }
 
         $stmt = sqlsrv_query($conn, $sql, $params);
@@ -3050,32 +3052,47 @@ function handleGetReport($input) {
     }
 
     $desigByDept = [];
+    $reportingDesigMap = [];
     foreach ($tempDesig as $deptId => $designations) {
-        $parents = array_filter($designations, function ($d) {
-            return $d['parentId'] === null;
-        });
+        $designationMap = [];
+        foreach ($designations as $d) {
+            $designationMap[$d['id']] = $d;
+        }
 
-        usort($parents, function ($a, $b) {
-            return $a['sortOrder'] <=> $b['sortOrder'];
-        });
+        foreach ($designations as $d) {
+            $currentId = $d['id'];
+            $visited = [];
+            while (isset($designationMap[$currentId]) && $designationMap[$currentId]['parentId'] !== null) {
+                if (isset($visited[$currentId])) {
+                    break;
+                }
+                $visited[$currentId] = true;
+                $currentId = $designationMap[$currentId]['parentId'];
+            }
 
-        foreach ($parents as $parent) {
-            $parent['parentName'] = null;
-            $desigByDept[$deptId][] = $parent;
+            $reportingDesigMap[$deptId][$d['id']] = $currentId;
+        }
 
-            $children = array_filter($designations, function ($d) use ($parent) {
-                return $d['parentId'] == $parent['id'];
-            });
-
-            usort($children, function ($a, $b) {
-                return $a['sortOrder'] <=> $b['sortOrder'];
-            });
-
-            foreach ($children as $child) {
-                $child['parentName'] = $parent['name'];
-                $desigByDept[$deptId][] = $child;
+        foreach ($designations as $d) {
+            if ($d['parentId'] === null) {
+                $d['parentName'] = null;
+                $desigByDept[$deptId][] = $d;
             }
         }
+
+        usort($desigByDept[$deptId], function ($a, $b) {
+            $aEmpty = empty($a['sortOrder']);
+            $bEmpty = empty($b['sortOrder']);
+
+            if ($aEmpty != $bEmpty) {
+                return $aEmpty ? 1 : -1;
+            }
+            if ($a['sortOrder'] != $b['sortOrder']) {
+                return $a['sortOrder'] <=> $b['sortOrder'];
+            }
+
+            return strcmp($a['name'], $b['name']);
+        });
     }
 
     $numDays = $toDay - $fromDay + 1;
@@ -3116,6 +3133,7 @@ function handleGetReport($input) {
             $empId = (string)$row['EmployeeId'];
             $deptId = intval($row['DepartmentId']);
             $desigId = intval($row['DesignationId']);
+            $reportDesigId = $reportingDesigMap[$deptId][$desigId] ?? $desigId;
             $code = $row['EmployeeCode'];
             $name = $row['EmployeeName'];
             $status = $row['Status'];
@@ -3150,7 +3168,7 @@ function handleGetReport($input) {
             ];
 
             if ($status == 'Working') {
-                $employeesByDeptDesig[$deptId][$desigId][] = [
+                $employeesByDeptDesig[$deptId][$reportDesigId][] = [
                     'id' => $empId,
                     'code' => $code,
                     'name' => $name
@@ -3595,7 +3613,18 @@ function handleGetReport($input) {
     foreach (array_keys($statusCountsByDept) as $id) {
         if (!in_array($id, $allIds)) $allIds[] = $id;
     }
-            
+    
+    $reportingDesigHcMap = [];
+    foreach ($desigHcMap as $deptId => $designationHcs) {
+        foreach ($designationHcs as $desigId => $hc) {
+            $reportDesigId = $reportingDesigMap[$deptId][$desigId] ?? $desigId;
+            if (!isset($reportingDesigHcMap[$deptId][$reportDesigId])) {
+                $reportingDesigHcMap[$deptId][$reportDesigId] = 0;
+            }
+            $reportingDesigHcMap[$deptId][$reportDesigId] += intval($hc);
+        }
+    }
+    
     foreach ($allIds as $id) {
         $stdHc = isset($hcMap[$id]) ? intval($hcMap[$id]) : 0;
         $name = isset($depts[$id]) ? $depts[$id] : "Dept $id";
@@ -3647,10 +3676,9 @@ function handleGetReport($input) {
         if (isset($desigByDept[$id])) {
             foreach ($desigByDept[$id] as $desig) {
                 $desigId = $desig['id'];
-                $desigStdHc = intval($desigHcMap[$id][$desigId] ?? 0);
-
+                $desigStdHc = intval($reportingDesigHcMap[$id][$desigId] ?? 0);
                 $employeeCount = count($employeesByDeptDesig[$id][$desigId] ?? []);
-
+                
                 if ($desigStdHc <= 0 && $employeeCount == 0) {
                     continue;
                 }
@@ -3717,15 +3745,13 @@ function handleGetReport($input) {
                     }
                 }
  
-                $desigDays = []; $desigSum = 0;
+                $desigDays = []; 
+                $desigSum = 0;
                 for ($d = $fromDay; $d <= $toDay; $d++) {
                     if ($d > date('j') && $month == date('n') && $year == date('Y')) {
                         $desigDays[$d] = null;
                     } else {
-                        $desigDays[$d] = $desigSummary['total_present'][$d]
-                            + $desigSummary['total_half_present'][$d]
-                            + $desigSummary['total_wo_present'][$d]
-                            + $desigSummary['total_wo_half_present'][$d];
+                        $desigDays[$d] = $desigSummary['total_present'][$d] + $desigSummary['total_half_present'][$d] + $desigSummary['total_wo_present'][$d] + $desigSummary['total_wo_half_present'][$d] + $desigSummary['total_single_punch'][$d];
                         $desigSum += $desigDays[$d];
                     }
                 }
