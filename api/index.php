@@ -42,10 +42,6 @@ $sqlConfig = [
     "pwd" => "Wpl@123"
 ];
 //getSQLServer();exit;
-if (date('d-m-Y') === '19-08-2026') {
-    echo 'Matched';
-    exit;
-}
 
 // --- Global Connection Objects (Lazy Loaded) ---
 $mysqlConn = null;
@@ -1603,8 +1599,6 @@ function handleDashboardData($input, $returnData = false) {
                             'outCount' => 0,
                             'firstIn' => null,
                             'lastOut' => null,
-                            'inTimes' => [],
-                            'outTimes' => [],
                             'punches' => [],
                             'firstPunch' => $row['LogDate'],
                             'lastPunch' => $row['LogDate']
@@ -1614,13 +1608,12 @@ function handleDashboardData($input, $returnData = false) {
                     $deviceEmployeeStats[$key]['punchCount']++;
 
                     $deviceEmployeeStats[$key]['punches'][] = [
-                        'dateTime'  => clone $row['LogDate'],
+                        'dateTime' => clone $row['LogDate'],
                         'direction' => strtoupper(trim($row['AttDirection'])),
                     ];
 
                     if ($isIn) {
                         $deviceEmployeeStats[$key]['inCount']++;
-                        $deviceEmployeeStats[$key]['inTimes'][] = $row['LogDate'];
                         if ($deviceEmployeeStats[$key]['firstIn'] === null || $row['LogDate'] < $deviceEmployeeStats[$key]['firstIn']) {
                             $deviceEmployeeStats[$key]['firstIn'] = $row['LogDate'];
                         }
@@ -1628,7 +1621,6 @@ function handleDashboardData($input, $returnData = false) {
 
                     if ($isOut) {
                         $deviceEmployeeStats[$key]['outCount']++;
-                        $deviceEmployeeStats[$key]['outTimes'][] = $row['LogDate'];
                         if ($deviceEmployeeStats[$key]['lastOut'] === null || $row['LogDate'] > $deviceEmployeeStats[$key]['lastOut']) {
                             $deviceEmployeeStats[$key]['lastOut'] = $row['LogDate'];
                         }

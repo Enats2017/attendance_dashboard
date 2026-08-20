@@ -353,9 +353,7 @@
             const totalPresentRecords = logs.filter(isPresent).length;
             const totalAbsentRecords = Math.max(0, emps.length - totalPresentRecords);
 
-            const avgHours = logs.length
-                ? (logs.reduce((sum, l) => sum + (l.hoursWorked || 0), 0) / logs.length).toFixed(1)
-                : 0;
+            const avgHours = logs.length ? (logs.reduce((sum, l) => sum + (l.hoursWorked || 0), 0) / logs.length).toFixed(1) : 0;
 
             return {
                 present: totalPresentRecords,
@@ -421,16 +419,32 @@
 
                 let noPunchDays = 0;
                 const noPunchLogs = [];
-                allDates.forEach(dt => {
+                allDates.forEach((dt, index) => {
                     const key = `${emp.id}_${dt}`;
                     const status = statusKeyMap[key] || "absent";
 
-                    if (status === "absent" || status === "weeklyOff") {
+                    if (status === "absent") {
                         noPunchDays++;
                         noPunchLogs.push({
                             date: dt,
                             status: status
                         });
+                        return;
+                    }
+
+                    if (status === "weeklyOff") {
+                        const previousDate = allDates[index - 1];
+                        const nextDate = allDates[index + 1];
+                        const previousStatus = previousDate ? statusKeyMap[`${emp.id}_${previousDate}`] || "absent" : null;
+                        const nextStatus = nextDate ? statusKeyMap[`${emp.id}_${nextDate}`] || "absent" : null;
+                        const isSandwich = previousStatus === "absent" && nextStatus === "absent";
+                        if (isSandwich) {
+                            noPunchDays++;
+                            noPunchLogs.push({
+                                date: dt,
+                                status: status
+                            });
+                        }
                     }
                 });
 

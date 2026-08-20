@@ -600,7 +600,10 @@ class AttendanceView {
         const dashFamiliesWithCount = dashFamilies.filter((f) => famCounts[f.id] > 0);
 
         const familyCardsHtml = dashFamiliesWithCount.map((f, i) => `
-            <div class="stat-card ${famColorCls[i % famColorCls.length]} stat-card-clickable" data-dashboard-family-id="${f.id}" onclick="AppController.view._showDashboardFamilyDrilldown(${f.id})">
+            <div class="stat-card ${famColorCls[i % famColorCls.length]} stat-card-clickable" data-dashboard-family-id="${f.id}" onclick="AppController.view._showDashboardFamilyDrilldown(${f.id})" style="position:relative;">
+                <button class="stat-card-download-btn" title="Download ${this._escapeAttr(f.name)} Excel" onclick="event.stopPropagation(); AppController.view._downloadFamilyExcel(${f.id})">
+                    <i class="ph ph-download-simple"></i>
+                </button>
                 <div class="stat-icon"><i class="ph ph-cards"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">${this._escapeAttr(f.name)}</span>
@@ -742,7 +745,11 @@ class AttendanceView {
         });
 
         const genderCards = `
-            <div class="stat-card info stat-card-clickable" data-gender="Male" onclick="AppController.view._showGenderSummaryDrilldown('Male')">
+            <div class="stat-card info stat-card-clickable" data-gender="Male" onclick="AppController.view._showGenderSummaryDrilldown('Male')" style="position:relative;">
+                <button class="stat-card-download-btn" title="Download Male Employees Excel"
+                    onclick="event.stopPropagation(); AppController.view._downloadGenderExcel('Male')">
+                    <i class="ph ph-download-simple"></i>
+                </button>
                 <div class="stat-icon"><i class="ph ph-gender-male"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">Male</span>
@@ -750,7 +757,11 @@ class AttendanceView {
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
             </div>
-            <div class="stat-card accent stat-card-clickable" data-gender="Female" onclick="AppController.view._showGenderSummaryDrilldown('Female')">
+            <div class="stat-card accent stat-card-clickable" data-gender="Female" onclick="AppController.view._showGenderSummaryDrilldown('Female')" style="position:relative;">
+                <button class="stat-card-download-btn" title="Download Female Employees Excel"
+                    onclick="event.stopPropagation(); AppController.view._downloadGenderExcel('Female')">
+                    <i class="ph ph-download-simple"></i>
+                </button>
                 <div class="stat-icon"><i class="ph ph-gender-female"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">Female</span>
@@ -768,7 +779,11 @@ class AttendanceView {
 
         // --- Staff / Workmen ---
         const swCards = `
-            <div class="stat-card info stat-card-clickable" data-workforce="Staff" onclick="AppController.view._showWorkforceSelected('Staff')">
+            <div class="stat-card info stat-card-clickable" data-workforce="Staff" onclick="AppController.view._showWorkforceSelected('Staff')" style="position:relative;">
+                <button class="stat-card-download-btn" title="Download Staff Employees Excel"
+                    onclick="event.stopPropagation(); AppController.view._downloadWorkforceExcel('Staff')">
+                    <i class="ph ph-download-simple"></i>
+                </button>
                 <div class="stat-icon"><i class="ph ph-identification-badge"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">Staff</span>
@@ -776,7 +791,11 @@ class AttendanceView {
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
             </div>
-            <div class="stat-card warning stat-card-clickable" data-workforce="Workmen" onclick="AppController.view._showWorkforceSelected('Workmen')">
+            <div class="stat-card warning stat-card-clickable" data-workforce="Workmen" onclick="AppController.view._showWorkforceSelected('Workmen')" style="position:relative;">
+                <button class="stat-card-download-btn" title="Download Workmen Employees Excel"
+                    onclick="event.stopPropagation(); AppController.view._downloadWorkforceExcel('Workmen')">
+                    <i class="ph ph-download-simple"></i>
+                </button>
                 <div class="stat-icon"><i class="ph ph-hard-hat"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">Workmen</span>
@@ -784,7 +803,11 @@ class AttendanceView {
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
             </div>
-            <div class="stat-card accent stat-card-clickable" data-workforce="Contract" onclick="AppController.view._showWorkforceSelected('Contract')">
+            <div class="stat-card accent stat-card-clickable" data-workforce="Contract" onclick="AppController.view._showWorkforceSelected('Contract')" style="position:relative;">
+                <button class="stat-card-download-btn" title="Download Contract Employees Excel"
+                    onclick="event.stopPropagation(); AppController.view._downloadWorkforceExcel('Contract')">
+                    <i class="ph ph-download-simple"></i>
+                </button>
                 <div class="stat-icon"><i class="ph ph-handshake"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">Contract</span>
@@ -792,7 +815,11 @@ class AttendanceView {
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
             </div>
-            <div class="stat-card info stat-card-clickable" data-workforce="Consultant" onclick="AppController.view._showWorkforceSelected('Consultant')">
+            <div class="stat-card info stat-card-clickable" data-workforce="Consultant" onclick="AppController.view._showWorkforceSelected('Consultant')" style="position:relative;">
+                <button class="stat-card-download-btn" title="Download Consultant Employees Excel"
+                    onclick="event.stopPropagation(); AppController.view._downloadWorkforceExcel('Consultant')">
+                    <i class="ph ph-download-simple"></i>
+                </button>
                 <div class="stat-icon"><i class="ph ph-briefcase-metal"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">Consultant</span>
@@ -831,7 +858,11 @@ class AttendanceView {
         });
 
         const ageCards = ageGroups.filter((g) => ageCounts[g] > 0).map((g) => `
-            <div class="stat-card ${ageGroupCls[g]} stat-card-clickable" data-age-group="${this._escapeAttr(g)}" onclick="AppController.view._showAgeGroupDrilldown('${this._escapeAttr(g)}')">
+            <div class="stat-card ${ageGroupCls[g]} stat-card-clickable" data-age-group="${this._escapeAttr(g)}" onclick="AppController.view._showAgeGroupDrilldown('${this._escapeAttr(g)}')" style="position:relative;">
+                <button class="stat-card-download-btn" title="Download ${this._escapeAttr(g)} Employees Excel"
+                    onclick="event.stopPropagation(); AppController.view._downloadAgeGroupExcel('${this._escapeAttr(g)}')">
+                    <i class="ph ph-download-simple"></i>
+                </button>
                 <div class="stat-icon">
                     <span class="material-symbols-outlined">
                         ${ageGroupIcons[g]}
@@ -4127,6 +4158,121 @@ class AttendanceView {
     }
 
 
+    _downloadGenderExcel(gender) {
+        const data = this._currentGenderSummaryData;
+        if (!data) return;
+        const { emps } = data;
+
+        const genderEmps = emps.filter((e) => e.gender === gender);
+        if (!genderEmps.length) return;
+
+        const exportData = genderEmps.map((emp) => ({
+            Code: emp.code,
+            Name: emp.name,
+            Gender: emp.gender,
+            Dept: emp.dept,
+            Company: emp.company,
+            Designation: emp.designation,
+            TeamName: emp.teamName,
+            shiftGroupName: emp.shiftGroupName,
+            Shift: emp.shift,
+            ShiftStart: emp.shiftStart || "",
+            ShiftEnd: emp.shiftEnd || "",
+            Location: emp.location || "",
+        }));
+
+        this.exportExcel(exportData, gender + "-all-locations");
+    }
+
+
+    _downloadWorkforceExcel(type) {
+        const dataMap = {
+            Staff: this._currentStaffSummaryData,
+            Workmen: this._currentWorkerSummaryData,
+            Contract: this._currentContractSummaryData,
+            Consultant: this._currentConsultantSummaryData,
+        };
+        const data = dataMap[type];
+        if (!data) return;
+        const { emps } = data;
+        if (!emps.length) return;
+
+        const exportData = emps.map((emp) => ({
+            Code: emp.code,
+            Name: emp.name,
+            Gender: emp.gender,
+            TeamName: emp.teamName,
+            Dept: emp.dept,
+            Company: emp.company,
+            Designation: emp.designation,
+            shiftGroupName: emp.shiftGroupName,
+            Shift: emp.shift,
+            ShiftStart: emp.shiftStart || "",
+            ShiftEnd: emp.shiftEnd || "",
+            Location: emp.location || "",
+        }));
+
+        this.exportExcel(exportData, type + "-all-locations");
+    }
+
+
+    _downloadAgeGroupExcel(group) {
+        const data = this._currentAgeData;
+        if (!data) return;
+        const { emps, model } = data;
+
+        const groupEmps = emps.filter((e) => model.getAgeGroup(e.dob) === group);
+        if (!groupEmps.length) return;
+
+        const exportData = groupEmps.map((emp) => ({
+            Code: emp.code,
+            Name: emp.name,
+            Age: this._calculateAge(emp.dobRaw),
+            DOB: this._formatDate(emp.dobRaw),
+            Gender: emp.gender,
+            Dept: emp.dept,
+            Company: emp.company,
+            Designation: emp.designation,
+            TeamName: emp.teamName,
+            shiftGroupName: emp.shiftGroupName,
+            Location: emp.location || "",
+        }));
+
+        const safeName = group.replace(/[^\w]+/g, "_");
+        this.exportExcel(exportData, safeName + "-all-locations");
+    }
+
+
+    _downloadFamilyExcel(familyId) {
+        const data = this._currentDashboardFamilyData;
+        if (!data) return;
+        const { emps, famMap, families } = data;
+
+        const famEmps = emps.filter((e) => {
+            const famInfo = famMap[e.designationId];
+            return famInfo && famInfo.familyId === familyId;
+        });
+        if (!famEmps.length) return;
+
+        const fam = families.find((f) => f.id === familyId);
+        const famName = fam ? fam.name.replace(/[^\w]+/g, "_") : "family-" + familyId;
+
+        const exportData = famEmps.map((emp) => ({
+            Code: emp.code,
+            Name: emp.name,
+            Dept: emp.dept,
+            Company: emp.company,
+            Designation: emp.designation,
+            TeamName: emp.teamName,
+            shiftGroupName: emp.shiftGroupName,
+            Shift: emp.shift,
+            Location: emp.location || "",
+        }));
+
+        this.exportExcel(exportData, famName + "-all-locations");
+    }
+
+
     _countBy(arr, keyFn) {
         const out = {};
         arr.forEach((x) => {
@@ -4959,6 +5105,7 @@ class AttendanceView {
                     <td>${(currentPage - 1) * pageSize + index + 1}</td>
                     <td><b>${e.code || "–"}</b></td>
                     <td>${e.name || "–"}</td>
+                    <td>${e.gender || "–"}</td>
                     <td>${e.company || "–"}</td>
                     <td>${e.dept || "–"}</td>
                     <td>${e.designation || "–"}</td>
@@ -4978,6 +5125,7 @@ class AttendanceView {
             return {
                 Code: e.code,
                 Name: e.name,
+                Gender: e.gender || "",
                 Dept: e.dept,
                 Company: e.company,
                 TeamName: e.teamName,
@@ -5039,6 +5187,7 @@ class AttendanceView {
 	                            <th>Sr.No</th>
 								<th>Code</th>
 								<th>Name</th>
+                                <th>Gender</th>
 								<th>Company</th>
 								<th>Department</th>
                                 <th>Designation</th>
@@ -7644,6 +7793,14 @@ class AttendanceView {
         const isDashboardDesig = key.startsWith("dashboardDesig_");
         const isManualPunchShift = key.startsWith("manualPunchShift_");
         const isManualPunchAll = key === "manualPunchAll";
+        const isCompanyLocation = key.startsWith("companyLocation_");
+        const isAvailableLocation = key.startsWith("availableLocation_");
+        const isAgeLocation = key.startsWith("ageLocation_");
+        const isGenderLocation = key.startsWith("genderLocation_");
+        const isCategoryCompany = key.startsWith("categoryCompany_");
+        const isDashboardDept = key.startsWith("dashboardDept_");
+        const isDashboardFamily = key.startsWith("dashboardFamily_") || key.startsWith("desigFamily_");
+        const isWorkforceLocation = key.startsWith("staffList_") || key.startsWith("workerList_") || key.startsWith("contractList_") || key.startsWith("consultantList_") || key.startsWith("workforce");
         const isNewJoinedOnly = key === "newJoined";
         const isNewJoinedRelated = key === "newJoined" || key.startsWith("njBreakdown_") || key.startsWith("newjoinedDesig_");
         const isResignedRelated = key.startsWith("resBreakdown_") || key.startsWith("resignedDesig_");
@@ -7684,22 +7841,22 @@ class AttendanceView {
                 headers = ["Sr.No", "Code", "Name", "Team", "Dept", "Company", "Designation", "Shift Group", "Location", "DOB", "Age", "Gender"];
             }
         } else {
-            headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift", "In Time", "Out Time", "Status", "Action"];
+            headers = ["Sr.No", "Code", "Name", "Gender", "Dept", "Company", "Designation", "Shift", "In Time", "Out Time", "Status", "Action"];
             if (isAgeGroup) {
-                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Age", "Shift", "In Time", "Out Time", "Status", "Action"];
+                headers = ["Sr.No", "Code", "Name", "Gender", "Dept", "Company", "Designation", "Age", "Shift", "In Time", "Out Time", "Status", "Action"];
             } else if (key === "resigned") {
-                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "DOJ", "DOR", "Status", "Action"];
+                headers = ["Sr.No", "Code", "Name", "Gender", "Dept", "Company", "Designation", "DOJ", "DOR", "Status", "Action"];
             }
             else if (key === "newJoined") {
-                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "DOJ", "Status", "Action"];
+                headers = ["Sr.No", "Code", "Name", "Gender", "Dept", "Company", "Designation", "DOJ", "Status", "Action"];
             } else if (key === "lateIn") {
-                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift", "In Time", "Late By", "Out Time", "Status", "Action"];
+                headers = ["Sr.No", "Code", "Name", "Gender", "Dept", "Company", "Designation", "Shift", "In Time", "Late By", "Out Time", "Status", "Action"];
             } else if (key === "earlyOut") {
-                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift", "In Time", "Out Time", "Early By", "Status", "Action"];
+                headers = ["Sr.No", "Code", "Name", "Gender", "Dept", "Company", "Designation", "Shift", "In Time", "Out Time", "Early By", "Status", "Action"];
             } else if (key === "singlePunch") {
-                headers = ["Sr.No", "Code", "Name", "Dept", "Company", "Designation", "Shift", "In Time", "Out Time", "Status", "Action"];
+                headers = ["Sr.No", "Code", "Name", "Gender", "Dept", "Company", "Designation", "Shift", "In Time", "Out Time", "Status", "Action"];
             } else if (key === "staffList" || key === "workerList" || key === "contractList" || key === "consultantList") {
-                headers = ["Sr.No", "Code", "Name", "Team", "Dept", "Company", "Designation", "Shift", "In Time", "Out Time", "Status", "Action"];
+                headers = ["Sr.No", "Code", "Name", "Gender", "Team", "Dept", "Company", "Designation", "Shift", "In Time", "Out Time", "Status", "Action"];
             }
         }
 
@@ -7800,6 +7957,7 @@ class AttendanceView {
                         <td>${sr}</td>
                         <td><b>${emp.code || "–"}</b></td>
                         <td>${emp.name || "–"}</td>
+                        <td>${emp.gender || "–"}</td>
                         <td>${emp.dept || "–"}</td>
                         <td>${emp.company || "–"}</td>
                         <td>${emp.designation || "–"}</td>
@@ -7817,6 +7975,7 @@ class AttendanceView {
                         <td>${sr}</td>
                         <td><b>${emp.code || "–"}</b></td>
                         <td>${emp.name || "–"}</td>
+                        <td>${emp.gender || "–"}</td>
                         <td>${emp.dept || "–"}</td>
                         <td>${emp.company || "–"}</td>
                         <td>${emp.designation || "–"}</td>
@@ -7834,6 +7993,7 @@ class AttendanceView {
                         <td>${sr}</td>
                         <td><b>${emp.code || "–"}</b></td>
                         <td>${emp.name || "–"}</td>
+                        <td>${emp.gender || "–"}</td>
                         <td>${emp.dept || "–"}</td>
                         <td>${emp.company || "–"}</td>
                         <td>${emp.designation || "–"}</td>
@@ -7851,6 +8011,7 @@ class AttendanceView {
                         <td>${sr}</td>
                         <td><b>${emp.code || "–"}</b></td>
                         <td>${emp.name || "–"}</td>
+                        <td>${emp.gender || "–"}</td>
                         <td>${emp.teamName || "–"}</td>
                         <td>${emp.dept || "–"}</td>
                         <td>${emp.company || "–"}</td>
@@ -7868,6 +8029,7 @@ class AttendanceView {
                         <td>${sr}</td>
                         <td><b>${emp.code || "–"}</b></td>
                         <td>${emp.name || "–"}</td>
+                        <td>${emp.gender || "–"}</td>
                         <td>${emp.dept || "–"}</td>
                         <td>${emp.company || "–"}</td>
                         <td>${emp.designation || "–"}</td>
@@ -7883,6 +8045,7 @@ class AttendanceView {
                         <td>${sr}</td>
                         <td><b>${emp.code || "–"}</b></td>
                         <td>${emp.name || "–"}</td>
+                        <td>${emp.gender || "–"}</td>
                         <td>${emp.dept || "–"}</td>
                         <td>${emp.company || "–"}</td>
                         <td>${emp.designation || "–"}</td>
@@ -7897,6 +8060,7 @@ class AttendanceView {
                         <td>${sr}</td>
                         <td><b>${emp.code || "–"}</b></td>
                         <td>${emp.name || "–"}</td>
+                        <td>${emp.gender || "–"}</td>
                         <td>${emp.dept || "–"}</td>
                         <td>${emp.company || "–"}</td>
                         <td>${emp.designation || "–"}</td>
@@ -7915,8 +8079,7 @@ class AttendanceView {
         const endP = Math.min(totalPages, currentPage + 2);
         for (let i = startP; i <= endP; i++) {
             pageButtons += `
-                <button class="btn-page ${i === currentPage ? "btn-page-active" : ""}"
-                    onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, ${i}, '${containerId}', '${closeHandler}', AppController.view._statCardFullItems, AppController.view._statCardFullExportName)">
+                <button class="btn-page ${i === currentPage ? "btn-page-active" : ""}" onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, ${i}, '${containerId}', '${closeHandler}', AppController.view._statCardFullItems, AppController.view._statCardFullExportName)">
                     ${i}
                 </button>
             `;
@@ -7986,6 +8149,7 @@ class AttendanceView {
                 return {
                     Code: emp?.code,
                     Name: emp?.name,
+                    Gender: emp?.gender,
                     Dept: emp?.dept,
                     Company: emp?.company,
                     Designation: emp?.designation,
@@ -8000,6 +8164,7 @@ class AttendanceView {
                 return {
                     Code: emp?.code,
                     Name: emp?.name,
+                    Gender: emp?.gender,
                     Dept: emp?.dept,
                     Company: emp?.company,
                     Designation: emp?.designation,
@@ -8015,6 +8180,7 @@ class AttendanceView {
                 return {
                     Code: emp?.code,
                     Name: emp?.name,
+                    Gender: emp?.gender,
                     Dept: emp?.dept,
                     Company: emp?.company,
                     Designation: emp?.designation,
@@ -8029,6 +8195,7 @@ class AttendanceView {
                 return {
                     Code: emp?.code,
                     Name: emp?.name,
+                    Gender: emp?.gender,
                     Dept: emp?.dept,
                     Company: emp?.company,
                     Designation: emp?.designation,
@@ -8045,6 +8212,7 @@ class AttendanceView {
                 return {
                     Code: emp?.code,
                     Name: emp?.name,
+                    Gender: emp?.gender,
                     Dept: emp?.dept,
                     Company: emp?.company,
                     Designation: emp?.designation,
@@ -8061,6 +8229,7 @@ class AttendanceView {
                 return {
                     Code: emp?.code,
                     Name: emp?.name,
+                    Gender: emp?.gender,
                     TeamName: emp?.teamName,
                     Dept: emp?.dept,
                     Company: emp?.company,
@@ -8076,6 +8245,7 @@ class AttendanceView {
             return {
                 Code: emp?.code,
                 Name: emp?.name,
+                Gender: emp?.gender,
                 Dept: emp?.dept,
                 Company: emp?.company,
                 Designation: emp?.designation,
@@ -8102,8 +8272,49 @@ class AttendanceView {
 			<div class="drilldown-box">
 				<div class="drilldown-header">
 					<div class="drilldown-title">
-                        ${titleMap[key] || (isAgeGroup ? "🎂 Age Group: " + key.replace("ageGroup_", "") : isCompany ? "🏢 Company: " + key.replace("company_", "") : isDeptSummary ? "💼 Dept: " + key.replace("deptSummary_", "") : isGenderSummary ? "⚧ Gender: " + key.replace("genderSummary_", "") : isShiftSummary ? "🕐 Shift: " + key.replace("shiftSummary_", "") : isStaffSummary ? "👔 Staff Dept: " + key.replace("staffSummary_", "") : isWorkerSummary ? "🔧 Workmen Dept: " + key.replace("workerSummary_", "") : isDashboardDesig ? "🏷️ Designation: " + key.replace("dashboardDesig_", "") : isManualPunchShift ? "✏️ Manual Punch — Shift: " + key.replace("manualPunchShift_", "") : isManualPunchAll ? "✏️ All Manual Punches" : key)}
-						<small>${items.length} records</small>
+                        ${(() => {
+                            if (titleMap[key]) return titleMap[key];
+                            if (isAgeGroup) return "🎂 Age Group: " + key.replace("ageGroup_", "");
+                            if (isAgeLocation) {
+                                const rest = key.replace("ageLocation_", "");
+                                const i = rest.lastIndexOf("_");
+                                const group = i > -1 ? rest.slice(0, i) : rest;
+                                const loc = i > -1 ? rest.slice(i + 1) : "";
+                                return "🎂 Age Group: " + group + (loc ? " — Location: " + loc : "");
+                            }
+                            if (isCompany) return "🏢 Company: " + key.replace("company_", "");
+                            if (isCompanyLocation) {
+                                const rest = key.replace("companyLocation_", "");
+                                const i = rest.lastIndexOf("_");
+                                const company = i > -1 ? rest.slice(0, i) : rest;
+                                const loc = i > -1 ? rest.slice(i + 1) : "";
+                                return "🏢 Company: " + company + (loc ? " — Location: " + loc : "");
+                            }
+                            if (isCategoryCompany) {
+                                return "🏢 " + key.replace("categoryCompany_", "").replace(/_/g, " / ");
+                            }
+                            if (isAvailableLocation) return "👥 Available — Location: " + key.replace("availableLocation_", "");
+                            if (isGenderSummary) return "⚧ Gender: " + key.replace("genderSummary_", "");
+                            if (isGenderLocation) {
+                                const rest = key.replace("genderLocation_", "");
+                                const i = rest.lastIndexOf("_");
+                                const gender = i > -1 ? rest.slice(0, i) : rest;
+                                const loc = i > -1 ? rest.slice(i + 1) : "";
+                                return "⚧ Gender: " + gender + (loc ? " — Location: " + loc : "");
+                            }
+                            if (isDeptSummary) return "💼 Dept: " + key.replace("deptSummary_", "");
+                            if (isDashboardDept) return "💼 Dept: " + key.replace("dashboardDept_", "");
+                            if (isShiftSummary) return "🕐 Shift: " + key.replace("shiftSummary_", "");
+                            if (isStaffSummary) return "👔 Staff Dept: " + key.replace("staffSummary_", "");
+                            if (isWorkerSummary) return "🔧 Workmen Dept: " + key.replace("workerSummary_", "");
+                            if (isDashboardDesig) return "🏷️ Designation: " + key.replace("dashboardDesig_", "");
+                            if (isDashboardFamily) return "🃏 Family: " + key.replace(/^(dashboardFamily_|desigFamily_)/, "");
+                            if (isManualPunchShift) return "✏️ Manual Punch — Shift: " + key.replace("manualPunchShift_", "");
+                            if (isManualPunchAll) return "✏️ All Manual Punches";
+                            if (isWorkforceLocation) return "👥 " + key.replace(/_/g, " — ");
+                            return key.replace(/_/g, " — ");
+                        })()}
+                        <small>${items.length} records</small>
 					</div>
 					<div class="drilldown-btn-group">
 						<button class="btn-drill btn-drill-excel" onclick="AppController.view.exportExcel(AppController.view._statCardExportData, '${key}-employees')">
@@ -8880,14 +9091,6 @@ class AttendanceView {
             });
         });
 
-        // ---- Edit-priority tracking ----
-        // Whenever the user actually changes a row's number (typing directly,
-        // or the +/- buttons), we stamp that input with an increasing
-        // "edit sequence" number. When Sort has to break a tie between two
-        // rows holding the same number, the row the user edited more
-        // recently wins the tie and keeps that number; the row that used to
-        // hold it (and everything after) gets pushed down instead of the
-        // other way around.
         let editSeqCounter = 0;
         const markEdited = (input) => {
             if (!input) return;
@@ -10533,12 +10736,10 @@ class AttendanceView {
 
         const statusClass = (() => {
             const s = (log?.status || "").toLowerCase();
-
             if (s.includes("half")) return "half";
             if (s.includes("wo") || s.includes("weekly")) return "wo";
             if (s.includes("absent")) return "absent";
             if (s.includes("present")) return "present";
-
             return "default";
         })();
 
@@ -10581,8 +10782,9 @@ class AttendanceView {
                             Employee Information
                         </div>
                         <div class="rd-grid">
+                            ${row("Employee Code", emp?.code)}    
                             ${row("Employee Name", emp?.name)}
-                            ${row("Employee Code", emp?.code)}
+                            ${row("Gender", emp?.gender)}
                             ${row("Company", emp?.company)}
                             ${row("Department", emp?.dept)}
                             ${row("Designation", emp?.designation)}
