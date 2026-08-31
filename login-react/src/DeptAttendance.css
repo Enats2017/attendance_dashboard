@@ -167,3 +167,562 @@
   .da-report-card { box-shadow: none; border: none; }
   .da-table th, .da-table td { font-size: 10px; padding: 4px 6px; }
 }
+
+/* =========================================================
+   EMPLOYEE STATUS SUMMARY
+   ========================================================= */
+
+.da-status-summary-card {
+    margin-top: 20px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+    overflow: hidden;
+}
+
+.da-status-summary-header {
+    padding: 16px 20px;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.da-status-summary-header h3 {
+    margin: 0;
+    color: #0f172a;
+    font-size: 16px;
+    font-weight: 800;
+}
+
+.da-status-summary-header p {
+    margin: 4px 0 0;
+    color: #64748b;
+    font-size: 12px;
+}
+
+.da-status-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    padding: 18px;
+}
+
+.da-status-summary-box {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.da-status-summary-box-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 11px 14px;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    color: #334155;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.da-status-record-count {
+    color: #94a3b8;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.da-status-summary-table-wrap {
+    height: 280px;
+    overflow: hidden;
+}
+
+.da-status-summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.da-status-col-date {
+    width: 55%;
+}
+
+.da-status-col-count {
+    width: 20%;
+}
+
+.da-status-col-view {
+    width: 25%;
+}
+
+.da-status-summary-table th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: 9px 10px;
+    background: #f8fafc;
+    color: #64748b;
+    border-bottom: 1px solid #e2e8f0;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.da-status-summary-table th:nth-child(2),
+.da-status-summary-table th:nth-child(3) {
+    text-align: center;
+}
+
+.da-status-summary-table td {
+    padding: 9px 10px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
+}
+
+.da-status-summary-table td:nth-child(2),
+.da-status-summary-table td:nth-child(3) {
+    text-align: center;
+}
+
+.da-status-summary-table tbody tr:hover td {
+    background: rgba(124, 58, 237, 0.04);
+}
+
+.da-status-count {
+    text-align: center;
+    font-weight: 800;
+    color: #1e40af !important;
+}
+
+.da-view-btn {
+    width: 32px;
+    height: 30px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #c7d2fe;
+    border-radius: 7px;
+    background: #eef2ff;
+    color: #4338ca;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+.da-view-btn:hover {
+    background: #4f46e5;
+    border-color: #4f46e5;
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(79, 70, 229, 0.25);
+}
+
+.da-view-btn:active {
+    transform: translateY(0);
+}
+
+.da-status-summary-empty {
+    padding: 18px;
+    text-align: center;
+    color: #94a3b8;
+    font-size: 12px;
+}
+
+
+/* =========================================================
+   STATUS EMPLOYEE MODAL
+   ========================================================= */
+
+.da-status-modal {
+    width: 92%;
+    max-width: 850px;
+    max-height: 82vh;
+    background: #fff;
+    border-radius: 18px;
+    padding: 22px;
+    box-shadow: 0 20px 60px rgba(15, 23, 42, 0.25);
+    overflow: hidden;
+    animation: modalSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.da-status-modal-date {
+    margin: 5px 0 0;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.da-status-modal-summary {
+    margin-bottom: 12px;
+    color: #4338ca;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.da-status-employee-table-wrap {
+    max-height: 48vh;
+    overflow: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+}
+
+.da-status-employee-table-wrap::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.da-status-employee-table-wrap::-webkit-scrollbar-track {
+    background: #f8fafc;
+}
+
+.da-status-employee-table-wrap::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 999px;
+}
+
+.da-status-employee-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.da-status-employee-table th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    padding: 10px 12px;
+    background: linear-gradient(135deg, #1e1b4b, #312e81);
+    color: rgba(255, 255, 255, 0.95);
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.da-status-employee-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
+}
+
+.da-status-employee-table tbody tr:hover td {
+    background: rgba(124, 58, 237, 0.04);
+}
+
+.da-modal-employee-name {
+    color: #0f172a !important;
+    font-weight: 700 !important;
+}
+
+.da-status-modal-empty {
+    padding: 40px 20px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    color: #94a3b8;
+    text-align: center;
+    font-size: 13px;
+}
+
+
+/* =========================================================
+   RESPONSIVE STATUS SUMMARY
+   ========================================================= */
+
+@media (max-width: 900px) {
+    .da-status-summary-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+    .da-status-summary-grid {
+        padding: 12px;
+        gap: 12px;
+    }
+
+    .da-status-modal {
+        width: 94%;
+        max-height: 88vh;
+        padding: 16px;
+    }
+
+    .da-status-employee-table {
+        min-width: 650px;
+    }
+
+    .da-status-employee-table-wrap {
+        overflow-x: auto;
+    }
+}
+
+
+/* =========================================================
+   STATUS SUMMARY PAGINATION
+   ========================================================= */
+
+.da-status-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 10px 12px;
+    border-top: 1px solid #e2e8f0;
+    background: #f8fafc;
+}
+
+.da-page-btn {
+    min-width: 30px;
+    height: 30px;
+    padding: 0 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.da-page-btn:hover:not(:disabled) {
+    background: #eef2ff;
+    border-color: #818cf8;
+    color: #4338ca;
+}
+
+.da-page-btn-active {
+    background: #4f46e5 !important;
+    border-color: #4f46e5 !important;
+    color: #ffffff !important;
+}
+
+.da-page-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+/* =========================================================
+   CLICKABLE SUMMARY COUNTS (tfoot)
+   ========================================================= */
+
+.da-count-clickable {
+    color: #4338ca;
+    font-weight: 800;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    transition: all 0.15s ease;
+    padding: 2px 4px;
+    border-radius: 5px;
+}
+
+.da-count-clickable:hover {
+    background: rgba(79, 70, 229, 0.1);
+    text-decoration-color: #4338ca;
+}
+
+
+/* =========================================================
+   ATTENDANCE EMPLOYEE REPORT (inline panel below main table)
+   ========================================================= */
+
+.da-attendance-report-card {
+    margin-top: 20px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+    overflow: hidden;
+    animation: fadeSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.da-attendance-report-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 20px;
+    background: linear-gradient(135deg, #1e1b4b, #312e81);
+    color: #fff;
+}
+
+.da-attendance-report-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 800;
+}
+
+.da-attendance-report-header p {
+    margin: 3px 0 0;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+    font-weight: 500;
+}
+
+.da-attendance-report-header p span {
+    color: #fff;
+    font-weight: 700;
+}
+
+.da-attendance-report-header .da-modal-close {
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.da-attendance-report-header .da-modal-close:hover {
+    color: #fff;
+}
+
+.da-attendance-report-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 14px 20px;
+    border-bottom: 1px solid #e2e8f0;
+    background: #f8fafc;
+}
+
+.da-attendance-report-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 24px;
+}
+
+.da-attendance-search-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.da-attendance-search-group label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #475569;
+    white-space: nowrap;
+}
+
+.da-attendance-search-input {
+    padding: 8px 14px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 9px;
+    font-size: 13px;
+    font-family: inherit;
+    background: #fff;
+    color: #0f172a;
+    outline: none;
+    min-width: 220px;
+    transition: all 0.2s;
+}
+
+.da-attendance-search-input:focus {
+    border-color: #7c3aed;
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+}
+
+.da-attendance-table-wrap {
+    max-height: 55vh;
+    overflow: auto;
+}
+
+.da-attendance-table-wrap::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.da-attendance-table-wrap::-webkit-scrollbar-track {
+    background: #f8fafc;
+}
+
+.da-attendance-table-wrap::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 999px;
+}
+
+.da-attendance-report-card .da-status-employee-table th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+}
+
+@media (max-width: 768px) {
+    .da-attendance-report-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .da-attendance-report-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .da-attendance-search-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .da-attendance-search-group label {
+        text-align: left;
+    }
+
+    .da-attendance-search-input {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .da-attendance-table-wrap {
+        overflow-x: auto;
+    }
+
+    .da-status-employee-table {
+        min-width: 750px;
+    }
+
+    .da-attendance-pagination {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .da-attendance-pagination-info {
+        text-align: left;
+    }
+
+    .da-attendance-pagination-buttons {
+        justify-content: flex-start;
+    }
+}
+
+/* =========================================================
+   ATTENDANCE EMPLOYEE REPORT PAGINATION
+   ========================================================= */
+
+.da-attendance-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 10px 14px;
+    border-top: 1px solid #e2e8f0;
+    background: #f8fafc;
+}
+
+.da-attendance-pagination-info {
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.da-attendance-pagination-buttons {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+}

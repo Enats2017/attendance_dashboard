@@ -1391,4 +1391,455 @@ html {
         padding: 4px 6px;
     }
 }
-/*# sourceMappingURL=main.a2a82f9f.css.map*/
+.da-status-summary-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    box-shadow: 0 4px 16px #0f172a14;
+    margin-top: 20px;
+    overflow: hidden;
+}
+.da-status-summary-header {
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 16px 20px;
+}
+.da-status-summary-header h3 {
+    color: #0f172a;
+    font-size: 16px;
+    font-weight: 800;
+    margin: 0;
+}
+.da-status-summary-header p {
+    color: #64748b;
+    font-size: 12px;
+    margin: 4px 0 0;
+}
+.da-status-summary-grid {
+    grid-gap: 16px;
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 18px;
+}
+.da-status-summary-box {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+}
+.da-status-summary-box-header {
+    align-items: center;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    color: #334155;
+    display: flex;
+    font-size: 13px;
+    font-weight: 800;
+    gap: 10px;
+    justify-content: space-between;
+    padding: 11px 14px;
+}
+.da-status-record-count {
+    color: #94a3b8;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.da-status-summary-table-wrap {
+    height: 280px;
+    overflow: hidden;
+}
+.da-status-summary-table {
+    border-collapse: collapse;
+    font-size: 12px;
+    width: 100%;
+}
+.da-status-col-date {
+    width: 55%;
+}
+.da-status-col-count {
+    width: 20%;
+}
+.da-status-col-view {
+    width: 25%;
+}
+.da-status-summary-table th {
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 9px 10px;
+    position: -webkit-sticky;
+    position: sticky;
+    text-align: left;
+    text-transform: uppercase;
+    top: 0;
+    z-index: 2;
+}
+.da-status-summary-table th:nth-child(2),
+.da-status-summary-table th:nth-child(3) {
+    text-align: center;
+}
+.da-status-summary-table td {
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
+    padding: 9px 10px;
+}
+.da-status-summary-table td:nth-child(2),
+.da-status-summary-table td:nth-child(3) {
+    text-align: center;
+}
+.da-status-summary-table tbody tr:hover td {
+    background: #7c3aed0a;
+}
+.da-status-count {
+    color: #1e40af !important;
+    font-weight: 800;
+    text-align: center;
+}
+.da-view-btn {
+    align-items: center;
+    background: #eef2ff;
+    border: 1px solid #c7d2fe;
+    border-radius: 7px;
+    color: #4338ca;
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 14px;
+    height: 30px;
+    justify-content: center;
+    padding: 0;
+    transition: all 0.2s ease;
+    width: 32px;
+}
+.da-view-btn:hover {
+    background: #4f46e5;
+    border-color: #4f46e5;
+    box-shadow: 0 3px 8px #4f46e540;
+    color: #fff;
+    transform: translateY(-1px);
+}
+.da-view-btn:active {
+    transform: translateY(0);
+}
+.da-status-summary-empty {
+    color: #94a3b8;
+    font-size: 12px;
+    padding: 18px;
+    text-align: center;
+}
+.da-status-modal {
+    animation: modalSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+    background: #fff;
+    border-radius: 18px;
+    box-shadow: 0 20px 60px #0f172a40;
+    max-height: 82vh;
+    max-width: 850px;
+    overflow: hidden;
+    padding: 22px;
+    width: 92%;
+}
+.da-status-modal-date {
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 600;
+    margin: 5px 0 0;
+}
+.da-status-modal-summary {
+    color: #4338ca;
+    font-size: 12px;
+    font-weight: 800;
+    margin-bottom: 12px;
+}
+.da-status-employee-table-wrap {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    max-height: 48vh;
+    overflow: auto;
+}
+.da-status-employee-table-wrap::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+}
+.da-status-employee-table-wrap::-webkit-scrollbar-track {
+    background: #f8fafc;
+}
+.da-status-employee-table-wrap::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 999px;
+}
+.da-status-employee-table {
+    border-collapse: collapse;
+    font-size: 13px;
+    width: 100%;
+}
+.da-status-employee-table th {
+    background: linear-gradient(135deg, #1e1b4b, #312e81);
+    color: #fffffff2;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    padding: 10px 12px;
+    position: -webkit-sticky;
+    position: sticky;
+    text-align: left;
+    text-transform: uppercase;
+    top: 0;
+    z-index: 3;
+}
+.da-status-employee-table td {
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
+    padding: 10px 12px;
+}
+.da-status-employee-table tbody tr:hover td {
+    background: #7c3aed0a;
+}
+.da-modal-employee-name {
+    color: #0f172a !important;
+    font-weight: 700 !important;
+}
+.da-status-modal-empty {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    color: #94a3b8;
+    font-size: 13px;
+    padding: 40px 20px;
+    text-align: center;
+}
+@media (max-width: 900px) {
+    .da-status-summary-grid {
+        grid-template-columns: 1fr;
+    }
+}
+@media (max-width: 768px) {
+    .da-status-summary-grid {
+        gap: 12px;
+        padding: 12px;
+    }
+    .da-status-modal {
+        max-height: 88vh;
+        padding: 16px;
+        width: 94%;
+    }
+    .da-status-employee-table {
+        min-width: 650px;
+    }
+    .da-status-employee-table-wrap {
+        overflow-x: auto;
+    }
+}
+.da-status-pagination {
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    gap: 4px;
+    padding: 10px 12px;
+}
+.da-page-btn,
+.da-status-pagination {
+    align-items: center;
+    justify-content: center;
+}
+.da-page-btn {
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    color: #475569;
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 12px;
+    font-weight: 700;
+    height: 30px;
+    min-width: 30px;
+    padding: 0 8px;
+    transition: all 0.2s ease;
+}
+.da-page-btn:hover:not(:disabled) {
+    background: #eef2ff;
+    border-color: #818cf8;
+    color: #4338ca;
+}
+.da-page-btn-active {
+    background: #4f46e5 !important;
+    border-color: #4f46e5 !important;
+    color: #fff !important;
+}
+.da-page-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+.da-count-clickable {
+    border-radius: 5px;
+    color: #4338ca;
+    cursor: pointer;
+    font-weight: 800;
+    padding: 2px 4px;
+    text-decoration: underline;
+    -webkit-text-decoration-color: #0000;
+    text-decoration-color: #0000;
+    transition: all 0.15s ease;
+}
+.da-count-clickable:hover {
+    background: #4f46e51a;
+    -webkit-text-decoration-color: #4338ca;
+    text-decoration-color: #4338ca;
+}
+.da-attendance-report-card {
+    animation: fadeSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    box-shadow: 0 4px 16px #0f172a14;
+    margin-top: 20px;
+    overflow: hidden;
+}
+.da-attendance-report-header {
+    align-items: center;
+    background: linear-gradient(135deg, #1e1b4b, #312e81);
+    color: #fff;
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    padding: 14px 20px;
+}
+.da-attendance-report-header h3 {
+    font-size: 16px;
+    font-weight: 800;
+    margin: 0;
+}
+.da-attendance-report-header p {
+    color: #ffffffb3;
+    font-size: 12px;
+    font-weight: 500;
+    margin: 3px 0 0;
+}
+.da-attendance-report-header p span {
+    color: #fff;
+    font-weight: 700;
+}
+.da-attendance-report-header .da-modal-close {
+    color: #ffffffbf;
+}
+.da-attendance-report-header .da-modal-close:hover {
+    color: #fff;
+}
+.da-attendance-report-toolbar {
+    align-items: center;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: flex-start;
+    padding: 14px 20px;
+}
+.da-attendance-report-actions {
+    align-items: center;
+    display: flex;
+    gap: 24px;
+    justify-content: flex-start;
+}
+.da-attendance-search-group {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+}
+.da-attendance-search-group label {
+    color: #475569;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.da-attendance-search-input {
+    background: #fff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 9px;
+    color: #0f172a;
+    font-family: inherit;
+    font-size: 13px;
+    min-width: 220px;
+    outline: none;
+    padding: 8px 14px;
+    transition: all 0.2s;
+}
+.da-attendance-search-input:focus {
+    border-color: #7c3aed;
+    box-shadow: 0 0 0 3px #7c3aed1a;
+}
+.da-attendance-table-wrap {
+    max-height: 55vh;
+    overflow: auto;
+}
+.da-attendance-table-wrap::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+}
+.da-attendance-table-wrap::-webkit-scrollbar-track {
+    background: #f8fafc;
+}
+.da-attendance-table-wrap::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 999px;
+}
+.da-attendance-report-card .da-status-employee-table th {
+    position: -webkit-sticky;
+    position: sticky;
+    top: 0;
+    z-index: 3;
+}
+@media (max-width: 768px) {
+    .da-attendance-report-actions,
+    .da-attendance-report-toolbar,
+    .da-attendance-search-group {
+        align-items: stretch;
+        flex-direction: column;
+    }
+    .da-attendance-search-group label {
+        text-align: left;
+    }
+    .da-attendance-search-input {
+        min-width: 0;
+        width: 100%;
+    }
+    .da-attendance-table-wrap {
+        overflow-x: auto;
+    }
+    .da-status-employee-table {
+        min-width: 750px;
+    }
+    .da-attendance-pagination {
+        align-items: stretch;
+        flex-direction: column;
+    }
+    .da-attendance-pagination-info {
+        text-align: left;
+    }
+    .da-attendance-pagination-buttons {
+        justify-content: flex-start;
+    }
+}
+.da-attendance-pagination {
+    align-items: center;
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    gap: 16px;
+    justify-content: space-between;
+    padding: 10px 14px;
+}
+.da-attendance-pagination-info {
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.da-attendance-pagination-buttons {
+    align-items: center;
+    display: flex;
+    gap: 4px;
+    justify-content: flex-end;
+}
+/*# sourceMappingURL=main.b014c213.css.map*/
