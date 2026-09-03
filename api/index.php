@@ -9,8 +9,8 @@
 // Suppress errors for clean JSON output
 ini_set('display_errors', 0);
 error_reporting(0);
-ini_set('memory_limit', '512M');
-ini_set('max_execution_time', 120);
+ini_set('memory_limit', '5120M');        
+ini_set('max_execution_time', 300);      
 
 header('Content-Type: application/json');
 session_start();
@@ -230,8 +230,7 @@ function getPlaceholderIds($conn, $table, $idCol, $nameCol) {
 function getModulePermissionMap() {
     return [
         'master_module' => ['master'],
-        'get_subadmins' => ['master'],
-        'department_designation_mapping' => ['master'],
+        'get_subadmins' => ['master']
     ];
 }
 
@@ -1023,6 +1022,24 @@ function handleDashboardData($input, $returnData = false) {
     $locationFilter = isset($input['location']) && $input['location'] !== 'All' ? $input['location'] : null;
     
     $conn = getSQLServer();
+
+    $loggedInUserId = intval($_SESSION['userId'] ?? 0);
+
+    if ($loggedInUserId <= 0) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Unauthorized'
+        ]);
+        return;
+    }
+
+    $targetUserId = intval($input['targetUserId'] ?? 0);
+
+    if (!empty($_SESSION['isMaster'])) {
+        $targetUserId = $targetUserId > 0 ? $targetUserId : $loggedInUserId;
+    } else {
+        $targetUserId = $loggedInUserId;
+    }
     
     $allTeams = getAllTeams($conn);
 
@@ -1247,9 +1264,9 @@ function handleDashboardData($input, $returnData = false) {
     $deptNameMap = [];
     $deptLocHcMap = [];
 
-    $sqlDeptLocHc = "SELECT DL.DepartmentId, DL.LocationId, DL.StandardHeadCount, D.DepartmentFName FROM DepartmentLocationHeadCount DL WITH (NOLOCK) INNER JOIN Departments D WITH (NOLOCK) ON DL.DepartmentId = D.DepartmentId WHERE DL.LocationId IN ($employeeLocationList) AND DL.DepartmentId IN ($departmentList)";
+    $sqlDeptLocHc = "SELECT DL.DepartmentId, DL.LocationId, DL.StandardHeadCount, D.DepartmentFName FROM DepartmentLocationHeadCount DL WITH (NOLOCK) INNER JOIN Departments D WITH (NOLOCK) ON DL.DepartmentId = D.DepartmentId WHERE DL.UserId = ? AND DL.LocationId IN ($employeeLocationList) AND DL.DepartmentId IN ($departmentList)";
 
-    $stmtDeptLocHc = sqlsrv_query($conn, $sqlDeptLocHc);
+    $stmtDeptLocHc = sqlsrv_query($conn, $sqlDeptLocHc, [$targetUserId]);
 
     if ($stmtDeptLocHc) {
         while ($row = sqlsrv_fetch_array($stmtDeptLocHc, SQLSRV_FETCH_ASSOC)) {
@@ -1263,9 +1280,9 @@ function handleDashboardData($input, $returnData = false) {
     $desigLocHcMap = [];
     $designationNameMap = [];
 
-    $sqlDesigLocHc = "SELECT DDL.DepartmentId, DDL.DesignationId, DDL.LocationId, DDL.StandardHeadCount, DG.DesignationsName FROM DepartmentDesignationLocationHeadCount DDL WITH (NOLOCK) INNER JOIN Designations DG WITH (NOLOCK) ON DDL.DesignationId = DG.DesignationId WHERE DDL.LocationId IN ($employeeLocationList) AND DDL.DepartmentId IN ($departmentList)";
+    $sqlDesigLocHc = "SELECT DDL.DepartmentId, DDL.DesignationId, DDL.LocationId, DDL.StandardHeadCount, DG.DesignationsName FROM DepartmentDesignationLocationHeadCount DDL WITH (NOLOCK) INNER JOIN Designations DG ON DDL.DesignationId = DG.DesignationId WHERE DDL.UserId = ? AND DDL.LocationId IN ($employeeLocationList) AND DDL.DepartmentId IN ($departmentList)";
 
-    $stmtDesigLocHc = sqlsrv_query($conn, $sqlDesigLocHc);
+    $stmtDesigLocHc = sqlsrv_query($conn, $sqlDesigLocHc, [$targetUserId]);
 
     if ($stmtDesigLocHc) {
         while ($row = sqlsrv_fetch_array($stmtDesigLocHc, SQLSRV_FETCH_ASSOC)) {
@@ -2343,6 +2360,75 @@ function handleDashboardData($input, $returnData = false) {
 
     $totalTime = round((microtime(true) - $apiStart) * 1000, 2);
 
+    $punchDaysByEmp = [];
+    $punchDetailsByEmp = [];
+    foreach ($employeeDayStatus as $key => $status) {
+        list($empId, $date) = explode('_', $key, 2);
+
+        if (!isset($validEmpIdSet[$empId])) {
+            continue;
+        }
+
+        if ($date < $dayFrom || $date > $dayTo) {
+            continue;
+        }
+
+        if ($status !== 'absent' && $status !== 'weeklyOff') {
+            $punchDaysByEmp[$empId] = ($punchDaysByEmp[$empId] ?? 0) + 1;
+
+            $punchDetailsByEmp[$empId][] = [
+                'date' => $date,
+                'status' => $status
+            ];
+        }
+    }
+
+    $zeroPunches = 0;
+    $punches1to5 = 0;
+    $punches6to10 = 0;
+    $zeroPunchEmpIds = [];
+    $punches1to5EmpIds = [];
+    $punches6to10EmpIds = [];
+    $zeroPunchDetails = [];
+    $punches1to5Details = [];
+    $punches6to10Details = [];
+    foreach ($employees as $emp) {
+        $empId = $emp['id'];
+        $days  = $punchDaysByEmp[$empId] ?? 0;
+
+        if ($days === 0) {
+            $zeroPunches++;
+            $zeroPunchEmpIds[] = $empId;
+            $zeroPunchDetails[] = [
+                'empId' => $empId,
+                'employeeName' => $emp['name'],
+                'employeeCode' => $emp['code'],
+                'punchDays' => 0,
+                'dates' => []
+            ];
+        } elseif ($days >= 1 && $days <= 5) {
+            $punches1to5++;
+            $punches1to5EmpIds[] = $empId;
+            $punches1to5Details[] = [
+                'empId' => $empId,
+                'employeeName' => $emp['name'],
+                'employeeCode' => $emp['code'],
+                'punchDays' => $days,
+                'dates' => $punchDetailsByEmp[$empId] ?? []
+            ];
+        } elseif ($days >= 6 && $days <= 10) {
+            $punches6to10++;
+            $punches6to10EmpIds[] = $empId;
+            $punches6to10Details[] = [
+                'empId' => $empId,
+                'employeeName' => $emp['name'],
+                'employeeCode' => $emp['code'],
+                'punchDays' => $days,
+                'dates' => $punchDetailsByEmp[$empId] ?? []
+            ];
+        }
+    }
+
     echo json_encode([
         'success' => true,
         'performance' => [
@@ -2417,6 +2503,24 @@ function handleDashboardData($input, $returnData = false) {
             'consultantAbsent' => $consultantAbsent,
         ],
         
+        'punchFrequency' => [
+            'zeroPunches'  => $zeroPunches,
+            'punches1to5'  => $punches1to5,
+            'punches6to10' => $punches6to10,
+        ],
+
+        'punchFrequencyDetails' => [
+            'zero' => $zeroPunchDetails,
+            'oneToFive' => $punches1to5Details,
+            'sixToTen' => $punches6to10Details,
+        ],
+
+        'punchFrequencyEmpIds' => [
+            'zero' => $zeroPunchEmpIds,
+            'oneToFive' => $punches1to5EmpIds,
+            'sixToTen' => $punches6to10EmpIds,
+        ],
+
         'deptWiseStats' => $deptStats,
         'genderWiseStats' => $genderStats,
         'ageGroupWiseStats' => $ageGroupStats,
@@ -2499,8 +2603,51 @@ function getSubAdmins() {
 function handleGetDepartmentDesignationMapping($input = []) {
     $conn = getSQLServer();
 
+    $loggedInUserId = intval($_SESSION['userId'] ?? 0);
+
+    if ($loggedInUserId <= 0) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Unauthorized'
+        ]);
+
+        return;
+    }
+
+    $targetUserId = intval($input['targetUserId'] ?? 0);
+
+    if (!empty($_SESSION['isMaster'])) {
+        if ($targetUserId <= 0) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Target UserId is required'
+            ]);
+    
+            return;
+        }
+
+    } else {
+        $targetUserId = $loggedInUserId;
+    }
+
+    $checkUserSql = "SELECT UserId, LoginName, RoleName, IsAdmin, RecordStatus FROM SystemUsers WHERE UserId = ? AND RecordStatus = 1";
+
+    $checkUserStmt = sqlsrv_query($conn, $checkUserSql, [$targetUserId]);
+
+    $targetUser = $checkUserStmt ? sqlsrv_fetch_array($checkUserStmt, SQLSRV_FETCH_ASSOC) : null;
+
+    if (!$targetUser) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Invalid user selected'
+        ]);
+        return;
+    }
+
     $departments = [];
+
     $stmtDept = sqlsrv_query($conn, "SELECT DepartmentId, DepartmentFName FROM Departments WITH (NOLOCK) WHERE RecordStatus = 1 ORDER BY CASE WHEN SortOrder IS NULL THEN 1 ELSE 0 END, SortOrder ASC, DepartmentFName ASC");
+
     if ($stmtDept) {
         while ($row = sqlsrv_fetch_array($stmtDept, SQLSRV_FETCH_ASSOC)) {
             $departments[] = [
@@ -2511,7 +2658,9 @@ function handleGetDepartmentDesignationMapping($input = []) {
     }
 
     $designations = [];
-    $stmtDesig = sqlsrv_query($conn, "SELECT DesignationId, DesignationsName FROM Designations WITH (NOLOCK) ORDER BY CASE WHEN sortOrder IS NULL THEN 1 ELSE 0 END, sortOrder ASC, DesignationsName ASC");
+
+    $stmtDesig = sqlsrv_query($conn, "SELECT DesignationId, DesignationsName FROM Designations WITH (NOLOCK) ORDER BY CASE WHEN SortOrder IS NULL THEN 1 ELSE 0 END, SortOrder ASC, DesignationsName ASC");
+
     if ($stmtDesig) {
         while ($row = sqlsrv_fetch_array($stmtDesig, SQLSRV_FETCH_ASSOC)) {
             $designations[] = [
@@ -2522,12 +2671,19 @@ function handleGetDepartmentDesignationMapping($input = []) {
     }
 
     $mappingByDept = [];
-    $sqlMap = "SELECT Id, DepartmentId, DesignationId, ParentDesignationId, IsActive, SortOrder FROM DepartmentDesignationMapping WITH (NOLOCK) WHERE IsActive = 1";
-    $stmtMap = sqlsrv_query($conn, $sqlMap);
+
+    $sqlMap = "SELECT Id, UserId, DepartmentId, DesignationId, ParentDesignationId, IsActive, SortOrder FROM DepartmentDesignationMapping WITH (NOLOCK) WHERE IsActive = 1 AND UserId = ?";
+
+    $stmtMap = sqlsrv_query($conn, $sqlMap, [$targetUserId]);
+
     if ($stmtMap) {
         while ($row = sqlsrv_fetch_array($stmtMap, SQLSRV_FETCH_ASSOC)) {
             $deptId = intval($row['DepartmentId']);
-            if (!isset($mappingByDept[$deptId])) $mappingByDept[$deptId] = [];
+
+            if (!isset($mappingByDept[$deptId])) {
+                $mappingByDept[$deptId] = [];
+            }
+
             $mappingByDept[$deptId][] = [
                 'designationId' => intval($row['DesignationId']),
                 'parentDesignationId' => $row['ParentDesignationId'] !== null ? intval($row['ParentDesignationId']) : null,
@@ -2538,6 +2694,7 @@ function handleGetDepartmentDesignationMapping($input = []) {
 
     echo json_encode([
         'success' => true,
+        'targetUserId' => $targetUserId,
         'departments' => $departments,
         'designations' => $designations,
         'mappingByDept' => $mappingByDept
@@ -2545,13 +2702,55 @@ function handleGetDepartmentDesignationMapping($input = []) {
 }
 
 
-// Add Department - Designation mapping
+// Add / Update Department - Designation mapping
 function handleSaveDepartmentDesignationMapping($input) {
     $conn = getSQLServer();
+
+    $loggedInUserId = intval($_SESSION['userId'] ?? 0);
+
+    if ($loggedInUserId <= 0) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Unauthorized'
+        ]);
+        return;
+    }
+
+    $targetUserId = intval($input['targetUserId'] ?? 0);
+
+    if (!empty($_SESSION['isMaster'])) {
+        if ($targetUserId <= 0) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Target UserId is required'
+            ]);
+            return;
+        }
+    } else {
+        $targetUserId = $loggedInUserId;
+    }
+
+    $checkUserSql = "SELECT UserId FROM SystemUsers WHERE UserId = ? AND RecordStatus = 1";
+
+    $checkUserStmt = sqlsrv_query($conn, $checkUserSql, [$targetUserId]);
+
+    $targetUser = $checkUserStmt ? sqlsrv_fetch_array($checkUserStmt, SQLSRV_FETCH_ASSOC) : null;
+
+    if (!$targetUser) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Invalid target user'
+        ]);
+        return;
+    }
+
     $items = isset($input['items']) ? $input['items'] : [];
 
     if (empty($items)) {
-        echo json_encode(['success' => false, 'message' => 'No items to save']);
+        echo json_encode([
+            'success' => false,
+            'message' => 'No items to save'
+        ]);
         return;
     }
 
@@ -2561,32 +2760,47 @@ function handleSaveDepartmentDesignationMapping($input) {
     foreach ($items as $item) {
         $deptId = intval($item['departmentId'] ?? 0);
         $desigId = intval($item['designationId'] ?? 0);
+
         $parentDesigId = isset($item['parentDesignationId']) && $item['parentDesignationId'] !== '' && $item['parentDesignationId'] !== null ? intval($item['parentDesignationId']) : null;
+
         $isActive = !empty($item['isActive']) ? 1 : 0;
+
         $sortOrder = isset($item['sortOrder']) && $item['sortOrder'] !== '' ? intval($item['sortOrder']) : null;
 
         if ($deptId <= 0 || $desigId <= 0) {
-            $errors[] = ['departmentId' => $deptId, 'designationId' => $desigId, 'reason' => 'invalid_ids'];
+            $errors[] = [
+                'departmentId' => $deptId,
+                'designationId' => $desigId,
+                'reason' => 'invalid_ids'
+            ];
+
             $success = false;
             continue;
         }
 
-        $checkSql = "SELECT Id FROM DepartmentDesignationMapping WHERE DepartmentId = ? AND DesignationId = ?";
-        $checkStmt = sqlsrv_query($conn, $checkSql, array($deptId, $desigId));
+        $checkSql = "SELECT Id, UserId FROM DepartmentDesignationMapping WHERE UserId = ? AND DepartmentId = ? AND DesignationId = ?";
+
+        $checkStmt = sqlsrv_query($conn, $checkSql, [$targetUserId, $deptId, $desigId]);
+
         $existingRow = $checkStmt ? sqlsrv_fetch_array($checkStmt, SQLSRV_FETCH_ASSOC) : null;
 
         if ($existingRow) {
-            $sql = "UPDATE DepartmentDesignationMapping SET ParentDesignationId = ?, IsActive = ?, SortOrder = ?, UpdatedAt = GETDATE() WHERE DepartmentId = ? AND DesignationId = ?";
-            $params = array($parentDesigId, $isActive, $sortOrder, $deptId, $desigId);
+            $sql = "UPDATE DepartmentDesignationMapping SET ParentDesignationId = ?, IsActive = ?, SortOrder = ?, UpdatedAt = GETDATE() WHERE Id = ? AND UserId = ?";
+            $params = [$parentDesigId, $isActive, $sortOrder, $existingRow['Id'], $targetUserId];
         } else {
-            $sql = "INSERT INTO DepartmentDesignationMapping (DepartmentId, DesignationId, ParentDesignationId, IsActive, SortOrder, CreatedAt) VALUES (?, ?, ?, ?, ?, GETDATE())";
-            $params = array($deptId, $desigId, $parentDesigId, $isActive, $sortOrder);
+            $sql = "INSERT INTO DepartmentDesignationMapping (UserId, DepartmentId, DesignationId, ParentDesignationId, IsActive, SortOrder, CreatedAt) VALUES (?, ?, ?, ?, ?, ?, GETDATE())";
+            $params = [$targetUserId, $deptId, $desigId, $parentDesigId, $isActive, $sortOrder];
         }
 
         $stmt = sqlsrv_query($conn, $sql, $params);
+
         if (!$stmt) {
             $success = false;
-            $errors[] = ['departmentId' => $deptId, 'designationId' => $desigId, 'errors' => sqlsrv_errors()];
+            $errors[] = [
+                'departmentId' => $deptId,
+                'designationId' => $desigId,
+                'errors' => sqlsrv_errors()
+            ];
         }
     }
 
@@ -2598,8 +2812,48 @@ function handleSaveDepartmentDesignationMapping($input) {
 }
 
 
+// Delete Department - Designation mapping
 function handleDeleteDepartmentDesignationMapping($input) {
     $conn = getSQLServer();
+
+    $loggedInUserId = intval($_SESSION['userId'] ?? 0);
+
+    if ($loggedInUserId <= 0) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Unauthorized'
+        ]);
+        return;
+    }
+
+    $targetUserId = intval($input['targetUserId'] ?? 0);
+
+    if (!empty($_SESSION['isMaster'])) {
+        if ($targetUserId <= 0) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Target UserId is required'
+            ]);
+            return;
+        }
+    } else {
+        $targetUserId = $loggedInUserId;
+    }
+
+    $checkUserSql = "SELECT UserId FROM SystemUsers WHERE UserId = ? AND RecordStatus = 1";
+
+    $checkUserStmt = sqlsrv_query($conn, $checkUserSql, [$targetUserId]);
+
+    $targetUser = $checkUserStmt ? sqlsrv_fetch_array($checkUserStmt, SQLSRV_FETCH_ASSOC) : null;
+
+    if (!$targetUser) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Invalid target user'
+        ]);
+        return;
+    }
+
     $departmentId = intval($input['departmentId'] ?? 0);
     $designationId = intval($input['designationId'] ?? 0);
 
@@ -2608,13 +2862,12 @@ function handleDeleteDepartmentDesignationMapping($input) {
             'success' => false,
             'message' => 'Invalid Department or Designation.'
         ]);
-
         return;
     }
 
-    $sql = "UPDATE DepartmentDesignationMapping SET IsActive = 0, UpdatedAt = GETDATE() WHERE DepartmentId = ? AND DesignationId = ?";
+    $sql = "UPDATE DepartmentDesignationMapping SET IsActive = 0, UpdatedAt = GETDATE() WHERE UserId = ? AND DepartmentId = ? AND DesignationId = ?";
 
-    $stmt = sqlsrv_query($conn, $sql, [$departmentId, $designationId]);
+    $stmt = sqlsrv_query($conn, $sql, [$targetUserId, $departmentId, $designationId]);
 
     if (!$stmt) {
         echo json_encode([
@@ -2637,14 +2890,35 @@ function handleDeleteDepartmentDesignationMapping($input) {
  */
 function handleGetStdHC($input = []) {
     $sqlConn = getSQLServer();
+
+    $loggedInUserId = intval($_SESSION['userId'] ?? 0);
+
+    if ($loggedInUserId <= 0) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Unauthorized'
+        ]);
+        return;
+    }
+
+    $targetUserId = intval($input['targetUserId'] ?? 0);
+
+    if (!empty($_SESSION['isMaster'])) {
+        if ($targetUserId <= 0) {
+            $targetUserId = $loggedInUserId;
+        }
+    } else {
+        $targetUserId = $loggedInUserId;
+    }
+
     $scope = resolveScope($sqlConn, $input);
     $locFilter = resolveLocationFilter($scope, $input);
     $locationList = $locFilter['list'];
     $departmentList = !empty($scope['departments']) ? implode(',', array_map('intval', $scope['departments'])) : '0';
 
-    $sqlDepts = "SELECT D.DepartmentId, D.DepartmentFName AS DepartmentName, ISNULL(SUM(DLHC.StandardHeadCount), 0) AS std_hc FROM Departments D WITH (NOLOCK) LEFT JOIN DepartmentLocationHeadCount DLHC WITH (NOLOCK) ON DLHC.DepartmentId = D.DepartmentId AND DLHC.LocationId IN ($locationList) WHERE D.DepartmentId IN ($departmentList) GROUP BY D.DepartmentId, D.DepartmentFName, D.SortOrder ORDER BY CASE WHEN D.SortOrder IS NULL THEN 1 ELSE 0 END, D.SortOrder ASC, D.DepartmentFName ASC";
+    $sqlDepts = "SELECT D.DepartmentId, D.DepartmentFName AS DepartmentName, ISNULL(SUM(DLHC.StandardHeadCount), 0) AS std_hc FROM Departments D WITH (NOLOCK) LEFT JOIN DepartmentLocationHeadCount DLHC WITH (NOLOCK) ON DLHC.DepartmentId = D.DepartmentId AND DLHC.LocationId IN ($locationList) AND DLHC.UserId = ? WHERE D.DepartmentId IN ($departmentList) GROUP BY D.DepartmentId, D.DepartmentFName, D.SortOrder ORDER BY CASE WHEN D.SortOrder IS NULL THEN 1 ELSE 0 END, D.SortOrder ASC, D.DepartmentFName ASC";
 
-    $stmt = sqlsrv_query($sqlConn, $sqlDepts);
+    $stmt = sqlsrv_query($sqlConn, $sqlDepts, [$targetUserId]);
 
     $data = [];
     while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
@@ -2687,14 +2961,40 @@ function handleGetStdHC($input = []) {
 
 function handleGetDesignationStdHC($input = []) {
     $sqlConn = getSQLServer();
+
+    $loggedInUserId = intval($_SESSION['userId'] ?? 0);
+
+    if ($loggedInUserId <= 0) {
+        echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+        return;
+    }
+
+    $targetUserId = intval($input['targetUserId'] ?? 0);
+
+    if (!empty($_SESSION['isMaster'])) {
+        $targetUserId = $targetUserId > 0 ? $targetUserId : $loggedInUserId;
+    } else {
+        $targetUserId = $loggedInUserId;
+    }
+
     $scope = resolveScope($sqlConn, $input);
     $locFilter = resolveLocationFilter($scope, $input);
+
     $locationList = $locFilter['list'];
     $departmentList = !empty($scope['departments']) ? implode(',', array_map('intval', $scope['departments'])) : '0';
 
-    $sqlDesig = "SELECT DDM.DepartmentId, DG.DesignationId, DG.DesignationsName, ISNULL(SUM(DDLHC.StandardHeadCount), 0) AS std_hc FROM DepartmentDesignationMapping DDM WITH (NOLOCK) INNER JOIN Designations DG WITH (NOLOCK) ON DDM.DesignationId = DG.DesignationId LEFT JOIN DepartmentDesignationLocationHeadCount DDLHC WITH (NOLOCK) ON DDLHC.DepartmentId = DDM.DepartmentId AND DDLHC.DesignationId = DDM.DesignationId AND DDLHC.LocationId IN ($locationList) WHERE DDM.IsActive = 1 AND DDM.DepartmentId IN ($departmentList) GROUP BY DDM.DepartmentId, DG.DesignationId, DG.DesignationsName, DG.SortOrder ORDER BY DDM.DepartmentId, CASE WHEN DG.SortOrder IS NULL THEN 1 ELSE 0 END, DG.SortOrder ASC, DG.DesignationsName ASC";
+    $sqlDesig = "SELECT DDM.DepartmentId, DG.DesignationId, DG.DesignationsName, ISNULL(SUM(DDLHC.StandardHeadCount), 0) AS std_hc FROM DepartmentDesignationMapping DDM WITH (NOLOCK) INNER JOIN Designations DG WITH (NOLOCK) ON DDM.DesignationId = DG.DesignationId LEFT JOIN DepartmentDesignationLocationHeadCount DDLHC WITH (NOLOCK) ON DDLHC.DepartmentId = DDM.DepartmentId AND DDLHC.DesignationId = DDM.DesignationId AND DDLHC.LocationId IN ($locationList) AND DDLHC.UserId = ? WHERE DDM.IsActive = 1 AND DDM.UserId = ? AND DDM.DepartmentId IN ($departmentList) GROUP BY DDM.DepartmentId, DG.DesignationId, DG.DesignationsName, DG.SortOrder ORDER BY DDM.DepartmentId, CASE WHEN DG.SortOrder IS NULL THEN 1 ELSE 0 END, DG.SortOrder ASC, DG.DesignationsName ASC";
 
-    $stmt = sqlsrv_query($sqlConn, $sqlDesig);
+    $stmt = sqlsrv_query($sqlConn, $sqlDesig, [$targetUserId, $targetUserId]);
+
+    if (!$stmt) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Query failed (designation standard headcount)',
+            'errors' => sqlsrv_errors()
+        ]);
+        return;
+    }
 
     $data = [];
     while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
@@ -2719,6 +3019,21 @@ function handleGetDesignationStdHC($input = []) {
 function handleBulkUpdateDesignationStdHC($input) {
     $items = isset($input['items']) ? $input['items'] : [];
     $sqlConn = getSQLServer();
+
+    $loggedInUserId = intval($_SESSION['userId'] ?? 0);
+
+    if ($loggedInUserId <= 0) {
+        echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+        return;
+    }
+
+    $targetUserId = intval($input['targetUserId'] ?? 0);
+
+    if (!empty($_SESSION['isMaster'])) {
+        $targetUserId = $targetUserId > 0 ? $targetUserId : $loggedInUserId;
+    } else {
+        $targetUserId = $loggedInUserId;
+    }
 
     if (empty($items)) {
         echo json_encode(['success' => false, 'message' => 'No items to save']);
@@ -2753,42 +3068,42 @@ function handleBulkUpdateDesignationStdHC($input) {
         $locationId = $group['locationId'];
 
         foreach ($group['items'] as $desigId => $hc) {
-            $checkSql = "SELECT Id FROM DepartmentDesignationLocationHeadCount WHERE DepartmentId = ? AND DesignationId = ? AND LocationId = ?";
-            $checkStmt = sqlsrv_query($sqlConn, $checkSql, array($deptId, $desigId, $locationId));
+            $checkSql = "SELECT Id FROM DepartmentDesignationLocationHeadCount WHERE UserId = ? AND DepartmentId = ? AND DesignationId = ? AND LocationId = ?";
+
+            $checkStmt = sqlsrv_query($sqlConn, $checkSql, [$targetUserId, $deptId, $desigId, $locationId]);
+
             $existingRow = $checkStmt ? sqlsrv_fetch_array($checkStmt, SQLSRV_FETCH_ASSOC) : null;
 
             if ($existingRow) {
-                $sql = "UPDATE DepartmentDesignationLocationHeadCount SET StandardHeadCount = ?, UpdatedOn = GETDATE() WHERE DepartmentId = ? AND DesignationId = ? AND LocationId = ?";
-                $params = array($hc, $deptId, $desigId, $locationId);
+                $sql = "UPDATE DepartmentDesignationLocationHeadCount SET StandardHeadCount = ?, UpdatedOn = GETDATE() WHERE UserId = ? AND DepartmentId = ? AND DesignationId = ? AND LocationId = ?";
+                $params = [$hc, $targetUserId, $deptId, $desigId, $locationId];
             } else {
-                $sql = "INSERT INTO DepartmentDesignationLocationHeadCount (DepartmentId, DesignationId, LocationId, StandardHeadCount, CreatedOn) VALUES (?, ?, ?, ?, GETDATE())";
-                $params = array($deptId, $desigId, $locationId, $hc);
+                $sql = "INSERT INTO DepartmentDesignationLocationHeadCount (UserId, DepartmentId, DesignationId, LocationId, StandardHeadCount, CreatedOn) VALUES (?, ?, ?, ?, ?, GETDATE())";
+                $params = [$targetUserId, $deptId, $desigId, $locationId, $hc];
             }
             sqlsrv_query($sqlConn, $sql, $params);
         }
 
         $totalStdHC = 0;
 
-        $sqlTotal = "SELECT ISNULL(SUM(StandardHeadCount),0) AS TotalHC FROM DepartmentDesignationLocationHeadCount WHERE DepartmentId = ? AND LocationId = ?";
+        $sqlTotal = "SELECT ISNULL(SUM(StandardHeadCount), 0) AS TotalHC FROM DepartmentDesignationLocationHeadCount WHERE UserId = ? AND DepartmentId = ? AND LocationId = ?";
 
-        $stmtTotal = sqlsrv_query($sqlConn, $sqlTotal, array($deptId, $locationId));
+        $stmtTotal = sqlsrv_query($sqlConn, $sqlTotal, [$targetUserId, $deptId, $locationId]);
 
         if ($rowTotal = sqlsrv_fetch_array($stmtTotal, SQLSRV_FETCH_ASSOC)) {
             $totalStdHC = intval($rowTotal['TotalHC']);
         }
         
-        $checkDeptSql = "SELECT Id
-        FROM DepartmentLocationHeadCount
-        WHERE DepartmentId = ? AND LocationId = ?";
+        $checkDeptSql = "SELECT Id FROM DepartmentLocationHeadCount WHERE UserId = ? AND DepartmentId = ? AND LocationId = ?";
 
-        $checkDeptStmt = sqlsrv_query($sqlConn, $checkDeptSql, array($deptId, $locationId));
+        $checkDeptStmt = sqlsrv_query($sqlConn, $checkDeptSql, [$targetUserId, $deptId, $locationId]);
 
         $deptRow = $checkDeptStmt ? sqlsrv_fetch_array($checkDeptStmt, SQLSRV_FETCH_ASSOC) : null;
 
         if ($deptRow) {
-            sqlsrv_query($sqlConn, "UPDATE DepartmentLocationHeadCount SET StandardHeadCount = ?, UpdatedOn = GETDATE() WHERE DepartmentId = ? AND LocationId = ?", array($totalStdHC, $deptId, $locationId));
+            sqlsrv_query($sqlConn, "UPDATE DepartmentLocationHeadCount SET StandardHeadCount = ?, UpdatedOn = GETDATE() WHERE UserId = ? AND DepartmentId = ? AND LocationId = ?", [$totalStdHC, $targetUserId, $deptId, $locationId]);
         } else {
-            sqlsrv_query($sqlConn, "INSERT INTO DepartmentLocationHeadCount (DepartmentId, LocationId, StandardHeadCount, CreatedOn) VALUES (?, ?, ?, GETDATE())", array($deptId, $locationId, $totalStdHC));
+            sqlsrv_query($sqlConn, "INSERT INTO DepartmentLocationHeadCount (UserId, DepartmentId, LocationId, StandardHeadCount, CreatedOn) VALUES (?, ?, ?, ?, GETDATE())", [$targetUserId, $deptId, $locationId, $totalStdHC]);
         }
     }
 
@@ -2890,6 +3205,26 @@ function handleGetReport($input) {
     $sqlConn = getSQLServer();
     $scope = resolveScope($sqlConn, $input);
 
+    $loggedInUserId = intval($_SESSION['userId'] ?? 0);
+
+    if ($loggedInUserId <= 0) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Unauthorized'
+        ]);
+        return;
+    }
+
+    $targetUserId = intval($input['targetUserId'] ?? 0);
+
+    if (!empty($_SESSION['isMaster'])) {
+        if ($targetUserId <= 0) {
+            $targetUserId = $loggedInUserId;
+        }
+    } else {
+        $targetUserId = $loggedInUserId;
+    }
+
     $shiftGroupShiftIdsMap = [];
     $shiftGroupNameMap = [];
     $stmtShiftGroupShifts = sqlsrv_query($sqlConn, "SELECT ShiftGroupId, ShiftGroupName, ShiftIds FROM ShiftGroups");
@@ -2936,15 +3271,21 @@ function handleGetReport($input) {
     $allLocationsList = !empty($scope['locations']) ? implode(',', array_map('intval', $scope['locations'])) : '0';
 
     $totalStdMachines = 0;
-    $sqlMachStd = "SELECT SUM(TotalMachines) as total FROM LocationMachineStdCount WITH (NOLOCK) WHERE LocationId IN ($locationList)";
-    $stmtMachStd = sqlsrv_query($sqlConn, $sqlMachStd);
+    
+    $sqlMachStd = "SELECT SUM(TotalMachines) as total FROM LocationMachineStdCount WITH (NOLOCK) WHERE UserId = ? AND LocationId IN ($locationList)";
+
+    $stmtMachStd = sqlsrv_query($sqlConn, $sqlMachStd, [$targetUserId]);
+    
     if ($stmtMachStd && $rowMS = sqlsrv_fetch_array($stmtMachStd, SQLSRV_FETCH_ASSOC)) {
         $totalStdMachines = intval($rowMS['total']);
     }
 
     $dailyMachMap = [];
-    $sqlMachDaily = "SELECT MachineDate, SUM(RunningMachines) as total FROM LocationDailyMachineCount WITH (NOLOCK) WHERE LocationId IN ($locationList) AND MachineDate >= '$dayFrom' AND MachineDate <= '$dayTo' GROUP BY MachineDate";
-    $stmtMachDaily = sqlsrv_query($sqlConn, $sqlMachDaily);
+    
+    $sqlMachDaily = "SELECT MachineDate, SUM(RunningMachines) as total FROM LocationDailyMachineCount WITH (NOLOCK) WHERE UserId = ? AND LocationId IN ($locationList) AND MachineDate >= ? AND MachineDate <= ? GROUP BY MachineDate";
+
+    $stmtMachDaily = sqlsrv_query($sqlConn, $sqlMachDaily, [$targetUserId, $dayFrom, $dayTo]);
+    
     if ($stmtMachDaily) {
         while ($rowMD = sqlsrv_fetch_array($stmtMachDaily, SQLSRV_FETCH_ASSOC)) {
             $d = intval(date('j', strtotime($rowMD['MachineDate']->format('Y-m-d'))));
@@ -2977,8 +3318,11 @@ function handleGetReport($input) {
     }
 
     $hcMap = [];
-    $sqlHc = "SELECT DepartmentId, SUM(StandardHeadCount) as std_hc FROM DepartmentLocationHeadCount WITH (NOLOCK) WHERE LocationId IN ($locationList) AND DepartmentId IN ($departmentList) GROUP BY DepartmentId";
-    $stmtHc = sqlsrv_query($sqlConn, $sqlHc);
+
+    $sqlHc = "SELECT DepartmentId, SUM(StandardHeadCount) AS std_hc FROM DepartmentLocationHeadCount WITH (NOLOCK) WHERE UserId = ? AND LocationId IN ($locationList) AND DepartmentId IN ($departmentList) GROUP BY DepartmentId";
+
+    $stmtHc = sqlsrv_query($sqlConn, $sqlHc, [$targetUserId]);
+    
     if ($stmtHc) {
         while ($row = sqlsrv_fetch_array($stmtHc, SQLSRV_FETCH_ASSOC)) {
             $hcMap[$row['DepartmentId']] = intval($row['std_hc']);
@@ -2986,8 +3330,11 @@ function handleGetReport($input) {
     }
 
     $desigHcMap = [];
-    $sqlDesigHc = "SELECT DepartmentId, DesignationId, SUM(StandardHeadCount) as std_hc FROM DepartmentDesignationLocationHeadCount WITH (NOLOCK) WHERE LocationId IN ($locationList) AND DepartmentId IN ($departmentList) GROUP BY DepartmentId, DesignationId";
-    $stmtDesigHc = sqlsrv_query($sqlConn, $sqlDesigHc);
+
+    $sqlDesigHc = "SELECT DepartmentId, DesignationId, SUM(StandardHeadCount) AS std_hc FROM DepartmentDesignationLocationHeadCount WITH (NOLOCK) WHERE UserId = ? AND LocationId IN ($locationList) AND DepartmentId IN ($departmentList) GROUP BY DepartmentId, DesignationId";
+
+    $stmtDesigHc = sqlsrv_query($sqlConn, $sqlDesigHc, [$targetUserId]);
+    
     if ($stmtDesigHc) {
         while ($row = sqlsrv_fetch_array($stmtDesigHc, SQLSRV_FETCH_ASSOC)) {
             $desigHcMap[$row['DepartmentId']][$row['DesignationId']] = intval($row['std_hc']);
@@ -3006,9 +3353,9 @@ function handleGetReport($input) {
         }
     }
 
-    $sqlDesig = "SELECT DDM.DepartmentId, DG.DesignationId, DG.DesignationsName, DG.SortOrder AS DesigSortOrder, DDM.ParentDesignationId FROM DepartmentDesignationMapping DDM WITH (NOLOCK) INNER JOIN Designations DG WITH (NOLOCK) ON DDM.DesignationId = DG.DesignationId WHERE DDM.IsActive = 1 AND DDM.DepartmentId IN ($departmentList) ORDER BY CASE WHEN DG.SortOrder IS NULL OR DG.SortOrder = 0 THEN 1 ELSE 0 END, DG.SortOrder ASC, DG.DesignationsName ASC";
+    $sqlDesig = "SELECT DDM.DepartmentId, DG.DesignationId, DG.DesignationsName, DG.SortOrder AS DesigSortOrder, DDM.ParentDesignationId FROM DepartmentDesignationMapping DDM WITH (NOLOCK) INNER JOIN Designations DG WITH (NOLOCK) ON DDM.DesignationId = DG.DesignationId WHERE DDM.IsActive = 1 AND DDM.UserId = ? AND DDM.DepartmentId IN ($departmentList) ORDER BY CASE WHEN DG.SortOrder IS NULL OR DG.SortOrder = 0 THEN 1 ELSE 0 END, DG.SortOrder ASC, DG.DesignationsName ASC";
  
-    $stmtDesig = sqlsrv_query($sqlConn, $sqlDesig);
+    $stmtDesig = sqlsrv_query($sqlConn, $sqlDesig, [$targetUserId]);
  
     if (!$stmtDesig) {
         echo json_encode([
@@ -3837,8 +4184,19 @@ function handleGetMachineStd($input) {
     $scope = resolveScope($sqlConn, $input);
     $locFilter = resolveLocationFilter($scope, $input);
 
-    $sql = "SELECT SUM(TotalMachines) AS TotalMachines FROM LocationMachineStdCount WHERE LocationId IN ({$locFilter['list']})";
-    $stmt = sqlsrv_query($sqlConn, $sql);
+    $targetUserId = intval($input['targetUserId'] ?? 0);
+
+    if (!empty($_SESSION['isMaster'])) {
+        if ($targetUserId <= 0) {
+            $targetUserId = intval($_SESSION['userId'] ?? 0);
+        }
+    } else {
+        $targetUserId = intval($_SESSION['userId'] ?? 0);
+    }
+
+    $sql = "SELECT SUM(TotalMachines) AS TotalMachines FROM LocationMachineStdCount WHERE UserId = ? AND LocationId IN ({$locFilter['list']})";
+
+    $stmt = sqlsrv_query($sqlConn, $sql, [$targetUserId]);
 
     $total = 0;
     if ($stmt && $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
@@ -3856,16 +4214,28 @@ function handleGetMachineStd($input) {
  */
 function handleUpdateMachineStd($input) {
     $locationId = intval($input['location_id']);
+
+    $targetUserId = intval($input['targetUserId'] ?? 0);
+
+    if (!empty($_SESSION['isMaster'])) {
+        if ($targetUserId <= 0) {
+            $targetUserId = intval($_SESSION['userId'] ?? 0);
+        }
+    } else {
+        $targetUserId = intval($_SESSION['userId'] ?? 0);
+    }
+
     if ($locationId <= 0) {
         echo json_encode(['success' => false, 'message' => 'Please select a specific location to update total machines.']);
         return;
     }
+    
     $totalMachines = intval($input['total_machines']);
     $sqlConn = getSQLServer();
 
-    $sql = "MERGE LocationMachineStdCount AS target USING (SELECT ? AS LocationId, ? AS TotalMachines) AS src ON target.LocationId = src.LocationId WHEN MATCHED THEN UPDATE SET TotalMachines = src.TotalMachines, UpdatedAt = GETDATE() WHEN NOT MATCHED THEN INSERT (LocationId, TotalMachines, UpdatedAt) VALUES (src.LocationId, src.TotalMachines, GETDATE());";
+    $sql = "MERGE LocationMachineStdCount AS target USING (SELECT ? AS UserId, ? AS LocationId, ? AS TotalMachines) AS src ON target.UserId = src.UserId AND target.LocationId = src.LocationId WHEN MATCHED THEN UPDATE SET TotalMachines = src.TotalMachines, UpdatedAt = GETDATE() WHEN NOT MATCHED THEN INSERT (UserId, LocationId, TotalMachines, UpdatedAt) VALUES (src.UserId, src.LocationId, src.TotalMachines, GETDATE());";
 
-    $stmt = sqlsrv_query($sqlConn, $sql, array($locationId, $totalMachines));
+    $stmt = sqlsrv_query($sqlConn, $sql, [$targetUserId, $locationId, $totalMachines]);
 
     if (!$stmt) {
         echo json_encode(['success' => false, 'message' => 'Failed to save total machines', 'errors' => sqlsrv_errors()]);
@@ -3881,16 +4251,28 @@ function handleUpdateMachineStd($input) {
 function handleGetDailyMachines($input) {
     $dateFrom = $input['date_from'];
     $dateTo = $input['date_to'];
+    
     $sqlConn = getSQLServer();
+
+    $targetUserId = intval($input['targetUserId'] ?? 0);
+
+    if (!empty($_SESSION['isMaster'])) {
+        if ($targetUserId <= 0) {
+            $targetUserId = intval($_SESSION['userId'] ?? 0);
+        }
+    } else {
+        $targetUserId = intval($_SESSION['userId'] ?? 0);
+    }
+
     $scope = resolveScope($sqlConn, $input);
     $locFilter = resolveLocationFilter($scope, $input);
 
     if ($locFilter['isAll']) {
-        $sql = "SELECT MachineDate, SUM(RunningMachines) AS RunningMachines FROM LocationDailyMachineCount WHERE LocationId IN ({$locFilter['list']}) AND MachineDate >= ? AND MachineDate <= ? GROUP BY MachineDate ORDER BY MachineDate ASC";
-        $stmt = sqlsrv_query($sqlConn, $sql, array($dateFrom, $dateTo));
+        $sql = "SELECT MachineDate, SUM(RunningMachines) AS RunningMachines FROM LocationDailyMachineCount WHERE UserId = ? AND LocationId IN ({$locFilter['list']}) AND MachineDate >= ? AND MachineDate <= ? GROUP BY MachineDateORDER BY MachineDate ASC";
+        $stmt = sqlsrv_query($sqlConn, $sql, [$targetUserId, $dateFrom, $dateTo]);
     } else {
-        $sql = "SELECT MachineDate, RunningMachines FROM LocationDailyMachineCount WHERE LocationId = ? AND MachineDate >= ? AND MachineDate <= ? ORDER BY MachineDate ASC";
-        $stmt = sqlsrv_query($sqlConn, $sql, array($locFilter['single'], $dateFrom, $dateTo));
+        $sql = "SELECT MachineDate, RunningMachines FROM LocationDailyMachineCount WHERE UserId = ? AND LocationId = ? AND MachineDate >= ? AND MachineDate <= ? ORDER BY MachineDate ASC";
+        $stmt = sqlsrv_query($sqlConn, $sql, [$targetUserId, $locFilter['single'], $dateFrom, $dateTo]);
     }
 
     $data = [];
@@ -3910,21 +4292,35 @@ function handleGetDailyMachines($input) {
  */
 function handleBulkUpdateDailyMachines($input) {
     $locationId = intval($input['location_id']);
+    
     if ($locationId <= 0) {
         echo json_encode(['success' => false, 'message' => 'Please select a specific location to save daily machine counts.']);
         return;
     }
+    
     $items = $input['items'] ?? [];
+    
     $sqlConn = getSQLServer();
+
+    $targetUserId = intval($input['targetUserId'] ?? 0);
+
+    if (!empty($_SESSION['isMaster'])) {
+        if ($targetUserId <= 0) {
+            $targetUserId = intval($_SESSION['userId'] ?? 0);
+        }
+    } else {
+        $targetUserId = intval($_SESSION['userId'] ?? 0);
+    }
 
     $errors = [];
     foreach ($items as $item) {
         $date = $item['date'];
         $count = intval($item['running_machines']);
 
-        $sql = "MERGE LocationDailyMachineCount AS target USING (SELECT ? AS LocationId, ? AS MachineDate, ? AS RunningMachines) AS src ON target.LocationId = src.LocationId AND target.MachineDate = src.MachineDate WHEN MATCHED THEN UPDATE SET RunningMachines = src.RunningMachines, UpdatedAt = GETDATE() WHEN NOT MATCHED THEN INSERT (LocationId, MachineDate, RunningMachines, UpdatedAt) VALUES (src.LocationId, src.MachineDate, src.RunningMachines, GETDATE());";
+        $sql = "MERGE LocationDailyMachineCount AS target USING (SELECT ? AS UserId, ? AS LocationId, ? AS MachineDate, ? AS RunningMachines) AS src ON target.UserId = src.UserId AND target.LocationId = src.LocationId AND target.MachineDate = src.MachineDate WHEN MATCHED THEN UPDATE SET RunningMachines = src.RunningMachines, UpdatedAt = GETDATE() WHEN NOT MATCHED THEN INSERT (UserId, LocationId, MachineDate, RunningMachines, UpdatedAt) VALUES (src.UserId, src.LocationId, src.MachineDate, src.RunningMachines, GETDATE());";
 
-        $stmt = sqlsrv_query($sqlConn, $sql, array($locationId, $date, $count));
+        $stmt = sqlsrv_query($sqlConn, $sql, [$targetUserId, $locationId, $date, $count]);
+        
         if (!$stmt) {
             $errors[] = ['date' => $date, 'errors' => sqlsrv_errors()];
         }

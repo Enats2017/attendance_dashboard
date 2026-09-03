@@ -7,7 +7,7 @@ class AttendanceView {
         this.TABS = [
             { id: "feature", label: "Dashboard", icon: "ph-house" },
             { id: "units", label: "Units List", icon: "ph-buildings", roles: ["master"] }, 
-            { id: "dept_designation_mapping", label: "Dept-Designation Mapping", icon: "ph-map-trifold", roles: ["master"] },
+            { id: "dept_designation_mapping", label: "Dept-Designation Mapping", icon: "ph-map-trifold" },
             { id: "all", label: "Attendance Logs", icon: "ph-list-dashes" },
             { id: "age", label: "Age Analysis", icon: "ph-user-circle" },
             { id: "company", label: "Company Stats", icon: "ph-buildings" },
@@ -542,7 +542,8 @@ class AttendanceView {
             <div class="summary-grid">
                 ${cards.map((c) => `
                     <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
-                        ${c.key ? `data-card-key="${c.key}"` : ""}>
+                        ${c.key ? `data-card-key="${c.key}"` : ""}
+                        ${c.onclick ? `onclick="${c.onclick}"` : ""}>
                         <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
                         <div class="stat-content">
                             <span class="stat-label">${c.label}</span>
@@ -3937,12 +3938,28 @@ class AttendanceView {
         if (this._applyFilterHandler) {
             this.app.removeEventListener("click", this._applyFilterHandler);
         }
+
         this._applyFilterHandler = (event) => {
             if (event.target.closest("#btn-apply-filters")) {
+                const dateFrom = document.getElementById("f-from").value;
+                const dateTo   = document.getElementById("f-to").value;
+
+                if (dateFrom && dateTo) {
+                    const from = new Date(dateFrom + "T00:00:00");
+                    const to   = new Date(dateTo + "T00:00:00");
+                    const days = Math.floor((to - from) / (1000 * 60 * 60 * 24)) + 1;
+
+                    if (days > 31) {
+                        alert("You cannot filter more than 31 days.\nA larger date range can make the website slow.");
+                        return;
+                    }
+                }
+
                 const subEl = document.getElementById("f-subadmin");
+
                 handler({
-                    dateFrom: document.getElementById("f-from").value,
-                    dateTo: document.getElementById("f-to").value,
+                    dateFrom: dateFrom,
+                    dateTo: dateTo,
                     company: document.getElementById("f-company").value,
                     dept: document.getElementById("f-dept").value,
                     shift: document.getElementById("f-shift").value,
@@ -3951,6 +3968,7 @@ class AttendanceView {
                 });
             }
         };
+
         this.app.addEventListener("click", this._applyFilterHandler);
     }
 
@@ -7099,6 +7117,144 @@ class AttendanceView {
     _renderSpecial(logs, emps, empMap, filters, model, npPage = 1, spPage = 1) {
         const noPunchGroups = model.findNoPunchEmployees();
         const singlePunchGroups = model.getSinglePunchEmployeesGrouped();
+
+        const punchFreq = model.getPunchFrequency();
+        const punchFreqDayCount = {
+            zeroPunches: new Set(),
+            punches1to5: new Set(),
+            punches6to10: new Set()
+        };
+
+        const punchFreqItems = {
+            zeroPunches: model.getZeroPunchEmployees(),
+            punches1to5: model.get1to5PunchEmployees(),
+            punches6to10: model.get6to10PunchEmployees()
+        };
+
+        Object.keys(punchFreqItems).forEach((bucketKey) => {
+            const bucketItems = punchFreqItems[bucketKey] || [];
+
+            bucketItems.forEach(({ emp, date, log }) => {
+                if (!emp) return;
+                const punchDate = date || log?.date;
+                if (punchDate) {
+                    punchFreqDayCount[bucketKey].add(`${emp.id}_${punchDate}`);
+                }
+            });
+        });
+
+        const punchFreqCardsHtml = `
+            <div class="stat-card punch-frequency-card danger stat-card-clickable" data-punch-freq="zeroPunches" onclick="AppController.view._showPunchFrequencyBreakdown('zeroPunches')" style="position:relative;">
+                <button class="stat-card-download-btn" title="Download 0 Punches Excel" onclick="event.stopPropagation(); AppController.view._downloadPunchFrequencyExcel('zeroPunches')">
+                    <i class="ph ph-download-simple"></i>
+                </button>
+
+                <div class="stat-icon">
+                    <i class="ph ph-prohibit"></i>
+                </div>
+
+                <div class="stat-content">
+                    <span class="stat-label">
+                        0 Punches
+                    </span>
+
+                    <span class="stat-label">
+                        Employees:
+                    </span>
+
+                    <span class="stat-value">
+                        ${punchFreq.zeroPunches}
+                    </span>
+
+                    <span class="stat-label">
+                        Days:
+                    </span>
+
+                    <span class="stat-value">
+                        ${punchFreqDayCount.zeroPunches.size}
+                    </span>
+
+                    <span class="stat-card-hint">
+                        ↓ click to view
+                    </span>
+
+                </div>
+            </div>
+
+
+            <div class="stat-card punch-frequency-card warning stat-card-clickable" data-punch-freq="punches1to5" onclick="AppController.view._showPunchFrequencyBreakdown('punches1to5')" style="position:relative;">
+                <button class="stat-card-download-btn" title="Download 1-5 Punches Excel" onclick="event.stopPropagation(); AppController.view._downloadPunchFrequencyExcel('punches1to5')">
+                    <i class="ph ph-download-simple"></i>
+                </button>
+
+                <div class="stat-icon">
+                    <i class="ph ph-hash"></i>
+                </div>
+
+                <div class="stat-content">
+                    <span class="stat-label">
+                        1-5 Punches
+                    </span>
+
+                    <span class="stat-label">
+                        Employees:
+                    </span>
+
+                    <span class="stat-value">
+                        ${punchFreq.punches1to5}
+                    </span>
+
+                    <span class="stat-label">
+                        Days:
+                    </span>
+
+                    <span class="stat-value">
+                        ${punchFreqDayCount.punches1to5.size}
+                    </span>
+
+                    <span class="stat-card-hint">
+                        ↓ click to view
+                    </span>
+                </div>
+            </div>
+
+            <div class="stat-card punch-frequency-card info stat-card-clickable" data-punch-freq="punches6to10" onclick="AppController.view._showPunchFrequencyBreakdown('punches6to10')" style="position:relative;">
+                <button class="stat-card-download-btn" title="Download 6-10 Punches Excel" onclick="event.stopPropagation(); AppController.view._downloadPunchFrequencyExcel('punches6to10')">
+                    <i class="ph ph-download-simple"></i>
+                </button>
+
+                <div class="stat-icon">
+                    <i class="ph ph-hash"></i>
+                </div>
+
+                <div class="stat-content">
+                    <span class="stat-label">
+                        6-10 Punches
+                    </span>
+
+                    <span class="stat-label">
+                        Employees:
+                    </span>
+
+                    <span class="stat-value">
+                        ${punchFreq.punches6to10}
+                    </span>
+
+                    <span class="stat-label">
+                        Days:
+                    </span>
+
+                    <span class="stat-value">
+                        ${punchFreqDayCount.punches6to10.size}
+                    </span>
+
+                    <span class="stat-card-hint">
+                        ↓ click to view
+                    </span>
+                </div>
+            </div>
+        `;
+
         const noPunchPageSize = 10;
         const noPunchCurrentPage = npPage;
         const totalNoPunchPages = Math.max(1, Math.ceil(noPunchGroups.length / noPunchPageSize));
@@ -7181,6 +7337,16 @@ class AttendanceView {
 
         return {
             html: `
+                <div style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#334155;margin:0 0 12px;display:flex;align-items:center;gap:8px;">
+                    Punch Frequency Alerts
+                    <span style="flex:1;height:1px;background:#64748b;display:block;border-radius:2px;"></span>
+                </div>
+                <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); margin-bottom:20px;">
+                    ${punchFreqCardsHtml}
+                </div>
+                <div id="punch-freq-category-drilldown" style="margin-bottom:8px;"></div>
+                <div id="punch-freq-final-drilldown" style="margin-bottom:20px;"></div>
+
                 <h2 class="section-title">
                     <i class="ph-fill ph-warning-circle"></i>
                     Critical Alerts
@@ -7732,6 +7898,9 @@ class AttendanceView {
             if (!key) return;
 
             if (key === "presentHeadcount") return;
+            if (key === "zeroPunches") return;
+            if (key === "punches1to5") return;
+            if (key === "punches6to10") return;
 
             const wasActive = card.classList.contains("active");
             document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
@@ -7780,6 +7949,9 @@ class AttendanceView {
             presentHeadcount: "✅ Present + Half Present Employees",
             weeklyOffPresent: "📅✅ Weekly Off Present Employees",
             weeklyOffHalfPresent: "📅½ Weekly Off Half Present Employees",
+            zeroPunches: "🚫 0 Punches Employees",
+            punches1to5: "1️⃣ 1-5 Punches Employees",
+            punches6to10: "🔢 6-10 Punches Employees",
         };
 
         const isResignedOnly = key === "resigned";
@@ -9281,7 +9453,7 @@ class AttendanceView {
     }
 
 
-    async _initDesignationFamiliesTab(model) {
+    async _initDesignationFamiliesTab(model, selectedUserId = null) {
         const contentEl = document.getElementById("designation-families-content");
         if (!contentEl) return;
 
@@ -9439,33 +9611,44 @@ class AttendanceView {
     }
 
     
-    async _initDeptDesignationMappingTab(model) {
+    async _initDeptDesignationMappingTab(model, selectedUserId = null) {
         const contentEl = document.getElementById("dept-designation-mapping-content");
         if (!contentEl) return;
+        
+        this._ddmModel = model;
+        const isMaster = !!model.state.isMaster;
+        let targetUserId = null;
+        let subAdminList = [];
+        
+        if (isMaster) {
+            const subAdminRes = await model.fetchSubAdmins();
+            if (subAdminRes && subAdminRes.success) {
+                subAdminList = model.state.subAdminList || [];
+            }
 
-        const res = await model.fetchDepartmentDesignationMapping();
+            targetUserId = selectedUserId !== null ? Number(selectedUserId) : Number((window.HRMS_USER || {}).id || 0);
+        }
+
+        const res = await model.fetchDepartmentDesignationMapping(targetUserId);
 
         if (!res || !res.success) {
             contentEl.innerHTML = `
-                <div style = "background:#fff1f2; color:#dc2626; padding:18px; border-radius:10px; border:1px solid #fecdd3; font-weight:600;">
+                <div style="background:#fff1f2; color:#dc2626; padding:18px; border-radius:10px; border:1px solid #fecdd3; font-weight:600;">
                     Error loading mapping
                 </div>
             `;
             return;
         }
 
-        const { departments, designations, mappingByDept } = res;
-
+        const { departments, designations, mappingByDept, targetUserId: resolvedTargetUserId } = res;
         const pageSize = 25;
         let currentPage = 1;
-
         let filteredDepartments = [...departments];
-
         let searchText = "";
-
-        this._currentDeptDesigMappingData = { departments, designations, mappingByDept };
-
-        this._ddmModel = model;
+        this._currentDeptDesigMappingData = { departments, designations, mappingByDept, targetUserId: resolvedTargetUserId };
+        
+        this._ddmSelectedUserId = resolvedTargetUserId;
+        this._ddmSubAdminList = subAdminList;
 
         contentEl.innerHTML = `<div id="ddm-main-container"></div>`;
 
@@ -9475,22 +9658,38 @@ class AttendanceView {
             const start = (currentPage - 1) * pageSize;
             const end = start + pageSize;
             const pageDepartments = filteredDepartments.slice(start, end);
-            
+
             mainContainer.innerHTML = `
                 <div style="background:#ffffff; border-radius:14px; border:1px solid #e5e7eb; box-shadow:0 4px 12px rgba(0,0,0,.06); overflow:hidden;">
                     <div style="padding:22px 25px; border-bottom:1px solid #e5e7eb; display:flex; justify-content:space-between; align-items:center;">
                         <div>
-                            <h2 style="margin:0; font-size:24px; font-weight:700; color:#111827;">
-                                Department Designation Mapping
-                            </h2>
-                            <p style="margin:6px 0 0; color:#6b7280; font-size:14px;">
-                                Manage designation mapping department wise.
-                            </p>
+                            <h2 style="margin:0; font-size:24px; font-weight:700; color:#111827;">Department Designation Mapping</h2>
+                            <p style="margin:6px 0 0; color:#6b7280; font-size:14px;">Manage designation mapping department wise.</p>
                         </div>
+
+                        ${
+                            isMaster ? `
+                                <div style="display:flex; align-items:center; gap:10px;">
+                                    <label for="ddm-user-selector" style="font-size:14px; font-weight:600; color:#374151;">Manage For:</label>
+                                    <select id="ddm-user-selector" style="min-width:240px; padding:10px 14px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; background:#fff; outline:none;">
+                                        <option value="${(window.HRMS_USER || {}).id || ""}">My Own Mapping</option>
+                                        ${subAdminList.map(user => `
+                                            <option value="${user.id}">
+                                                ${this._escapeAttr(user.name || user.username || user.user_name || "Sub Admin")}
+                                            </option>
+                                        `).join("")}
+                                    </select>
+                                </div>
+                            `
+                            : ""
+                        }
+
                     </div>
+
                     <div style="padding:20px; border-bottom:1px solid #e5e7eb;">
                         <input type="text" value="${searchText}" id="ddm-department-search" placeholder="Search Department..." style="width:320px; padding:10px 14px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; outline:none;">
                     </div>
+
                     <div style="overflow:auto;">
                         <table style="width:100%; border-collapse:collapse;">
                             <thead>
@@ -9500,17 +9699,16 @@ class AttendanceView {
                                     <th style="padding:16px; text-align:center; font-size:14px; font-weight:700; color:#374151; width:150px;">Action</th>
                                 </tr>
                             </thead>
+
                             <tbody>
                                 ${
                                     pageDepartments.length > 0 ? pageDepartments.map(dept => {
                                         const assigned = mappingByDept[dept.id] || [];
                                         return `
                                             <tr class="ddm-row" style="border-bottom:1px solid #f1f5f9;">
-                                                <td class="ddm-department-name" style="padding:18px 16px;font-size:15px;font-weight:600;color:#1f2937;">
-                                                    ${this._escapeAttr(dept.name)}
-                                                </td>
+                                                <td class="ddm-department-name" style="padding:18px 16px;font-size:15px;font-weight:600;color:#1f2937;">${this._escapeAttr(dept.name)}</td>
                                                 <td style="text-align:center;padding:18px;">
-                                                    <span style="display:inline-flex;justify-content:center;align-items:center;min-width:38px;height:38px;padding:0 12px; border-radius:999px;background:#eef2ff;color:#4338ca;font-weight:700;">
+                                                    <span style="display:inline-flex;justify-content:center;align-items:center;min-width:38px;height:38px;padding:0 12px;border-radius:999px;background:#eef2ff;color:#4338ca;font-weight:700;">
                                                         ${assigned.length}
                                                     </span>
                                                 </td>
@@ -9521,12 +9719,9 @@ class AttendanceView {
                                                 </td>
                                             </tr>
                                         `;
-                                    }).join("")
-                                    : `
+                                    }).join("") : `
                                         <tr>
-                                            <td colspan="3" style="padding:30px;text-align:center;color:#6b7280;">
-                                                No departments found.
-                                            </td>
+                                            <td colspan="3" style="padding:30px;text-align:center;color:#6b7280;">No departments found.</td>
                                         </tr>
                                     `
                                 }
@@ -9538,7 +9733,9 @@ class AttendanceView {
                                 Previous
                             </button>
 
-                            <span>Page ${currentPage} of ${Math.ceil(filteredDepartments.length / pageSize)}</span>
+                            <span>
+                                Page ${currentPage} of ${Math.ceil(filteredDepartments.length / pageSize)}
+                            </span>
 
                             <button id="next-page" ${currentPage === Math.ceil(filteredDepartments.length / pageSize) ? "disabled" : ""} style="padding:8px 16px; cursor:pointer;">
                                 Next
@@ -9555,17 +9752,30 @@ class AttendanceView {
                 };
             });
 
-            const deptSearch = document.getElementById("ddm-department-search");
-            
-            deptSearch.focus();
-            deptSearch.setSelectionRange(searchText.length, searchText.length);
+            if (isMaster) {
+                const userSelector = document.getElementById("ddm-user-selector");
+                if (userSelector) {
+                    userSelector.value = String(this._ddmSelectedUserId || (window.HRMS_USER || {}).id ||"");
+                    userSelector.addEventListener("change", async (e) => {
+                        const selectedUserId = e.target.value ? Number(e.target.value) : null;
+                        this._ddmSelectedUserId = selectedUserId;
+                        await this._initDeptDesignationMappingTab(model, selectedUserId);
+                    });
+                }
+            }
 
-            deptSearch.addEventListener("input", (e) => {
-                searchText = e.target.value.toLowerCase().trim();
-                filteredDepartments = departments.filter(dept => dept.name.toLowerCase().includes(searchText));
-                currentPage = 1;
-                renderTable();
-            });
+            const deptSearch = document.getElementById("ddm-department-search");
+
+            if (deptSearch) {
+                deptSearch.focus();
+                deptSearch.setSelectionRange(searchText.length, searchText.length);
+                deptSearch.addEventListener("input", (e) => {
+                    searchText = e.target.value.toLowerCase().trim();
+                    filteredDepartments = departments.filter(dept => dept.name .toLowerCase() .includes(searchText));
+                    currentPage = 1;
+                    renderTable();
+                });
+            }
 
             document.getElementById("prev-page")?.addEventListener("click", () => {
                 if (currentPage > 1) {
@@ -9580,18 +9790,16 @@ class AttendanceView {
                     renderTable();
                 }
             });
-        }
+        };
 
         renderTable();
     }
 
-
     _renderDeptDesigMappingCheckboxes(deptId) {
         const data = this._currentDeptDesigMappingData;
         if (!data) return;
-        const { departments, designations, mappingByDept } = data;
+        const { departments, designations, mappingByDept, targetUserId } = data;
         const department = departments.find(d => Number(d.id) === Number(deptId));
-
         if (!department) return;
 
         const existing = mappingByDept[deptId] || [];
@@ -9605,16 +9813,14 @@ class AttendanceView {
         });
 
         const parentSelections = {};
-
         Object.keys(existingMap).forEach(designationId => {
-            parentSelections[Number(designationId)] =
-                existingMap[designationId].parentDesignationId;
+            parentSelections[Number(designationId)] = existingMap[designationId].parentDesignationId;
         });
 
         const rowsHtml = designations.map(d => {
-            const checked = existingMap.hasOwnProperty(Number(d.id));
+            const checked = Object.prototype.hasOwnProperty.call(existingMap, Number(d.id));
             return `
-                <label style=" display:flex; align-items:center; gap:10px; padding:14px 16px; border:1px solid ${checked ? "#4f46e5" : "#dbe4f0"}; background:${checked ? "#eef2ff" : "#fff"}; border-radius:10px; cursor:pointer; transition:.2s; font-size:14px; font-weight:500;" class="ddm-item">
+                <label style="display:flex; align-items:center; gap:10px; padding:14px 16px; border:1px solid ${checked ? "#4f46e5" : "#dbe4f0"}; background:${checked ? "#eef2ff" : "#fff"}; border-radius:10px; cursor:pointer; transition:.2s; font-size:14px; font-weight:500;" class="ddm-item">
                     <input type="checkbox" class="ddm-checkbox" value="${d.id}" ${checked ? "checked" : ""}>
                     <span>${this._escapeAttr(d.name)}</span>
                 </label>
@@ -9641,7 +9847,6 @@ class AttendanceView {
             container.innerHTML = assignedDesignations.map(d => {
                 const designationId = Number(d.id);
                 const selectedParentId = parentSelections[designationId] ?? null;
-
                 const parentOptions = assignedDesignations.filter(parent => Number(parent.id) !== designationId).map(parent => {
                     const parentId = Number(parent.id);
                     return `
@@ -9657,7 +9862,7 @@ class AttendanceView {
                             ${this._escapeAttr(d.name)}
                         </div>
 
-                        <select class="ddm-parent-select" data-designation-id="${designationId}" style="width:100%; padding:9px 12px; border:1px solid #dbe4f0; border-radius:8px; background:#fff; font-size:14px;">
+                        <select class="ddm-parent-select" data-designation-id="${designationId}"style=" width:100%; padding:9px 12px; border:1px solid #dbe4f0; border-radius:8px; background:#fff; font-size:14px;">
                             <option value="">
                                 -- None --
                             </option>
@@ -9684,13 +9889,9 @@ class AttendanceView {
                 <!-- Header -->
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
                     <div>
-                        <h2 style="margin:0; font-size:26px;">
-                            ${this._escapeAttr(department.name)}
-                        </h2>
+                        <h2 style="margin:0; font-size:26px;">${this._escapeAttr(department.name)}</h2>
                         <div style="margin-top:6px; color:#64748b;">
-                            <span id="ddm-assigned-count">
-                                ${existing.length}
-                            </span>
+                            <span id="ddm-assigned-count">${existing.length}</span>
                             designation${existing.length != 1 ? "s" : ""}
                             assigned
                         </div>
@@ -9699,6 +9900,7 @@ class AttendanceView {
                     <button id="ddm-save-btn" style="background:#4f46e5; color:#fff; border:none; padding:10px 18px; border-radius:8px; cursor:pointer; font-weight:600;">
                         Save Changes
                     </button>
+
                 </div>
 
                 <!-- Existing assigned designation chips -->
@@ -9725,24 +9927,15 @@ class AttendanceView {
                         <div style="font-size:16px; font-weight:700; color:#111827;">
                             Parent-Child Designation Mapping
                         </div>
-
                         <div style="margin-top:4px; font-size:13px; color:#64748b;">
-                            Select a parent designation for each
-                            assigned designation.
+                            Select a parent designation for each assigned designation.
                         </div>
                     </div>
 
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; padding:12px 14px; background:#f8fafc; border-bottom:1px solid #e5e7eb; font-size:13px; font-weight:700; color:#475569;">
-                        <div>
-                            Designation
-                        </div>
-
-                        <div>
-                            Parent Designation
-                        </div>
+                        <div>Designation</div>
+                        <div>Parent Designation</div>
                     </div>
-
-                    <!-- Dynamic parent-child rows -->
                     <div id="ddm-parent-child-container"></div>
                 </div>
 
@@ -9761,9 +9954,8 @@ class AttendanceView {
         mainContainer.querySelectorAll(".ddm-remove-chip").forEach(btn => {
             btn.onclick = async () => {
                 this.showOverlay("Removing...");
-                const res = await this._ddmModel.deleteDepartmentDesignationMapping(Number(btn.dataset.dept), Number(btn.dataset.designation));
+                const res = await this._ddmModel.deleteDepartmentDesignationMapping(Number(btn.dataset.dept), Number(btn.dataset.designation), targetUserId);
                 this.hideOverlay();
-
                 if (res.success) {
                     this.showToast("Designation removed successfully", "success");
                     const dept = Number(btn.dataset.dept);
@@ -9771,24 +9963,24 @@ class AttendanceView {
                     this._currentDeptDesigMappingData.mappingByDept[dept] = (this._currentDeptDesigMappingData.mappingByDept[dept] || []).filter(x => Number(x.designationId) !== desig);
                     await this._refreshDepartmentDesignationMapping(dept);
                 } else {
-                    this.showToast(res.message, "error");
+                    this.showToast(res.message,"error");
                 }
             };
         });
 
         mainContainer.querySelectorAll(".ddm-checkbox").forEach(cb => {
-                cb.addEventListener("change", () => {
-                    const designationId = Number(cb.value);
-                    if (cb.checked) {
-                        if (!Object.prototype.hasOwnProperty.call(parentSelections, designationId)) {
-                            parentSelections[designationId] = null;
-                        }
-                    } else {
-                        delete parentSelections[designationId];
+            cb.addEventListener("change", () => {
+                const designationId = Number(cb.value);
+                if (cb.checked) {
+                    if (!Object.prototype.hasOwnProperty.call(parentSelections,designationId)) {
+                        parentSelections[designationId] = null;
                     }
-                    renderParentChildMapping();
-                });
+                } else {
+                    delete parentSelections[designationId];
+                }
+                renderParentChildMapping();
             });
+        });
 
         document.getElementById("ddm-search").addEventListener("input", function () {
             const value = this.value.toLowerCase();
@@ -9797,34 +9989,32 @@ class AttendanceView {
             });
         });
 
-        document.getElementById("ddm-back-btn").onclick = () => {
-            this._initDeptDesignationMappingTab(this._ddmModel);
-        };
+        document.getElementById("ddm-back-btn").onclick = () => {this._initDeptDesignationMappingTab(this._ddmModel, this._currentDeptDesigMappingData?.targetUserId ?? null);};
 
         document.getElementById("ddm-save-btn").onclick = async () => {
             const items = [];
             mainContainer.querySelectorAll(".ddm-item").forEach(row => {
-                const cb = row.querySelector(".ddm-checkbox");
-                const designationId = Number(cb.value);
-                const parentDesignationId = cb.checked ? (parentSelections[designationId] ?? null) : null;
-
-                items.push({
-                    departmentId: Number(deptId),
-                    designationId: designationId,
-                    parentDesignationId: parentDesignationId,
-                    isActive: cb.checked
+                    const cb = row.querySelector(".ddm-checkbox");
+                    const designationId = Number(cb.value);
+                    const parentDesignationId = cb.checked ? (parentSelections[designationId] ?? null) : null;
+                    items.push({
+                        departmentId: Number(deptId),
+                        designationId: designationId,
+                        parentDesignationId: parentDesignationId,
+                        isActive: cb.checked
+                    })
                 });
-            });
 
-            const invalidSelfParent = items.find(item => item.parentDesignationId !== null && Number(item.parentDesignationId) === Number(item.designationId));
-
+            const invalidSelfParent = items.find(item => item.parentDesignationId !== null &&Number(item.parentDesignationId) === Number(item.designationId));
             if (invalidSelfParent) {
                 this.showToast("A designation cannot be its own parent.", "error");
                 return;
             }
 
             this.showOverlay("Saving mapping...");
-            const saveRes = await this._ddmModel.saveDepartmentDesignationMapping(items);
+
+            const saveRes = await this._ddmModel.saveDepartmentDesignationMapping(items, targetUserId);
+
             this.hideOverlay();
 
             if (saveRes.success) {
@@ -9838,19 +10028,24 @@ class AttendanceView {
 
 
     async _refreshDepartmentDesignationMapping(deptId) {
-        const res = await this._ddmModel.fetchDepartmentDesignationMapping();
-        if (res.success) {
+        const targetUserId = this._currentDeptDesigMappingData?.targetUserId ?? null;
+        const res = await this._ddmModel.fetchDepartmentDesignationMapping(targetUserId);
 
-            console.log(res.mappingByDept[deptId]);
-
-            this._currentDeptDesigMappingData = {
-                departments: res.departments,
-                designations: res.designations,
-                mappingByDept: res.mappingByDept
-            };
-
-            this._renderDeptDesigMappingCheckboxes(deptId);
+        if (!res || !res.success) {
+            console.error("Failed to refresh Department-Designation mapping", res);
+            return;
         }
+
+        console.log("Refreshed mapping:", res.mappingByDept?.[deptId]);
+
+        this._currentDeptDesigMappingData = {
+            departments: res.departments,
+            designations: res.designations,
+            mappingByDept: res.mappingByDept,
+            targetUserId: res.targetUserId
+        };
+
+        this._renderDeptDesigMappingCheckboxes(deptId);
     }
 
 
@@ -10300,11 +10495,7 @@ class AttendanceView {
                     return;
                 }
 
-                Charts.stacked(
-                    chartId,
-                    formattedDates,
-                    series,
-                    chartTitle,
+                Charts.stacked(chartId, formattedDates, series, chartTitle,
                     (category, index) => {
                         const dateVal = dates[index];
                         const filteredEmps = items.filter(({ emp }) => emp[dateField] === dateVal).map(({ emp }) => emp);
@@ -10462,6 +10653,322 @@ class AttendanceView {
         const content = this._renderJoinExitTab(null, mode, page);
         document.querySelector(".tab-pane-container").innerHTML = content.html;
         content.renderCharts();
+    }
+
+
+    _showPunchFrequencyBreakdown(bucketKey) {
+        document.querySelectorAll('[data-punch-freq]').forEach(c => c.classList.remove('active'));
+
+        const card = this.app.querySelector(`[data-punch-freq="${bucketKey}"]`);
+        if (card) card.classList.add('active');
+
+        this._closeStatCardDrilldown();
+        this._closePunchFreqCompanyCards();
+
+        const getterMap = {
+            zeroPunches: 'getZeroPunchEmployees',
+            punches1to5: 'get1to5PunchEmployees',
+            punches6to10: 'get6to10PunchEmployees',
+        };
+
+        const items = AppController.model[getterMap[bucketKey]]();
+
+        this._currentPunchFreqData = { bucketKey, items };
+
+        const labelMap = {
+            zeroPunches: '0 Punches',
+            punches1to5: '1-5 Punches',
+            punches6to10: '6-10 Punches',
+        };
+
+        const mergeCat = (rawCat) => rawCat || "OTHER";
+
+        const categoryOrder = ["ON-ROLL", "CC", "CONTRACTOR", "OUTSOURCE", "OTHER"];
+
+        const categoryLabels = {
+            "ON-ROLL": "ON-ROLL",
+            "CC": "COMPANY CONTRACT (CC)",
+            "CONTRACTOR": "CONTRACTOR",
+            "OUTSOURCE": "OUTSOURCE",
+            "OTHER": "UNASSIGNED",
+        };
+
+        const colorCls = ["info", "success", "warning", "accent", "danger"];
+
+        const catEmpIds = {};
+        const catCompanies = {};
+        const catPunchDays = {};
+
+        items.forEach(({ emp, date, log }) => {
+            if (!emp) return;
+
+            const cat = mergeCat(emp.companyCategory);
+
+            if (!catEmpIds[cat]) {
+                catEmpIds[cat] = new Set();
+            }
+
+            if (!catCompanies[cat]) {
+                catCompanies[cat] = new Set();
+            }
+
+            if (!catPunchDays[cat]) {
+                catPunchDays[cat] = new Set();
+            }
+
+            catEmpIds[cat].add(emp.id);
+
+            if (emp.company) {
+                catCompanies[cat].add(emp.company);
+            }
+
+            const punchDate = date || log?.date;
+
+            if (punchDate) {
+                catPunchDays[cat].add(`${emp.id}_${punchDate}`);
+            }
+        });
+
+        const cardsHtml = categoryOrder.filter((cat) => {
+            return catEmpIds[cat] && catEmpIds[cat].size > 0;
+        }).map((cat, i) => {
+            const companyNames = catCompanies[cat] ? [...catCompanies[cat]] : [];
+            const companyCount = companyNames.length;
+            const employeeCount = catEmpIds[cat].size;
+            const punchDayCount = catPunchDays[cat] ? catPunchDays[cat].size : 0;
+            const catLabel = categoryLabels[cat] || cat;
+            const bottomText = companyCount > 1 ? `(${companyCount} Companies)` : "↓ click to view";
+
+            const topLabel = `
+                <div class="punch-frequency-category-title">
+                    ${this._escapeAttr(catLabel)}
+                </div>
+            `;
+
+            if (companyCount === 1) {
+                return `
+                    <div class="stat-card punch-frequency-card ${colorCls[i % colorCls.length]} stat-card-clickable" data-punch-freq-category="${this._escapeAttr(cat)}" onclick="AppController.view._showPunchFrequencyCategorySelected('${this._escapeAttr(cat)}')">
+                        ${topLabel}
+
+                        <div class="stat-icon">
+                            <i class="ph ph-buildings"></i>
+                        </div>
+
+                        <div class="stat-content">
+                            <span class="stat-label">
+                                ${this._escapeAttr(companyNames[0])}
+                            </span>
+
+                            <span class="stat-label" style="font-weight:400;">
+                                Employees:
+                            </span>
+
+                            <span class="stat-value">
+                                ${employeeCount}
+                            </span>
+
+                            <span class="stat-label" style="font-weight:400;">
+                                Days:
+                            </span>
+
+                            <span class="stat-value">
+                                ${punchDayCount}
+                            </span>
+
+                            <span class="stat-card-hint">
+                                ${bottomText}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable" data-punch-freq-category="${this._escapeAttr(cat)}" onclick="AppController.view._showPunchFrequencyCategorySelected('${this._escapeAttr(cat)}')">
+                    ${topLabel}
+
+                    <div class="stat-icon">
+                        <i class="ph ph-buildings"></i>
+                    </div>
+
+                    <div class="stat-content">
+                        <span class="stat-label" style="font-weight:400;">
+                            Employees:
+                        </span>
+
+                        <span class="stat-value">
+                            ${employeeCount}
+                        </span>
+
+                        <span class="stat-label" style="font-weight:400;">
+                            Days:
+                        </span>
+
+                        <span class="stat-value">
+                            ${punchDayCount}
+                        </span>
+
+                        <span class="stat-card-sub">
+                            (${companyCount} Companies)
+                        </span>
+                    </div>
+                </div>
+            `;
+        }).join("");
+
+        const panel = document.getElementById("punch-freq-category-drilldown");
+
+        if (!panel) return;
+
+        panel.innerHTML = `
+            <div style="font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#334155; margin:0 0 12px; display:flex; align-items:center; gap:8px;">
+                ${labelMap[bucketKey]} — BY COMPANY CATEGORY
+                <span style="flex:1; height:1px; background:#64748b; display:block; border-radius:2px;"></span>
+            </div>
+
+            <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                ${
+                    cardsHtml || '<p style="padding:16px;color:#94a3b8;">No records found.</p>'
+                }
+            </div>
+
+            <div id="punch-freq-company-drilldown" style="margin-top:8px;"></div>
+        `;
+
+        panel.scrollIntoView({
+            behavior: "smooth",
+            block: "start"
+        });
+    }
+
+
+    _showPunchFrequencyCategorySelected(category) {
+        document.querySelectorAll('[data-punch-freq-category]').forEach(c => c.classList.remove('active'));
+        const card = this.app.querySelector(`[data-punch-freq-category="${category}"]`);
+        if (card) card.classList.add('active');
+        this._closeStatCardDrilldown();
+
+        const data = this._currentPunchFreqData;
+        if (!data) return;
+        const { bucketKey, items } = data;
+
+        const mergeCat = (rawCat) => rawCat || "OTHER";
+        // IMPORTANT: filter the original items — do NOT remap to {log:null},
+        // otherwise punch dates for 1-5 / 6-10 get lost.
+        const catItems = items.filter(({ emp }) => mergeCat(emp.companyCategory) === category);
+
+        const companyEmpIds = {};
+        catItems.forEach(({ emp }) => {
+            if (!companyEmpIds[emp.company]) companyEmpIds[emp.company] = new Set();
+            companyEmpIds[emp.company].add(emp.id);
+        });
+        const companies = Object.keys(companyEmpIds);
+        const colorCls = ["info", "success", "warning", "accent", "danger"];
+
+        this._currentPunchFreqCategoryData = { bucketKey, category, catItems };
+
+        if (companies.length === 1) {
+            this._showPunchFrequencyCompanyDrilldown(companies[0]);
+            return;
+        }
+
+        const cardsHtml = companies.map((c, i) => `
+            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable" data-punch-freq-company="${this._escapeAttr(c)}" onclick="AppController.view._showPunchFrequencyCompanyDrilldown('${this._escapeAttr(c)}')">
+                <div class="stat-icon"><i class="ph ph-buildings"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">${this._escapeAttr(c)}</span>
+                    <span class="stat-value">${companyEmpIds[c].size}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+        `).join("");
+
+        const panel = document.getElementById("punch-freq-company-drilldown");
+        if (!panel) return;
+        panel.style.display = "block";
+        panel.innerHTML = `
+            <div style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#334155;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
+                ${category} — COMPANIES
+                <span style="flex:1;height:1px;background:#64748b;display:block;border-radius:2px;"></span>
+            </div>
+            <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                ${cardsHtml}
+            </div>
+        `;
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+
+    _showPunchFrequencyCompanyDrilldown(company) {
+        document.querySelectorAll('[data-punch-freq-company]').forEach(c => c.classList.remove('active'));
+
+        const card = this.app.querySelector(`[data-punch-freq-company="${company}"]`);
+
+        if (card) {
+            card.classList.add('active');
+        }
+
+        const data = this._currentPunchFreqCategoryData;
+
+        if (!data) return;
+
+        const { bucketKey, category, catItems } = data;
+
+        const companyItems = catItems.filter(({ emp }) => emp && emp.company === company);
+
+        const items = companyItems;
+
+        this._renderStatCardDrilldown(bucketKey + "_" + category + "_" + company, items, 1, "punch-freq-final-drilldown", "AppController.view._closePunchFreqFinalDrilldown()");
+    }
+
+
+    _closePunchFreqCompanyCards() {
+        const panel = document.getElementById("punch-freq-company-drilldown");
+        if (panel) { panel.style.display = "none"; panel.innerHTML = ""; }
+        document.querySelectorAll('[data-punch-freq-company]').forEach(c => c.classList.remove('active'));
+        this._closePunchFreqFinalDrilldown();
+    }
+
+    _closePunchFreqFinalDrilldown() {
+        const panel = document.getElementById("punch-freq-final-drilldown");
+        if (panel) { panel.style.display = "none"; panel.innerHTML = ""; }
+        document.querySelectorAll('[data-punch-freq-company]').forEach(c => c.classList.remove('active'));
+    }
+
+
+    _downloadPunchFrequencyExcel(bucketKey) {
+        const getterMap = {
+            zeroPunches: 'getZeroPunchEmployees',
+            punches1to5: 'get1to5PunchEmployees',
+            punches6to10: 'get6to10PunchEmployees',
+        };
+        const items = AppController.model[getterMap[bucketKey]]();
+        if (!items || !items.length) return;
+
+        const hasDates = items.some((it) => it.log && (it.date || it.log.date));
+
+        const exportData = items.map(({ log, emp, date }) => {
+            const base = {
+                Code: emp?.code,
+                Name: emp?.name,
+                Dept: emp?.dept,
+                Company: emp?.company,
+                Designation: emp?.designation,
+                TeamName: emp?.teamName,
+                shiftGroupName: emp?.shiftGroupName,
+                Location: emp?.location || "",
+            };
+            if (hasDates) {
+                base.Date = this._formatDate(date || log?.date);
+                base.In = log?.inTime || "";
+                base.Out = log?.outTime || "";
+                base.Status = log?.status || "";
+            }
+            return base;
+        });
+
+        const labelMap = { zeroPunches: "0-punches", punches1to5: "1-5-punches", punches6to10: "6-10-punches" };
+        this.exportExcel(exportData, (labelMap[bucketKey] || bucketKey) + "-all");
     }
 
     

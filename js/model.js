@@ -150,7 +150,10 @@
                         counts: data.counts,
                         singlePunchKeys: new Set(data.singlePunchKeys || []),
                         singlePunchData: data.singlePunchData || {},
-                        employeeDayStatus: data.employeeDayStatus || {}
+                        employeeDayStatus: data.employeeDayStatus || {},
+                        punchFrequency: data.punchFrequency || { zeroPunches: 0, punches1to5: 0, punches6to10: 0 },
+                         punchFrequencyDetails: data.punchFrequencyDetails || { zero: [], oneToFive: [], sixToTen: [] },
+                        punchFrequencyEmpIds: data.punchFrequencyEmpIds || { zero: [], oneToFive: [], sixToTen: [] }
                     };
                     this.state.dashboardData = {
                         employees: data.dashboardEmployees || [],
@@ -253,7 +256,7 @@
             if (this.state.activeTab === tabId) {
                 return;
             }
-            if ((tabId === 'sort_order' || tabId === 'units' || tabId === 'dept_designation_mapping') && !(window.HRMS_USER && window.HRMS_USER.isMaster)) {
+            if ((tabId === 'sort_order' || tabId === 'units') && !(window.HRMS_USER && window.HRMS_USER.isMaster)) {
                 return;
             }
             this.state.activeTab = tabId;
@@ -1482,53 +1485,82 @@
         }
 
 
-        async fetchDepartmentDesignationMapping() {
+        async fetchDepartmentDesignationMapping(targetUserId = null) {
             try {
                 const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
+                
                 url.searchParams.set('action', 'get_department_designation_mapping');
-                const response = await fetch(url.toString(), { credentials: 'include' });
+
+                if (targetUserId) {
+                    url.searchParams.set('targetUserId', targetUserId);
+                }
+
+                const response = await fetch(url.toString(), {
+                    credentials: 'include'
+                });
+
                 return await response.json();
             } catch (error) {
                 console.error('Fetch Dept-Designation Mapping Error:', error);
-                return { success: false, error: error.message };
+                return {
+                    success: false,
+                    error: error.message
+                };
             }
         }
 
 
-        async saveDepartmentDesignationMapping(items) {
+        async saveDepartmentDesignationMapping(items, targetUserId = null) {
             try {
                 const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
+
                 url.searchParams.set('action', 'save_department_designation_mapping');
+
+                const payload = { action: 'save_department_designation_mapping', items };
+
+                if (targetUserId) {
+                    payload.targetUserId = targetUserId;
+                }
+
                 const response = await fetch(url.toString(), {
                     method: 'POST',
                     credentials: 'include',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'save_department_designation_mapping', items })
+                    body: JSON.stringify(payload)
                 });
+
                 return await response.json();
             } catch (error) {
                 console.error('Save Dept-Designation Mapping Error:', error);
-                return { success: false, error: error.message };
+                return {
+                    success: false,
+                    error: error.message
+                };
             }
         }
 
 
-        async deleteDepartmentDesignationMapping(departmentId, designationId) {
+        async deleteDepartmentDesignationMapping(departmentId, designationId, targetUserId = null) {
             try {
                 const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
+
                 url.searchParams.set('action', 'delete_department_designation_mapping');
+
+                const payload = {
+                    action: 'delete_department_designation_mapping',
+                    departmentId,
+                    designationId
+                };
+
+                if (targetUserId) {
+                    payload.targetUserId = targetUserId;
+                }
 
                 const response = await fetch(url.toString(), {
                     method: 'POST',
                     credentials: 'include',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        action: 'delete_department_designation_mapping',
-                        departmentId,
-                        designationId
-                    })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
                 });
 
                 return await response.json();
@@ -1540,6 +1572,105 @@
                 };
             }
         }
+    
+        getPunchFrequency() {
+            return this.state.data.punchFrequency || {
+                zeroPunches: 0,
+                punches1to5: 0,
+                punches6to10: 0
+            };
+        }
+
+        getZeroPunchEmployees() {
+            const ids = this.state.data.punchFrequencyEmpIds?.zero || [];
+            const empMap = this.getEmpMap();
+            return ids.map(id => ({ log: null, emp: empMap[id], date: null })).filter(item => item.emp);
+        }
+
+        get1to5PunchEmployees() {
+            const details = this.state.data.punchFrequencyDetails?.oneToFive || [];
+            const empMap = this.getEmpMap();
+            const logMap = this._buildLogMap(this.state.data.attendanceLogs || []);
+
+            const result = [];
+            details.forEach(item => {
+                const emp = empMap[item.empId];
+                if (!emp) return;
+                
+                const dates = item.dates || [];
+
+                dates.forEach(d => {
+                    const date = d.date;
+                    const key = `${item.empId}_${date}`;
+                    const attendanceLog = logMap[key] || null;
+                    const punchInfo = this.state.data.singlePunchData?.[key];
+
+                    const log = punchInfo ? {
+                        ...(attendanceLog || {}),
+                        empId: emp.id,
+                        date,
+                        inTime: punchInfo.direction === 'in' ? punchInfo.time : (attendanceLog?.inTime || null),
+                        outTime: punchInfo.direction === 'out' ? punchInfo.time : (attendanceLog?.outTime || null),
+                        status: 'Single Punch',
+                        detailedStatus: 'Single Punch',
+                        detailedStatusCode: 'SP',
+                        shiftStart: punchInfo.shiftStart || attendanceLog?.shiftStart || null,
+                        shiftEnd: punchInfo.shiftEnd || attendanceLog?.shiftEnd || null,
+                        shiftName: punchInfo.shiftName || attendanceLog?.shiftName || emp.shift || 'No Shift',
+                        shiftGroupId: punchInfo.shiftGroupId ?? attendanceLog?.shiftGroupId ?? emp.shiftGroupId ?? null,
+                        shiftGroupName: punchInfo.shiftGroupName || attendanceLog?.shiftGroupName || emp.shiftGroupName || 'No Shift Group',
+                        source: punchInfo.source || 'attendanceLogPunch'
+                    } : attendanceLog;
+
+                    result.push({ emp, log, date });
+                });
+            });
+
+            return result;
+        }
+
+        get6to10PunchEmployees() {
+            const details = this.state.data.punchFrequencyDetails?.sixToTen || [];
+            const empMap = this.getEmpMap();
+            const logMap = this._buildLogMap(this.state.data.attendanceLogs || []);
+
+            const result = [];
+            details.forEach(item => {
+                const emp = empMap[item.empId];
+                if (!emp) return;
+
+                const dates = item.dates || [];
+
+                dates.forEach(d => {
+                    const date = d.date;
+                    const key = `${item.empId}_${date}`;
+                    const attendanceLog = logMap[key] || null;
+                    const punchInfo = this.state.data.singlePunchData?.[key];
+
+                    const log = punchInfo ? {
+                        ...(attendanceLog || {}),
+                        empId: emp.id,
+                        date,
+                        inTime: punchInfo.direction === 'in' ? punchInfo.time : (attendanceLog?.inTime || null),
+                        outTime: punchInfo.direction === 'out' ? punchInfo.time : (attendanceLog?.outTime || null),
+                        status: 'Single Punch',
+                        detailedStatus: 'Single Punch',
+                        detailedStatusCode: 'SP',
+                        shiftStart: punchInfo.shiftStart || attendanceLog?.shiftStart || null,
+                        shiftEnd: punchInfo.shiftEnd || attendanceLog?.shiftEnd || null,
+                        shiftName: punchInfo.shiftName || attendanceLog?.shiftName || emp.shift || 'No Shift',
+                        shiftGroupId: punchInfo.shiftGroupId ?? attendanceLog?.shiftGroupId ?? emp.shiftGroupId ?? null,
+                        shiftGroupName: punchInfo.shiftGroupName || attendanceLog?.shiftGroupName || emp.shiftGroupName || 'No Shift Group',
+                        source: punchInfo.source || 'attendanceLogPunch'
+                    } : attendanceLog;
+
+                    result.push({ emp, log, date });
+                });
+            });
+
+            return result;
+        }
     }
+
 
     window.AttendanceModel = AttendanceModel;

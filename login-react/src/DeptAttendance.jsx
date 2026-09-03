@@ -10,6 +10,9 @@ const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "Ju
 export default function DeptAttendance() {
     const [locationId, setLocationId] = useState(null);
     const [locationList, setLocationList] = useState([]);
+    const [adminList, setAdminList] = useState([]);
+    const [selectedAdminId, setSelectedAdminId] = useState(null);
+    const [isMasterAdmin, setIsMasterAdmin] = useState(false);
     const [month, setMonth] = useState(() => new Date().getMonth() + 1);
     const [year, setYear] = useState(() => new Date().getFullYear());
     const [dayFrom, setDayFrom] = useState(1);
@@ -51,27 +54,44 @@ export default function DeptAttendance() {
 
     useEffect(() => {
         const userSession = localStorage.getItem("hrms_user");
+
         if (!userSession) {
             window.location.replace("/attendance-dashboard/login");
             return;
         }
-        fetchLocations();
+
+        try {
+            const user = JSON.parse(userSession);
+            const master = Boolean(user.isMaster ?? user.is_master ?? user.IsMaster);
+            const userId = Number(user.userId ?? user.UserId ?? user.id);
+
+            setIsMasterAdmin(master);
+
+            if (master) {
+                fetchSubAdmins();
+            } else if (userId > 0) {
+                setSelectedAdminId(userId);
+                fetchLocations(userId);
+            }
+        } catch (err) {
+            console.error("Invalid hrms_user session:", err);
+        }
     }, []);
 
     useEffect(() => {
-        if (locationId !== null) {
+        if (locationId !== null && selectedAdminId !== null) {
             fetchStdHc();
             fetchDesignationStdHc();
             fetchMachineStd();
         }
-    }, [locationId]);
+    }, [locationId, selectedAdminId]);
 
     useEffect(() => {
-        if (locationId !== null) {
+        if (locationId !== null && selectedAdminId !== null) {
             loadReport();
             fetchDailyMachines();
         }
-    }, [month, year, dayFrom, dayTo, locationId]);
+    }, [month, year, dayFrom, dayTo, locationId, selectedAdminId]);
 
     useEffect(() => {
         const maxDays = new Date(year, month, 0).getDate();
@@ -82,21 +102,92 @@ export default function DeptAttendance() {
         ));
     }, [month, year]);
 
-    async function fetchLocations() {
+
+    async function fetchSubAdmins() {
         try {
             const res = await fetch(API_BASE, {
                 method: "POST",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "get_locations" }),
+                body: JSON.stringify({
+                    action: "get_subadmins"
+                }),
             });
+
             const data = await res.json();
-            if (data.success && data.data && data.data.length > 0) {
+
+            if (data.success && Array.isArray(data.data)) {
+                setAdminList(data.data);
+
+                if (data.data.length > 0) {
+                    const firstAdmin = data.data[0];
+
+                    setSelectedAdminId(firstAdmin.id);
+                    await fetchLocations(firstAdmin.id);
+                }
+            }
+        } catch (err) {
+            console.error("fetchSubAdmins error:", err);
+        }
+    }
+
+
+    async function fetchLocations(adminId) {
+        try {
+            const res = await fetch(API_BASE, {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    action: "get_locations",
+                    targetUserId: adminId
+                }),
+            });
+
+            const data = await res.json();
+
+            if (data.success && Array.isArray(data.data)) {
                 setLocationList(data.data);
                 setLocationId(0);
+            } else {
+                setLocationList([]);
+                setLocationId(0);
             }
-        } catch {}
+        } catch (err) {
+            console.error("fetchLocations error:", err);
+            setLocationList([]);
+            setLocationId(0);
+        }
     }
+
+
+    async function handleAdminChange(adminId) {
+        setSelectedAdminId(adminId);
+
+        // Reset current location
+        setLocationId(null);
+        setLocationList([]);
+
+        // Clear old Admin's data
+        setReportData(null);
+        setStdHcMap({});
+        setDeptList([]);
+        setDesigStdHcMap({});
+        setDesigList([]);
+        setMachineStd(0);
+        setDailyMachines({});
+        setStatusDetail(null);
+        setAttendanceDetail(null);
+
+        // Reset expanded sections
+        setExpandedDept(null);
+        setExpandedDesig(null);
+        setExpandedSummary(null);
+
+        // Load locations belonging to the selected Admin
+        await fetchLocations(adminId);
+    }
+
 
     async function fetchStdHc() {
         try {
@@ -104,7 +195,11 @@ export default function DeptAttendance() {
                 method: "POST",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "get_std_hc", location_id: locationId }),
+                body: JSON.stringify({
+                    action: "get_std_hc",
+                    location_id: locationId,
+                    targetUserId: selectedAdminId
+                }),
             });
             const data = await res.json();
             if (data.success && data.data) {
@@ -129,9 +224,15 @@ export default function DeptAttendance() {
                 method: "POST",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "get_designation_std_hc", location_id: locationId }),
+                body: JSON.stringify({
+                    action: "get_designation_std_hc",
+                    location_id: locationId,
+                    targetUserId: selectedAdminId
+                }),
             });
+            
             const data = await res.json();
+            
             if (data.success && data.data) {
                 const map = {};
                 data.data.forEach((d) => {
@@ -150,7 +251,11 @@ export default function DeptAttendance() {
                 method: "POST",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "get_machine_std", location_id: locationId }),
+                body: JSON.stringify({
+                    action: "get_machine_std",
+                    location_id: locationId,
+                    targetUserId: selectedAdminId
+                }),
             });
             const data = await res.json();
             if (data.success && data.data) setMachineStd(data.data.total_machines || 0);
@@ -163,7 +268,12 @@ export default function DeptAttendance() {
                 method: "POST",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "update_machine_std", location_id: locationId, total_machines: editMachineStd }),
+                body: JSON.stringify({
+                    action: "update_machine_std",
+                    location_id: locationId,
+                    targetUserId: selectedAdminId,
+                    total_machines: editMachineStd
+                }),
             });
             const data = await res.json();
             if (!data.success) {
@@ -194,6 +304,7 @@ export default function DeptAttendance() {
                 body: JSON.stringify({
                     action: "get_daily_machines",
                     location_id: locationId,
+                    targetUserId: selectedAdminId,
                     date_from: dateStr(year, month, dayFrom),
                     date_to: dateStr(year, month, dayTo),
                 }),
@@ -215,7 +326,12 @@ export default function DeptAttendance() {
                 method: "POST",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "bulk_update_daily_machines", location_id: locationId, items }),
+                body: JSON.stringify({
+                    action: "bulk_update_daily_machines",
+                    location_id: locationId,
+                    targetUserId: selectedAdminId,
+                    items
+                }),
             });
             const data = await res.json();
             if (!data.success) {
@@ -249,7 +365,15 @@ export default function DeptAttendance() {
 				method: "POST",
 				credentials: "include",
 				headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "get_report", month, year, day_from: dayFrom, day_to: dayTo, location_id: locationId }),
+                body: JSON.stringify({
+                    action: "get_report",
+                    month,
+                    year,
+                    day_from: dayFrom,
+                    day_to: dayTo,
+                    location_id: locationId,
+                    targetUserId: selectedAdminId
+                }),
 			});
 			
 			const data = await res.json();
@@ -290,7 +414,11 @@ export default function DeptAttendance() {
                 method: "POST",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "bulk_update_designation_std_hc", items }),
+                body: JSON.stringify({
+                    action: "bulk_update_designation_std_hc",
+                    targetUserId: selectedAdminId,
+                    items
+                }),
             });
             const data = await res.json();
 
@@ -373,6 +501,19 @@ export default function DeptAttendance() {
             </div>
 
             <div className="da-filter-bar">
+                {isMasterAdmin && (
+                    <div className="da-filter-group">
+                        <label>Admin</label>
+                        <select value={selectedAdminId ?? ""} onChange={(e) => handleAdminChange(Number(e.target.value))}>
+                            {adminList.map((admin) => (
+                                <option key={admin.id} value={admin.id}>
+                                    {admin.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+                
                 <div className="da-filter-group">
                     <label>Location</label>
                     <select value={locationId ?? ""} onChange={(e) => setLocationId(Number(e.target.value))}>
@@ -384,6 +525,7 @@ export default function DeptAttendance() {
                         ))}
                     </select>
                 </div>
+                
                 <div className="da-filter-group">
                     <label>Month</label>
                     <select value={month} onChange={(e) => setMonth(Number(e.target.value))}>
@@ -394,6 +536,7 @@ export default function DeptAttendance() {
                         ))}
                     </select>
                 </div>
+                
                 <div className="da-filter-group">
                     <label>Year</label>
                     <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
@@ -404,6 +547,7 @@ export default function DeptAttendance() {
                         ))}
                     </select>
                 </div>
+                
                 <div className="da-filter-group">
                     <label>Day From</label>
                     <input type="date" min={minDate} max={toDateValue} value={fromDateValue}
@@ -414,6 +558,7 @@ export default function DeptAttendance() {
                         }}
                     />
                 </div>
+                
                 <div className="da-filter-group">
                     <label>Day To</label>
                     <input type="date" min={fromDateValue} max={maxDate} value={toDateValue}
@@ -424,22 +569,27 @@ export default function DeptAttendance() {
                         }}
                     />
                 </div>
+                
                 <div className="da-filter-group">
                     <label>&nbsp;</label>
                     <button className="da-btn da-btn-sm" style={{ background: "#e2e8f0", color: "#475569" }} onClick={() => { setDayFrom(1); setDayTo(maxDays); }}>
                         📅 Full Month
                     </button>
                 </div>
+                
                 <div className="da-filter-actions">
                     <button className="da-btn da-btn-primary" disabled={loading} onClick={loadReport}>
                         {loading ? "⏳ Loading..." : "🔍 Generate"}
                     </button>
+                
                     <button className="da-btn da-btn-warning" disabled={locationId === null} onClick={() => { setEditDesigHc(JSON.parse(JSON.stringify(desigStdHcMap))); setShowDesigSettings(true); }}>
                         ⚙️ Designation STD HC
                     </button>
+                
                     <button className="da-btn da-btn-warning" disabled={locationId === null} onClick={() => { setEditMachineStd(machineStd); setShowMachineStdSettings(true); }}>
                         ⚙️ Total Machines
                     </button>
+                
                     <button className="da-btn da-btn-warning" disabled={locationId === null}
                         onClick={() => {
                             const initial = {};
@@ -453,9 +603,11 @@ export default function DeptAttendance() {
                     >
                         ⚙️ Daily Running Machines
                     </button>
+                    
                     <button className="da-btn da-btn-success" onClick={exportExcel}>
                         ⬇ Excel
                     </button>
+                    
                     <button className="da-btn da-btn-sm" style={{ background: "#475569", color: "#fff" }} onClick={() => window.print()}>
                         🖨 Print
                     </button>
@@ -574,6 +726,7 @@ export default function DeptAttendance() {
     );
 }
 
+
 function DeptSummaryRows({ summary, days }) {
     const rows = [
         { key: "total_present", label: "Total Present", cls: "da-dsum-present" },
@@ -605,6 +758,7 @@ function DeptSummaryRows({ summary, days }) {
         </>
     );
 }
+
 
 function ReportTable({ data, days, unitName, unitCapacity, loginName, month, year, expandedDept, onToggleDept, expandedDesig, onToggleDesig, expandedSummary, onToggleSummary, onViewAttendance }) {
     if (!data || !data.departments) return null;
@@ -747,6 +901,7 @@ function ReportTable({ data, days, unitName, unitCapacity, loginName, month, yea
         </div>
     );
 }
+
 
 function StatusSummary({ summary, summaryEmployees, days, month, year, onView }) {
     const PAGE_SIZE = 5;
@@ -896,6 +1051,7 @@ function StatusSummary({ summary, summaryEmployees, days, month, year, onView })
         </div>
     );
 }
+
 
 function AttendanceEmployeeReport({ statusLabel, date, employees, onClose }) {
     const [employeeNameSearch, setEmployeeNameSearch] = useState("");
@@ -1070,6 +1226,7 @@ function AttendanceEmployeeReport({ statusLabel, date, employees, onClose }) {
     );
 }
 
+
 function SummaryRow({ label, statusKey, stdValue, dayValues, avgValue, days, className, hideLabel, onDayClick }) {
     return (
         <tr className={className}>
@@ -1093,6 +1250,7 @@ function SummaryRow({ label, statusKey, stdValue, dayValues, avgValue, days, cla
         </tr>
     );
 }
+
 
 function DesigSettingsModal({ deptList, editDesigHc, setEditDesigHc, desigList, saving, onSave, onClose }) {
     // Group designations under their parent department
@@ -1213,6 +1371,7 @@ function DesigSettingsModal({ deptList, editDesigHc, setEditDesigHc, desigList, 
     );
 }
 
+
 function MachineStdModal({ value, setValue, onSave, onClose }) {
     return (
         <div className="da-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -1248,6 +1407,7 @@ function MachineStdModal({ value, setValue, onSave, onClose }) {
         </div>
     );
 }
+
 
 function DailyMachineModal({ year, month, days, editDailyMachines, setEditDailyMachines, onSave, onClose }) {
     function dateStr(y, m, d) {
@@ -1330,6 +1490,7 @@ function DailyMachineModal({ year, month, days, editDailyMachines, setEditDailyM
     );
 }
 
+
 function StatusEmployeeModal({ statusLabel, date, employees, onClose }) {
     const employeeList = employees || [];
     return (
@@ -1390,3 +1551,5 @@ function StatusEmployeeModal({ statusLabel, date, employees, onClose }) {
         </div>
     );
 }
+
+

@@ -1534,3 +1534,55 @@ body {
 
 }
 
+/* =========================================
+   Punch Frequency Alerts – consistent layout
+   ========================================= */
+
+.punch-frequency-card .stat-content {
+    align-items: center;
+    text-align: center;
+}
+
+/* Same label color as all other dashboard cards */
+.punch-frequency-card .stat-label {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--text-muted);
+}
+
+/* Space before Employees */
+.punch-frequency-card .stat-label + .stat-label {
+    margin-top: 10px;
+}
+
+/* Space before Days */
+.punch-frequency-card .stat-value + .stat-label {
+    margin-top: 7px;
+}
+
+/* Same number color as all other dashboard cards */
+.punch-frequency-card .stat-value {
+    font-size: 18px;
+    font-weight: 800;
+    line-height: 1.2;
+    color: var(--text-main);
+}
+
+.punch-frequency-card .stat-card-hint,
+.punch-frequency-card .stat-card-sub {
+    margin-top: 8px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #94a3b8;
+}
+
+/* Same heading color as dashboard section headings */
+.punch-frequency-category-title {
+    margin-bottom: 12px;
+    color: var(--text-main);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
