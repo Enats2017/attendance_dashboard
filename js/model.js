@@ -136,9 +136,19 @@
                 if (this.state.filters.subadminUserId) {
                     url.searchParams.set('subadmin_user_id', this.state.filters.subadminUserId);
                 }
+                
                 console.log('Dashboard URL:', url.toString());
-                const response = await fetch(url.toString(), { credentials: 'include' });
-                const data = await response.json();
+
+                const response = await fetch(url.toString(), {
+                    credentials: 'include'
+                });
+
+                const responseText = await response.text();
+
+                console.log('HTTP Status:', response.status);
+                console.log('Response:', responseText.substring(0, 2000));
+
+                const data = JSON.parse(responseText);
 
                 if (data.success) {
                     this.state.data = {
@@ -152,19 +162,27 @@
                         singlePunchData: data.singlePunchData || {},
                         employeeDayStatus: data.employeeDayStatus || {},
                         punchFrequency: data.punchFrequency || { zeroPunches: 0, punches1to5: 0, punches6to10: 0 },
-                         punchFrequencyDetails: data.punchFrequencyDetails || { zero: [], oneToFive: [], sixToTen: [] },
-                        punchFrequencyEmpIds: data.punchFrequencyEmpIds || { zero: [], oneToFive: [], sixToTen: [] }
+                        punchFrequencyDetails: data.punchFrequencyDetails || { zero: [], oneToFive: [], sixToTen: [] },
+                        punchFrequencyEmpIds: data.punchFrequencyEmpIds || { zero: [], oneToFive: [], sixToTen: [] },
+
+                        // ★ M2 — preserve families so they are not wiped on every fetch
+                        designationFamilies: this.state.data.designationFamilies || [],
+                        designationToFamilyMap: this.state.data.designationToFamilyMap || {}
                     };
+
                     this.state.dashboardData = {
                         employees: data.dashboardEmployees || [],
-                        attendanceLogs: data.attendanceLogs,     
                         todayStats: data.todayStats || {},
                         requiredHeadcount: data.requiredHeadcount ?? 0,
                         totalMachines: data.totalMachines ?? 0,
                         gapHeadcount: data.gapHeadcount ?? 0,
                         requiredHeadcountByDept: data.requiredHeadcountByDept || {},
                         requiredHeadcountByLocation: data.requiredHeadcountByLocation || [],
-                        locationScope: data.locationScope || { count: 0, locations: [] }
+                        locationScope: data.locationScope || { count: 0, locations: [] },
+
+                        // ★ M1 — keep families on the dashboard store too
+                        designationFamilies: (this.state.dashboardData && this.state.dashboardData.designationFamilies) || [],
+                        designationToFamilyMap: (this.state.dashboardData && this.state.dashboardData.designationToFamilyMap) || {}
                     };
                     this.state.todayStats = data.todayStats || {
                         present: 0, 
@@ -1110,19 +1128,21 @@
 
 
         async loadDesignationFamiliesForStats() {
-            if (this.state.data.designationFamilies && this.state.data.designationFamilies.length) {
+            const dd = this.state.dashboardData || (this.state.dashboardData = {});
+            if (this.state.data.designationFamilies?.length && dd.designationFamilies?.length) {
                 return { success: true };
             }
             const res = await this.fetchDesignationFamilies();
             if (res && res.success) {
-                this.state.data.designationFamilies = res.data || [];
+                const families = res.data || [];
                 const map = {};
-                (res.data || []).forEach(fam => {
-                    (fam.designations || []).forEach(d => {
-                        map[d.id] = { familyId: fam.id, familyName: fam.name };
-                    });
-                });
+                families.forEach(fam => (fam.designations || []).forEach(d => {
+                    map[d.id] = { familyId: fam.id, familyName: fam.name };
+                }));
+                this.state.data.designationFamilies = families;
                 this.state.data.designationToFamilyMap = map;
+                dd.designationFamilies = families;
+                dd.designationToFamilyMap = map;
                 this._commit();
             }
             return res;

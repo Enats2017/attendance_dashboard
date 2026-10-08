@@ -100,9 +100,9 @@ class AttendanceView {
         let stats, logs, emps, empMap;
 
         if (state.activeTab === "feature") {
-            const dash = model.state.dashboardData || { employees: [], attendanceLogs: [] };
+            const dash = model.state.dashboardData || { employees: [] };
             emps = dash.employees || [];
-            logs = dash.attendanceLogs || [];
+            logs = [];
             empMap = {};
             emps.forEach((e) => { empMap[e.id] = e; });
             stats = dash.todayStats || {
@@ -120,7 +120,7 @@ class AttendanceView {
 
         const filterOpts = model.getFilterOptions();
 
-        this._staffWorkerStats = state.staffWorkerStats || {};
+        this._staffWorkerStats = { ...(state.staffWorkerStats || {}) };
 
         this.app.innerHTML = `
 			<div class="dashboard-layout">
@@ -173,6 +173,15 @@ class AttendanceView {
 
 
     _handleDeptAccordionClick(e) {
+        const catItem = e.target.closest(".stat-category-item");
+        if (catItem) {
+            e.stopPropagation();
+            const cardKey = catItem.dataset.cardKey;
+            const category = catItem.dataset.category;
+            this._showCategoryFilteredDrilldown(cardKey, category);
+            return;
+        }
+
         const seg = e.target.closest(".dept-acc-seg");
         if (seg) {
             e.stopPropagation();
@@ -214,6 +223,147 @@ class AttendanceView {
             if (!data) return;
             this._toggleDeptAccordionEl(expandEl, dept, data.emps, data.logs, data.model);
         }
+    }
+
+
+    _showCategoryFilteredDrilldown(cardKey, category) {
+        if (cardKey === "newJoined" || cardKey === "resigned") {
+            this._resetJoinExitPanels();
+        }
+        const dayLogs = this._currentSummaryDayLogs || [];
+        const empMap = this._currentSummaryEmpMap || {};
+
+        const mergeCat = (rawCat) => {
+            if (!rawCat) return null;
+            const c = String(rawCat).toUpperCase().trim();
+            if (c === "ON-ROLL" || c === "ONROLL") return "ON-ROLL";
+            if (c === "CC" || c === "COMPANY CONTRACT" || c === "COMPANY CONTRACT (CC)") return "CC";
+            if (c === "CONTRACTOR") return "CONTRACTOR";
+            if (c === "OUTSOURCE") return "OUTSOURCE";
+            return null;
+        };
+
+        const statusMap = {
+            totalHeadcount: null,
+            present: "Present",
+            halfPresent: "Half Present",
+            absent: "Absent",
+            weeklyOff: "Weekly Off",
+            weeklyOffPresent: "WO Present",
+            weeklyOffHalfPresent: "WO Half Present",
+            singlePunch: "Single Punch",
+            lateIn: "Late In",
+            earlyOut: "Early Out",
+            manualPunch: "Manual Punch"
+        };
+
+        const status = statusMap[cardKey];
+        let items = [];
+
+        if (cardKey === "totalHeadcount") {
+            items = Object.values(empMap).filter(emp => mergeCat(emp.companyCategory) === category).map(emp => ({ log: null, emp: emp, date: null }));
+        } else if (cardKey === "lateIn") {
+            const lateInItems = this._currentSummaryModel ? this._currentSummaryModel.getLateInEmployees() : [];
+            items = lateInItems.filter(({ emp }) => {
+                return emp && mergeCat(emp.companyCategory) === category;
+            });
+        } else if (cardKey === "earlyOut") {
+            const earlyOutItems = this._currentSummaryModel ? this._currentSummaryModel.getEarlyOutEmployees() : [];
+            items = earlyOutItems.filter(({ emp }) => {
+                return emp && mergeCat(emp.companyCategory) === category;
+            });
+        }  else if (cardKey === "staffList" || cardKey === "workerList" || cardKey === "contractList" || cardKey === "consultantList") {
+            const summaryDataMap = {
+                staffList: this._currentStaffSummaryData,
+                workerList: this._currentWorkerSummaryData,
+                contractList: this._currentContractSummaryData,
+                consultantList: this._currentConsultantSummaryData
+            };
+
+            const data = summaryDataMap[cardKey];
+
+            if (data) {
+                const { emps, dayLogs, empMap, model } = data;
+
+                const teamIdMap = {
+                    staffList: model.state.teamConfig?.staffTeamId ?? 7,
+                    workerList: model.state.teamConfig?.workerTeamId ?? 6,
+                    contractList: model.state.teamConfig?.contractTeamId ?? 8,
+                    consultantList: model.state.teamConfig?.consultantTeamId ?? 9
+                };
+
+                const teamId = teamIdMap[cardKey];
+
+                items = dayLogs.filter(l => {
+                    const emp = empMap[l.empId];
+
+                    if (!emp) return false;
+                    if (emp.team !== teamId) return false;
+
+                    const isPresent = this._matchesStatus(l, "Present") || this._matchesStatus(l, "WO Present");
+                    const isHalf = this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Half Present");
+                    
+                    if (!isPresent && !isHalf) return false;
+                    return mergeCat(emp.companyCategory) === category;
+                }).map(l => ({
+                    log: l,
+                    emp: empMap[l.empId],
+                    date: l.date
+                }));
+            }
+        } else if (cardKey === "newJoined") {
+            const newJoinedItems = this._currentSummaryModel ? this._currentSummaryModel.getNewJoinedEmployees() : [];
+            items = newJoinedItems.filter(({ emp }) => {
+                const mappedEmp = empMap[emp?.id] || emp;
+                return mappedEmp && mergeCat(mappedEmp.companyCategory) === category;
+            }).map(({ log, emp }) => ({
+                log: log || null,
+                emp: empMap[emp?.id] || emp,
+                date: null
+            }));
+        } else if (cardKey === "resigned") {
+            const resignedItems = this._currentSummaryModel ? this._currentSummaryModel.getResignedEmployees() : [];
+            items = resignedItems.filter(({ emp }) => {
+                const mappedEmp = empMap[emp?.id] || emp;
+                return mappedEmp && mergeCat(mappedEmp.companyCategory) === category;
+            }).map(({ log, emp }) => ({
+                log: log || null,
+                emp: empMap[emp?.id] || emp,
+                date: null
+            }));
+        } else if (status) {
+            items = dayLogs.filter(l => this._matchesStatus(l, status)).filter(l => {
+                const emp = empMap[l.empId];
+                return emp && mergeCat(emp.companyCategory) === category;
+            }).map(l => ({
+                log: l,
+                emp: empMap[l.empId],
+                date: l.date
+            }));
+        } else {
+            items = dayLogs.filter(l => {
+                const emp = empMap[l.empId];
+                return emp && mergeCat(emp.companyCategory) === category;
+            }).map(l => ({
+                log: l,
+                emp: empMap[l.empId],
+                date: l.date
+            }));
+        }
+
+        console.log("Category clicked:", cardKey, category, "→ Items:", items.length);
+
+        document.querySelectorAll(".stat-card-clickable, .stat-category-item").forEach(el => el.classList.remove("active"));
+
+        const card = this.app.querySelector(`[data-card-key="${cardKey}"]`);
+        if (card) card.classList.add("active");
+
+        const catEl = this.app.querySelector(
+            `.stat-category-item[data-card-key="${cardKey}"][data-category="${category}"]`
+        );
+        if (catEl) catEl.classList.add("active");
+
+        this._renderStatCardDrilldown(cardKey, items, 1);
     }
 
 
@@ -433,11 +583,15 @@ class AttendanceView {
                         <label>Viewing As</label>
                         <select id="f-subadmin">
                             <option value="">All (Master View)</option>
-                            ${subAdminList.map((s) => `
-                                <option value="${s.id}" ${String(selectedId) === String(s.id) ? "selected" : ""}>
-                                    ${this._escapeAttr(s.name)}
-                                </option>
-                            `).join("")}
+                            ${subAdminList.map((s) => {
+                                const currentUserId = Number((window.HRMS_USER || {}).id || (window.HRMS_USER || {}).userId || 0);
+                                const isSelf = Number(s.id) === currentUserId;
+                                return `
+                                    <option value="${s.id}" ${String(selectedId) === String(s.id) ? "selected" : ""}>
+                                        ${isSelf ? "Me (Self)" : this._escapeAttr(s.name)}
+                                    </option>
+                                `;
+                            }).join("")}
                         </select>
                     </div>` : ""}
                 </div>
@@ -461,49 +615,146 @@ class AttendanceView {
         const staffWorkerStats = this._staffWorkerStats || {};
         let totalPresentHalf = stats.total;
 
+        // ---------- category helpers ----------
+        const categoryOrder = ["ON-ROLL", "CC", "CONTRACTOR", "OUTSOURCE"];
+        const mergeCat = (rawCat) => {
+            if (!rawCat) return null;
+            const c = String(rawCat).toUpperCase().trim();
+            if (c === "ON-ROLL" || c === "ONROLL") return "ON-ROLL";
+            if (c === "CC" || c === "COMPANY CONTRACT" || c === "COMPANY CONTRACT (CC)") return "CC";
+            if (c === "CONTRACTOR") return "CONTRACTOR";
+            if (c === "OUTSOURCE") return "OUTSOURCE";
+            return null;
+        };
+
+        const { dateFrom, dateTo } = model.state.filters;
+        const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
+
+        // store for click handlers
+        this._currentSummaryDayLogs = dayLogs;
+        this._currentSummaryEmpMap = empMap;
+        this._currentSummaryModel = model;
+
+        // count by status + category
+        const countByStatusAndCat = (statusKey) => {
+            let total = 0;
+            const catCounts = { "ON-ROLL": 0, "CC": 0, "CONTRACTOR": 0, "OUTSOURCE": 0 };
+
+            dayLogs.forEach(l => {
+                if (!this._matchesStatus(l, statusKey)) return;
+                const emp = empMap[l.empId];
+                if (!emp) return;
+                total++;
+                const cat = mergeCat(emp.companyCategory);
+                if (cat && catCounts[cat] !== undefined) catCounts[cat]++;
+            });
+            return { total, catCounts };
+        };
+
+        // total headcount categories (employee level, not dayLogs)
+        const totalCatCounts = { "ON-ROLL": 0, "CC": 0, "CONTRACTOR": 0, "OUTSOURCE": 0 };
+        emps.forEach(e => {
+            const cat = mergeCat(e.companyCategory);
+            if (cat) totalCatCounts[cat]++;
+        });
+
+        // ---------- category counts used by summary cards ----------
+        const staffCatCounts = {
+            "ON-ROLL": 0,
+            "CC": 0,
+            "CONTRACTOR": 0,
+            "OUTSOURCE": 0
+        };
+
+        const workerCatCounts = {
+            "ON-ROLL": 0,
+            "CC": 0,
+            "CONTRACTOR": 0,
+            "OUTSOURCE": 0
+        };
+
+        const contractCatCounts = {
+            "ON-ROLL": 0,
+            "CC": 0,
+            "CONTRACTOR": 0,
+            "OUTSOURCE": 0
+        };
+
+        const consultantCatCounts = {
+            "ON-ROLL": 0,
+            "CC": 0,
+            "CONTRACTOR": 0,
+            "OUTSOURCE": 0
+        };
+
+        const manualPunchCatCounts = {
+            "ON-ROLL": 0,
+            "CC": 0,
+            "CONTRACTOR": 0,
+            "OUTSOURCE": 0
+        };
+
+        const newJoinedCatCounts = {
+            "ON-ROLL": 0,
+            "CC": 0,
+            "CONTRACTOR": 0,
+            "OUTSOURCE": 0
+        };
+
+        const resignedCatCounts = {
+            "ON-ROLL": 0,
+            "CC": 0,
+            "CONTRACTOR": 0,
+            "OUTSOURCE": 0
+        };
+        
         if (emps && logs && empMap && model) {
-            const { dateFrom, dateTo } = model.state.filters;
-            const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
-            
             const staffTeamId = model.state.teamConfig?.staffTeamId ?? 7;
             const workerTeamId = model.state.teamConfig?.workerTeamId ?? 6;
             const contractTeamId = model.state.teamConfig?.contractTeamId ?? 8;
             const consultantTeamId = model.state.teamConfig?.consultantTeamId ?? 9;
+
             const staffEmps = emps.filter((e) => e.team === staffTeamId);
             const workerEmps = emps.filter((e) => e.team === workerTeamId);
             const contractEmps = emps.filter((e) => e.team === contractTeamId);
             const consultantEmps = emps.filter((e) => e.team === consultantTeamId);
 
-            this._currentStaffSummaryData = { emps: staffEmps, model, dayLogs, empMap, isDashboard: false, };
-            this._currentWorkerSummaryData = { emps: workerEmps, model, dayLogs, empMap, isDashboard: false, };
-            this._currentContractSummaryData = { emps: contractEmps, model, dayLogs, empMap, isDashboard: false, };
-            this._currentConsultantSummaryData = { emps: consultantEmps, model, dayLogs, empMap, isDashboard: false, };
+            this._currentStaffSummaryData = { emps: staffEmps, model, dayLogs, empMap, isDashboard: false };
+            this._currentWorkerSummaryData = { emps: workerEmps, model, dayLogs, empMap, isDashboard: false };
+            this._currentContractSummaryData = { emps: contractEmps, model, dayLogs, empMap, isDashboard: false };
+            this._currentConsultantSummaryData = { emps: consultantEmps, model, dayLogs, empMap, isDashboard: false };
 
             let staffPresent = 0, staffHalf = 0, workerPresent = 0, workerHalf = 0;
             let contractPresent = 0, contractHalf = 0, consultantPresent = 0, consultantHalf = 0;
-            totalPresentHalf = 0;
 
             dayLogs.forEach((l) => {
                 const e = empMap[l.empId];
                 if (!e) return;
                 const isPresent = this._matchesStatus(l, "Present") || this._matchesStatus(l, "WO Present");
                 const isHalf = this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Half Present");
+                if (!isPresent && !isHalf) return;
+
+                const cat = mergeCat(e.companyCategory);
 
                 if (e.team === staffTeamId) {
                     if (isPresent) staffPresent++;
                     if (isHalf) staffHalf++;
+                    if (cat && staffCatCounts[cat] !== undefined) staffCatCounts[cat]++;
                 }
                 if (e.team === workerTeamId) {
                     if (isPresent) workerPresent++;
                     if (isHalf) workerHalf++;
+                    if (cat && workerCatCounts[cat] !== undefined) workerCatCounts[cat]++;
                 }
                 if (e.team === contractTeamId) {
                     if (isPresent) contractPresent++;
                     if (isHalf) contractHalf++;
+                    if (cat && contractCatCounts[cat] !== undefined) contractCatCounts[cat]++;
                 }
                 if (e.team === consultantTeamId) {
                     if (isPresent) consultantPresent++;
                     if (isHalf) consultantHalf++;
+                    if (cat && consultantCatCounts[cat] !== undefined) consultantCatCounts[cat]++;
                 }
             });
 
@@ -517,50 +768,234 @@ class AttendanceView {
             staffWorkerStats.consultantHalfPresent = consultantHalf;
         }
 
+        // Manual Punch — category breakdown
+        const manualPunchItems = model.getManualPunchEmployees();
+        manualPunchItems.forEach(({ emp }) => {
+            const cat = mergeCat(emp?.companyCategory);
+            if (cat && manualPunchCatCounts[cat] !== undefined) manualPunchCatCounts[cat]++;
+        });
+
+        // New Joined — category breakdown
+        const newJoinedItemsForCat = model.getNewJoinedEmployees ? model.getNewJoinedEmployees() : [];
+        newJoinedItemsForCat.forEach(({ emp }) => {
+            const mappedEmp = empMap[emp?.id] || emp;
+            const cat = mergeCat(mappedEmp?.companyCategory);
+            if (cat && newJoinedCatCounts[cat] !== undefined) {
+                newJoinedCatCounts[cat]++;
+            }
+        });
+
+        // Resigned — category breakdown
+        const resignedItemsForCat = model.getResignedEmployees ? model.getResignedEmployees() : [];
+        resignedItemsForCat.forEach(({ emp }) => {
+            const mappedEmp = empMap[emp?.id] || emp;
+            const cat = mergeCat(mappedEmp?.companyCategory);
+            if (cat && resignedCatCounts[cat] !== undefined) {
+                resignedCatCounts[cat]++;
+            }
+        });
+
+        const lateInItems = model.getLateInEmployees();
+        const lateInCatCounts = {
+            "ON-ROLL": 0,
+            "CC": 0,
+            "CONTRACTOR": 0,
+            "OUTSOURCE": 0
+        };
+
+        lateInItems.forEach(({ emp }) => {
+            const cat = mergeCat(emp?.companyCategory);
+            if (cat && lateInCatCounts[cat] !== undefined) {
+                lateInCatCounts[cat]++;
+            }
+        });
+
+        const earlyOutItems = model.getEarlyOutEmployees();
+        const earlyOutCatCounts = {
+            "ON-ROLL": 0,
+            "CC": 0,
+            "CONTRACTOR": 0,
+            "OUTSOURCE": 0
+        };
+
+        earlyOutItems.forEach(({ emp }) => {
+            const cat = mergeCat(emp?.companyCategory);
+            if (cat && earlyOutCatCounts[cat] !== undefined) {
+                earlyOutCatCounts[cat]++;
+            }
+        });
+
         const cards = [
-            { key: "totalHeadcount", label: "TotalHeadcount", val: emps.length, icon: "ph-users", cls: "", },
-            { key: "present", label: "Present", val: stats.present, icon: "ph-check-circle", cls: "success", },
-            { key: "halfPresent", label: "Half Day", val: stats.halfPresent ?? 0, icon: "ph-circle-half", cls: "warning", },
-            { key: "absent", label: "Absent", val: stats.absent, icon: "ph-x-circle", cls: "danger", },
-            { key: "weeklyOff", label: "Weekly Off", val: stats.weeklyOff ?? 0, icon: "ph-calendar-x", cls: "info", },
-            { key: "weeklyOffPresent", label: "WO Present", val: stats.weeklyOffPresent ?? 0, icon: "ph-calendar-check", cls: "success", },
-            { key: "weeklyOffHalfPresent", label: "WO Half Present", val: stats.weeklyOffHalfPresent ?? 0, icon: "ph-calendar-check", cls: "warning", },
-            { key: "singlePunch", label: "Single Punch", val: stats.singlePunch, icon: "ph-lightning", cls: "warning", },
-            { key: "manualPunch", label: "Manual Punch", val: model.getManualPunchEmployees().length, icon: "ph-pencil-simple", cls: "warning", },
-            { key: "lateIn", label: "Late In", val: stats.lateIn, icon: "ph-clock-afternoon", cls: "info", },
-            { key: "earlyOut", label: "Early Out", val: stats.earlyOut, icon: "ph-sign-out", cls: "accent", },
-            { key: null, label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", },
-            { key: "staffList", label: "Staff Present", val: (staffWorkerStats.staffPresent || 0) + (staffWorkerStats.staffHalfPresent || 0) + (staffWorkerStats.staffWeeklyOffPresent || 0) + (staffWorkerStats.staffWeeklyOffHalfPresent || 0), icon: "ph-identification-badge", cls: "info", },
-            { key: "workerList", label: "Workmen Present", val: (staffWorkerStats.workerPresent || 0) + (staffWorkerStats.workerHalfPresent || 0) + (staffWorkerStats.workerWeeklyOffPresent || 0) + (staffWorkerStats.workerWeeklyOffHalfPresent || 0), icon: "ph-hard-hat", cls: "warning", },
-            { key: "contractList", label: "Contract Present", val: (staffWorkerStats.contractPresent || 0) + (staffWorkerStats.contractHalfPresent || 0), icon: "ph-handshake", cls: "accent", },
-            { key: "consultantList", label: "Consultant Present", val: (staffWorkerStats.consultantPresent || 0) + (staffWorkerStats.consultantHalfPresent || 0), icon: "ph-briefcase-metal", cls: "info", },
-            { key: "newJoined", label: "New Join", val: stats.newJoined || 0, icon: "ph-user-plus", cls: "success", },
-            { key: "resigned", label: "Resigned", val: stats.resigned || 0, icon: "ph-user-minus", cls: "danger", },
+            {
+                key: "totalHeadcount",
+                label: "Total Headcount",
+                val: emps.length,
+                icon: "ph-users",
+                cls: "",
+                catCounts: totalCatCounts
+            },
+            {
+                key: "present",
+                label: "Present",
+                ...countByStatusAndCat("Present"),
+                icon: "ph-check-circle",
+                cls: "success"
+            },
+            {
+                key: "halfPresent",
+                label: "Half Day",
+                ...countByStatusAndCat("Half Present"),
+                icon: "ph-circle-half",
+                cls: "warning"
+            },
+            {
+                key: "absent",
+                label: "Absent",
+                ...countByStatusAndCat("Absent"),
+                icon: "ph-x-circle",
+                cls: "danger"
+            },
+            {
+                key: "weeklyOff",
+                label: "Weekly Off",
+                ...countByStatusAndCat("Weekly Off"),
+                icon: "ph-calendar-x",
+                cls: "info"
+            },
+            {
+                key: "weeklyOffPresent",
+                label: "WO Present",
+                ...countByStatusAndCat("WO Present"),
+                icon: "ph-calendar-check",
+                cls: "success"
+            },
+            {
+                key: "weeklyOffHalfPresent",
+                label: "WO Half Present",
+                ...countByStatusAndCat("WO Half Present"),
+                icon: "ph-calendar-check",
+                cls: "warning"
+            },
+            {
+                key: "singlePunch",
+                label: "Single Punch",
+                ...countByStatusAndCat("Single Punch"),
+                icon: "ph-lightning",
+                cls: "warning"
+            },
+            {
+                key: "manualPunch",
+                label: "Manual Punch",
+                val: model.getManualPunchEmployees().length,
+                icon: "ph-pencil-simple",
+                cls: "warning",
+                catCounts: manualPunchCatCounts
+            },
+            {
+                key: "lateIn",
+                label: "Late In",
+                val: lateInItems.length,
+                icon: "ph-clock-afternoon",
+                cls: "info",
+                catCounts: lateInCatCounts
+            },
+            {
+                key: "earlyOut",
+                label: "Early Out",
+                val: earlyOutItems.length,
+                icon: "ph-sign-out",
+                cls: "accent",
+                catCounts: earlyOutCatCounts
+            },
+                        {
+                key: "staffList",
+                label: "Staff Present",
+                val: (staffWorkerStats.staffPresent || 0) + (staffWorkerStats.staffHalfPresent || 0),
+                icon: "ph-identification-badge",
+                cls: "info",
+                catCounts: staffCatCounts
+            },
+            {
+                key: "workerList",
+                label: "Workmen Present",
+                val: (staffWorkerStats.workerPresent || 0) + (staffWorkerStats.workerHalfPresent || 0),
+                icon: "ph-hard-hat",
+                cls: "warning",
+                catCounts: workerCatCounts
+            },
+            {
+                key: "contractList",
+                label: "Contract Present",
+                val: (staffWorkerStats.contractPresent || 0) + (staffWorkerStats.contractHalfPresent || 0),
+                icon: "ph-handshake",
+                cls: "accent",
+                catCounts: contractCatCounts
+            },
+            {
+                key: "consultantList",
+                label: "Consultant Present",
+                val: (staffWorkerStats.consultantPresent || 0) + (staffWorkerStats.consultantHalfPresent || 0),
+                icon: "ph-briefcase-metal",
+                cls: "info",
+                catCounts: consultantCatCounts
+            },
+            {
+                key: "newJoined",
+                label: "New Join",
+                val: stats.newJoined || 0,
+                icon: "ph-user-plus",
+                cls: "success",
+                catCounts: newJoinedCatCounts
+            },
+            {
+                key: "resigned",
+                label: "Resigned",
+                val: stats.resigned || 0,
+                icon: "ph-user-minus",
+                cls: "danger",
+                catCounts: resignedCatCounts
+            }
         ];
 
+        // ---------- HTML ----------
         return `
-            <div class="summary-grid">
-                ${cards.map((c) => `
-                    <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
-                        ${c.key ? `data-card-key="${c.key}"` : ""}
-                        ${c.onclick ? `onclick="${c.onclick}"` : ""}>
-                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                        <div class="stat-content">
-                            <span class="stat-label">${c.label}</span>
-                            <span class="stat-value">${c.val}</span>
-                            ${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
+            <div class="summary-grid summary-grid-category">
+                ${cards.map(c => {
+                    const value = c.val !== undefined ? c.val : c.total;
+                    return `
+                        <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
+                            ${c.key ? `data-card-key="${c.key}"` : ""}>
+                            <div class="stat-card-top">
+                                <div class="stat-card-top-left">
+                                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                                    <div class="stat-content">
+                                        <span class="stat-label">${c.label}</span>
+                                        <span class="stat-value">${value}</span>
+                                    </div>
+                                </div>
+                                ${c.key ? '<i class="ph ph-caret-right stat-card-chevron"></i>' : ""}
+                            </div>
+
+                            ${c.catCounts ? `
+                                <div class="stat-category-row">
+                                    ${categoryOrder.map(cat => `
+                                        <div class="stat-category-item" data-card-key="${c.key}" data-category="${cat}" title="View ${cat} only">
+                                            <span class="cat-label">${cat}</span>
+                                            <span class="cat-value">${c.catCounts[cat] || 0}</span>
+                                        </div>
+                                    `).join("")}
+                                </div>
+                            ` : ""}
                         </div>
-                    </div>
-                `,).join("")}
+                    `;
+                }).join("")}
             </div>
         `;
     }
 
 
     _renderDashboardSummaryCards(emps, stats, model, logs, empMap) {
-        const { dateFrom, dateTo } = model.state.filters;
-        const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
-        const staffWorkerStats = this._staffWorkerStats || {};
+        const dayLogs = [];
         
         this._fullAvailableItems = emps.map(emp => ({ log: null, emp, date: null }));
 
@@ -583,8 +1018,8 @@ class AttendanceView {
         this._currentUnassignedSummaryData = { emps: emps.filter(e => e.team !== staffTeamId && e.team !== workerTeamId && e.team !== contractTeamId && e.team !== consultantTeamId), model, dayLogs, empMap, isDashboard: true, };
 
         // --- Designation Family cards (headcount-based, not attendance-based) ---
-        const dashFamilies = model.state.data.designationFamilies || [];
-        const dashFamMap = model.state.data.designationToFamilyMap || {};
+        const dashFamilies = model.state.dashboardData?.designationFamilies || [];
+        const dashFamMap = model.state.dashboardData?.designationToFamilyMap || {};
 
         this._currentDashboardFamilyData = { emps, model, empMap, famMap: dashFamMap, families: dashFamilies, isDashboard: true, };
 
@@ -617,7 +1052,7 @@ class AttendanceView {
         // --- Headcount: Required / Available / Gap ---
         const requiredCount = model.getRequiredHeadcount();
         const totalMachines = model.getTotalMachines(); 
-        const availableCount = stats.total;
+        const availableCount = emps.length;
         const gapCount = model.getGapHeadcount();
 
         const headcountCard = `
@@ -973,6 +1408,24 @@ class AttendanceView {
         const { dateFrom, dateTo } = model.state.filters;
         const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
 
+        const categoryOrder = ["ON-ROLL", "CC", "CONTRACTOR", "OUTSOURCE"];
+        const mergeCat = (rawCat) => {
+            if (!rawCat) return null;
+            const c = String(rawCat).toUpperCase().trim();
+            if (c === "ON-ROLL" || c === "ONROLL") return "ON-ROLL";
+            if (c === "CC" || c === "COMPANY CONTRACT" || c === "COMPANY CONTRACT (CC)") return "CC";
+            if (c === "CONTRACTOR") return "CONTRACTOR";
+            if (c === "OUTSOURCE") return "OUTSOURCE";
+            return null;
+        };
+
+        const catCountsByGroup = {};
+        groups.forEach(g => {
+            catCountsByGroup[g] = { "ON-ROLL": 0, "CC": 0, "CONTRACTOR": 0, "OUTSOURCE": 0 };
+        });
+
+        const totalCatCounts = { "ON-ROLL": 0, "CC": 0, "CONTRACTOR": 0, "OUTSOURCE": 0 };
+
         console.log("========== AGE DEBUG ==========");
         console.log("Employees :", emps.length);
         console.log("Raw Logs :", logs.length);
@@ -1032,33 +1485,60 @@ class AttendanceView {
             if (!isPresentOrHalf) return;
 
             const g = model.getAgeGroup(e.dob);
+            const cat = mergeCat(e.companyCategory);
 
-            if (counts[g] !== undefined) counts[g]++;
+            if (counts[g] !== undefined) {
+                counts[g]++;
+                if (cat && catCountsByGroup[g][cat] !== undefined) {
+                    catCountsByGroup[g][cat]++;
+                }
+            }
+            if (cat && totalCatCounts[cat] !== undefined) {
+                totalCatCounts[cat]++;
+            }
         });
 
         const totalPresentHalf = groups.reduce((sum, g) => sum + counts[g], 0);
 
         const cards = [
-            { key: "presentHeadcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", ageGroup: null, },
-            ...groups.map((g) => ({ key: "ageGroup", label: g, val: counts[g], icon: ageGroupIcons[g], cls: groupCls[g], ageGroup: g, })),
+            { key: "presentHeadcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", ageGroup: null,catCounts: totalCatCounts },
+            ...groups.map((g) => ({ key: "ageGroup", label: g, val: counts[g], icon: ageGroupIcons[g], cls: groupCls[g], ageGroup: g, catCounts: catCountsByGroup[g] })),
             { key: null, label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", ageGroup: null, },
         ];
 
         return `
-            <div class="summary-grid">
+            <div class="summary-grid summary-grid-category">
                 ${cards.map((c) => `
-                    <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
-                        style="flex-direction:column; align-items:center; text-align:center;"
+                    <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}" 
                         ${c.key === "presentHeadcount" ? `data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()"` : ""}
                         ${c.ageGroup ? `data-age-group="${this._escapeAttr(c.ageGroup)}" onclick="AppController.view._showAgeGroupDrilldown('${this._escapeAttr(c.ageGroup)}')"` : ""}>
-                        <div class="stat-icon">
-                            ${c.ageGroup ? `<span class="material-symbols-outlined">${c.icon}</span>` : `<i class="ph ${c.icon}"></i>`}
-                        </div>
-                        <div class="stat-content" style="align-items:center; text-align:center;">
-                            <span class="stat-label">${c.label}</span>
-                            <span class="stat-value">${c.val}</span>
+                        <div class="stat-card-top">
+                            <div class="stat-card-top-left">
+                                <div class="stat-icon">
+                                    ${c.ageGroup ? `<span class="material-symbols-outlined">${c.icon}</span>` : `<i class="ph ${c.icon}"></i>`}
+                                </div>
+                                <div class="stat-content" style="align-items:center; text-align:center;">
+                                    <span class="stat-label">${c.label}</span>
+                                    <span class="stat-value">${c.val}</span>
+                                </div>
+                            </div>
                             ${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
                         </div>
+                        ${c.catCounts ? `
+                            <div class="stat-category-row">
+                                ${categoryOrder.map(cat => `
+                                    <div class="stat-category-item" data-card-key="${c.key || "ageGroup"}" data-category="${cat}" data-age-group="${c.ageGroup || ""}" title="View ${cat} only" 
+                                        onclick="event.stopPropagation(); ${
+                                            c.key === "presentHeadcount"
+                                                ? `AppController.view._showPresentHeadcountDrilldown('${cat}')`
+                                                : `AppController.view._showAgeGroupDrilldown('${this._escapeAttr(c.ageGroup)}', '${cat}')`
+                                    }">
+                                        <span class="cat-label">${cat}</span>
+                                        <span class="cat-value">${c.catCounts[cat] || 0}</span>
+                                    </div>
+                                `).join("")}
+                            </div>
+                        ` : ""}
                     </div>
                 `,).join("")}
             </div>
@@ -1071,6 +1551,26 @@ class AttendanceView {
         const famMap = model.state.data.designationToFamilyMap || {};
 
         const { dateFrom, dateTo } = model.state.filters;
+        
+        const categoryOrder = ["ON-ROLL", "CC", "CONTRACTOR", "OUTSOURCE"];
+
+        const mergeCat = (rawCat) => {
+            if (!rawCat) return null;
+
+            const c = String(rawCat).toUpperCase().trim();
+
+            if (c === "ON-ROLL" || c === "ONROLL") return "ON-ROLL";
+
+            if (c === "CC" || c === "COMPANY CONTRACT" || c === "COMPANY CONTRACT (CC)") {
+                return "CC";
+            }
+
+            if (c === "CONTRACTOR") return "CONTRACTOR";
+            if (c === "OUTSOURCE") return "OUTSOURCE";
+
+            return null;
+        };
+
         const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
 
         this._currentDesigFamilySummaryData = { emps, model, dayLogs, empMap, famMap, families };
@@ -1102,67 +1602,143 @@ class AttendanceView {
         }
 
         const colorCls = ["info", "success", "warning", "accent", "danger"];
+
         const counts = {};
-        families.forEach((f) => (counts[f.id] = 0));
+
+        const totalCatCounts = {
+            "ON-ROLL": 0,
+            "CC": 0,
+            "CONTRACTOR": 0,
+            "OUTSOURCE": 0
+        };
+
+        const familyCatCounts = {};
+
+        families.forEach((f) => {
+            counts[f.id] = 0;
+            familyCatCounts[f.id] = {
+                "ON-ROLL": 0,
+                "CC": 0,
+                "CONTRACTOR": 0,
+                "OUTSOURCE": 0
+            };
+        });
 
         dayLogs.forEach((l) => {
             const e = empMap[l.empId];
+
             if (!e) return;
+
             const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch");
+
             if (!isPresentOrHalf) return;
 
             const famInfo = famMap[e.designationId];
-            if (famInfo && counts[famInfo.familyId] !== undefined) {
-                counts[famInfo.familyId]++;
+
+            if (!famInfo || counts[famInfo.familyId] === undefined) {
+                return;
+            }
+
+            counts[famInfo.familyId]++;
+
+            const cat = mergeCat(e.companyCategory);
+
+            if (cat && totalCatCounts[cat] !== undefined) {
+                totalCatCounts[cat]++;
+            }
+
+            if (cat && familyCatCounts[famInfo.familyId] && familyCatCounts[famInfo.familyId][cat] !== undefined) {
+                familyCatCounts[famInfo.familyId][cat]++;
             }
         });
 
         const cards = [
-            { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
-            ...families.map((f, i) => ({ type: "family", label: f.name, val: counts[f.id], icon: "ph-cards", cls: colorCls[i % colorCls.length], familyId: f.id, })),
+            { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", catCounts: totalCatCounts },
+            ...families.map((f, i) => ({ type: "family", label: f.name, val: counts[f.id], icon: "ph-cards", cls: colorCls[i % colorCls.length], familyId: f.id, catCounts: familyCatCounts[f.id] })),
             { type: "avgHours", label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", },
         ];
 
         return `
-            <div class="summary-grid">
+            <div class="summary-grid summary-grid-category">
                 ${cards.map((c) => {
-            if (c.type === "family") {
+                if (c.type === "family") {
+                    return `
+                        <div class="stat-card ${c.cls} stat-card-clickable" data-family-id="${c.familyId}" onclick="AppController.view._showDesignationFamilyDrilldown(${c.familyId})">
+
+                            <div class="stat-card-top">
+                                <div class="stat-card-top-left">
+                                    <div class="stat-icon">
+                                        <i class="ph ${c.icon}"></i>
+                                    </div>
+
+                                    <div class="stat-content">
+                                        <span class="stat-label">${c.label}</span>
+                                        <span class="stat-value">${c.val}</span>
+                                    </div>
+                                </div>
+
+                                <span class="stat-card-hint">↓ click to view</span>
+                            </div>
+
+                            <div class="stat-category-row">
+                                ${categoryOrder.map((cat) => `
+                                    <div class="stat-category-item" data-family-id="${c.familyId}" data-category="${cat}" title="View ${cat} only"
+                                        onclick="event.stopPropagation(); AppController.view._showDesignationFamilyDrilldown(${c.familyId}, '${cat}')"
+                                    >
+                                        <span class="cat-label">${cat}</span>
+                                        <span class="cat-value">${c.catCounts?.[cat] || 0}</span>
+                                    </div>
+                                `).join("")}
+                            </div>
+
+                        </div>
+                    `;
+                }
+                
+                if (c.type === "avgHours") {
+                    return `
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="ph ${c.icon}">
+                                </i>
+                            </div>
+                            <div class="stat-content">
+                                <span class="stat-label">${c.label}</span>
+                                <span class="stat-value">${c.val}</span>
+                            </div>
+                        </div>
+                    `;
+                }
+                
                 return `
-                    <div class="stat-card ${c.cls} stat-card-clickable" data-family-id="${c.familyId}" onclick="AppController.view._showDesignationFamilyDrilldown(${c.familyId})">
-                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                        <div class="stat-content">
-                            <span class="stat-label">${c.label}</span>
-                            <span class="stat-value">${c.val}</span>
+                    <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
+                        <div class="stat-card-top">
+                            <div class="stat-card-top-left">
+                                <div class="stat-icon">
+                                    <i class="ph ${c.icon}"></i>
+                                </div>
+
+                                <div class="stat-content">
+                                    <span class="stat-label">${c.label}</span>
+                                    <span class="stat-value">${c.val}</span>
+                                </div>
+                            </div>
+
                             <span class="stat-card-hint">↓ click to view</span>
                         </div>
+
+                        <div class="stat-category-row">
+                            ${categoryOrder.map((cat) => `
+                                <div class="stat-category-item" data-category="${cat}" title="View ${cat} only"
+                                    onclick="event.stopPropagation(); AppController.view._showPresentHeadcountDrilldown('${cat}')"
+                                >
+                                    <span class="cat-label">${cat}</span>
+                                    <span class="cat-value">${c.catCounts?.[cat] || 0}</span>
+                                </div>
+                            `).join("")}
+                        </div>
+
                     </div>
                 `;
-            }
-            if (c.type === "avgHours") {
-                return `
-                    <div class="stat-card">
-                        <div class="stat-icon"><i class="ph ${c.icon}">
-                            </i>
-                        </div>
-                        <div class="stat-content">
-                            <span class="stat-label">${c.label}</span>
-                            <span class="stat-value">${c.val}</span>
-                        </div>
-                    </div>
-                `;
-            }
-            return `
-                <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
-                    <div class="stat-icon"><i class="ph ${c.icon}">
-                        </i>
-                    </div>
-                    <div class="stat-content">
-                        <span class="stat-label">${c.label}</span>
-                        <span class="stat-value">${c.val}</span>
-                        <span class="stat-card-hint">↓ click to view</span>
-                    </div>
-                </div>
-            `;
         }).join("")}
             </div>
         `;
@@ -1312,15 +1888,56 @@ class AttendanceView {
         const depts = [...new Set(emps.map((e) => e.dept))];
         const colorCls = ["info", "success", "warning", "accent", "danger"];
 
+        const categoryOrder = ["ON-ROLL", "CC", "CONTRACTOR", "OUTSOURCE"];
+
+        const mergeCat = (rawCat) => {
+            if (!rawCat) return null;
+
+            const c = String(rawCat).toUpperCase().trim();
+
+            if (c === "ON-ROLL" || c === "ONROLL") return "ON-ROLL";
+            if (c === "CC" || c === "COMPANY CONTRACT" || c === "COMPANY CONTRACT (CC)") return "CC";
+            if (c === "CONTRACTOR") return "CONTRACTOR";
+            if (c === "OUTSOURCE") return "OUTSOURCE";
+
+            return null;
+        };
+
         const counts = {};
         depts.forEach((d) => (counts[d] = 0));
+
+        const catCountsByDept = {};
+        depts.forEach((d) => {
+            catCountsByDept[d] = {
+                "ON-ROLL": 0,
+                "CC": 0,
+                "CONTRACTOR": 0,
+                "OUTSOURCE": 0
+            };
+        });
+
+        const totalCatCounts = {
+            "ON-ROLL": 0,
+            "CC": 0,
+            "CONTRACTOR": 0,
+            "OUTSOURCE": 0
+        };
 
         dayLogs.forEach((l) => {
             const e = empMap[l.empId];
             if (!e) return;
             const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch");
             if (!isPresentOrHalf) return;
-            if (counts[e.dept] !== undefined) counts[e.dept]++;
+            if (counts[e.dept] !== undefined) {
+                counts[e.dept]++;
+                const cat = mergeCat(e.companyCategory);
+                if (cat && catCountsByDept[e.dept][cat] !== undefined) {
+                    catCountsByDept[e.dept][cat]++;
+                }
+                if (cat && totalCatCounts[cat] !== undefined) {
+                    totalCatCounts[cat]++;
+                }
+            }
         });
 
         // const totalPresentHalf = depts.reduce((sum, d) => sum + counts[d], 0);
@@ -1335,24 +1952,64 @@ class AttendanceView {
         }));
 
         const cards = [
-            { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
-            ...depts.map((d, i) => ({ type: "dept", label: d, val: counts[d], icon: "ph-briefcase", cls: colorCls[i % colorCls.length], dept: d, })),
-            { type: "avgHours", label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", },
+            { 
+                type: "headcount", 
+                label: "Total Presentcount", 
+                val: totalPresentHalf, icon: "ph-users", 
+                cls: "", 
+                catCounts: totalCatCounts,
+            },
+            ...depts.map((d, i) => ({ 
+                type: "dept", 
+                label: d, 
+                val: counts[d], 
+                icon: "ph-briefcase", 
+                cls: colorCls[i % colorCls.length], 
+                dept: d, catCounts: 
+                catCountsByDept[d],    
+            })),
+            { 
+                type: "avgHours", 
+                label: "Avg Hours", 
+                val: stats.avgHours + "h", 
+                icon: "ph-timer", 
+                cls: "", 
+            },
         ];
 
         return `
-            <div class="summary-grid">
+            <div class="summary-grid summary-grid-category">
                 ${cards.map((c) => {
                     if (c.type === "dept") {
                         return `
-                            <div class="stat-card ${c.cls} stat-card-clickable" data-dept="${this._escapeAttr(c.dept)}" onclick="AppController.view._showDeptSummaryDrilldown('${this._escapeAttr(c.dept)}')">
-                                <div class="stat-icon"><i class="ph ${c.icon}">
-                                    </i>
-                                </div>
-                                <div class="stat-content">
-                                    <span class="stat-label">${c.label}</span>
-                                    <span class="stat-value">${c.val}</span>
+                            <div class="stat-card ${c.cls} stat-card-clickable" data-dept="${this._escapeAttr(c.dept)}" 
+                                onclick="AppController.view._showDeptSummaryDrilldown('${this._escapeAttr(c.dept)}')"
+                            >
+                                <div class="stat-card-top">
+                                    <div class="stat-card-top-left">
+                                        <div class="stat-icon">
+                                            <i class="ph ${c.icon}"></i>
+                                        </div>
+
+                                        <div class="stat-content" style="align-items:center; text-align:center;">
+                                            <span class="stat-label">${c.label}</span>
+                                            <span class="stat-value">${c.val}</span>
+                                        </div>
+                                    </div>
+
                                     <span class="stat-card-hint">↓ click to view</span>
+                                </div>
+
+                                <div class="stat-category-row">
+                                    ${categoryOrder.map((cat) => `
+                                        <div class="stat-category-item" data-category="${cat}" data-dept="${this._escapeAttr(c.dept)}" title="View ${cat} only"
+                                            onclick="event.stopPropagation(); AppController.view._showDeptSummaryDrilldown('${this._escapeAttr(c.dept)}', '${cat}')"
+                                        >
+                                            <span class="cat-label">${cat}</span>
+                                            <span class="cat-value">${c.catCounts[cat] || 0}</span>
+
+                                        </div>
+                                    `).join("")}
                                 </div>
                             </div>
                         `;
@@ -1360,31 +2017,56 @@ class AttendanceView {
                     if (c.type === "avgHours") {
                         return `
                             <div class="stat-card">
-                                <div class="stat-icon">
-                                    <i class="ph ${c.icon}"></i>
-                                </div>
-                                <div class="stat-content">
-                                    <span class="stat-label">${c.label}</span>
-                                    <span class="stat-value">${c.val}</span>
+                                <div class="stat-card-top">
+                                    <div class="stat-card-top-left">
+                                        <div class="stat-icon">
+                                            <i class="ph ${c.icon}"></i>
+                                        </div>
+                                        <div class="stat-content">
+                                            <span class="stat-label">${c.label}</span>
+                                            <span class="stat-value">${c.val}</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         `;
                     }
                     // headcount
                     return `
-                        <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
-                            <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                            <div class="stat-content">
-                                <span class="stat-label">${c.label}</span>
-                                <span class="stat-value">${c.val}</span>
-                                <span class="stat-card-hint">↓ click to view</span>
+                        <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" 
+                            onclick="AppController.view._showPresentHeadcountDrilldown()"
+                        >
+                            <div class="stat-card-top">
+                                <div class="stat-card-top-left">
+                                    <div class="stat-icon">
+                                        <i class="ph ${c.icon}"></i>
+                                    </div>
+
+                                    <div class="stat-content" style="align-items:center; text-align:center;">
+                                        <span class="stat-label">${c.label}</span>
+                                        <span class="stat-value">${c.val}</span>
+                                    </div>
+                                    <span class="stat-card-hint">↓ click to view</span>
+                                </div>
+                            </div>
+
+                            <div class="stat-category-row">
+                                ${categoryOrder.map((cat) => `
+                                    <div class="stat-category-item" data-card-key="presentHeadcount" data-category="${cat}" title="View ${cat} only" 
+                                        onclick="event.stopPropagation(); AppController.view._showPresentHeadcountDrilldown('${cat}')"
+                                    >
+                                        <span class="cat-label">${cat}</span>
+                                        <span class="cat-value">${c.catCounts[cat] || 0}</span>
+                                    </div>
+                                `).join("")}
                             </div>
                         </div>
-                    `;  
+                    `;
                 }).join("")}
             </div>
         `;
     }
+
 
     _renderGenderSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
@@ -1395,14 +2077,63 @@ class AttendanceView {
         const genderIcons = { Male: "ph-gender-male", Female: "ph-gender-female", };
         const genderCls = { Male: "info", Female: "accent" };
 
+        const categoryOrder = ["ON-ROLL", "CC", "CONTRACTOR", "OUTSOURCE"];
+
+        const mergeCat = (rawCat) => {
+            if (!rawCat) return null;
+
+            const c = String(rawCat).toUpperCase().trim();
+
+            if (c === "ON-ROLL" || c === "ONROLL") return "ON-ROLL";
+            if (c === "CC" || c === "COMPANY CONTRACT" || c === "COMPANY CONTRACT (CC)") return "CC";
+            if (c === "CONTRACTOR") return "CONTRACTOR";
+            if (c === "OUTSOURCE") return "OUTSOURCE";
+
+            return null;
+        };
+
         const counts = {};
         genders.forEach((g) => (counts[g] = 0));
+
+        const catCountsByGender = {};
+        genders.forEach((g) => {
+            catCountsByGender[g] = {
+                "ON-ROLL": 0,
+                "CC": 0,
+                "CONTRACTOR": 0,
+                "OUTSOURCE": 0
+            };
+        });
+
+        const totalCatCounts = {
+            "ON-ROLL": 0,
+            "CC": 0,
+            "CONTRACTOR": 0,
+            "OUTSOURCE": 0
+        };
+
         dayLogs.forEach((l) => {
             const e = empMap[l.empId];
+            
             if (!e) return;
+            
             const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch");
+            
             if (!isPresentOrHalf) return;
-            if (counts[e.gender] !== undefined) counts[e.gender]++;
+            
+            if (counts[e.gender] !== undefined) {
+                counts[e.gender]++;
+
+                const cat = mergeCat(e.companyCategory);
+
+                if (cat && catCountsByGender[e.gender][cat] !== undefined) {
+                    catCountsByGender[e.gender][cat]++;
+                }
+
+                if (cat && totalCatCounts[cat] !== undefined) {
+                    totalCatCounts[cat]++;
+                }
+            }
         });
 
         this._currentTabPresentHeadcountItems = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch"),).map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
@@ -1410,22 +2141,39 @@ class AttendanceView {
         const totalPresentHalf = (stats.present || 0) + (stats.halfPresent || 0) + (stats.weeklyOffPresent || 0) + (stats.weeklyOffHalfPresent || 0) + (stats.singlePunch || 0);
 
         const cards = [
-            { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
-            ...genders.map((g) => ({ type: "gender", label: g, val: counts[g], icon: genderIcons[g], cls: genderCls[g], gender: g, })),
+            { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", catCounts: totalCatCounts, },
+            ...genders.map((g) => ({ type: "gender", label: g, val: counts[g], icon: genderIcons[g], cls: genderCls[g], gender: g, catCounts: catCountsByGender[g], })),
             { type: "avgHours", label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", },
         ];
 
         return `
-            <div class="summary-grid">
+            <div class="summary-grid summary-grid-category">
                 ${cards.map((c) => {
                     if (c.type === "gender") {
                         return `
                             <div class="stat-card ${c.cls} stat-card-clickable" data-gender="${this._escapeAttr(c.gender)}" onclick="AppController.view._showGenderSummaryDrilldown('${this._escapeAttr(c.gender)}')">
-                                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                                <div class="stat-content">
-                                    <span class="stat-label">${c.label}</span>
-                                    <span class="stat-value">${c.val}</span>
+                                <div class="stat-card-top">
+                                    <div class="stat-card-top-left">
+                                        <div class="stat-icon">
+                                            <i class="ph ${c.icon}"></i>
+                                        </div>
+                                        <div class="stat-content">
+                                            <span class="stat-label">${c.label}</span>
+                                            <span class="stat-value">${c.val}</span>
+                                        </div>
+                                    </div>
                                     <span class="stat-card-hint">↓ click to view</span>
+                                </div>
+
+                                <div class="stat-category-row">
+                                    ${categoryOrder.map((cat) => `
+                                        <div class="stat-category-item" data-category="${cat}" data-gender="${this._escapeAttr(c.gender)}" title="View ${cat} only"
+                                            onclick="event.stopPropagation(); AppController.view._showGenderSummaryDrilldown('${this._escapeAttr(c.gender)}', '${cat}')"
+                                        >
+                                            <span class="cat-label">${cat}</span>
+                                            <span class="cat-value">${c.catCounts[cat] || 0}</span>
+                                        </div>
+                                    `).join("")}
                                 </div>
                             </div>
                         `;
@@ -1445,12 +2193,29 @@ class AttendanceView {
                     }
                     return `
                         <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
-                            <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                                <div class="stat-content">
-                                    <span class="stat-label">${c.label}</span>
-                                    <span class="stat-value">${c.val}</span>
-                                    <span class="stat-card-hint">↓ click to view</span>
+                            <div class="stat-card-top">
+                                <div class="stat-card-top-left">
+                                    <div class="stat-icon">
+                                        <i class="ph ${c.icon}"></i>
+                                    </div>
+                                    <div class="stat-content">
+                                        <span class="stat-label">${c.label}</span>
+                                        <span class="stat-value">${c.val}</span>
+                                    </div>
                                 </div>
+                                <span class="stat-card-hint">↓ click to view</span>
+                            </div>
+
+                            <div class="stat-category-row">
+                                ${categoryOrder.map((cat) => `
+                                    <div class="stat-category-item" data-card-key="presentHeadcount" data-category="${cat}" title="View ${cat} only"
+                                        onclick="event.stopPropagation(); AppController.view._showPresentHeadcountDrilldown('${cat}')"
+                                    >
+                                        <span class="cat-label">${cat}</span>
+                                        <span class="cat-value">${c.catCounts[cat] || 0}</span>
+                                    </div>
+                                `).join("")}
+                            </div>
                         </div>
                     `;
                 }).join("")}
@@ -1461,36 +2226,124 @@ class AttendanceView {
 
     _renderLateInSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
+
+        const categoryOrder = ["ON-ROLL", "CC", "CONTRACTOR", "OUTSOURCE"];
+
+        const mergeCat = (rawCat) => {
+            if (!rawCat) return null;
+
+            const c = String(rawCat).toUpperCase().trim();
+
+            if (c === "ON-ROLL" || c === "ONROLL") return "ON-ROLL";
+            if (c === "CC" || c === "COMPANY CONTRACT" || c === "COMPANY CONTRACT (CC)") return "CC";
+            if (c === "CONTRACTOR") return "CONTRACTOR";
+            if (c === "OUTSOURCE") return "OUTSOURCE";
+
+            return null;
+        };
+
+        const totalCatCounts = {
+            "ON-ROLL": 0,
+            "CC": 0,
+            "CONTRACTOR": 0,
+            "OUTSOURCE": 0
+        };
+
+        const lateInCatCounts = {
+            "ON-ROLL": 0,
+            "CC": 0,
+            "CONTRACTOR": 0,
+            "OUTSOURCE": 0
+        };
+
         const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo,);
 
-        this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
-            this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch")
-        ).map((l) => ({
-            log: l,
-            emp: empMap[l.empId],
-            date: l.date,
-        }));
+        this._currentTabPresentHeadcountItems = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch")).map((l) => {
+            const emp = empMap[l.empId];
+            if (emp) {
+                const cat = mergeCat(emp.companyCategory);
+                if (cat && totalCatCounts[cat] !== undefined) {
+                    totalCatCounts[cat]++;
+                }
+            }
+
+            return {
+                log: l,
+                emp,
+                date: l.date,
+            };
+        });
+
+        const lateInItems = model.getLateInEmployees();
+        
+        this._currentTabLateInItems = lateInItems;
+
+        lateInItems.forEach(({ emp, log, date }) => {
+            const cat = mergeCat(emp?.companyCategory);
+
+            if (cat && lateInCatCounts[cat] !== undefined) {
+                lateInCatCounts[cat]++;
+            }
+        });
 
         const totalPresentHalf = this._currentTabPresentHeadcountItems.length;
-
+        
         const cards = [
-            { key: "presentHeadcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
-            { key: "lateIn", label: "Late In", val: stats.lateIn, icon: "ph-clock-afternoon", cls: "info", },
+            { key: "presentHeadcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", catCounts: totalCatCounts, },
+            { key: "lateIn", label: "Late In", val: stats.lateIn, icon: "ph-clock-afternoon", cls: "info", catCounts: lateInCatCounts, },
             { key: null, label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", },
         ];
 
         return `
-            <div class="summary-grid">
-                ${cards.map((c) => `
-                    <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}" ${c.key === "presentHeadcount" ? `data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()"` : c.key ? `data-card-key="${c.key}"` : ""}>
-                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                        <div class="stat-content">
-                            <span class="stat-label">${c.label}</span>
-                            <span class="stat-value">${c.val}</span>
-                            ${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
+            <div class="summary-grid summary-grid-category">
+                ${cards.map((c) => {
+                    if (c.key === "presentHeadcount" || c.key === "lateIn") {
+                        return `
+                            <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="${c.key}"
+                                ${c.key === "presentHeadcount" ? `onclick="AppController.view._showPresentHeadcountDrilldown()"` : ""}
+                            >
+                                <div class="stat-card-top">
+                                    <div class="stat-card-top-left">
+                                        <div class="stat-icon">
+                                            <i class="ph ${c.icon}"></i>
+                                        </div>
+
+                                        <div class="stat-content">
+                                            <span class="stat-label">${c.label}</span>
+                                            <span class="stat-value">${c.val}</span>
+                                        </div>
+                                    </div>
+
+                                    <span class="stat-card-hint">↓ click to view</span>
+                                </div>
+
+                                <div class="stat-category-row">
+                                    ${categoryOrder.map((cat) => `
+                                        <div class="stat-category-item" data-card-key="${c.key}" data-category="${cat}" title="View ${cat} only"
+                                            onclick="${c.key === "lateIn" ? `event.stopPropagation(); AppController.view._showLateInDrilldown('${cat}')` : `event.stopPropagation(); AppController.view._showPresentHeadcountDrilldown('${cat}')`}"
+                                        >
+                                            <span class="cat-label">${cat}</span>
+                                            <span class="cat-value">${c.catCounts[cat] || 0}</span>
+                                        </div>
+                                    `).join("")}
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    return `
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="ph ${c.icon}"></i>
+                            </div>
+
+                            <div class="stat-content">
+                                <span class="stat-label">${c.label}</span>
+                                <span class="stat-value">${c.val}</span>
+                            </div>
                         </div>
-                    </div>
-                `,).join("")}
+                    `;
+                }).join("")}
             </div>
         `;
     }
@@ -1498,32 +2351,125 @@ class AttendanceView {
 
     _renderEarlyOutSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
+
+        const categoryOrder = ["ON-ROLL", "CC", "CONTRACTOR", "OUTSOURCE"];
+
+        const mergeCat = (rawCat) => {
+            if (!rawCat) return null;
+
+            const c = String(rawCat).toUpperCase().trim();
+
+            if (c === "ON-ROLL" || c === "ONROLL") return "ON-ROLL";
+            if (c === "CC" || c === "COMPANY CONTRACT" || c === "COMPANY CONTRACT (CC)") return "CC";
+            if (c === "CONTRACTOR") return "CONTRACTOR";
+            if (c === "OUTSOURCE") return "OUTSOURCE";
+
+            return null;
+        };
+
+        const totalCatCounts = {
+            "ON-ROLL": 0,
+            "CC": 0,
+            "CONTRACTOR": 0,
+            "OUTSOURCE": 0
+        };
+
+        const earlyOutCatCounts = {
+            "ON-ROLL": 0,
+            "CC": 0,
+            "CONTRACTOR": 0,
+            "OUTSOURCE": 0
+        };
+
         const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
-        this._currentTabPresentHeadcountItems = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch")).map((l) => ({
-            log: l,
-            emp: empMap[l.empId],
-            date: l.date,
-        }));
+        this._currentTabPresentHeadcountItems = dayLogs
+        .filter((l) =>
+            this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch")
+        ).map((l) => {
+            const emp = empMap[l.empId];
+
+            if (emp) {
+                const cat = mergeCat(emp.companyCategory);
+                if (cat && totalCatCounts[cat] !== undefined) {
+                    totalCatCounts[cat]++;
+                }
+            }
+
+            return {
+                log: l,
+                emp,
+                date: l.date,
+            };
+        });
+
+        const earlyOutItems = model.getEarlyOutEmployees();
+
+        this._currentTabEarlyOutItems = earlyOutItems;
+
+        earlyOutItems.forEach(({ emp }) => {
+            const cat = mergeCat(emp?.companyCategory);
+
+            if (cat && earlyOutCatCounts[cat] !== undefined) {
+                earlyOutCatCounts[cat]++;
+            }
+        });
+
         const totalPresentHalf = this._currentTabPresentHeadcountItems.length;
 
         const cards = [
-            { key: "presentHeadcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
-            { key: "earlyOut", label: "Early Out", val: stats.earlyOut, icon: "ph-sign-out", cls: "accent", },
+            { key: "presentHeadcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", catCounts: totalCatCounts },
+            { key: "earlyOut", label: "Early Out", val: stats.earlyOut, icon: "ph-sign-out", cls: "accent", catCounts: earlyOutCatCounts },
             { key: null, label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", },
         ];
 
         return `
-            <div class="summary-grid">
-                ${cards.map((c) => `
-                    <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}" ${c.key === "presentHeadcount" ? `data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()"` : c.key ? `data-card-key="${c.key}"` : ""}>
-                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                        <div class="stat-content">
-                            <span class="stat-label">${c.label}</span>
-                            <span class="stat-value">${c.val}</span>
-                            ${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
+            <div class="summary-grid summary-grid-category">
+                ${cards.map((c) => {
+                    if (c.key === "presentHeadcount" || c.key === "earlyOut") {
+                        return `
+                            <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="${c.key}" ${c.key === "presentHeadcount" ? `onclick="AppController.view._showPresentHeadcountDrilldown()"` : ""}>
+                                <div class="stat-card-top">
+                                    <div class="stat-card-top-left">
+                                        <div class="stat-icon">
+                                            <i class="ph ${c.icon}"></i>
+                                        </div>
+
+                                        <div class="stat-content">
+                                            <span class="stat-label">${c.label}</span>
+                                            <span class="stat-value">${c.val}</span>
+                                        </div>
+                                    </div>
+
+                                    <span class="stat-card-hint">↓ click to view</span>
+                                </div>
+
+                                <div class="stat-category-row">
+                                    ${categoryOrder.map((cat) => `
+                                        <div class="stat-category-item" data-card-key="${c.key}" data-category="${cat}" title="View ${cat} only"
+                                            onclick="${c.key === "earlyOut" ? `event.stopPropagation(); AppController.view._showEarlyOutDrilldown('${cat}')` : `event.stopPropagation(); AppController.view._showPresentHeadcountDrilldown('${cat}')`}"
+                                        >
+                                            <span class="cat-label">${cat}</span>
+                                            <span class="cat-value">${c.catCounts[cat] || 0}</span>
+                                        </div>
+                                    `).join("")}
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    return `
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="ph ${c.icon}"></i>
+                            </div>
+
+                            <div class="stat-content">
+                                <span class="stat-label">${c.label}</span>
+                                <span class="stat-value">${c.val}</span>
+                            </div>
                         </div>
-                    </div>
-                `,).join("")}
+                    `;
+                }).join("")}
             </div>
         `;
     }
@@ -1532,40 +2478,109 @@ class AttendanceView {
     _renderResignedSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
         const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
-        const totalPresentHalf = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present")).length;
 
-        const cards = [
-            { key: "resigned", label: "Resigned", val: stats.resigned || 0, icon: "ph-user-minus", cls: "danger", },
-        ];
+        const categoryOrder = ["ON-ROLL", "CC", "CONTRACTOR", "OUTSOURCE"];
+
+        const mergeCat = (rawCat) => {
+            if (!rawCat) return null;
+            const category = String(rawCat).toUpperCase().trim();
+
+            if (category === "ON-ROLL" || category === "ONROLL") return "ON-ROLL";
+            if (category === "CC" || category === "COMPANY CONTRACT" || category === "COMPANY CONTRACT (CC)") return "CC";
+            if (category === "CONTRACTOR") return "CONTRACTOR";
+            if (category === "OUTSOURCE") return "OUTSOURCE";
+
+            return null;
+        };
+
+        const getCategoryCounts = (employees) => {
+            const counts = {
+                "ON-ROLL": 0,
+                CC: 0,
+                CONTRACTOR: 0,
+                OUTSOURCE: 0,
+            };
+
+            employees.forEach((emp) => {
+                const category = mergeCat(emp.companyCategory);
+                if (category) counts[category]++;
+            });
+
+            return counts;
+        };
+
+        const downloadButton = (scope, value, title = "Download this card's employees") => `
+            <button class="stat-card-download-btn" title="${this._escapeAttr(title)}" onclick="event.stopPropagation(); AppController.view._downloadJoinExitCardExcel('resigned', '${scope}', '${this._escapeAttr(value)}')">
+                <i class="ph ph-download-simple"></i>
+            </button>
+        `;
+
+        const resignedItems = model.getResignedEmployees ? model.getResignedEmployees() : [];
+        const resEmps = resignedItems.map((item) => item.emp).filter(Boolean);
+
+        const resignedCatCounts = {
+            "ON-ROLL": 0,
+            CC: 0,
+            CONTRACTOR: 0,
+            OUTSOURCE: 0,
+        };
+
+        resignedItems.forEach(({ emp }) => {
+            const mappedEmp = empMap[emp?.id] || emp;
+            const category = mergeCat(mappedEmp?.companyCategory);
+            if (category && resignedCatCounts[category] !== undefined) {
+                resignedCatCounts[category]++;
+            }
+        });
+
+        this._currentSummaryModel = model;
+        this._currentSummaryEmpMap = empMap;
+        this._currentSummaryDayLogs = dayLogs;
+        this._currentResignedBreakdown = {
+            emps: resEmps,
+            category: null,
+            location: null,
+            company: null,
+        };
 
         const topRow = `
-            <div class="summary-grid">
-                ${cards.map((c) => `
-                    <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
-                        ${c.key ? `data-card-key="${c.key}"` : ""}>
-                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                        <div class="stat-content">
-                            <span class="stat-label">${c.label}</span>
-                            <span class="stat-value">${c.val}</span>
-                            ${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
+            <div class="summary-grid summary-grid-category">
+                <div class="stat-card danger stat-card-clickable" data-card-key="resigned" style="position:relative;">
+                    <button class="stat-card-download-btn" title="Download all resigned employees" onclick="event.stopPropagation(); AppController.view._downloadJoinExitExcel('resigned')">
+                        <i class="ph ph-download-simple"></i>
+                    </button>
+
+                    <div class="stat-card-top" style="display:flex; flex-direction:column; align-items:center;">
+                        <div class="stat-card-top-left" style="display:flex; flex-direction:column; align-items:center; width:100%;">
+                            <div class="stat-icon"><i class="ph ph-user-minus"></i></div>
+                            <div class="stat-content" style="display:flex; flex-direction:column; align-items:center;">
+                                <span class="stat-label">Resigned</span>
+                                <span class="stat-value">${stats.resigned || 0}</span>
+                            </div>
                         </div>
+                        <span class="stat-card-hint" style="margin-top:6px;">↓ click to view</span>
                     </div>
-                `,).join("")}
+
+                    <div class="stat-category-row">
+                        ${categoryOrder.map((category) => `
+                            <div class="stat-category-item" data-card-key="resigned" data-category="${this._escapeAttr(category)}" title="View ${this._escapeAttr(category)} only">
+                                <span class="cat-label">${category}</span>
+                                <span class="cat-value">${resignedCatCounts[category] || 0}</span>
+                            </div>
+                        `).join("")}
+                    </div>
+                </div>
             </div>
         `;
 
-        // ---- Resigned employees ka breakdown (Dashboard jaisa) ----
-        const resignedItems = model.getResignedEmployees ? model.getResignedEmployees() : [];
-        const resEmps = resignedItems.map((it) => it.emp);
-
         const sectionLabel = (text) => `
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase; letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px; display:flex;align-items:center;gap:8px;">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px;display:flex;align-items:center;gap:8px;">
                 ${text}
                 <span style="flex:1;height:1px;background:#e5e7eb;display:block;"></span>
             </div>
         `;
 
-        if (resEmps.length === 0) {
+        if (!resEmps.length) {
             return `
                 ${topRow}
                 ${sectionLabel("Resigned Breakdown")}
@@ -1573,78 +2588,157 @@ class AttendanceView {
             `;
         }
 
-        // --- By Company ---
-        this._currentResignedBreakdown = { emps: resEmps };
-        const companies = [...new Set(resEmps.map((e) => e.company))];
-        const compColorCls = ["info", "success", "warning", "accent", "danger"];
-        const companyCounts = {};
-        companies.forEach((c) => (companyCounts[c] = 0));
-        resEmps.forEach((e) => {
-            if (companyCounts[e.company] !== undefined) companyCounts[e.company]++;
-        });
-        const companyCards = companies.map((c, i) => `
-            <div class="stat-card ${compColorCls[i % compColorCls.length]} stat-card-clickable" data-res-company="${this._escapeAttr(c)}" onclick="AppController.view._showResignedBreakdownDrilldown('company', '${this._escapeAttr(c)}')">
-                <div class="stat-icon"><i class="ph ph-buildings"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">${c}</span>
-                    <span class="stat-value">${companyCounts[c]}</span>
-                    <span class="stat-card-hint">↓ click to view</span>
-                </div>
-            </div>
-        `,).join("");
+        // Company category cards
+        const companyCategoryLabels = {
+            "ON-ROLL": "ON-ROLL",
+            CC: "CC",
+            CONTRACTOR: "CONTRACTOR",
+            OUTSOURCE: "OUTSOURCE",
+        };
+        const companyCategoryColors = ["info", "success", "warning", "accent"];
+        const companiesByCategory = {
+            "ON-ROLL": [],
+            CC: [],
+            CONTRACTOR: [],
+            OUTSOURCE: [],
+        };
 
-        // --- Gender ---
+        resEmps.forEach((emp) => {
+            const category = mergeCat(emp.companyCategory);
+            if (category && companiesByCategory[category]) {
+                companiesByCategory[category].push(emp);
+            }
+        });
+
+        const companyCards = categoryOrder.map((category, index) => {
+            const categoryEmployees = companiesByCategory[category] || [];
+            const companies = [...new Set(categoryEmployees.map((emp) => emp.company))];
+
+            return `
+                <div class="stat-card ${companyCategoryColors[index % companyCategoryColors.length]} stat-card-clickable" data-res-company-category="${this._escapeAttr(category)}" onclick="AppController.view._showResignedBreakdownDrilldown('company-category', '${this._escapeAttr(category)}')"
+                    style="position:relative;">
+                    ${downloadButton("company-category", category)}
+
+                    <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;color:#475569;margin-bottom:8px;">
+                        ${companyCategoryLabels[category]}
+                    </div>
+                    <div class="stat-icon"><i class="ph ph-buildings"></i></div>
+                    <div class="stat-content">
+                        ${
+                            companies.length === 1
+                                ? `
+                                    <span class="stat-label">${this._escapeAttr(companies[0])}</span>
+                                    <span class="stat-value">${categoryEmployees.length}</span>
+                                `
+                                : `
+                                    <span class="stat-label">Total Headcount</span>
+                                    <span class="stat-value">${categoryEmployees.length}</span>
+                                    <span class="stat-card-sub">(${companies.length} Companies)</span>
+                                `
+                        }
+                        <span class="stat-card-hint">↓ click to view</span>
+                    </div>
+                </div>
+            `;
+        }).join("");
+
+        // Gender cards
         const genderCounts = { Male: 0, Female: 0 };
-        resEmps.forEach((e) => {
-            if (genderCounts[e.gender] !== undefined) genderCounts[e.gender]++;
+        const genderCategoryCounts = {
+            Male: getCategoryCounts([]),
+            Female: getCategoryCounts([]),
+        };
+
+        resEmps.forEach((emp) => {
+            if (genderCounts[emp.gender] === undefined) return;
+
+            genderCounts[emp.gender]++;
+            const category = mergeCat(emp.companyCategory);
+            if (category) genderCategoryCounts[emp.gender][category]++;
         });
-        const genderCards = `
-            <div class="stat-card info stat-card-clickable" data-res-gender="Male" onclick="AppController.view._showResignedBreakdownDrilldown('gender', 'Male')">
-                <div class="stat-icon"><i class="ph ph-gender-male"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">Male</span>
-                    <span class="stat-value">${genderCounts.Male}</span>
-                    <span class="stat-card-hint">↓ click to view</span>
-                </div>
-            </div>
-            <div class="stat-card accent stat-card-clickable" data-res-gender="Female" onclick="AppController.view._showResignedBreakdownDrilldown('gender', 'Female')">
-                <div class="stat-icon"><i class="ph ph-gender-female"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">Female</span>
-                    <span class="stat-value">${genderCounts.Female}</span>
-                    <span class="stat-card-hint">↓ click to view</span>
-                </div>
-            </div>
-        `;
 
-        // --- Staff / Workmen ---
-        const staffTeamId = model.state.teamConfig?.staffTeamId ?? 7;
-        const workerTeamId = model.state.teamConfig?.workerTeamId ?? 6;
-        const staffCount = resEmps.filter((e) => e.team === staffTeamId).length;
-        const workerCount = resEmps.filter((e) => e.team === workerTeamId).length;
+        const genderCards = ["Male", "Female"].map((gender) => {
+            const isMale = gender === "Male";
+            const color = isMale ? "info" : "accent";
+            const icon = isMale ? "ph-gender-male" : "ph-gender-female";
 
-        const swCards = `
-            <div class="stat-card info stat-card-clickable" data-res-workforce="Staff" onclick="AppController.view._showResignedBreakdownDrilldown('workforce', 'Staff')">
-                <div class="stat-icon"><i class="ph ph-identification-badge"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">Staff</span>
-                    <span class="stat-value">${staffCount}</span>
-                    <span class="stat-card-hint">↓ click to view</span>
-                </div>
-            </div>
-            <div class="stat-card warning stat-card-clickable"
-                data-res-workforce="Workmen"
-                onclick="AppController.view._showResignedBreakdownDrilldown('workforce', 'Workmen')">
-                <div class="stat-icon"><i class="ph ph-hard-hat"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">Workmen</span>
-                    <span class="stat-value">${workerCount}</span>
-                    <span class="stat-card-hint">↓ click to view</span>
-                </div>
-            </div>
-        `;
+            return `
+                <div class="stat-card ${color} stat-card-clickable" data-res-gender="${gender}" onclick="AppController.view._showResignedBreakdownDrilldown('gender', '${gender}')" style="position:relative;">
+                    ${downloadButton("gender", gender)}
 
-        // --- Age Group ---
+                    <div class="stat-card-top">
+                        <div class="stat-card-top-left">
+                            <div class="stat-icon"><i class="ph ${icon}"></i></div>
+                            <div class="stat-content">
+                                <span class="stat-label">${gender}</span>
+                                <span class="stat-value">${genderCounts[gender]}</span>
+                            </div>
+                        </div>
+                        <span class="stat-card-hint">↓ click to view</span>
+                    </div>
+
+                    <div class="stat-category-row">
+                        ${categoryOrder.map((category) => `
+                            <div class="stat-category-item" title="View ${this._escapeAttr(category)} only" onclick="event.stopPropagation(); AppController.view._showResignedBreakdownDrilldown('gender', '${gender}', '${this._escapeAttr(category)}')">
+                                <span class="cat-label">${category}</span>
+                                <span class="cat-value">${genderCategoryCounts[gender][category] || 0}</span>
+                            </div>
+                        `).join("")}
+                    </div>
+                </div>
+            `;
+        }).join("");
+
+        // Staff and Workmen cards
+        const staffEmps = resEmps.filter((emp) => [58].includes(emp.categoryId));
+        const workerEmps = resEmps.filter((emp) => [51, 59, 60].includes(emp.categoryId));
+        const workforceCards = [
+            {
+                label: "Staff",
+                value: "Staff",
+                employees: staffEmps,
+                icon: "ph-identification-badge",
+                color: "info",
+            },
+            {
+                label: "Workmen",
+                value: "Workmen",
+                employees: workerEmps,
+                icon: "ph-hard-hat",
+                color: "warning",
+            },
+        ].map((group) => {
+            const categoryCounts = getCategoryCounts(group.employees);
+
+            return `
+                <div class="stat-card ${group.color} stat-card-clickable" data-res-workforce="${group.value}" onclick="AppController.view._showResignedBreakdownDrilldown('workforce', '${group.value}')"
+                    style="position:relative;">
+                    ${downloadButton("workforce", group.value)}
+
+                    <div class="stat-card-top">
+                        <div class="stat-card-top-left">
+                            <div class="stat-icon"><i class="ph ${group.icon}"></i></div>
+                            <div class="stat-content">
+                                <span class="stat-label">${group.label}</span>
+                                <span class="stat-value">${group.employees.length}</span>
+                            </div>
+                        </div>
+                        <span class="stat-card-hint">↓ click to view</span>
+                    </div>
+
+                    <div class="stat-category-row">
+                        ${categoryOrder.map((category) => `
+                            <div class="stat-category-item" title="View ${this._escapeAttr(category)} only" onclick="event.stopPropagation(); AppController.view._showResignedBreakdownDrilldown('workforce', '${group.value}', '${this._escapeAttr(category)}')">
+                                <span class="cat-label">${category}</span>
+                                <span class="cat-value">${categoryCounts[category] || 0}</span>
+                            </div>
+                        `).join("")}
+                    </div>
+                </div>
+            `;
+        }).join("");
+
+        // Age group cards
         const ageGroups = ["Under 18", "Under 25", "25–34", "35–44", "45–54", "55–59", "60+"];
         const ageGroupIcons = {
             "Under 18": "ph-baby",
@@ -1655,7 +2749,7 @@ class AttendanceView {
             "55–59": "ph-user-focus",
             "60+": "ph-person-simple-tai-chi",
         };
-        const ageGroupCls = {
+        const ageGroupColors = {
             "Under 18": "",
             "Under 25": "info",
             "25–34": "success",
@@ -1664,116 +2758,224 @@ class AttendanceView {
             "55–59": "danger",
             "60+": "accent",
         };
+
         const ageCounts = {};
-        ageGroups.forEach((g) => (ageCounts[g] = 0));
-        resEmps.forEach((e) => {
-            const g = model.getAgeGroup(e.dob);
-            if (ageCounts[g] !== undefined) ageCounts[g]++;
+        const ageCategoryCounts = {};
+
+        ageGroups.forEach((group) => {
+            ageCounts[group] = 0;
+            ageCategoryCounts[group] = getCategoryCounts([]);
         });
-        const ageCards = ageGroups.map((g) => `
-            <div class="stat-card ${ageGroupCls[g]} stat-card-clickable"
-                data-res-age="${this._escapeAttr(g)}"
-                onclick="AppController.view._showResignedBreakdownDrilldown('age', '${this._escapeAttr(g)}')">
-                <div class="stat-icon"><i class="ph ${ageGroupIcons[g]}"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">${g}</span>
-                    <span class="stat-value">${ageCounts[g]}</span>
+
+        resEmps.forEach((emp) => {
+            const group = model.getAgeGroup(emp.dob);
+            if (ageCounts[group] === undefined) return;
+
+            ageCounts[group]++;
+            const category = mergeCat(emp.companyCategory);
+            if (category) ageCategoryCounts[group][category]++;
+        });
+
+        const ageCards = ageGroups.map((group) => `
+            <div class="stat-card ${ageGroupColors[group]} stat-card-clickable" data-res-age="${this._escapeAttr(group)}" onclick="AppController.view._showResignedBreakdownDrilldown('age', '${this._escapeAttr(group)}')"
+                style="position:relative;">
+                ${downloadButton("age", group)}
+
+                <div class="stat-card-top">
+                    <div class="stat-card-top-left">
+                        <div class="stat-icon"><i class="ph ${ageGroupIcons[group]}"></i></div>
+                        <div class="stat-content">
+                            <span class="stat-label">${group}</span>
+                            <span class="stat-value">${ageCounts[group]}</span>
+                        </div>
+                    </div>
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
-            </div>
-        `,).join("");
 
-        // --- By Department (clickable -> designation drilldown) ---
+                <div class="stat-category-row">
+                    ${categoryOrder.map((category) => `
+                        <div class="stat-category-item" title="View ${this._escapeAttr(category)} only" onclick="event.stopPropagation(); AppController.view._showResignedBreakdownDrilldown('age', '${this._escapeAttr(group)}', '${this._escapeAttr(category)}')">
+                            <span class="cat-label">${category}</span>
+                            <span class="cat-value">${ageCategoryCounts[group][category] || 0}</span>
+                        </div>
+                    `).join("")}
+                </div>
+            </div>
+        `).join("");
+
+        // Department cards
         this._currentResignedDeptData = { resEmps };
 
-        const resDepts = [...new Set(resEmps.map((e) => e.dept))];
-        const resDeptColorCls = ["info", "success", "warning", "accent", "danger"];
-        const resDeptCounts = {};
-        resDepts.forEach((d) => (resDeptCounts[d] = 0));
-        resEmps.forEach((e) => {
-            if (resDeptCounts[e.dept] !== undefined) resDeptCounts[e.dept]++;
+        const departments = [...new Set(resEmps.map((emp) => emp.dept))];
+        const departmentColors = ["info", "success", "warning", "accent", "danger"];
+        const departmentCounts = {};
+        const departmentCategoryCounts = {};
+
+        departments.forEach((department) => {
+            departmentCounts[department] = 0;
+            departmentCategoryCounts[department] = getCategoryCounts([]);
         });
-        const resDeptCards = resDepts.map((d, i) => `
-            <div class="stat-card ${resDeptColorCls[i % resDeptColorCls.length]} stat-card-clickable"
-                data-resigned-dept="${this._escapeAttr(d)}"
-                onclick="AppController.view._showResignedDeptDrilldown('${this._escapeAttr(d)}')">
-                <div class="stat-icon"><i class="ph ph-briefcase"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">${d}</span>
-                    <span class="stat-value">${resDeptCounts[d]}</span>
+
+        resEmps.forEach((emp) => {
+            if (departmentCounts[emp.dept] === undefined) return;
+
+            departmentCounts[emp.dept]++;
+            const category = mergeCat(emp.companyCategory);
+            if (category) departmentCategoryCounts[emp.dept][category]++;
+        });
+
+        const departmentCards = departments.map((department, index) => `
+            <div class="stat-card ${departmentColors[index % departmentColors.length]} stat-card-clickable" data-resigned-dept="${this._escapeAttr(department)}" onclick="AppController.view._showResignedDeptDrilldown('${this._escapeAttr(department)}')"
+                style="position:relative;">
+                ${downloadButton("department", department)}
+
+                <div class="stat-card-top">
+                    <div class="stat-card-top-left">
+                        <div class="stat-icon"><i class="ph ph-briefcase"></i></div>
+                        <div class="stat-content">
+                            <span class="stat-label">${this._escapeAttr(department)}</span>
+                            <span class="stat-value">${departmentCounts[department]}</span>
+                        </div>
+                    </div>
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
+
+                <div class="stat-category-row">
+                    ${categoryOrder.map((category) => `
+                        <div class="stat-category-item" title="View ${this._escapeAttr(category)} only" onclick="event.stopPropagation(); AppController.view._showResignedDeptDrilldown('${this._escapeAttr(department)}', '${this._escapeAttr(category)}')">
+                            <span class="cat-label">${category}</span>
+                            <span class="cat-value">${departmentCategoryCounts[department][category] || 0}</span>
+                        </div>
+                    `).join("")}
+                </div>
             </div>
-        `,).join("");
+        `).join("");
 
         return `
             ${topRow}
+
             <div style="margin-top:8px;">
-                ${sectionLabel("Resigned — By Company")}
-                <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                ${sectionLabel("Resigned — By Company Category")}
+                <div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));">
                     ${companyCards}
-                </div>
-
-                ${sectionLabel("Resigned — Gender & Workforce Type")}
-                <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
-                    ${genderCards}
-                    ${swCards}
-                </div>
-
-                ${sectionLabel("Resigned — By Age Group")}
-                <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));">
-                    ${ageCards}
                 </div>
 
                 <div id="resigned-breakdown-drilldown" style="margin-top:8px;"></div>
 
-                ${sectionLabel("Resigned — By Department")}
-                <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
-                    ${resDeptCards}
+                ${sectionLabel("Resigned — Gender & Workforce Type")}
+                <div class="summary-grid summary-grid-category" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));">
+                    ${genderCards}
+                    ${workforceCards}
                 </div>
+
+                ${sectionLabel("Resigned — By Age Group")}
+                <div class="summary-grid summary-grid-category" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));">
+                    ${ageCards}
+                </div>
+
+                ${sectionLabel("Resigned — By Department")}
+                <div class="summary-grid summary-grid-category" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));">
+                    ${departmentCards}
+                </div>
+
                 <div id="resigned-desig-drilldown" style="margin-top:8px;"></div>
+                <div id="resigned-final-drilldown" style="margin-top:8px;"></div>
             </div>
         `;
     }
 
-
     _renderNewJoinedSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
         const dayLogs = this._buildEmployeeDayLogs(emps, logs, dateFrom, dateTo);
-        const totalPresentHalf = dayLogs.filter((l) => this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present"),).length;
 
-        const cards = [
-            { key: "newJoined", label: "New Join", val: stats.newJoined || 0, icon: "ph-user-plus", cls: "success", },
-        ];
+        const categoryOrder = ["ON-ROLL", "CC", "CONTRACTOR", "OUTSOURCE"];
+
+        const normalizeCategory = (rawCategory) => {
+            if (!rawCategory) return null;
+            const category = String(rawCategory).toUpperCase().trim();
+            if (category === "ON-ROLL" || category === "ONROLL") return "ON-ROLL";
+            if (category === "CC" || category === "COMPANY CONTRACT" || category === "COMPANY CONTRACT (CC)") return "CC";
+            if (category === "CONTRACTOR") return "CONTRACTOR";
+            if (category === "OUTSOURCE") return "OUTSOURCE";
+
+            return null;
+        };
+
+        const getCategoryCounts = (employees) => {
+            const counts = {
+                "ON-ROLL": 0,
+                CC: 0,
+                CONTRACTOR: 0,
+                OUTSOURCE: 0,
+            };
+
+            employees.forEach((emp) => {
+                const category = normalizeCategory(emp.companyCategory);
+                if (category) counts[category]++;
+            });
+
+            return counts;
+        };
+
+        const downloadButton = (scope, value, title = "Download this card's employees") => `
+            <button class="stat-card-download-btn" title="${this._escapeAttr(title)}" onclick="event.stopPropagation(); AppController.view._downloadJoinExitCardExcel('newJoined', '${scope}', '${this._escapeAttr(value)}')">
+                <i class="ph ph-download-simple"></i>
+            </button>
+        `;
+
+        const newJoinedItems = model.getNewJoinedEmployees ? model.getNewJoinedEmployees() : [];
+        const njEmps = newJoinedItems.map((item) => item.emp).filter(Boolean);
+
+        const newJoinedCategoryCounts = getCategoryCounts(newJoinedItems.map((item) => empMap[item.emp?.id] || item.emp).filter(Boolean));
+
+        this._currentSummaryModel = model;
+        this._currentSummaryEmpMap = empMap;
+        this._currentSummaryDayLogs = dayLogs;
+        this._currentNewJoinedBreakdown = {
+            emps: njEmps,
+            category: null,
+            location: null,
+            company: null,
+        };
 
         const topRow = `
-            <div class="summary-grid">
-                ${cards.map((c) => `
-                    <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
-                        ${c.key ? `data-card-key="${c.key}"` : ""}>
-                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                        <div class="stat-content">
-                            <span class="stat-label">${c.label}</span>
-                            <span class="stat-value">${c.val}</span>
-                            ${c.key ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
+            <div class="summary-grid summary-grid-category">
+                <div class="stat-card success stat-card-clickable" data-card-key="newJoined" style="position:relative;">
+                    <button class="stat-card-download-btn" title="Download all new joined employees" onclick="event.stopPropagation(); AppController.view._downloadJoinExitExcel('newJoined')">
+                        <i class="ph ph-download-simple"></i>
+                    </button>
+
+                    <div class="stat-card-top" style="display:flex;flex-direction:column;align-items:center;">
+                        <div class="stat-card-top-left" style="display:flex;align-items:center;justify-content:center;width:100%;">
+                            <div class="stat-icon"><i class="ph ph-user-plus"></i></div>
+                            <div class="stat-content">
+                                <span class="stat-label">New Join</span>
+                                <span class="stat-value">${stats.newJoined || 0}</span>
+                            </div>
                         </div>
+                        <span class="stat-card-hint" style="margin-top:6px;">↓ click to view</span>
                     </div>
-                `,).join("")}
+
+                    <div class="stat-category-row">
+                        ${categoryOrder.map((category) => `
+                            <div class="stat-category-item" data-card-key="newJoined" data-category="${this._escapeAttr(category)}" title="View ${this._escapeAttr(category)} only">
+                                <span class="cat-label">${category}</span>
+                                <span class="cat-value">${newJoinedCategoryCounts[category] || 0}</span>
+                            </div>
+                        `).join("")}
+                    </div>
+                </div>
             </div>
         `;
 
-        // ---- New Joined employees ke breakdown cards (Dashboard jaisa) ----
-        const newJoinedItems = model.getNewJoinedEmployees ? model.getNewJoinedEmployees() : [];
-        const njEmps = newJoinedItems.map((it) => it.emp);
-
         const sectionLabel = (text) => `
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase; letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px; display:flex;align-items:center;gap:8px;">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px;display:flex;align-items:center;gap:8px;">
                 ${text}
                 <span style="flex:1;height:1px;background:#e5e7eb;display:block;"></span>
             </div>
         `;
 
-        if (njEmps.length === 0) {
+        if (!njEmps.length) {
             return `
                 ${topRow}
                 ${sectionLabel("New Joined Breakdown")}
@@ -1781,77 +2983,161 @@ class AttendanceView {
             `;
         }
 
-        this._currentNewJoinedBreakdown = { emps: njEmps };
+        // Company category cards
+        const companyCategoryLabels = {
+            "ON-ROLL": "ON-ROLL",
+            CC: "CC",
+            CONTRACTOR: "CONTRACTOR",
+            OUTSOURCE: "OUTSOURCE",
+        };
+        const companyCategoryColors = ["info", "success", "warning", "accent"];
+        const companiesByCategory = {
+            "ON-ROLL": [],
+            CC: [],
+            CONTRACTOR: [],
+            OUTSOURCE: [],
+        };
 
-        // --- By Company ---
-        const companies = [...new Set(njEmps.map((e) => e.company))];
-        const compColorCls = ["info", "success", "warning", "accent", "danger"];
-        const companyCounts = {};
-        companies.forEach((c) => (companyCounts[c] = 0));
-        njEmps.forEach((e) => {
-            if (companyCounts[e.company] !== undefined) companyCounts[e.company]++;
+        njEmps.forEach((emp) => {
+            const category = normalizeCategory(emp.companyCategory);
+            if (category && companiesByCategory[category]) {
+                companiesByCategory[category].push(emp);
+            }
         });
-        const companyCards = companies.map((c, i) => `
-            <div class="stat-card ${compColorCls[i % compColorCls.length]} stat-card-clickable" data-nj-company="${this._escapeAttr(c)}" onclick="AppController.view._showNewJoinedBreakdownDrilldown('company', '${this._escapeAttr(c)}')">
-                <div class="stat-icon"><i class="ph ph-buildings"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">${c}</span>
-                    <span class="stat-value">${companyCounts[c]}</span>
-                    <span class="stat-card-hint">↓ click to view</span>
-                </div>
-            </div>
-        `,).join("");
 
-        // --- Gender ---
+        const companyCards = categoryOrder.map((category, index) => {
+            const categoryEmployees = companiesByCategory[category] || [];
+            const companies = [...new Set(categoryEmployees.map((emp) => emp.company))];
+
+            return `
+                <div class="stat-card ${companyCategoryColors[index % companyCategoryColors.length]} stat-card-clickable" data-nj-company-category="${this._escapeAttr(category)}" onclick="AppController.view._showNewJoinedBreakdownDrilldown('company-category', '${this._escapeAttr(category)}')" style="position:relative;">
+                    ${downloadButton("company-category", category)}
+
+                    <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;color:#475569;margin-bottom:8px;">
+                        ${companyCategoryLabels[category]}
+                    </div>
+                    
+                    <div class="stat-icon"><i class="ph ph-buildings"></i></div>
+                    
+                    <div class="stat-content">
+                        ${
+                            companies.length === 1
+                                ? `
+                                    <span class="stat-label">${this._escapeAttr(companies[0])}</span>
+                                    <span class="stat-value">${categoryEmployees.length}</span>
+                                `
+                                : `
+                                    <span class="stat-label">Total Headcount</span>
+                                    <span class="stat-value">${categoryEmployees.length}</span>
+                                    <span class="stat-card-sub">(${companies.length} Companies)</span>
+                                `
+                        }
+                        <span class="stat-card-hint">↓ click to view</span>
+                    </div>
+                </div>
+            `;
+        }).join("");
+
+        // Gender cards
         const genderCounts = { Male: 0, Female: 0 };
-        njEmps.forEach((e) => {
-            if (genderCounts[e.gender] !== undefined) genderCounts[e.gender]++;
-        });
-        const genderCards = `
-            <div class="stat-card info stat-card-clickable" data-nj-gender="Male" onclick="AppController.view._showNewJoinedBreakdownDrilldown('gender', 'Male')">
-                <div class="stat-icon"><i class="ph ph-gender-male"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">Male</span>
-                    <span class="stat-value">${genderCounts.Male}</span>
-                    <span class="stat-card-hint">↓ click to view</span>
-                </div>
-            </div>
-            <div class="stat-card accent stat-card-clickable" data-nj-gender="Female" onclick="AppController.view._showNewJoinedBreakdownDrilldown('gender', 'Female')">
-                <div class="stat-icon"><i class="ph ph-gender-female"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">Female</span>
-                    <span class="stat-value">${genderCounts.Female}</span>
-                    <span class="stat-card-hint">↓ click to view</span>
-                </div>
-            </div>
-        `;
+        const genderCategoryCounts = {
+            Male: getCategoryCounts([]),
+            Female: getCategoryCounts([]),
+        };
 
-        // --- Staff / Workmen (Workforce Type) ---
+        njEmps.forEach((emp) => {
+            if (genderCounts[emp.gender] === undefined) return;
+
+            genderCounts[emp.gender]++;
+            const category = normalizeCategory(emp.companyCategory);
+            if (category) genderCategoryCounts[emp.gender][category]++;
+        });
+
+        const genderCards = ["Male", "Female"].map((gender) => {
+            const color = gender === "Male" ? "info" : "accent";
+            const icon = gender === "Male" ? "ph-gender-male" : "ph-gender-female";
+
+            return `
+                <div class="stat-card ${color} stat-card-clickable" data-nj-gender="${gender}" onclick="AppController.view._showNewJoinedBreakdownDrilldown('gender', '${gender}')"
+                    style="position:relative;">
+                    ${downloadButton("gender", gender)}
+
+                    <div class="stat-card-top">
+                        <div class="stat-card-top-left">
+                            <div class="stat-icon"><i class="ph ${icon}"></i></div>
+                            <div class="stat-content">
+                                <span class="stat-label">${gender}</span>
+                                <span class="stat-value">${genderCounts[gender]}</span>
+                            </div>
+                        </div>
+                        <span class="stat-card-hint">↓ click to view</span>
+                    </div>
+
+                    <div class="stat-category-row">
+                        ${categoryOrder.map((category) => `
+                            <div class="stat-category-item" title="View ${this._escapeAttr(category)} only" onclick="event.stopPropagation(); AppController.view._showNewJoinedBreakdownDrilldown('gender', '${gender}', '${this._escapeAttr(category)}')">
+                                <span class="cat-label">${category}</span>
+                                <span class="cat-value">${genderCategoryCounts[gender][category] || 0}</span>
+                            </div>
+                        `).join("")}
+                    </div>
+                </div>
+            `;
+        }).join("");
+
+        // Staff and Workmen cards
         const staffTeamId = model.state.teamConfig?.staffTeamId ?? 7;
         const workerTeamId = model.state.teamConfig?.workerTeamId ?? 6;
-        const staffCount = njEmps.filter((e) => e.team === staffTeamId).length;
-        const workerCount = njEmps.filter((e) => e.team === workerTeamId).length;
+        const staffEmployees = njEmps.filter((emp) => emp.team === staffTeamId);
+        const workerEmployees = njEmps.filter((emp) => emp.team === workerTeamId);
 
-        const swCards = `
-            <div class="stat-card info stat-card-clickable" data-nj-workforce="Staff" onclick="AppController.view._showNewJoinedBreakdownDrilldown('workforce', 'Staff')">
-                <div class="stat-icon"><i class="ph ph-identification-badge"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">Staff</span>
-                    <span class="stat-value">${staffCount}</span>
-                    <span class="stat-card-hint">↓ click to view</span>
-                </div>
-            </div>
-            <div class="stat-card warning stat-card-clickable" data-nj-workforce="Workmen" onclick="AppController.view._showNewJoinedBreakdownDrilldown('workforce', 'Workmen')">
-                <div class="stat-icon"><i class="ph ph-hard-hat"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">Workmen</span>
-                    <span class="stat-value">${workerCount}</span>
-                    <span class="stat-card-hint">↓ click to view</span>
-                </div>
-            </div>
-        `;
+        const workforceCards = [
+            {
+                label: "Staff",
+                value: "Staff",
+                employees: staffEmployees,
+                icon: "ph-identification-badge",
+                color: "info",
+            },
+            {
+                label: "Workmen",
+                value: "Workmen",
+                employees: workerEmployees,
+                icon: "ph-hard-hat",
+                color: "warning",
+            },
+        ].map((group) => {
+            const categoryCounts = getCategoryCounts(group.employees);
 
-        // --- Age Group ---
+            return `
+                <div class="stat-card ${group.color} stat-card-clickable" data-nj-workforce="${group.value}" onclick="AppController.view._showNewJoinedBreakdownDrilldown('workforce', '${group.value}')"
+                    style="position:relative;">
+                    ${downloadButton("workforce", group.value)}
+
+                    <div class="stat-card-top">
+                        <div class="stat-card-top-left">
+                            <div class="stat-icon"><i class="ph ${group.icon}"></i></div>
+                            <div class="stat-content">
+                                <span class="stat-label">${group.label}</span>
+                                <span class="stat-value">${group.employees.length}</span>
+                            </div>
+                        </div>
+                        <span class="stat-card-hint">↓ click to view</span>
+                    </div>
+
+                    <div class="stat-category-row">
+                        ${categoryOrder.map((category) => `
+                            <div class="stat-category-item" title="View ${this._escapeAttr(category)} only" onclick="event.stopPropagation(); AppController.view._showNewJoinedBreakdownDrilldown('workforce', '${group.value}', '${this._escapeAttr(category)}')">
+                                <span class="cat-label">${category}</span>
+                                <span class="cat-value">${categoryCounts[category] || 0}</span>
+                            </div>
+                        `).join("")}
+                    </div>
+                </div>
+            `;
+        }).join("");
+
+        // Age group cards
         const ageGroups = ["Under 18", "Under 25", "25–34", "35–44", "45–54", "55–59", "60+"];
         const ageGroupIcons = {
             "Under 18": "ph-baby",
@@ -1862,7 +3148,7 @@ class AttendanceView {
             "55–59": "ph-user-focus",
             "60+": "ph-person-simple-tai-chi",
         };
-        const ageGroupCls = {
+        const ageGroupColors = {
             "Under 18": "",
             "Under 25": "info",
             "25–34": "success",
@@ -1871,91 +3157,204 @@ class AttendanceView {
             "55–59": "danger",
             "60+": "accent",
         };
+
         const ageCounts = {};
-        ageGroups.forEach((g) => (ageCounts[g] = 0));
-        njEmps.forEach((e) => {
-            const g = model.getAgeGroup(e.dob);
-            if (ageCounts[g] !== undefined) ageCounts[g]++;
+        const ageCategoryCounts = {};
+
+        ageGroups.forEach((group) => {
+            ageCounts[group] = 0;
+            ageCategoryCounts[group] = getCategoryCounts([]);
         });
-        const ageCards = ageGroups.map((g) => `
-            <div class="stat-card ${ageGroupCls[g]} stat-card-clickable" data-nj-age="${this._escapeAttr(g)}" onclick="AppController.view._showNewJoinedBreakdownDrilldown('age', '${this._escapeAttr(g)}')">
-                <div class="stat-icon"><i class="ph ${ageGroupIcons[g]}"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">${g}</span>
-                    <span class="stat-value">${ageCounts[g]}</span>
+
+        njEmps.forEach((emp) => {
+            const group = model.getAgeGroup(emp.dob);
+            if (ageCounts[group] === undefined) return;
+
+            ageCounts[group]++;
+            const category = normalizeCategory(emp.companyCategory);
+            if (category) ageCategoryCounts[group][category]++;
+        });
+
+        const ageCards = ageGroups.map((group) => `
+            <div class="stat-card ${ageGroupColors[group]} stat-card-clickable" data-nj-age="${this._escapeAttr(group)}" onclick="AppController.view._showNewJoinedBreakdownDrilldown('age', '${this._escapeAttr(group)}')"
+                style="position:relative;">
+                ${downloadButton("age", group)}
+
+                <div class="stat-card-top">
+                    <div class="stat-card-top-left">
+                        <div class="stat-icon"><i class="ph ${ageGroupIcons[group]}"></i></div>
+                        <div class="stat-content">
+                            <span class="stat-label">${group}</span>
+                            <span class="stat-value">${ageCounts[group]}</span>
+                        </div>
+                    </div>
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
-            </div>
-        `,).join("");
 
-        // --- By Department ---
-        const njDepts = [...new Set(njEmps.map((e) => e.dept))];
-        const njDeptColorCls = ["info", "success", "warning", "accent", "danger"];
-        const njDeptCounts = {};
-        njDepts.forEach((d) => (njDeptCounts[d] = 0));
-        njEmps.forEach((e) => {
-            if (njDeptCounts[e.dept] !== undefined) njDeptCounts[e.dept]++;
-        });
+                <div class="stat-category-row">
+                    ${categoryOrder.map((category) => `
+                        <div class="stat-category-item" title="View ${this._escapeAttr(category)} only" onclick="event.stopPropagation(); AppController.view._showNewJoinedBreakdownDrilldown('age', '${this._escapeAttr(group)}', '${this._escapeAttr(category)}')">
+                            <span class="cat-label">${category}</span>
+                            <span class="cat-value">${ageCategoryCounts[group][category] || 0}</span>
+                        </div>
+                    `).join("")}
+                </div>
+            </div>
+        `).join("");
+
+        // Department cards
         this._currentNewJoinedDeptData = { njEmps };
 
-        const njDeptCards = njDepts.map((d, i) => `
-            <div class="stat-card ${njDeptColorCls[i % njDeptColorCls.length]} stat-card-clickable" data-newjoined-dept="${this._escapeAttr(d)}" onclick="AppController.view._showNewJoinedDeptDrilldown('${this._escapeAttr(d)}')">
-                <div class="stat-icon"><i class="ph ph-briefcase"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">${d}</span>
-                    <span class="stat-value">${njDeptCounts[d]}</span>
+        const departments = [...new Set(njEmps.map((emp) => emp.dept))];
+        const departmentColors = ["info", "success", "warning", "accent", "danger"];
+        const departmentCounts = {};
+        const departmentCategoryCounts = {};
+
+        departments.forEach((department) => {
+            departmentCounts[department] = 0;
+            departmentCategoryCounts[department] = getCategoryCounts([]);
+        });
+
+        njEmps.forEach((emp) => {
+            if (departmentCounts[emp.dept] === undefined) return;
+
+            departmentCounts[emp.dept]++;
+            const category = normalizeCategory(emp.companyCategory);
+            if (category) departmentCategoryCounts[emp.dept][category]++;
+        });
+
+        const departmentCards = departments.map((department, index) => `
+            <div class="stat-card ${departmentColors[index % departmentColors.length]} stat-card-clickable" data-newjoined-dept="${this._escapeAttr(department)}" onclick="AppController.view._showNewJoinedDeptDrilldown('${this._escapeAttr(department)}')"
+                style="position:relative;">
+                ${downloadButton("department", department)}
+
+                <div class="stat-card-top">
+                    <div class="stat-card-top-left">
+                        <div class="stat-icon"><i class="ph ph-briefcase"></i></div>
+                        <div class="stat-content">
+                            <span class="stat-label">${this._escapeAttr(department)}</span>
+                            <span class="stat-value">${departmentCounts[department]}</span>
+                        </div>
+                    </div>
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
+
+                <div class="stat-category-row">
+                    ${categoryOrder.map((category) => `
+                        <div class="stat-category-item" title="View ${this._escapeAttr(category)} only" onclick="event.stopPropagation(); AppController.view._showNewJoinedDeptDrilldown('${this._escapeAttr(department)}', '${this._escapeAttr(category)}')">
+                            <span class="cat-label">${category}</span>
+                            <span class="cat-value">${departmentCategoryCounts[department][category] || 0}</span>
+                        </div>
+                    `).join("")}
+                </div>
             </div>
-        `,).join("");
+        `).join("");
 
         return `
             ${topRow}
+
             <div style="margin-top:8px;">
-                ${sectionLabel("New Joined — By Company")}
-                <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                ${sectionLabel("New Joined — By Company Category")}
+                <div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));">
                     ${companyCards}
-                </div>
-
-                ${sectionLabel("New Joined — Gender & Workforce Type")}
-                <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
-                    ${genderCards}
-                    ${swCards}
-                </div>
-
-                ${sectionLabel("New Joined — By Age Group")}
-                <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));">
-                    ${ageCards}
                 </div>
 
                 <div id="newjoined-breakdown-drilldown" style="margin-top:8px;"></div>
 
-                ${sectionLabel("New Joined — By Department")}
-                <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
-                    ${njDeptCards}
+                ${sectionLabel("New Joined — Gender & Workforce Type")}
+                <div class="summary-grid summary-grid-category" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));">
+                    ${genderCards}
+                    ${workforceCards}
                 </div>
+
+                ${sectionLabel("New Joined — By Age Group")}
+                <div class="summary-grid summary-grid-category" style="grid-template-columns:repeat(auto-fit,minmax(250px,1fr));">
+                    ${ageCards}
+                </div>
+
+                ${sectionLabel("New Joined — By Department")}
+                <div class="summary-grid summary-grid-category" style="grid-template-columns:repeat(auto-fit,minmax(250px,1fr));">
+                    ${departmentCards}
+                </div>
+
                 <div id="newjoined-desig-drilldown" style="margin-top:8px;"></div>
+                <div id="newjoined-final-drilldown" style="margin-top:8px;"></div>
+                <div id="newjoined-company-employee-drilldown" style="margin-top:8px;"></div>
             </div>
         `;
     }
 
-
     _renderShiftSummaryCards(emps, stats, model, logs, empMap) {
         const { dateFrom, dateTo } = model.state.filters;
+        const categoryOrder = ["ON-ROLL", "CC", "CONTRACTOR", "OUTSOURCE"];
+
+        const mergeCat = (rawCat) => {
+            if (!rawCat) return null;
+
+            const c = String(rawCat).toUpperCase().trim();
+
+            if (c === "ON-ROLL" || c === "ONROLL") return "ON-ROLL";
+
+            if (c === "CC" || c === "COMPANY CONTRACT" || c === "COMPANY CONTRACT (CC)") {
+                return "CC";
+            }
+
+            if (c === "CONTRACTOR") return "CONTRACTOR";
+            if (c === "OUTSOURCE") return "OUTSOURCE";
+
+            return null;
+        };
+
         const dayLogs = this._buildShiftStatsLogs(emps, logs, dateFrom, dateTo);
+
         this._currentShiftSummaryData = { emps, model, dayLogs, empMap };
 
         const shifts = [...new Set(dayLogs.map((l) => this._normalizeShiftName(l.shiftName)))];
         const colorCls = ["info", "success", "warning", "accent", "danger"];
 
         const counts = {};
-        shifts.forEach((s) => (counts[s] = 0));
+        const totalCatCounts = {
+            "ON-ROLL": 0,
+            "CC": 0,
+            "CONTRACTOR": 0,
+            "OUTSOURCE": 0
+        };
+
+        const shiftCatCounts = {};
+        shifts.forEach((s) => {
+            counts[s] = 0;
+            shiftCatCounts[s] = {
+                "ON-ROLL": 0,
+                "CC": 0,
+                "CONTRACTOR": 0,
+                "OUTSOURCE": 0
+            };
+        });
 
         dayLogs.forEach((l) => {
             const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch");
+
             if (!isPresentOrHalf) return;
+
             const s = this._normalizeShiftName(l.shiftName);
-            if (counts[s] !== undefined) counts[s]++;
+
+            if (counts[s] !== undefined) {
+                counts[s]++;
+            }
+
+            const emp = empMap[l.empId];
+
+            if (!emp) return;
+
+            const cat = mergeCat(emp.companyCategory);
+
+            if (cat && totalCatCounts[cat] !== undefined) {
+                totalCatCounts[cat]++;
+            }
+
+            if (cat && shiftCatCounts[s] && shiftCatCounts[s][cat] !== undefined) {
+                shiftCatCounts[s][cat]++;
+            }
         });
 
         this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
@@ -1969,29 +3368,43 @@ class AttendanceView {
         const totalPresentHalf = this._currentTabPresentHeadcountItems.length;
 
         const cards = [
-            { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "" },
-            ...shifts.map((s, i) => ({
-                type: "shift",
-                label: s,
-                val: counts[s],
-                icon: "ph-clock-clockwise",
-                cls: colorCls[i % colorCls.length],
-                shift: s,
-            })),
+            { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "",  catCounts: totalCatCounts },
+            ...shifts.map((s, i) => ({ type: "shift", label: s, val: counts[s], icon: "ph-clock-clockwise", cls: colorCls[i % colorCls.length], shift: s, catCounts: shiftCatCounts[s] })),
             { type: "avgHours", label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "" },
         ];
 
         return `
-            <div class="summary-grid">
+            <div class="summary-grid summary-grid-category">
                 ${cards.map((c) => {
                     if (c.type === "shift") {
                         return `
-                            <div class="stat-card ${c.cls} stat-card-clickable" data-shift="${this._escapeAttr(c.shift)}" onclick="AppController.view._showShiftSummaryDrilldown('${this._escapeAttr(c.shift)}')">
-                                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                                <div class="stat-content">
-                                    <span class="stat-label">${c.label}</span>
-                                    <span class="stat-value">${c.val}</span>
+                            <div class="stat-card ${c.cls} stat-card-clickable" data-shift="${this._escapeAttr(c.shift)}"
+                                onclick="AppController.view._showShiftSummaryDrilldown('${this._escapeAttr(c.shift)}')"
+                            >
+                                <div class="stat-card-top">
+                                    <div class="stat-card-top-left">
+                                        <div class="stat-icon">
+                                            <i class="ph ${c.icon}"></i>
+                                        </div>
+
+                                        <div class="stat-content">
+                                            <span class="stat-label">${c.label}</span>
+                                            <span class="stat-value">${c.val}</span>
+                                        </div>
+                                    </div>
+
                                     <span class="stat-card-hint">↓ click to view</span>
+                                </div>
+
+                                <div class="stat-category-row">
+                                    ${categoryOrder.map((cat) => `
+                                        <div class="stat-category-item" data-shift="${this._escapeAttr(c.shift)}" data-category="${cat}" title="View ${cat} only"
+                                            onclick="event.stopPropagation(); AppController.view._showShiftSummaryDrilldown('${this._escapeAttr(c.shift)}', '${cat}')"
+                                        >
+                                            <span class="cat-label">${cat}</span>
+                                            <span class="cat-value">${c.catCounts?.[cat] || 0}</span>
+                                        </div>
+                                    `).join("")}
                                 </div>
                             </div>
                         `;
@@ -2008,12 +3421,33 @@ class AttendanceView {
                         `;
                     }
                     return `
-                        <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
-                            <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                            <div class="stat-content">
-                                <span class="stat-label">${c.label}</span>
-                                <span class="stat-value">${c.val}</span>
+                        <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount"
+                            onclick="AppController.view._showPresentHeadcountDrilldown()"
+                        >
+                            <div class="stat-card-top">
+                                <div class="stat-card-top-left">
+                                    <div class="stat-icon">
+                                        <i class="ph ${c.icon}"></i>
+                                    </div>
+
+                                    <div class="stat-content">
+                                        <span class="stat-label">${c.label}</span>
+                                        <span class="stat-value">${c.val}</span>
+                                    </div>
+                                </div>
+
                                 <span class="stat-card-hint">↓ click to view</span>
+                            </div>
+
+                            <div class="stat-category-row">
+                                ${categoryOrder.map((cat) => `
+                                    <div class="stat-category-item" data-category="${cat}" title="View ${cat} only"
+                                        onclick="event.stopPropagation(); AppController.view._showPresentHeadcountDrilldown('${cat}')"
+                                    >
+                                        <span class="cat-label">${cat}</span>
+                                        <span class="cat-value">${c.catCounts?.[cat] || 0}</span>
+                                    </div>
+                                `).join("")}
                             </div>
                         </div>
                     `;
@@ -2028,31 +3462,162 @@ class AttendanceView {
         this._currentManualPunchSummaryItems = items;
 
         const shiftMP = model.getManualPunchByShift();
+
+        const categoryOrder = ["ON-ROLL", "CC", "CONTRACTOR", "OUTSOURCE"];
+
+        const mergeCat = (rawCat) => {
+            if (!rawCat) return null;
+
+            const c = String(rawCat).toUpperCase().trim();
+
+            if (c === "ON-ROLL" || c === "ONROLL") {
+                return "ON-ROLL";
+            }
+
+            if (c === "CC" || c === "COMPANY CONTRACT" || c === "COMPANY CONTRACT (CC)") {
+                return "CC";
+            }
+
+            if (c === "CONTRACTOR") {
+                return "CONTRACTOR";
+            }
+
+            if (c === "OUTSOURCE") {
+                return "OUTSOURCE";
+            }
+
+            return null;
+        };
+
+        const totalCatCounts = {
+            "ON-ROLL": 0,
+            "CC": 0,
+            "CONTRACTOR": 0,
+            "OUTSOURCE": 0
+        };
+
+        const shiftCatCounts = {};
+        shiftMP.forEach((s) => {
+            shiftCatCounts[s.shiftName] = {
+                "ON-ROLL": 0,
+                "CC": 0,
+                "CONTRACTOR": 0,
+                "OUTSOURCE": 0
+            };
+        });
+
+        items.forEach((item) => {
+            const emp = item.emp;
+            if (!emp) {
+                return;
+            }
+
+            const cat = mergeCat(emp.companyCategory);
+            if (!cat) {
+                return;
+            }
+
+            if (totalCatCounts[cat] !== undefined) {
+                totalCatCounts[cat]++;
+            }
+
+            const shiftName = item.log?.shiftName || emp.shift || "No Shift";
+
+            if (shiftCatCounts[shiftName] && shiftCatCounts[shiftName][cat] !== undefined) {
+                shiftCatCounts[shiftName][cat]++;
+            }
+        });
+
         const colorCls = ["info", "success", "warning", "accent", "danger"];
 
         const totalCard = `
             <div class="stat-card warning stat-card-clickable" data-mp-total="all" onclick="AppController.view._showManualPunchShiftDrilldown(null)">
-                <div class="stat-icon"><i class="ph ph-pencil-simple"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">Total Manual Punches</span>
-                    <span class="stat-value">${items.length}</span>
-                    <span class="stat-card-hint">↓ click to view</span>
+                <div class="stat-card-top" style="justify-content: center;">
+                    <div class="stat-card-top-left" style="justify-content: center;">
+                        <div class="stat-icon">
+                            <i class="ph ph-pencil-simple"></i>
+                        </div>
+
+                        <div class="stat-content" style="text-align: center;">
+                            <span class="stat-label">
+                                Total Manual Punches
+                            </span>
+
+                            <span class="stat-value">
+                                ${items.length}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card-hint" style="text-align: center; width: 100%;">
+                    ↓ click to view
+                </div>
+
+                <div class="stat-category-row">
+                    ${categoryOrder.map((cat) => `
+                        <div class="stat-category-item" data-category="${cat}" title="View ${cat} only" onclick="event.stopPropagation(); AppController.view._showManualPunchShiftDrilldown(null, '${cat}')">
+                            <span class="cat-label">
+                                ${cat}
+                            </span>
+
+                            <span class="cat-value">
+                                ${totalCatCounts[cat] || 0}
+                            </span>
+                        </div>
+                    `).join("")}
                 </div>
             </div>
         `;
 
         const shiftCards = shiftMP.map((s, i) => `
             <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable" data-mp-shift="${this._escapeAttr(s.shiftName)}" onclick="AppController.view._showManualPunchShiftDrilldown('${this._escapeAttr(s.shiftName)}')">
-                <div class="stat-icon"><i class="ph ph-clock-clockwise"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">${s.shiftName}</span>
-                    <span class="stat-value">${s.count}</span>
-                    <span class="stat-card-hint">↓ click to view</span>
+                <div class="stat-card-top" style="justify-content: center;">
+                    <div class="stat-card-top-left" style="justify-content: center;">
+                        <div class="stat-icon">
+                            <i class="ph ph-clock-clockwise"></i>
+                        </div>
+
+                        <div class="stat-content" style="text-align: center;">
+                            <span class="stat-label">
+                                ${s.shiftName}
+                            </span>
+
+                            <span class="stat-value">
+                                ${s.count}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card-hint" style="text-align: center; width: 100%;">
+                    ↓ click to view
+                </div>
+
+                <div class="stat-category-row">
+                    ${categoryOrder.map((cat) => `
+                        <div class="stat-category-item" data-mp-shift="${this._escapeAttr(s.shiftName)}" data-category="${cat}" title="View ${cat} only"
+                            onclick="event.stopPropagation(); AppController.view._showManualPunchShiftDrilldown('${this._escapeAttr(s.shiftName)}', '${cat}')"
+                        >
+                            <span class="cat-label">
+                                ${cat}
+                            </span>
+
+                            <span class="cat-value">
+                                ${shiftCatCounts[s.shiftName]?.[cat] || 0}
+                            </span>
+                        </div>
+                    `).join("")}
                 </div>
             </div>
         `).join("");
 
-        return `<div class="summary-grid">${totalCard}${shiftCards}</div>`;
+        return `
+            <div class="summary-grid summary-grid-category">
+                ${totalCard}
+                ${shiftCards}
+            </div>
+        `;
     }
 
 
@@ -2080,10 +3645,44 @@ class AttendanceView {
         const nEmpMap = nightData.empMap;
 
         const { dateFrom, dateTo } = model.state.filters;
+
+        const categoryOrder = ["ON-ROLL", "CC", "CONTRACTOR", "OUTSOURCE"];
+
+        const mergeCat = (rawCat) => {
+            if (!rawCat) return null;
+
+            const c = String(rawCat).toUpperCase().trim();
+
+            if (c === "ON-ROLL" || c === "ONROLL") return "ON-ROLL";
+            if (c === "CC" || c === "COMPANY CONTRACT" || c === "COMPANY CONTRACT (CC)") return "CC";
+            if (c === "CONTRACTOR") return "CONTRACTOR";
+            if (c === "OUTSOURCE") return "OUTSOURCE";
+
+            return null;
+        };
+
+        const totalCatCounts = {
+            "ON-ROLL": 0,
+            "CC": 0,
+            "CONTRACTOR": 0,
+            "OUTSOURCE": 0
+        };
+
         const dayLogs = this._buildEmployeeDayLogs(nEmps, nLogs, dateFrom, dateTo);
         this._currentNightSummaryData = { emps: nEmps, model, dayLogs, empMap: nEmpMap };
 
         const shifts = [...new Set(nEmps.map((e) => e.shift || "No Shift"))];
+
+        const shiftCatCounts = {};
+        shifts.forEach((s) => {
+            shiftCatCounts[s] = {
+                "ON-ROLL": 0,
+                "CC": 0,
+                "CONTRACTOR": 0,
+                "OUTSOURCE": 0
+            };
+        });
+
         const colorCls = ["info", "success", "warning", "accent", "danger"];
 
         const counts = {};
@@ -2091,67 +3690,132 @@ class AttendanceView {
         dayLogs.forEach((l) => {
             const e = nEmpMap[l.empId];
             if (!e) return;
+
             const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present");
+
             if (!isPresentOrHalf) return;
+
             const s = e.shift || "No Shift";
-            if (counts[s] !== undefined) counts[s]++;
+
+            if (counts[s] !== undefined) {
+                counts[s]++;
+            }
+
+            const cat = mergeCat(e.companyCategory);
+
+            if (cat && shiftCatCounts[s] && shiftCatCounts[s][cat] !== undefined) {
+                shiftCatCounts[s][cat]++;
+            }
         });
 
         this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
             this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch")
-        ).map((l) => ({ log: l, emp: nEmpMap[l.empId], date: l.date }));
+        ).map((l) => {
+            const emp = nEmpMap[l.empId];
+
+            if (emp) {
+                const cat = mergeCat(emp.companyCategory);
+                if (cat && totalCatCounts[cat] !== undefined) {
+                    totalCatCounts[cat]++;
+                }
+            }
+
+            return {
+                log: l,
+                emp,
+                date: l.date
+            };
+        });
 
         const totalPresentHalf = this._currentTabPresentHeadcountItems.length;
 
         const cards = [
-            { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "" },
-            ...shifts.map((s, i) => ({ type: "shift", label: s, val: counts[s], icon: "ph-clock-clockwise", cls: colorCls[i % colorCls.length], shift: s })),
+            { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", catCounts: totalCatCounts },
+            ...shifts.map((s, i) => ({ type: "shift", label: s, val: counts[s], icon: "ph-clock-clockwise", cls: colorCls[i % colorCls.length], shift: s, catCounts: shiftCatCounts[s] })),
             { type: "avgHours", label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "" },
         ];
 
         return `
-            <div class="summary-grid">
+            <div class="summary-grid summary-grid-category">
                 ${cards.map((c) => {
-            if (c.type === "shift") {
-                return `
-                    <div class="stat-card ${c.cls} stat-card-clickable" data-night-shift="${this._escapeAttr(c.shift)}" onclick="AppController.view._showNightSummaryDrilldown('${this._escapeAttr(c.shift)}')">
-                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                        <div class="stat-content">
-                            <span class="stat-label">${c.label}</span>
-                            <span class="stat-value">${c.val}</span>
-                            <span class="stat-card-hint">↓ click to view</span>
+                    if (c.type === "shift") {
+                        return `
+                            <div class="stat-card ${c.cls} stat-card-clickable" data-night-shift="${this._escapeAttr(c.shift)}" onclick="AppController.view._showNightSummaryDrilldown('${this._escapeAttr(c.shift)}')">
+                                <div class="stat-card-top">
+                                    <div class="stat-card-top-left">
+                                        <div class="stat-icon">
+                                            <i class="ph ${c.icon}"></i>
+                                        </div>
+
+                                        <div class="stat-content">
+                                            <span class="stat-label">${c.label}</span>
+                                            <span class="stat-value">${c.val}</span>
+                                        </div>
+                                    </div>
+
+                                    <span class="stat-card-hint">↓ click to view</span>
+                                </div>
+
+                                <div class="stat-category-row">
+                                    ${categoryOrder.map((cat) => `
+                                        <div class="stat-category-item" data-night-shift="${this._escapeAttr(c.shift)}" data-category="${cat}" title="View ${cat} only"
+                                            onclick="event.stopPropagation(); AppController.view._showNightSummaryDrilldown('${this._escapeAttr(c.shift)}', '${cat}')"
+                                        >
+                                            <span class="cat-label">${cat}</span>
+                                            <span class="cat-value">${c.catCounts?.[cat] || 0}</span>
+                                        </div>
+                                    `).join("")}
+                                </div>
+                            </div>
+                        `;
+                    }
+                    if (c.type === "avgHours") {
+                        return `
+                            <div class="stat-card">
+                                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                                <div class="stat-content">
+                                    <span class="stat-label">${c.label}</span>
+                                    <span class="stat-value">${c.val}</span>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    return `
+                        <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
+                            <div class="stat-card-top">
+                                <div class="stat-card-top-left">
+                                    <div class="stat-icon">
+                                        <i class="ph ${c.icon}"></i>
+                                    </div>
+
+                                    <div class="stat-content">
+                                        <span class="stat-label">${c.label}</span>
+                                        <span class="stat-value">${c.val}</span>
+                                    </div>
+                                </div>
+
+                                <span class="stat-card-hint">↓ click to view</span>
+                            </div>
+
+                            <div class="stat-category-row">
+                                ${categoryOrder.map((cat) => `
+                                    <div class="stat-category-item" data-card-key="presentHeadcount" data-category="${cat}" title="View ${cat} only"
+                                        onclick="event.stopPropagation(); AppController.view._showPresentHeadcountDrilldown('${cat}')"
+                                    >
+                                        <span class="cat-label">${cat}</span>
+                                        <span class="cat-value">${c.catCounts[cat] || 0}</span>
+                                    </div>
+                                `).join("")}
+                            </div>
                         </div>
-                    </div>
-                `;
-            }
-            if (c.type === "avgHours") {
-                return `
-                    <div class="stat-card">
-                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                        <div class="stat-content">
-                            <span class="stat-label">${c.label}</span>
-                            <span class="stat-value">${c.val}</span>
-                        </div>
-                    </div>
-                `;
-            }
-            return `
-                <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
-                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                    <div class="stat-content">
-                        <span class="stat-label">${c.label}</span>
-                        <span class="stat-value">${c.val}</span>
-                        <span class="stat-card-hint">↓ click to view</span>
-                    </div>
-                </div>
-            `;
-        }).join("")}
+                    `;
+                }).join("")}
             </div>
         `;
     }
 
 
-    _showNightSummaryDrilldown(shiftName) {
+    _showNightSummaryDrilldown(shiftName, category = null) {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
         const card = this.app.querySelector(`.stat-card-clickable[data-night-shift="${shiftName}"]`);
         if (card) card.classList.add("active");
@@ -2161,8 +3825,38 @@ class AttendanceView {
         const { dayLogs, empMap } = data;
         const shiftLogs = dayLogs.filter((l) => {
             const e = empMap[l.empId];
-            if (!e || (e.shift || "No Shift") !== shiftName) return false;
-            return this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present");
+
+            if (!e || (e.shift || "No Shift") !== shiftName) {
+                return false;
+            }
+
+            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch");
+
+            if (!isPresentOrHalf) {
+                return false;
+            }
+
+            if (category) {
+                const rawCat = e.companyCategory;
+
+                if (!rawCat) {
+                    return false;
+                }
+
+                const cat = String(rawCat).toUpperCase().trim();
+
+                if (category === "ON-ROLL") {
+                    return cat === "ON-ROLL" || cat === "ONROLL";
+                }
+
+                if (category === "CC") {
+                    return cat === "CC" || cat === "COMPANY CONTRACT" || cat === "COMPANY CONTRACT (CC)";
+                }
+
+                return cat === category;
+            }
+
+            return true;
         });
         const items = shiftLogs.map((l) => ({ log: l, emp: empMap[l.empId], date: l.date }));
         this._renderStatCardDrilldown("nightSummary_" + shiftName, items, 1);
@@ -2175,24 +3869,94 @@ class AttendanceView {
 
         const { dateFrom, dateTo } = model.state.filters;
         const dayLogs = this._buildEmployeeDayLogs(staffEmps, logs, dateFrom, dateTo);
-        this._currentStaffSummaryData = { emps: staffEmps, model, dayLogs, empMap, };
+
+        this._currentStaffSummaryData = {
+            emps: staffEmps,
+            model,
+            dayLogs,
+            empMap,
+        };
 
         const depts = [...new Set(staffEmps.map((e) => e.dept))].sort();
+
         const colorCls = ["info", "success", "warning", "accent", "danger"];
+        const categoryOrder = ["ON-ROLL", "CC", "CONTRACTOR", "OUTSOURCE"];
+
+        const mergeCat = (rawCat) => {
+            if (!rawCat) return null;
+
+            const c = String(rawCat).toUpperCase().trim();
+
+            if (c === "ON-ROLL" || c === "ONROLL") {
+                return "ON-ROLL";
+            }
+
+            if (c === "CC" || c === "COMPANY CONTRACT" || c === "COMPANY CONTRACT (CC)") {
+                return "CC";
+            }
+
+            if (c === "CONTRACTOR") {
+                return "CONTRACTOR";
+            }
+
+            if (c === "OUTSOURCE") {
+                return "OUTSOURCE";
+            }
+
+            return null;
+        };
+
+        const totalCatCounts = {
+            "ON-ROLL": 0,
+            "CC": 0,
+            "CONTRACTOR": 0,
+            "OUTSOURCE": 0
+        };
+
+        const deptCatCounts = {};
+        depts.forEach((d) => {
+            deptCatCounts[d] = {
+                "ON-ROLL": 0,
+                "CC": 0,
+                "CONTRACTOR": 0,
+                "OUTSOURCE": 0
+            };
+        });
 
         const counts = {};
-        depts.forEach((d) => (counts[d] = 0));
+        depts.forEach((d) => {
+            counts[d] = 0;
+        });
+
         dayLogs.forEach((l) => {
             const e = empMap[l.empId];
-            if (!e) return;
+            if (!e) {
+                return;
+            }
+
             const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch");
-            if (!isPresentOrHalf) return;
+
+            if (!isPresentOrHalf) {
+                return;
+            }
+
             if (counts[e.dept] !== undefined) {
                 counts[e.dept]++;
             }
-        });
 
-        const totalPresentHalf = depts.reduce((sum, d) => sum + counts[d], 0);
+            const cat = mergeCat(e.companyCategory);
+            if (!cat) {
+                return;
+            }
+
+            if (totalCatCounts[cat] !== undefined) {
+                totalCatCounts[cat]++;
+            }
+
+            if (deptCatCounts[e.dept] && deptCatCounts[e.dept][cat] !== undefined) {
+                deptCatCounts[e.dept][cat]++;
+            }
+        });
 
         this._currentTabPresentHeadcountItems = dayLogs.filter((l) =>
             this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch")
@@ -2202,49 +3966,119 @@ class AttendanceView {
             date: l.date,
         }));
 
+        const totalPresentHalf = this._currentTabPresentHeadcountItems.length;
+
         const cards = [
-            { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
-            ...depts.map((d, i) => ({ type: "dept", label: d, val: counts[d], icon: "ph-briefcase", cls: colorCls[i % colorCls.length], dept: d, })),
+            { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", catCounts: totalCatCounts, },
+            ...depts.map((d, i) => ({ type: "dept", label: d, val: counts[d], icon: "ph-briefcase", cls: colorCls[i % colorCls.length], dept: d, catCounts: deptCatCounts[d], })),
             { type: "avgHours", label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", },
         ];
 
         return `
-            <div class="summary-grid">
+            <div class="summary-grid summary-grid-category">
                 ${cards.map((c) => {
-            if (c.type === "dept") {
-                return `
-                    <div class="stat-card ${c.cls} stat-card-clickable" data-staff-dept="${this._escapeAttr(c.dept)}" onclick="AppController.view._showStaffSummaryDrilldown('${this._escapeAttr(c.dept)}')">
-                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                        <div class="stat-content">
-                            <span class="stat-label">${c.label}</span>
-                            <span class="stat-value">${c.val}</span>
-                            <span class="stat-card-hint">↓ click to view</span>
+                    if (c.type === "dept") {
+                        return `
+                            <div class="stat-card ${c.cls} stat-card-clickable" data-staff-dept="${this._escapeAttr(c.dept)}" onclick="AppController.view._showStaffSummaryDrilldown('${this._escapeAttr(c.dept)}')">
+                                <div class="stat-card-top">
+                                    <div class="stat-card-top-left">
+                                        <div class="stat-icon">
+                                            <i class="ph ${c.icon}"></i>
+                                        </div>
+
+                                        <div class="stat-content">
+                                            <span class="stat-label">
+                                                ${c.label}
+                                            </span>
+
+                                            <span class="stat-value">
+                                                ${c.val}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <span class="stat-card-hint">
+                                        ↓ click to view
+                                    </span>
+                                </div>
+
+                                <div class="stat-category-row">
+                                    ${categoryOrder.map((cat) => `
+                                        <div class="stat-category-item" data-category="${cat}" title="View ${cat} only" onclick="event.stopPropagation(); AppController.view._showStaffSummaryDrilldown('${this._escapeAttr(c.dept)}', '${cat}')">
+                                            <span class="cat-label">
+                                                ${cat}
+                                            </span>
+
+                                            <span class="cat-value">
+                                                ${c.catCounts?.[cat] || 0}
+                                            </span>
+                                        </div>
+                                    `).join("")}
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    if (c.type === "avgHours") {
+                        return `
+                            <div class="stat-card">
+                                <div class="stat-icon">
+                                    <i class="ph ${c.icon}"></i>
+                                </div>
+
+                                <div class="stat-content">
+                                    <span class="stat-label">
+                                        ${c.label}
+                                    </span>
+
+                                    <span class="stat-value">
+                                        ${c.val}
+                                    </span>
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    return `
+                        <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
+                            <div class="stat-card-top">
+                                <div class="stat-card-top-left">
+                                    <div class="stat-icon">
+                                        <i class="ph ${c.icon}"></i>
+                                    </div>
+
+                                    <div class="stat-content">
+                                        <span class="stat-label">
+                                            ${c.label}
+                                        </span>
+
+                                        <span class="stat-value">
+                                            ${c.val}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <span class="stat-card-hint">
+                                    ↓ click to view
+                                </span>
+                            </div>
+
+                            <div class="stat-category-row">
+                                ${categoryOrder.map((cat) => `
+                                    <div class="stat-category-item" data-category="${cat}" title="View ${cat} only" onclick="event.stopPropagation(); AppController.view._showPresentHeadcountDrilldown('${cat}')">
+                                        <span class="cat-label">
+                                            ${cat}
+                                        </span>
+
+                                        <span class="cat-value">
+                                            ${c.catCounts?.[cat] || 0}
+                                        </span>
+                                    </div>
+                                `).join("")}
+                            </div>
                         </div>
-                    </div>
-                `;
-            }
-            if (c.type === "avgHours") {
-                return `
-                    <div class="stat-card">
-                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                        <div class="stat-content">
-                            <span class="stat-label">${c.label}</span>
-                            <span class="stat-value">${c.val}</span>
-                        </div>
-                    </div>
-                `;
-            }
-            return `
-                <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
-                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                    <div class="stat-content">
-                        <span class="stat-label">${c.label}</span>
-                        <span class="stat-value">${c.val}</span>
-                        <span class="stat-card-hint">↓ click to view</span>
-                    </div>
-                </div>
-            `;
-        }).join("")}
+                    `;
+                }).join("")}
             </div>
         `;
     }
@@ -2261,15 +4095,67 @@ class AttendanceView {
         const depts = [...new Set(workerEmps.map((e) => e.dept))].sort();
         const colorCls = ["info", "success", "warning", "accent", "danger"];
 
+        const categoryOrder = ["ON-ROLL", "CC", "CONTRACTOR", "OUTSOURCE"];
+
+        const mergeCat = (rawCat) => {
+            if (!rawCat) return null;
+
+            const c = String(rawCat).toUpperCase().trim();
+
+            if (c === "ON-ROLL" || c === "ONROLL") return "ON-ROLL";
+
+            if (c === "CC" || c === "COMPANY CONTRACT" || c === "COMPANY CONTRACT (CC)") {
+                return "CC";
+            }
+
+            if (c === "CONTRACTOR") return "CONTRACTOR";
+            if (c === "OUTSOURCE") return "OUTSOURCE";
+
+            return null;
+        };
+
         const counts = {};
         depts.forEach((d) => (counts[d] = 0));
+        const totalCatCounts = {
+            "ON-ROLL": 0,
+            "CC": 0,
+            "CONTRACTOR": 0,
+            "OUTSOURCE": 0
+        };
+
+        const deptCatCounts = {};
+        depts.forEach((d) => {
+            deptCatCounts[d] = {
+                "ON-ROLL": 0,
+                "CC": 0,
+                "CONTRACTOR": 0,
+                "OUTSOURCE": 0
+            };
+        });
+
         dayLogs.forEach((l) => {
             const e = empMap[l.empId];
+            
             if (!e) return;
+
             const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch");
+            
             if (!isPresentOrHalf) return;
+            
             if (counts[e.dept] !== undefined) {
                 counts[e.dept]++;
+            }
+
+            const cat = mergeCat(e.companyCategory);
+            
+            if (cat) {
+                if (totalCatCounts[cat] !== undefined) {
+                    totalCatCounts[cat]++;
+                }
+
+                if (deptCatCounts[e.dept] && deptCatCounts[e.dept][cat] !== undefined) {
+                    deptCatCounts[e.dept][cat]++;
+                }
             }
         });
 
@@ -2284,54 +4170,109 @@ class AttendanceView {
         const totalPresentHalf = this._currentTabPresentHeadcountItems.length;
 
         const cards = [
-            { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "", },
-            ...depts.map((d, i) => ({ type: "dept", label: d, val: counts[d], icon: "ph-briefcase", cls: colorCls[i % colorCls.length], dept: d, })),
+            { type: "headcount", label: "Total Presentcount", val: totalPresentHalf, icon: "ph-users", cls: "",  catCounts: totalCatCounts, },
+            ...depts.map((d, i) => ({ type: "dept", label: d, val: counts[d], icon: "ph-briefcase", cls: colorCls[i % colorCls.length], dept: d, catCounts: deptCatCounts[d], })),
             { type: "avgHours", label: "Avg Hours", val: stats.avgHours + "h", icon: "ph-timer", cls: "", },
         ];
 
         return `
-            <div class="summary-grid">
+            <div class="summary-grid summary-grid-category">
                 ${cards.map((c) => {
-            if (c.type === "dept") {
-                return `
-                    <div class="stat-card ${c.cls} stat-card-clickable" data-worker-dept="${this._escapeAttr(c.dept)}" onclick="AppController.view._showWorkerSummaryDrilldown('${this._escapeAttr(c.dept)}')">
-                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                        <div class="stat-content">
-                            <span class="stat-label">${c.label}</span>
-                            <span class="stat-value">${c.val}</span>
-                            <span class="stat-card-hint">↓ click to view</span>
+                    if (c.type === "dept") {
+                        return `
+                            <div class="stat-card ${c.cls} stat-card-clickable" data-worker-dept="${this._escapeAttr(c.dept)}" onclick="AppController.view._showWorkerSummaryDrilldown('${this._escapeAttr(c.dept)}')">
+                                <div class="stat-card-top">
+                                    <div class="stat-card-top-left">
+                                        <div class="stat-icon">
+                                            <i class="ph ${c.icon}"></i>
+                                        </div>
+
+                                        <div class="stat-content">
+                                            <span class="stat-label">${c.label}</span>
+                                            <span class="stat-value">${c.val}</span>
+                                        </div>
+                                    </div>
+
+                                    <span class="stat-card-hint">
+                                        ↓ click to view
+                                    </span>
+                                </div>
+
+                                <div class="stat-category-row">
+                                    ${categoryOrder.map((cat) => `
+                                        <div class="stat-category-item" data-category="${cat}" title="View ${cat} only" onclick="event.stopPropagation(); AppController.view._showWorkerSummaryDrilldown('${this._escapeAttr(c.dept)}', '${cat}')">
+                                            <span class="cat-label">
+                                                ${cat}
+                                            </span>
+
+                                            <span class="cat-value">
+                                                ${c.catCounts?.[cat] || 0}
+                                            </span>
+                                        </div>
+                                    `).join("")}
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    if (c.type === "avgHours") {
+                        return `
+                            <div class="stat-card">
+                                <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
+                                <div class="stat-content">
+                                    <span class="stat-label">${c.label}</span>
+                                    <span class="stat-value">${c.val}</span>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    return `
+                        <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
+                            <div class="stat-card-top">
+                                <div class="stat-card-top-left">
+                                    <div class="stat-icon">
+                                        <i class="ph ${c.icon}"></i>
+                                    </div>
+
+                                    <div class="stat-content">
+                                        <span class="stat-label">
+                                            ${c.label}
+                                        </span>
+
+                                        <span class="stat-value">
+                                            ${c.val}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <span class="stat-card-hint">
+                                    ↓ click to view
+                                </span>
+                            </div>
+
+                            <div class="stat-category-row">
+                                ${categoryOrder.map((cat) => `
+                                    <div class="stat-category-item" data-category="${cat}" title="View ${cat} only" onclick="event.stopPropagation(); AppController.view._showPresentHeadcountDrilldown('${cat}')">
+                                        <span class="cat-label">
+                                            ${cat}
+                                        </span>
+
+                                        <span class="cat-value">
+                                            ${c.catCounts?.[cat] || 0}
+                                        </span>
+                                    </div>
+                                `).join("")}
+                            </div>
                         </div>
-                    </div>
-                `;
-            }
-            if (c.type === "avgHours") {
-                return `
-                    <div class="stat-card">
-                        <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                        <div class="stat-content">
-                            <span class="stat-label">${c.label}</span>
-                            <span class="stat-value">${c.val}</span>
-                        </div>
-                    </div>
-                `;
-            }
-            return `
-                <div class="stat-card ${c.cls} stat-card-clickable" data-card-key="presentHeadcount" onclick="AppController.view._showPresentHeadcountDrilldown()">
-                    <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
-                    <div class="stat-content">
-                        <span class="stat-label">${c.label}</span>
-                        <span class="stat-value">${c.val}</span>
-                        <span class="stat-card-hint">↓ click to view</span>
-                    </div>
-                </div>
-            `;
-        }).join("")}
+                    `;
+                }).join("")}
             </div>
         `;
     }
 
 
-    _showWorkerSummaryDrilldown(dept) {
+    _showWorkerSummaryDrilldown(dept, category=null) {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
         const card = this.app.querySelector(`.stat-card-clickable[data-worker-dept="${dept}"]`,);
         if (card) card.classList.add("active");
@@ -2341,15 +4282,68 @@ class AttendanceView {
 
         const { emps, dayLogs, empMap } = data;
 
+        const mergeCat = (rawCat) => {
+            if (!rawCat) return null;
+
+            const c = String(rawCat).toUpperCase().trim();
+
+            if (c === "ON-ROLL" || c === "ONROLL") {
+                return "ON-ROLL";
+            }
+
+            if (c === "CC" || c === "COMPANY CONTRACT" || c === "COMPANY CONTRACT (CC)") {
+                return "CC";
+            }
+
+            if (c === "CONTRACTOR") {
+                return "CONTRACTOR";
+            }
+
+            if (c === "OUTSOURCE") {
+                return "OUTSOURCE";
+            }
+
+            return null;
+        };
+
         let items;
         if (data.isDashboard) {
-            items = emps.filter((e) => e.dept === dept).map((emp) => ({ log: null, emp, date: null }));
+            items = emps.filter((e) => {
+                if (e.dept !== dept) {
+                    return false;
+                }
+
+                if (category) {
+                    return mergeCat(e.companyCategory) === category;
+                }
+
+                return true;
+            }).map((emp) => ({
+                log: null,
+                emp,
+                date: null
+            }));
         } else {
             const deptLogs = dayLogs.filter((l) => {
                 const e = empMap[l.empId];
-                if (!e || e.dept !== dept) return false;
-                return (this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch"));
+
+                if (!e || e.dept !== dept) {
+                    return false;
+                }
+
+                const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch");
+
+                if (!isPresentOrHalf) {
+                    return false;
+                }
+
+                if (category) {
+                    return mergeCat(e.companyCategory) === category;
+                }
+
+                return true;
             });
+            
             items = deptLogs.map((l) => ({
                 log: l,
                 emp: empMap[l.empId],
@@ -2378,25 +4372,86 @@ class AttendanceView {
     }
 
     
-    _showStaffSummaryDrilldown(dept) {
+    _showStaffSummaryDrilldown(dept, category = null) {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-staff-dept="${dept}"]`,);
-        if (card) card.classList.add("active");
+
+        const card = this.app.querySelector(`.stat-card-clickable[data-staff-dept="${dept}"]`);
+
+        if (card) {
+            card.classList.add("active");
+        }
 
         const data = this._currentStaffSummaryData;
-        if (!data) return;
+
+        if (!data) {
+            return;
+        }
 
         const { emps, dayLogs, empMap } = data;
 
+        const mergeCat = (rawCat) => {
+            if (!rawCat) return null;
+
+            const c = String(rawCat).toUpperCase().trim();
+
+            if (c === "ON-ROLL" || c === "ONROLL") {
+                return "ON-ROLL";
+            }
+
+            if (c === "CC" || c === "COMPANY CONTRACT" || c === "COMPANY CONTRACT (CC)") {
+                return "CC";
+            }
+
+            if (c === "CONTRACTOR") {
+                return "CONTRACTOR";
+            }
+
+            if (c === "OUTSOURCE") {
+                return "OUTSOURCE";
+            }
+
+            return null;
+        };
+
         let items;
+
         if (data.isDashboard) {
-            items = emps.filter((e) => e.dept === dept).map((emp) => ({ log: null, emp, date: null }));
+            items = emps.filter((e) => {
+                if (e.dept !== dept) {
+                    return false;
+                }
+
+                if (category) {
+                    return mergeCat(e.companyCategory) === category;
+                }
+
+                return true;
+            }).map((emp) => ({
+                log: null,
+                emp,
+                date: null
+            }));
         } else {
             const deptLogs = dayLogs.filter((l) => {
                 const e = empMap[l.empId];
-                if (!e || e.dept !== dept) return false;
-                return (this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch"));
+
+                if (!e || e.dept !== dept) {
+                    return false;
+                }
+
+                const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch");
+
+                if (!isPresentOrHalf) {
+                    return false;
+                }
+
+                if (category) {
+                    return mergeCat(e.companyCategory) === category;
+                }
+
+                return true;
             });
+
             items = deptLogs.map((l) => ({
                 log: l,
                 emp: empMap[l.empId],
@@ -2425,7 +4480,7 @@ class AttendanceView {
     }
 
     
-    _showShiftSummaryDrilldown(shiftName) {
+    _showShiftSummaryDrilldown(shiftName, category = null) {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
         const card = this.app.querySelector(`.stat-card-clickable[data-shift="${shiftName}"]`);
         if (card) card.classList.add("active");
@@ -2436,8 +4491,40 @@ class AttendanceView {
         const { dayLogs, empMap } = data;
         const shiftLogs = dayLogs.filter((l) => {
             const e = empMap[l.empId];
-            if (!e || this._normalizeShiftName(l.shiftName) !== shiftName) return false;
-            return this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch");
+            if (!e) {
+                return false;
+            }
+
+            if (this._normalizeShiftName(l.shiftName) !== shiftName) {
+                return false;
+            }
+
+            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch");
+
+            if (!isPresentOrHalf) {
+                return false;
+            }
+
+            if (category) {
+                const rawCat = e.companyCategory;
+                if (!rawCat) {
+                    return false;
+                }
+
+                const cat = String(rawCat).toUpperCase().trim();
+
+                if (category === "ON-ROLL") {
+                    return cat === "ON-ROLL" || cat === "ONROLL";
+                }
+
+                if (category === "CC") {
+                    return (cat === "CC" || cat === "COMPANY CONTRACT" || cat === "COMPANY CONTRACT (CC)");
+                }
+
+                return cat === category;
+            }
+
+            return true;
         });
 
         const items = shiftLogs.map((l) => ({
@@ -2465,7 +4552,7 @@ class AttendanceView {
     }
 
 
-    _showGenderSummaryDrilldown(gender) {
+    _showGenderSummaryDrilldown(gender, category=null) {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
         const card = this.app.querySelector(`.stat-card-clickable[data-gender="${gender}"]`);
         if (card) card.classList.add("active");
@@ -2497,7 +4584,12 @@ class AttendanceView {
             return (this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch"));
         }).map((l) => ({ log: l, emp: data.empMap[l.empId], date: l.date }));
 
-        this._renderStatCardDrilldown("genderSummary_" + gender, items, 1);
+        const filteredItems = category ? items.filter((item) => {
+            const emp = item.emp;
+            return (emp?.companyCategory?.toUpperCase().trim() === category);
+        }) : items;
+
+        this._renderStatCardDrilldown("genderSummary_" + gender, filteredItems, 1);
     }
 
 
@@ -2576,7 +4668,7 @@ class AttendanceView {
     }
 
 
-    _showDeptSummaryDrilldown(dept) {
+    _showDeptSummaryDrilldown(dept, category=null) {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
         const card = this.app.querySelector(`.stat-card-clickable[data-dept="${dept}"]`,);
         if (card) {
@@ -2591,7 +4683,7 @@ class AttendanceView {
         const deptLogs = dayLogs.filter((l) => {
             const e = empMap[l.empId];
             if (!e || e.dept !== dept) return false;
-            return (this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "Single Punch"));
+            return (this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch"));
         });
 
         const items = deptLogs.map((l) => ({
@@ -2600,7 +4692,12 @@ class AttendanceView {
             date: l.date,
         }));
 
-        this._renderStatCardDrilldown("deptSummary_" + dept, items, 1);
+        const filteredItems = category ? items.filter((item) => {
+            const emp = item.emp;
+            return (emp?.companyCategory?.toUpperCase().trim() === category);
+        }) : items;
+
+        this._renderStatCardDrilldown("deptSummary_" + dept, filteredItems, 1);
     }
 
 
@@ -2619,10 +4716,14 @@ class AttendanceView {
     }
 
 
-    _showDesignationFamilyDrilldown(familyId) {
+    _showDesignationFamilyDrilldown(familyId, category = null) {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-family-id="${familyId}"]`,);
-        if (card) card.classList.add("active");
+
+        const card = this.app.querySelector(`.stat-card-clickable[data-family-id="${familyId}"]`);
+
+        if (card) {
+            card.classList.add("active");
+        }
 
         const data = this._currentDesigFamilySummaryData;
         if (!data) return;
@@ -2631,14 +4732,47 @@ class AttendanceView {
 
         const items = dayLogs.filter((l) => {
             const e = empMap[l.empId];
-            if (!e) return false;
+
+            if (!e) {
+                return false;
+            }
+
             const famInfo = famMap[e.designationId];
-            if (!famInfo || famInfo.familyId !== familyId) return false;
-            return this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "Single Punch");
+
+            if (!famInfo || famInfo.familyId !== familyId) {
+                return false;
+            }
+
+            const isPresentOrHalf = this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch");
+
+            if (!isPresentOrHalf) {
+                return false;
+            }
+
+            if (category) {
+                const rawCat = e.companyCategory;
+                if (!rawCat) {
+                    return false;
+                }
+
+                const cat = String(rawCat).toUpperCase().trim();
+
+                if (category === "ON-ROLL") {
+                    return cat === "ON-ROLL" || cat === "ONROLL";
+                }
+
+                if (category === "CC") {
+                    return (cat === "CC" || cat === "COMPANY CONTRACT" || cat === "COMPANY CONTRACT (CC)");
+                }
+
+                return cat === category;
+            }
+
+            return true;
         }).map((l) => ({
             log: l,
             emp: empMap[l.empId],
-            date: l.date,
+            date: l.date
         }));
 
         this._renderStatCardDrilldown("desigFamily_" + familyId, items, 1);
@@ -2945,9 +5079,7 @@ class AttendanceView {
         this._currentCompanyLocationData = { company, emps: companyEmps };
 
         const cardsHtml = locations.map((loc, i) => `
-            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
-                data-company-location="${this._escapeAttr(loc)}"
-                onclick="AppController.view._showCompanyLocationDrilldown('${this._escapeAttr(loc)}')">
+            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable" data-company-location="${this._escapeAttr(loc)}" onclick="AppController.view._showCompanyLocationDrilldown('${this._escapeAttr(loc)}')">
                 <div class="stat-icon"><i class="ph ph-map-pin"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">${this._escapeAttr(loc)}</span>
@@ -3005,7 +5137,7 @@ class AttendanceView {
     }
 
 
-    _showAgeGroupDrilldown(group) {
+    _showAgeGroupDrilldown(group, category=null) {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
         const card = this.app.querySelector(`.stat-card-clickable[data-age-group="${group}"]`);
         if (card) card.classList.add("active");
@@ -3032,11 +5164,17 @@ class AttendanceView {
         const items = data.dayLogs.filter((l) => {
             const e = data.empMap[l.empId];
             if (!e || data.model.getAgeGroup(e.dob) !== group) return false;
-            return (this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "Single Punch"));
+            return (this._matchesStatus(l, "Present") || this._matchesStatus(l, "Half Present") || this._matchesStatus(l, "WO Present") || this._matchesStatus(l, "WO Half Present") || this._matchesStatus(l, "Single Punch"));
         }).map((l) => ({ log: l, emp: data.empMap[l.empId], date: l.date }));
 
-        this._renderStatCardDrilldown("ageGroup_" + group, items, 1);
+        const filteredItems = category ? items.filter((item) => {
+            const emp = item.emp;
+            return emp?.companyCategory?.toUpperCase().trim() === category;
+        }) : items;
+
+        this._renderStatCardDrilldown("ageGroup_" + group, filteredItems, 1);
     }
+
 
     _showAgeGroupLocationCards(group) {
         const data = this._currentAgeData;
@@ -3096,8 +5234,6 @@ class AttendanceView {
         if (panel) { panel.style.display = "none"; panel.innerHTML = ""; }
         document.querySelectorAll("[data-age-location]").forEach(c => c.classList.remove("active"));
     }
-
-
 
     _showWorkforceSelected(type) {
         document.querySelectorAll(".stat-card-clickable").forEach(c => c.classList.remove("active"));
@@ -3388,9 +5524,7 @@ class AttendanceView {
         this._currentFamilyLocationData = { familyId, famEmps };
 
         const cardsHtml = locations.map((loc, i) => `
-            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
-                data-family-location="${this._escapeAttr(loc)}"
-                onclick="AppController.view._showFamilyLocationDrilldown('${this._escapeAttr(loc)}')">
+            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable" data-family-location="${this._escapeAttr(loc)}" onclick="AppController.view._showFamilyLocationDrilldown('${this._escapeAttr(loc)}')">
                 <div class="stat-icon"><i class="ph ph-map-pin"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">${this._escapeAttr(loc)}</span>
@@ -3423,12 +5557,116 @@ class AttendanceView {
 
         const data = this._currentFamilyLocationData;
         if (!data) return;
-        const items = data.famEmps.filter(e => (e.location || 'Unassigned') === location).map(emp => ({ log: null, emp, date: null }));
-        const fullItems = data.famEmps.map(emp => ({ log: null, emp, date: null }));
+        this._closeFamilyDesignationTable();
 
-        this._renderStatCardDrilldown("familyLocation_" + data.familyId + "_" + location, items, 1, "stat-card-drilldown", "AppController.view._closeStatCardDrilldown()", fullItems, "family_" + data.familyId + "_all_locations");
+        const locationEmps = data.famEmps.filter((emp) => (emp.location || "Unassigned") === location);
+        this._showFamilyDesignationCards(data.familyId, location, locationEmps);
     }
 
+    _showFamilyDesignationCards(familyId, location, locationEmps) {
+        const panel = document.getElementById("dashboard-family-location-drilldown");
+        if (!panel) return;
+
+        const designationMap = new Map();
+
+        locationEmps.forEach((emp) => {
+            const name = emp.designation || "Staff";
+            const order = Number(emp.designationSortOrder) || 0;
+
+            if (!designationMap.has(name)) {
+                designationMap.set(name, { name, order, count: 0 });
+            }
+
+            const designation = designationMap.get(name);
+            designation.count++;
+
+            if (order < designation.order) {
+                designation.order = order;
+            }
+        });
+
+        const designations = [...designationMap.values()].sort((a, b) => a.order !== b.order ? a.order - b.order : a.name.localeCompare(b.name));
+
+        this._currentFamilyDesignationData = {
+            familyId,
+            location,
+            employees: locationEmps,
+        };
+
+        let designationPanel = document.getElementById(
+            "dashboard-family-designation-drilldown"
+        );
+
+        if (!designationPanel) {
+            designationPanel = document.createElement("div");
+            designationPanel.id = "dashboard-family-designation-drilldown";
+            panel.appendChild(designationPanel);
+        }
+
+        const colors = ["info", "success", "warning", "accent", "danger"];
+
+        const cardsHtml = designations.map((designation, index) => `
+            <div class="stat-card ${colors[index % colors.length]} stat-card-clickable" data-family-designation="${this._escapeAttr(designation.name)}" onclick="AppController.view._showFamilyDesignationDrilldown('${this._escapeAttr(designation.name)}')">
+                <div class="stat-icon">
+                    <i class="ph ph-identification-badge"></i>
+                </div>
+                <div class="stat-content">
+                    <span class="stat-label">${this._escapeAttr(designation.name)}</span>
+                    <span class="stat-value">${designation.count}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+        `).join("");
+
+        designationPanel.innerHTML = `
+            <div style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#334155;margin:24px 0 12px;display:flex;align-items:center;gap:8px;">
+                ${this._escapeAttr(location)} — BY DESIGNATION
+                <span style="flex:1;height:1px;background:#64748b;display:block;border-radius:2px;"></span>
+            </div>
+
+            <div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));">
+                ${cardsHtml || '<p style="padding:16px;color:#94a3b8;">No designations found.</p>'}
+            </div>
+
+            <div id="dashboard-family-designation-table" style="margin-top:8px;"></div>
+        `;
+
+        designationPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    _showFamilyDesignationDrilldown(designation) {
+        document.querySelectorAll("[data-family-designation]").forEach((card) => {
+            card.classList.remove("active");
+        });
+
+        const card = this.app.querySelector(`[data-family-designation="${this._escapeAttr(designation)}"]`);
+        if (card) card.classList.add("active");
+
+        const data = this._currentFamilyDesignationData;
+        if (!data) return;
+
+        const items = data.employees.filter((emp) => (emp.designation || "Staff") === designation).map((emp) => ({ log: null, emp, date: null }));
+
+        this._renderStatCardDrilldown(
+            `dashboardFamily_${data.familyId}_${data.location}_${designation}`,
+            items,
+            1,
+            "dashboard-family-designation-table",
+            "AppController.view._closeFamilyDesignationTable()"
+        );
+    }
+
+    _closeFamilyDesignationTable() {
+        const panel = document.getElementById("dashboard-family-designation-table");
+        if (panel) {
+            panel.innerHTML = "";
+            panel.style.display = "none";
+        }
+
+        document.querySelectorAll("[data-family-designation]").forEach((card) => {
+            card.classList.remove("active");
+        });
+    }
 
     _closeFamilyLocationCards() {
         const panel = document.getElementById("dashboard-family-location-drilldown");
@@ -3451,256 +5689,674 @@ class AttendanceView {
         this._renderStatCardDrilldown("dashboardDesig_" + designation, items, 1);
     }
 
+    _resetJoinExitPanels(keep = null) {
+        this.closeDrillDown();
+        const main = document.getElementById("stat-card-drilldown");
+        if (main) { main.style.display = "none"; main.innerHTML = ""; }
 
-    _showNewJoinedBreakdownDrilldown(type, value) {
-        document.querySelectorAll("[data-nj-company],[data-nj-gender],[data-nj-workforce],[data-nj-age]",).forEach((c) => c.classList.remove("active"));
+        const ids = [];
+        if (keep !== "desig")     ids.push("newjoined-desig-drilldown", "resigned-desig-drilldown");
+        if (keep !== "breakdown") ids.push("newjoined-breakdown-drilldown", "resigned-breakdown-drilldown");
+        ids.forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = "";
+        });
+
+        const keepSel = {
+            breakdown: "[data-nj-company-category],[data-nj-location],[data-nj-company],[data-res-company-category],[data-res-location],[data-res-company]",
+            desig: "[data-newjoined-dept],[data-resigned-dept],[data-newjoined-desig],[data-resigned-desig]",
+        }[keep];
+
+        document.querySelectorAll(".stat-card-clickable, .stat-category-item").forEach((el) => {
+            if (keepSel && el.matches(keepSel)) return;
+            el.classList.remove("active");
+        });
+    }
+
+    _normalizeJoinExitCategory(rawCat) {
+        if (!rawCat) return null;
+        const c = String(rawCat).toUpperCase().trim();
+        if (c === "ON-ROLL" || c === "ONROLL") return "ON-ROLL";
+        if (c === "CC" || c === "COMPANY CONTRACT" || c === "COMPANY CONTRACT (CC)") return "CC";
+        if (c === "CONTRACTOR") return "CONTRACTOR";
+        if (c === "OUTSOURCE") return "OUTSOURCE";
+        return null;
+    }
+
+    _showNewJoinedBreakdownDrilldown(type, value, category = null) {
+        const isNavStep = type === "location" || type === "company";
+        this._resetJoinExitPanels(isNavStep ? "breakdown" : null);
 
         const attrMap = {
             company: "data-nj-company",
+            "company-category": "data-nj-company-category",
+            location: "data-nj-location",
             gender: "data-nj-gender",
             workforce: "data-nj-workforce",
             age: "data-nj-age",
         };
-        const card = this.app.querySelector(`[${attrMap[type]}="${value}"]`);
-        if (card) card.classList.add("active");
-
-        const data = this._currentNewJoinedBreakdown;
-        if (!data) return;
-        const { emps } = data;
-
-        let filtered;
-        if (type === "company") {
-            filtered = emps.filter((e) => e.company === value);
-        } else if (type === "gender") {
-            filtered = emps.filter((e) => e.gender === value);
-        } else if (type === "workforce") {
-            const staffTeamId = AppController.model.state.teamConfig?.staffTeamId ?? 7;
-            const workerTeamId = AppController.model.state.teamConfig?.workerTeamId ?? 6;
-            filtered = value === "Staff" ? emps.filter((e) => e.team === staffTeamId) : emps.filter((e) => e.team === workerTeamId);
-        } else if (type === "age") {
-            filtered = emps.filter((e) => AppController.model.getAgeGroup(e.dob) === value,);
+        
+        const attr = attrMap[type];
+        if (attr) {
+            document.querySelectorAll(`[${attr}]`).forEach((c) => c.classList.remove("active"));
+            const card = this.app.querySelector(`[${attr}="${this._escapeAttr(value)}"]`);
+            if (card) card.classList.add("active");
         }
 
-        const items = filtered.map((emp) => ({ log: null, emp, date: null }));
-        this._renderStatCardDrilldown(`njBreakdown_${type}_${value}`, items, 1, "newjoined-breakdown-drilldown", "AppController.view._closeNewJoinedBreakdownDrilldown()");
+        const data = this._currentNewJoinedBreakdown;
+        if (!data || !Array.isArray(data.emps)) return;
+        const { emps } = data;
+        const normalizeCategory = (c) => this._normalizeJoinExitCategory(c);
+
+        // ── CATEGORY → LOCATION CARDS ──
+        if (type === "company-category") {
+            const filtered = emps.filter((e) => normalizeCategory(e.companyCategory) === value);
+
+            data.category = value;
+            data.location = null;
+            data.company = null;
+
+            const locations = {};
+            filtered.forEach((emp) => {
+                const location = emp.location || "Unassigned";
+                if (!locations[location]) locations[location] = [];
+                locations[location].push(emp);
+            });
+
+            const colorCls = ["info", "success", "warning", "accent", "danger"];
+            const locationCards = Object.keys(locations).map((location, i) => `
+                <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable" data-nj-location="${this._escapeAttr(location)}" onclick="AppController.view._showNewJoinedBreakdownDrilldown('location', '${this._escapeAttr(location)}')" style="position:relative;">
+                    <button class="stat-card-download-btn" title="Download this card's employees" onclick="event.stopPropagation(); AppController.view._downloadJoinExitCardExcel('newJoined', 'location', '${this._escapeAttr(location)}')">
+                        <i class="ph ph-download-simple"></i>
+                    </button>
+
+                    <div class="stat-icon"><i class="ph ph-map-pin"></i></div>
+                    
+                    <div class="stat-content">
+                        <span class="stat-label">${this._escapeAttr(location)}</span>
+                        <span class="stat-value">${locations[location].length}</span>
+                        <span class="stat-card-sub">Employees</span>
+                        <span class="stat-card-hint">↓ click to view companies</span>
+                    </div>
+                </div>
+            `).join("");
+
+            const container = this.app.querySelector("#newjoined-breakdown-drilldown");
+            if (!container) return;
+
+            container.innerHTML = `
+                <div id="nj-location-drilldown" style="margin-top:12px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                        <div style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:#475569;">
+                            ${this._escapeAttr(value)} — By Location
+                        </div>
+                    </div>
+                    <div class="summary-grid" style="grid-template-columns: repeat(auto-fit,minmax(160px,1fr));">
+                        ${locationCards}
+                    </div>
+                </div>
+                <div id="nj-company-drilldown"></div>
+            `;
+            return;
+        }
+
+        // ── LOCATION → COMPANY CARDS (or straight to table if only 1 company) ──
+        if (type === "location") {
+            const cat = data.category;
+            if (!cat) return;
+
+            const filtered = emps.filter((e) =>
+                normalizeCategory(e.companyCategory) === cat && (e.location || "Unassigned") === value
+            );
+
+            data.location = value;
+            data.company = null;
+
+            const companies = {};
+            filtered.forEach((emp) => {
+                const company = emp.company || "Unassigned";
+                if (!companies[company]) companies[company] = [];
+                companies[company].push(emp);
+            });
+
+            const categoryCompanies = new Set();
+            emps.forEach((emp) => {
+                if (normalizeCategory(emp.companyCategory) === cat) {
+                    categoryCompanies.add(emp.company || "Unassigned");
+                }
+            });
+
+            const companyContainer = this.app.querySelector("#nj-company-drilldown");
+
+            if (categoryCompanies.size === 1) {
+                data.company = [...categoryCompanies][0];
+                if (companyContainer) companyContainer.innerHTML = "";
+                const items = filtered.map((emp) => ({ log: null, emp, date: null }));
+                this._renderStatCardDrilldown(`njBreakdown_company_${data.company}`, items, 1);
+                return;
+            }
+
+            if (!companyContainer) return;
+
+            const colorCls = ["info", "success", "warning", "accent", "danger"];
+            const companyCards = Object.keys(companies).map((company, i) => `
+                <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable" data-nj-company="${this._escapeAttr(company)}" onclick="AppController.view._showNewJoinedBreakdownDrilldown('company', '${this._escapeAttr(company)}')" style="position:relative;">
+                    <button class="stat-card-download-btn" title="Download this card's employees" onclick="event.stopPropagation(); AppController.view._downloadJoinExitCardExcel('newJoined', 'company', '${this._escapeAttr(company)}')">
+                        <i class="ph ph-download-simple"></i>
+                    </button>
+
+                    <div class="stat-icon"><i class="ph ph-buildings"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">${this._escapeAttr(company)}</span>
+                        <span class="stat-value">${companies[company].length}</span>
+                        <span class="stat-card-sub">Employees</span>
+                        <span class="stat-card-hint">↓ click to view employees</span>
+                    </div>
+                </div>
+            `).join("");
+
+            companyContainer.innerHTML = `
+                <div style="margin-top:12px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                        <div style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:#475569;">
+                            ${this._escapeAttr(value)} — By Company
+                        </div>
+                    </div>
+                    <div class="summary-grid" style="grid-template-columns: repeat(auto-fit,minmax(180px,1fr));">
+                        ${companyCards}
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        // ── COMPANY → TABLE ──
+        if (type === "company") {
+            const cat = data.category;
+            const location = data.location;
+            if (!cat || !location) return;
+
+            const filtered = emps.filter((e) =>
+                normalizeCategory(e.companyCategory) === cat &&
+                (e.location || "Unassigned") === location &&
+                e.company === value
+            );
+
+            data.company = value;
+
+            const items = filtered.map((emp) => ({ log: null, emp, date: null }));
+            this._renderStatCardDrilldown(`njBreakdown_${type}_${value}`, items, 1);
+            return;
+        }
+
+        // ── GENDER ──
+        if (type === "gender") {
+            const items = emps
+                .filter((e) => e.gender === value && (!category || normalizeCategory(e.companyCategory) === category))
+                .map((emp) => ({ log: null, emp, date: null }));
+            this._renderStatCardDrilldown(`njBreakdown_${type}_${value}`, items, 1);
+            return;
+        }
+
+        // ── WORKFORCE ──
+        if (type === "workforce") {
+            const staffTeamId = AppController.model.state.teamConfig?.staffTeamId ?? 7;
+            const workerTeamId = AppController.model.state.teamConfig?.workerTeamId ?? 6;
+
+            const items = emps
+                .filter((e) => {
+                    const isMatch = value === "Staff" ? e.team === staffTeamId : e.team === workerTeamId;
+                    return isMatch && (!category || normalizeCategory(e.companyCategory) === category);
+                })
+                .map((emp) => ({ log: null, emp, date: null }));
+            this._renderStatCardDrilldown(`njBreakdown_${type}_${value}`, items, 1);
+            return;
+        }
+
+        // ── AGE ──
+        if (type === "age") {
+            const items = emps
+                .filter((e) =>
+                    AppController.model.getAgeGroup(e.dob) === value &&
+                    (!category || normalizeCategory(e.companyCategory) === category)
+                )
+                .map((emp) => ({ log: null, emp, date: null }));
+            this._renderStatCardDrilldown(`njBreakdown_${type}_${value}`, items, 1);
+            return;
+        }
     }
 
 
-    _closeNewJoinedBreakdownDrilldown() {
-        const c = document.getElementById("newjoined-breakdown-drilldown");
-        if (c) c.innerHTML = "";
-        document.querySelectorAll("[data-nj-company],[data-nj-gender],[data-nj-workforce],[data-nj-age]",).forEach((el) => el.classList.remove("active"));
-    }
+    _showNewJoinedDeptDrilldown(dept, category = null) {
+        this._resetJoinExitPanels();
 
-
-    _showNewJoinedDeptDrilldown(dept) {
-        document.querySelectorAll(".stat-card-clickable[data-newjoined-dept]").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-newjoined-dept="${dept}"]`,);
+        const card = this.app.querySelector(`.stat-card-clickable[data-newjoined-dept="${this._escapeAttr(dept)}"]`);
         if (card) card.classList.add("active");
 
         const data = this._currentNewJoinedDeptData;
         if (!data) return;
 
-        const deptEmps = data.njEmps.filter((e) => e.dept === dept);
+        const normalizeCategory = (c) => this._normalizeJoinExitCategory(c);
 
+        const deptEmps = data.njEmps.filter((e) =>
+            e.dept === dept && (!category || normalizeCategory(e.companyCategory) === category)
+        );
+
+        // chip click → table directly
+        if (category) {
+            const items = deptEmps.map((emp) => ({ log: null, emp, date: null }));
+            this._renderStatCardDrilldown(`njDept_${dept}_${category}`, items, 1);
+            return;
+        }
+
+        // main click → designation cards
         const desigMap = {};
         deptEmps.forEach((e) => {
             const name = e.designation || "Staff";
             const order = e.designationSortOrder || 0;
-            if (!desigMap[name] || order < desigMap[name].order) {
-                desigMap[name] = { name, order };
-            }
+            if (!desigMap[name] || order < desigMap[name].order) desigMap[name] = { name, order };
         });
-        const desigs = Object.values(desigMap).sort((a, b) => a.order !== b.order ? a.order - b.order : a.name.localeCompare(b.name),).map((d) => d.name);
 
+        const desigs = Object.values(desigMap)
+            .sort((a, b) => a.order !== b.order ? a.order - b.order : a.name.localeCompare(b.name))
+            .map((d) => d.name);
+
+        const categoryOrder = ["ON-ROLL", "CC", "CONTRACTOR", "OUTSOURCE"];
         const desigCounts = {};
-        desigs.forEach((d) => (desigCounts[d] = 0));
+        const desigCategoryCounts = {};
+
+        desigs.forEach((d) => {
+            desigCounts[d] = 0;
+            desigCategoryCounts[d] = { "ON-ROLL": 0, "CC": 0, "CONTRACTOR": 0, "OUTSOURCE": 0 };
+        });
+
         deptEmps.forEach((e) => {
             const name = e.designation || "Staff";
-            if (desigCounts[name] !== undefined) desigCounts[name]++;
+            if (desigCounts[name] !== undefined) {
+                desigCounts[name]++;
+                const cat = normalizeCategory(e.companyCategory);
+                if (cat) desigCategoryCounts[name][cat]++;
+            }
         });
 
         this._currentNewJoinedDesigData = { dept, deptEmps };
 
         const colorCls = ["info", "success", "warning", "accent", "danger"];
         const desigCardsHtml = desigs.map((d, i) => `
-            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
-                style="flex: 0 1 180px;"
-                data-newjoined-desig="${this._escapeAttr(d)}"
-                onclick="AppController.view._showNewJoinedDesigDrilldown('${this._escapeAttr(d)}')">
-                <div class="stat-icon"><i class="ph ph-identification-badge"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">${d}</span>
-                    <span class="stat-value">${desigCounts[d]}</span>
+            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable" style="flex: 0 1 220px;" data-newjoined-desig="${this._escapeAttr(d)}" onclick="AppController.view._showNewJoinedDesigDrilldown('${this._escapeAttr(d)}')">
+                <button class="stat-card-download-btn" title="Download this card's employees" onclick="event.stopPropagation(); AppController.view._downloadJoinExitCardExcel('newJoined', 'designation', '${this._escapeAttr(d)}')">
+                    <i class="ph ph-download-simple"></i>
+                </button>
+
+                <div class="stat-card-top">
+                    <div class="stat-card-top-left">
+                        <div class="stat-icon"><i class="ph ph-identification-badge"></i></div>
+                        <div class="stat-content">
+                            <span class="stat-label">${d}</span>
+                            <span class="stat-value">${desigCounts[d]}</span>
+                        </div>
+                    </div>
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
+                <div class="stat-category-row">
+                    ${categoryOrder.map((cat) => `
+                        <div class="stat-category-item" title="View ${cat} only" onclick="event.stopPropagation(); AppController.view._showNewJoinedDesigDrilldown('${this._escapeAttr(d)}', '${this._escapeAttr(cat)}')">
+                            <span class="cat-label">${cat}</span>
+                            <span class="cat-value">${desigCategoryCounts[d][cat] || 0}</span>
+                        </div>
+                    `).join("")}
+                </div>
             </div>
-        `,).join("");
+        `).join("");
 
         const panel = document.getElementById("newjoined-desig-drilldown");
         if (!panel) return;
+
         panel.innerHTML = `
-            <div style="
-                font-size:10px;font-weight:700;text-transform:uppercase;
-                letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px;
-                display:flex;align-items:center;gap:8px;
-            ">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase; letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px; display:flex;align-items:center;gap:8px;">
                 BY ${dept.toUpperCase()} DEPARTMENT DESIGNATIONS
                 <span style="flex:1;height:1px;background:#e5e7eb;display:block;"></span>
             </div>
-            <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+            <div class="summary-grid summary-grid-category" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
                 ${desigCardsHtml || '<p style="padding:16px;color:#94a3b8;">No designations found.</p>'}
             </div>
-            <div id="newjoined-desig-table-container" style="margin-top:8px;"></div>
         `;
         panel.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
 
-    _showResignedBreakdownDrilldown(type, value) {
-        document.querySelectorAll("[data-res-company],[data-res-gender],[data-res-workforce],[data-res-age]",).forEach((c) => c.classList.remove("active"));
+    _showNewJoinedDesigDrilldown(designation, category = null) {
+        this._resetJoinExitPanels("desig");
+        document.querySelectorAll("[data-newjoined-desig]").forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(`.stat-card-clickable[data-newjoined-desig="${this._escapeAttr(designation)}"]`);
+        if (card) card.classList.add("active");
+
+        const data = this._currentNewJoinedDesigData;
+        if (!data) return;
+
+        const items = data.deptEmps
+            .filter((e) =>
+                (e.designation || "Staff") === designation &&
+                (!category || this._normalizeJoinExitCategory(e.companyCategory) === category)
+            )
+            .map((emp) => ({ log: null, emp, date: null }));
+
+        this._renderStatCardDrilldown("newjoinedDesig_" + designation, items, 1);
+    }
+
+
+    // ─────────────────────────────────────────────────────────────
+    // RESIGNED
+    // ─────────────────────────────────────────────────────────────
+    _showResignedBreakdownDrilldown(type, value, category = null) {
+        const isNavStep = type === "location" || type === "company";
+        this._resetJoinExitPanels(isNavStep ? "breakdown" : null);
 
         const attrMap = {
             company: "data-res-company",
+            "company-category": "data-res-company-category",
+            location: "data-res-location",
             gender: "data-res-gender",
             workforce: "data-res-workforce",
             age: "data-res-age",
         };
-        const card = this.app.querySelector(`[${attrMap[type]}="${value}"]`);
-        if (card) card.classList.add("active");
-
-        const data = this._currentResignedBreakdown;
-        if (!data) return;
-        const { emps } = data;
-
-        let filtered;
-        if (type === "company") {
-            filtered = emps.filter((e) => e.company === value);
-        } else if (type === "gender") {
-            filtered = emps.filter((e) => e.gender === value);
-        } else if (type === "workforce") {
-            filtered = value === "Staff" ? emps.filter((e) => [58].includes(e.categoryId)) : emps.filter((e) => [51, 59, 60].includes(e.categoryId));
-        } else if (type === "age") {
-            filtered = emps.filter((e) => AppController.model.getAgeGroup(e.dob) === value,);
+        const attr = attrMap[type];
+        if (attr) {
+            document.querySelectorAll(`[${attr}]`).forEach((c) => c.classList.remove("active"));
+            const card = this.app.querySelector(`[${attr}="${this._escapeAttr(value)}"]`);
+            if (card) card.classList.add("active");
         }
 
-        const items = filtered.map((emp) => ({ log: null, emp, date: null }));
-        this._renderStatCardDrilldown(`resBreakdown_${type}_${value}`, items, 1, "resigned-breakdown-drilldown", "AppController.view._closeResignedBreakdownDrilldown()");
+        const data = this._currentResignedBreakdown;
+        if (!data || !Array.isArray(data.emps)) return;
+        const { emps } = data;
+
+        if (data.category === undefined) {
+            data.category = null;
+            data.location = null;
+            data.company = null;
+        }
+
+        const normalizeCategory = (c) => this._normalizeJoinExitCategory(c);
+
+        // ── CATEGORY → LOCATION CARDS ──
+        if (type === "company-category") {
+            const filtered = emps.filter((e) => normalizeCategory(e.companyCategory) === value);
+
+            data.category = value;
+            data.location = null;
+            data.company = null;
+
+            const locations = {};
+            filtered.forEach((emp) => {
+                const location = emp.location || "Unassigned";
+                if (!locations[location]) locations[location] = [];
+                locations[location].push(emp);
+            });
+
+            const colorCls = ["info", "success", "warning", "accent", "danger"];
+            const locationCards = Object.keys(locations).map((location, i) => `
+                <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable" data-res-location="${this._escapeAttr(location)}" onclick="AppController.view._showResignedBreakdownDrilldown('location', '${this._escapeAttr(location)}')" style="position:relative;">
+                    <button class="stat-card-download-btn" title="Download this card's employees" onclick="event.stopPropagation(); AppController.view._downloadJoinExitCardExcel('resigned', 'location', '${this._escapeAttr(location)}')">
+                        <i class="ph ph-download-simple"></i>
+                    </button>
+
+                    <div class="stat-icon"><i class="ph ph-map-pin"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">${this._escapeAttr(location)}</span>
+                        <span class="stat-value">${locations[location].length}</span>
+                        <span class="stat-card-sub">Employees</span>
+                        <span class="stat-card-hint">↓ click to view companies</span>
+                    </div>
+                </div>
+            `).join("");
+
+            const container = this.app.querySelector("#resigned-breakdown-drilldown");
+            if (!container) return;
+
+            container.innerHTML = `
+                <div id="res-location-drilldown" style="margin-top:12px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                        <div style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:#475569;">
+                            ${this._escapeAttr(value)} — By Location
+                        </div>
+                    </div>
+                    <div class="summary-grid" style="grid-template-columns: repeat(auto-fit,minmax(160px,1fr));">
+                        ${locationCards}
+                    </div>
+                </div>
+                <div id="res-company-drilldown"></div>
+            `;
+            return;
+        }
+
+        // ── LOCATION → COMPANY CARDS (or straight to table if only 1 company) ──
+        if (type === "location") {
+            const cat = data.category;
+            if (!cat) return;
+
+            const filtered = emps.filter((e) =>
+                normalizeCategory(e.companyCategory) === cat && (e.location || "Unassigned") === value
+            );
+
+            data.location = value;
+            data.company = null;
+
+            const companies = {};
+            filtered.forEach((emp) => {
+                const company = emp.company || "Unassigned";
+                if (!companies[company]) companies[company] = [];
+                companies[company].push(emp);
+            });
+
+            const categoryCompanies = new Set();
+            emps.forEach((emp) => {
+                if (normalizeCategory(emp.companyCategory) === cat) {
+                    categoryCompanies.add(emp.company || "Unassigned");
+                }
+            });
+
+            const companyContainer = this.app.querySelector("#res-company-drilldown");
+
+            if (categoryCompanies.size === 1) {
+                data.company = [...categoryCompanies][0];
+                if (companyContainer) companyContainer.innerHTML = "";
+                const items = filtered.map((emp) => ({ log: null, emp, date: null }));
+                this._renderStatCardDrilldown(`resBreakdown_company_${data.company}`, items, 1);
+                return;
+            }
+
+            if (!companyContainer) return;
+
+            const colorCls = ["info", "success", "warning", "accent", "danger"];
+            const companyCards = Object.keys(companies).map((company, i) => `
+                <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable" data-res-company="${this._escapeAttr(company)}" onclick="AppController.view._showResignedBreakdownDrilldown('company', '${this._escapeAttr(company)}')" style="position:relative;">
+                    <button class="stat-card-download-btn" title="Download this card's employees" onclick="event.stopPropagation(); AppController.view._downloadJoinExitCardExcel('resigned', 'company', '${this._escapeAttr(company)}')">
+                        <i class="ph ph-download-simple"></i>
+                    </button>
+
+                    <div class="stat-icon"><i class="ph ph-buildings"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">${this._escapeAttr(company)}</span>
+                        <span class="stat-value">${companies[company].length}</span>
+                        <span class="stat-card-sub">Employees</span>
+                        <span class="stat-card-hint">↓ click to view employees</span>
+                    </div>
+                </div>
+            `).join("");
+
+            companyContainer.innerHTML = `
+                <div style="margin-top:12px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                        <div style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:#475569;">
+                            ${this._escapeAttr(value)} — By Company
+                        </div>
+                    </div>
+                    <div class="summary-grid" style="grid-template-columns: repeat(auto-fit,minmax(180px,1fr));">
+                        ${companyCards}
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        // ── COMPANY → TABLE ──
+        if (type === "company") {
+            const cat = data.category;
+            const location = data.location;
+            if (!cat || !location) return;
+
+            const filtered = emps.filter((e) =>
+                normalizeCategory(e.companyCategory) === cat &&
+                (e.location || "Unassigned") === location &&
+                e.company === value
+            );
+
+            data.company = value;
+
+            const items = filtered.map((emp) => ({ log: null, emp, date: null }));
+            this._renderStatCardDrilldown(`resBreakdown_${type}_${value}`, items, 1);
+            return;
+        }
+
+        // ── GENDER ──
+        if (type === "gender") {
+            const items = emps.filter((e) => e.gender === value && (!category || normalizeCategory(e.companyCategory) === category)).map((emp) => ({ log: null, emp, date: null }));
+            this._renderStatCardDrilldown(`resBreakdown_${type}_${value}`, items, 1);
+            return;
+        }
+
+        // ── WORKFORCE ──
+        if (type === "workforce") {
+            const items = emps.filter((e) => {
+                const isMatch = value === "Staff" ? [58].includes(e.categoryId) : [51, 59, 60].includes(e.categoryId);
+                return isMatch && (!category || normalizeCategory(e.companyCategory) === category);
+            }).map((emp) => ({ log: null, emp, date: null }));
+            this._renderStatCardDrilldown(`resBreakdown_${type}_${value}`, items, 1);
+            return;
+        }
+
+        // ── AGE ──
+        if (type === "age") {
+            const items = emps.filter((e) =>
+                AppController.model.getAgeGroup(e.dob) === value &&
+                (!category || normalizeCategory(e.companyCategory) === category)
+            ).map((emp) => ({ log: null, emp, date: null }));
+            this._renderStatCardDrilldown(`resBreakdown_${type}_${value}`, items, 1);
+            return;
+        }
     }
 
 
-    _closeResignedBreakdownDrilldown() {
-        const c = document.getElementById("resigned-breakdown-drilldown");
-        if (c) c.innerHTML = "";
-        document.querySelectorAll("[data-res-company],[data-res-gender],[data-res-workforce],[data-res-age]",).forEach((el) => el.classList.remove("active"));
-    }
+    _showResignedDeptDrilldown(dept, category = null) {
+        this._resetJoinExitPanels();
 
-
-    _showResignedDeptDrilldown(dept) {
-        document.querySelectorAll(".stat-card-clickable[data-resigned-dept]").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-resigned-dept="${dept}"]`,);
+        const card = this.app.querySelector(`.stat-card-clickable[data-resigned-dept="${this._escapeAttr(dept)}"]`);
         if (card) card.classList.add("active");
 
         const data = this._currentResignedDeptData;
         if (!data) return;
 
-        const deptEmps = data.resEmps.filter((e) => e.dept === dept);
+        const normalizeCategory = (c) => this._normalizeJoinExitCategory(c);
 
+        const deptEmps = data.resEmps.filter((e) => e.dept === dept && (!category || normalizeCategory(e.companyCategory) === category));
+
+        // chip click → table directly
+        if (category) {
+            const items = deptEmps.map((emp) => ({ log: null, emp, date: null }));
+            this._renderStatCardDrilldown(`resDept_${dept}_${category}`, items, 1);
+            return;
+        }
+
+        // main click → designation cards
         const desigMap = {};
         deptEmps.forEach((e) => {
             const name = e.designation || "Staff";
             const order = e.designationSortOrder || 0;
-            if (!desigMap[name] || order < desigMap[name].order) {
-                desigMap[name] = { name, order };
-            }
+            if (!desigMap[name] || order < desigMap[name].order) desigMap[name] = { name, order };
         });
-        const desigs = Object.values(desigMap).sort((a, b) => a.order !== b.order ? a.order - b.order : a.name.localeCompare(b.name),).map((d) => d.name);
 
+        const desigs = Object.values(desigMap).sort((a, b) => a.order !== b.order ? a.order - b.order : a.name.localeCompare(b.name)).map((d) => d.name);
+
+        const categoryOrder = ["ON-ROLL", "CC", "CONTRACTOR", "OUTSOURCE"];
         const desigCounts = {};
-        desigs.forEach((d) => (desigCounts[d] = 0));
+        const desigCategoryCounts = {};
+
+        desigs.forEach((d) => {
+            desigCounts[d] = 0;
+            desigCategoryCounts[d] = { "ON-ROLL": 0, "CC": 0, "CONTRACTOR": 0, "OUTSOURCE": 0 };
+        });
+
         deptEmps.forEach((e) => {
             const name = e.designation || "Staff";
-            if (desigCounts[name] !== undefined) desigCounts[name]++;
+            if (desigCounts[name] !== undefined) {
+                desigCounts[name]++;
+                const cat = normalizeCategory(e.companyCategory);
+                if (cat) desigCategoryCounts[name][cat]++;
+            }
         });
 
         this._currentResignedDesigData = { dept, deptEmps };
 
         const colorCls = ["info", "success", "warning", "accent", "danger"];
         const desigCardsHtml = desigs.map((d, i) => `
-            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
-                style="flex: 0 1 180px;"
-                data-resigned-desig="${this._escapeAttr(d)}"
-                onclick="AppController.view._showResignedDesigDrilldown('${this._escapeAttr(d)}')">
-                <div class="stat-icon"><i class="ph ph-identification-badge"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">${d}</span>
-                    <span class="stat-value">${desigCounts[d]}</span>
+            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable" style="flex: 0 1 220px;" data-resigned-desig="${this._escapeAttr(d)}" onclick="AppController.view._showResignedDesigDrilldown('${this._escapeAttr(d)}')">
+                <button class="stat-card-download-btn" title="Download this card's employees" onclick="event.stopPropagation(); AppController.view._downloadJoinExitCardExcel('resigned', 'designation', '${this._escapeAttr(d)}')">
+                    <i class="ph ph-download-simple"></i>
+                </button>
+
+                <div class="stat-card-top">
+                    <div class="stat-card-top-left">
+                        <div class="stat-icon"><i class="ph ph-identification-badge"></i></div>
+                        <div class="stat-content">
+                            <span class="stat-label">${d}</span>
+                            <span class="stat-value">${desigCounts[d]}</span>
+                        </div>
+                    </div>
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
+                <div class="stat-category-row">
+                    ${categoryOrder.map((cat) => `
+                        <div class="stat-category-item" title="View ${cat} only" onclick="event.stopPropagation(); AppController.view._showResignedDesigDrilldown('${this._escapeAttr(d)}', '${this._escapeAttr(cat)}')">
+                            <span class="cat-label">${cat}</span>
+                            <span class="cat-value">${desigCategoryCounts[d][cat] || 0}</span>
+                        </div>
+                    `).join("")}
+                </div>
             </div>
-        `,).join("");
+        `).join("");
 
         const panel = document.getElementById("resigned-desig-drilldown");
         if (!panel) return;
+
         panel.innerHTML = `
-            <div style="
-                font-size:10px;font-weight:700;text-transform:uppercase;
-                letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px;
-                display:flex;align-items:center;gap:8px;
-            ">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase; letter-spacing:0.08em;color:#9ca3af;margin:20px 0 10px; display:flex;align-items:center;gap:8px;">
                 BY ${dept.toUpperCase()} DEPARTMENT DESIGNATIONS
                 <span style="flex:1;height:1px;background:#e5e7eb;display:block;"></span>
             </div>
-            <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+            <div class="summary-grid summary-grid-category" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
                 ${desigCardsHtml || '<p style="padding:16px;color:#94a3b8;">No designations found.</p>'}
             </div>
-            <div id="resigned-desig-table-container" style="margin-top:8px;"></div>
         `;
         panel.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
 
-    _showResignedDesigDrilldown(designation) {
-        document.querySelectorAll(".stat-card-clickable[data-resigned-desig]").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-resigned-desig="${designation}"]`,);
+    _showResignedDesigDrilldown(designation, category = null) {
+        this._resetJoinExitPanels("desig");
+        document.querySelectorAll("[data-resigned-desig]").forEach((c) => c.classList.remove("active"));
+        const card = this.app.querySelector(`.stat-card-clickable[data-resigned-desig="${this._escapeAttr(designation)}"]`);
         if (card) card.classList.add("active");
 
         const data = this._currentResignedDesigData;
         if (!data) return;
-        const { deptEmps } = data;
 
-        const items = deptEmps.filter((e) => (e.designation || "Staff") === designation).map((emp) => ({ log: null, emp, date: null }));
+        const items = data.deptEmps.filter((e) =>
+            (e.designation || "Staff") === designation &&
+            (!category || this._normalizeJoinExitCategory(e.companyCategory) === category)
+        ).map((emp) => ({ log: null, emp, date: null }));
 
-        this._renderStatCardDrilldown("resignedDesig_" + designation, items, 1, "resigned-desig-table-container", "AppController.view._closeResignedDesigTable()",);
-    }
-
-
-    _closeResignedDesigTable() {
-        const c = document.getElementById("resigned-desig-table-container");
-        if (c) c.innerHTML = "";
-        document.querySelectorAll(".stat-card-clickable[data-resigned-desig]").forEach((el) => el.classList.remove("active"));
-    }
-
-
-    _showNewJoinedDesigDrilldown(designation) {
-        document.querySelectorAll(".stat-card-clickable[data-newjoined-desig]").forEach((c) => c.classList.remove("active"));
-        const card = this.app.querySelector(`.stat-card-clickable[data-newjoined-desig="${designation}"]`,);
-        if (card) card.classList.add("active");
-
-        const data = this._currentNewJoinedDesigData;
-        if (!data) return;
-        const { deptEmps } = data;
-
-        const items = deptEmps.filter((e) => (e.designation || "Staff") === designation).map((emp) => ({ log: null, emp, date: null }));
-
-        this._renderStatCardDrilldown("newjoinedDesig_" + designation, items, 1, "newjoined-desig-table-container", "AppController.view._closeNewJoinedDesigTable()",);
-    }
-
-
-    _closeNewJoinedDesigTable() {
-        const c = document.getElementById("newjoined-desig-table-container");
-        if (c) c.innerHTML = "";
-        document.querySelectorAll(".stat-card-clickable[data-newjoined-desig]").forEach((el) => el.classList.remove("active"));
+        this._renderStatCardDrilldown(`resignedDesig_${designation}`, items, 1);
     }
 
 
@@ -3710,10 +6366,9 @@ class AttendanceView {
         document.querySelectorAll(".stat-card-clickable[data-dashboard-desig]").forEach((el) => el.classList.remove("active"));
     }
 
-
     _renderTabContent(tabId, logs, emps, empMap, filters, counts, model) {
         let content;
-        const stats = model.getSummaryStats();
+        
         switch (tabId) {
             case "feature":
                 content = { html: "" };
@@ -4033,6 +6688,22 @@ class AttendanceView {
     }
 
     
+    _commonCols(emp) {
+        const d = (v) => (v ? this._formatDate(v) : "");
+        return {
+            "Employee Code": emp?.code ?? "",
+            "Employee Name": emp?.name ?? "",
+            "Company": emp?.company ?? "",
+            "Department": emp?.dept ?? "",
+            "Designation": emp?.designation ?? "",
+            "DOB": d(emp?.dobRaw),
+            "DOJ": d(emp?.doj),
+            "DOR": d(emp?.dor),
+            "Location": emp?.location ?? "",
+        };
+    }
+
+
     exportExcel(data, filename) {
         if (!window.XLSX) {
             console.error("SheetJS not loaded");
@@ -4046,7 +6717,7 @@ class AttendanceView {
                 if (typeof val === "string") {
                     val = val.replace(/\u00A0/g, "").replace(/\r/g, "").replace(/\n/g, "").replace(/\t/g, "").trim().replace(/\s+/g, " ");
 
-                    const isCodeColumn = key.toLowerCase() === "code";
+                    const isCodeColumn = key.toLowerCase() === "code" || key.toLowerCase() === "employee code";
                     const isPureDigits = /^\d+$/.test(val);
                     const hasLeadingZero = val.length > 1 && val[0] === "0";
 
@@ -4078,11 +6749,7 @@ class AttendanceView {
 
     downloadFullAvailableExcel() {
         const exportData = this._fullAvailableItems.map(({ log, emp, date }) => ({
-            Code: emp?.code,
-            Name: emp?.name,
-            Dept: emp?.dept,
-            Company: emp?.company,
-            Designation: emp?.designation,
+            ...this._commonCols(emp),
             TeamName: emp?.teamName,
             shiftGroupName: emp?.shiftGroupName,
             Shift: emp?.shift,
@@ -4098,16 +6765,12 @@ class AttendanceView {
     downloadFullExcel() {
         const items = this._statCardFullItems || [];
         if (!items.length) return;
-        const exportData = items.map(({ log, emp, date }) => ({
-            Code: emp?.code,
-            Name: emp?.name,
-            Dept: emp?.dept,
-            Company: emp?.company,
-            Designation: emp?.designation,
+        const exportData = items.map(({ emp }) => ({
+            ...this._commonCols(emp),
+            Gender: emp?.gender || "",
             TeamName: emp?.teamName,
-            shiftGroupName: emp?.shiftGroupName,
+            ShiftGroup: emp?.shiftGroupName,
             Shift: emp?.shift,
-            Location: emp?.location || ""
         }));
         this.exportExcel(exportData, this._statCardFullExportName || "full-export");
     }
@@ -4132,17 +6795,12 @@ class AttendanceView {
         };
 
         const exportData = catEmps.map((emp) => ({
-            Code: emp.code,
-            Name: emp.name,
-            Dept: emp.dept,
-            Company: emp.company,
-            Designation: emp.designation,
+            ...this._commonCols(emp),
             TeamName: emp.teamName,
-            shiftGroupName: emp.shiftGroupName,
+            ShiftGroup: emp.shiftGroupName,
             Shift: emp.shift,
             ShiftStart: emp.shiftStart || "",
             ShiftEnd: emp.shiftEnd || "",
-            Location: emp.location || "",
         }));
 
         const filename = (categoryLabelsForExport[category] || category) + "-all-locations";
@@ -4159,11 +6817,7 @@ class AttendanceView {
         if (!deptEmps.length) return;
 
         const exportData = deptEmps.map((emp) => ({
-            Code: emp.code,
-            Name: emp.name,
-            Dept: emp.dept,
-            Company: emp.company,
-            Designation: emp.designation,
+            ...this._commonCols(emp),
             TeamName: emp.teamName,
             shiftGroupName: emp.shiftGroupName,
             Shift: emp.shift,
@@ -4185,18 +6839,13 @@ class AttendanceView {
         if (!genderEmps.length) return;
 
         const exportData = genderEmps.map((emp) => ({
-            Code: emp.code,
-            Name: emp.name,
+            ...this._commonCols(emp),
             Gender: emp.gender,
-            Dept: emp.dept,
-            Company: emp.company,
-            Designation: emp.designation,
             TeamName: emp.teamName,
-            shiftGroupName: emp.shiftGroupName,
+            ShiftGroup: emp.shiftGroupName,
             Shift: emp.shift,
             ShiftStart: emp.shiftStart || "",
             ShiftEnd: emp.shiftEnd || "",
-            Location: emp.location || "",
         }));
 
         this.exportExcel(exportData, gender + "-all-locations");
@@ -4216,18 +6865,13 @@ class AttendanceView {
         if (!emps.length) return;
 
         const exportData = emps.map((emp) => ({
-            Code: emp.code,
-            Name: emp.name,
+            ...this._commonCols(emp),
             Gender: emp.gender,
             TeamName: emp.teamName,
-            Dept: emp.dept,
-            Company: emp.company,
-            Designation: emp.designation,
-            shiftGroupName: emp.shiftGroupName,
+            ShiftGroup: emp.shiftGroupName,
             Shift: emp.shift,
             ShiftStart: emp.shiftStart || "",
             ShiftEnd: emp.shiftEnd || "",
-            Location: emp.location || "",
         }));
 
         this.exportExcel(exportData, type + "-all-locations");
@@ -4243,17 +6887,11 @@ class AttendanceView {
         if (!groupEmps.length) return;
 
         const exportData = groupEmps.map((emp) => ({
-            Code: emp.code,
-            Name: emp.name,
+            ...this._commonCols(emp),
             Age: this._calculateAge(emp.dobRaw),
-            DOB: this._formatDate(emp.dobRaw),
             Gender: emp.gender,
-            Dept: emp.dept,
-            Company: emp.company,
-            Designation: emp.designation,
             TeamName: emp.teamName,
-            shiftGroupName: emp.shiftGroupName,
-            Location: emp.location || "",
+            ShiftGroup: emp.shiftGroupName,
         }));
 
         const safeName = group.replace(/[^\w]+/g, "_");
@@ -4276,18 +6914,115 @@ class AttendanceView {
         const famName = fam ? fam.name.replace(/[^\w]+/g, "_") : "family-" + familyId;
 
         const exportData = famEmps.map((emp) => ({
-            Code: emp.code,
-            Name: emp.name,
-            Dept: emp.dept,
-            Company: emp.company,
-            Designation: emp.designation,
+            ...this._commonCols(emp),
             TeamName: emp.teamName,
-            shiftGroupName: emp.shiftGroupName,
+            ShiftGroup: emp.shiftGroupName,
             Shift: emp.shift,
-            Location: emp.location || "",
         }));
 
         this.exportExcel(exportData, famName + "-all-locations");
+    }
+
+
+    _downloadJoinExitExcel(type) {
+        const model = this._currentSummaryModel;
+        if (!model) return;
+
+        const isResigned = type === "resigned";
+        const items = isResigned ? model.getResignedEmployees() : model.getNewJoinedEmployees();
+
+        if (!items || !items.length) {
+            this.showToast(`No ${isResigned ? "resigned" : "new joined"} employees to download.`, "error");
+            return;
+        }
+
+        const exportData = items.map(({ emp }) => ({
+            ...this._commonCols(emp),
+            Gender: emp?.gender || "",
+            TeamName: emp?.teamName || "",
+            ShiftGroup: emp?.shiftGroupName || "",
+            Status: emp?.status || "",
+        }));
+
+        this.exportExcel(
+            exportData,
+            isResigned ? "resigned-employees-all" : "new-joined-employees-all"
+        );
+    }
+
+
+    _downloadJoinExitCardExcel(type, scope, value) {
+        const model = AppController.model;
+        const isResigned = type === "resigned";
+        const items = isResigned ? model.getResignedEmployees() : model.getNewJoinedEmployees();
+
+        let employees = (items || []).map(({ emp }) => emp).filter(Boolean);
+
+        const categoryMatches = (emp, category) => this._normalizeJoinExitCategory(emp.companyCategory) === category;
+
+        const breakdown = isResigned ? this._currentResignedBreakdown : this._currentNewJoinedBreakdown;
+
+        switch (scope) {
+            case "company-category":
+                employees = employees.filter((emp) => categoryMatches(emp, value));
+                break;
+
+            case "gender":
+                employees = employees.filter((emp) => emp.gender === value);
+                break;
+
+            case "workforce": {
+                if (isResigned) {
+                    employees = employees.filter((emp) => value === "Staff" ? [58].includes(emp.categoryId) : [51, 59, 60].includes(emp.categoryId));
+                } else {
+                    const staffTeamId = model.state.teamConfig?.staffTeamId ?? 7;
+                    const workerTeamId = model.state.teamConfig?.workerTeamId ?? 6;
+                    employees = employees.filter((emp) => value === "Staff" ? emp.team === staffTeamId : emp.team === workerTeamId);
+                }
+                break;
+            }
+
+            case "age":
+                employees = employees.filter((emp) => model.getAgeGroup(emp.dob) === value);
+                break;
+
+            case "department":
+                employees = employees.filter((emp) => emp.dept === value);
+                break;
+
+            case "location":
+                employees = employees.filter((emp) => (!breakdown?.category || categoryMatches(emp, breakdown.category)) && (emp.location || "Unassigned") === value);
+                break;
+
+            case "company":
+                employees = employees.filter((emp) => (!breakdown?.category || categoryMatches(emp, breakdown.category)) && (!breakdown?.location || (emp.location || "Unassigned") === breakdown.location) && (emp.company || "Unassigned") === value);
+                break;
+
+            case "designation": {
+                const designationData = isResigned ? this._currentResignedDesigData : this._currentNewJoinedDesigData;
+                employees = (designationData?.deptEmps || []).filter((emp) => (emp.designation || "Staff") === value);
+                break;
+            }
+        }
+
+        if (!employees.length) {
+            this.showToast("No employees to download for this card.", "error");
+            return;
+        }
+
+        const exportData = employees.map((emp) => ({
+            ...this._commonCols(emp),
+            Gender: emp.gender || "",
+            TeamName: emp.teamName || "",
+            ShiftGroup: emp.shiftGroupName || "",
+            Status: emp.status || "",
+        }));
+
+        const safeValue = String(value || "all").replace(/[^\w-]+/g, "_");
+        this.exportExcel(
+            exportData,
+            `${type}-${scope}-${safeValue}`
+        );
     }
 
 
@@ -4870,6 +7605,7 @@ class AttendanceView {
                 e.company || "-",
                 e.dept || "-",
                 e.designation || "-",
+                this._formatDate(l.date),
                 e.shiftGroupName || "-",
                 l.shiftName || e.shift || "-",
                 l.inTime || "-",
@@ -4882,10 +7618,9 @@ class AttendanceView {
         this._lastData["all-attendance"] = dayLogs.map((l) => {
             const e = empMap[l.empId] || {};
             return {
-                Code: e.code,
-                Name: e.name,
-                Dept: e.dept,
-                Company: e.company,
+                ...this._commonCols(e),
+                ShiftGroup: e.shiftGroupName,
+                Shift: l.shiftName || e.shift,
                 Date: this._formatDate(l.date),
                 In: l.inTime,
                 Out: l.outTime,
@@ -4894,7 +7629,6 @@ class AttendanceView {
                 EarlyOut: Number(l.earlyBy) > 0 ? "Yes" : "No",
                 Status: this._getDisplayStatus(l),
                 DetailedStatus: l.detailedStatus,
-                DOB: this._formatDate(e.dobRaw),
                 Overtime: l.overtime || 0,
             };
         });
@@ -4998,7 +7732,7 @@ class AttendanceView {
                 </div>
 
                 <div id="main-table-wrap">
-                    ${this._tableHTML("tbl-all", ["Code", "Name", "Company", "Department", "Designation", "Shift Group", "Shift", "In Time", "Out Time", "Status", "Action"], rows, "all-attendance", (currentPage - 1) * pageSize)}
+                    ${this._tableHTML("tbl-all", ["Code", "Name", "Company", "Department", "Designation", "Attendance Date", "Shift Group", "Shift", "In Time", "Out Time", "Status", "Action"], rows, "all-attendance", (currentPage - 1) * pageSize)}
                     <div class="pagination-bar">
                         <div class="pagination-text">
                             Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, dayLogs.length)} of ${dayLogs.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
@@ -5127,6 +7861,7 @@ class AttendanceView {
                     <td>${e.company || "–"}</td>
                     <td>${e.dept || "–"}</td>
                     <td>${e.designation || "–"}</td>
+                    <td>${this._formatDate(l.date)}</td>
                     <td>${this._calculateAge(e.dobRaw)}</td>
                     <td>${e.shiftGroupName || "–"}</td>
                     <td>${l.shiftName || e.shift || "–"}</td>
@@ -5141,13 +7876,11 @@ class AttendanceView {
         this._drillData = logs.map((l) => {
             const e = empMap[l.empId] || {};
             return {
-                Code: e.code,
-                Name: e.name,
+                ...this._commonCols(e),
                 Gender: e.gender || "",
-                Dept: e.dept,
-                Company: e.company,
                 TeamName: e.teamName,
-                Shift: e.shift,
+                ShiftGroup: e.shiftGroupName || "",
+                Shift: l.shiftName || e.shift,
                 ShiftStart: l.shiftStart || "",
                 ShiftEnd: l.shiftEnd || "",
                 Date: this._formatDate(l.date),
@@ -5158,7 +7891,6 @@ class AttendanceView {
                 Early: (l.earlyBy || 0) > 0 ? "Yes" : "No",
                 Status: l.status,
                 DetailedStatus: l.detailedStatus,
-                DOB: this._formatDate(e.dobRaw),
                 Overtime: l.overtime || 0,
             };
         });
@@ -5209,6 +7941,7 @@ class AttendanceView {
 								<th>Company</th>
 								<th>Department</th>
                                 <th>Designation</th>
+                                <th>Attendance Date</th>
                                 <th>Age</th>
                                 <th>Shift Group</th>
                                 <th>Shift</th>
@@ -5310,15 +8043,11 @@ class AttendanceView {
         `).join("");
 
         this._manualPunchExportData = items.map(({ log, emp, date }) => ({
-            Code: emp.code,
-            Name: emp.name,
-            Dept: emp.dept,
-            Company: emp.company,
+            ...this._commonCols(emp),
             Date: this._formatDate(date),
             In: log.inTime,
             Out: log.outTime,
             Device: log.punchDevicesName,
-            DOB: this._formatDate(emp.dobRaw),
             Overtime: log.overtime || 0,
         }));
 
@@ -6358,7 +9087,9 @@ class AttendanceView {
                     <td>${g.emp.dept || "-"}</td>
                     <td>${g.emp.company || "-"}</td>
                     <td>${[...new Set(g.logs.map(l => l.shiftName).filter(Boolean))].join(", ") || g.emp.shift || "-"}</td>
-                    <td><span class="badge ${isRepeat ? "badge-danger" : "badge-info"}">${g.count} Late Day${g.count > 1 ? "s" : ""}</span></td>
+                    <td>
+                        <span class="badge ${isRepeat ? "badge-danger" : "badge-info"}">${g.count} Late Day${g.count > 1 ? "s" : ""}</span>
+                    </td>
                 </tr>
             `;
         }).join("");
@@ -6367,8 +9098,12 @@ class AttendanceView {
         groups.forEach((g) => g.logs.forEach((log) => flatItems.push({ log, emp: g.emp, date: log.date })));
 
         this._lastData["late-in"] = flatItems.map(({ log, emp, date }) => ({
-            Code: emp.code, Name: emp.name, Dept: emp.dept, Company: emp.company, Shift: log?.shiftName || emp.shift,
-            Date: this._formatDate(date), In: log?.inTime, Out: log?.outTime, Hours: log?.hoursWorked,
+            ...this._commonCols(emp),
+            Shift: log?.shiftName || emp.shift,
+            Date: this._formatDate(date), 
+            In: log?.inTime, 
+            Out: log?.outTime,
+            Hours: log?.hoursWorked, 
             LateByMins: log?.lateBy,
         }));
 
@@ -6388,7 +9123,12 @@ class AttendanceView {
 
         return {
             html: `
-                <style>.row-danger td { background: #fef2f2; }</style>
+                <style>
+                    .row-danger td { 
+                        background: #fef2f2; 
+                    }
+                </style>
+                
                 <h2 class="section-title"><i class="ph-fill ph-clock-afternoon"></i> Late In Records</h2>
                 <div class="charts-grid">
                     ${this._chartCard("ch-latein-shift", '<i class="ph ph-clock-clockwise"></i>', "amber", "Late-In Count by Shift", "Click for detail")}
@@ -6465,14 +9205,15 @@ class AttendanceView {
             const isRepeat = g.count >= this.LATE_THRESHOLD;
             const severityStyle = this._getSeverityStyle(g.count);
             return `
-                <tr style="cursor:pointer;${severityStyle}"
-                    onclick="AppController.view._showEarlyOutEmployeeDrilldown('${g.emp.id}')">
+                <tr style="cursor:pointer;${severityStyle}" onclick="AppController.view._showEarlyOutEmployeeDrilldown('${g.emp.id}')">
                     <td><b>${g.emp.code || "-"}</b></td>
                     <td>${g.emp.name || "-"}</td>
                     <td>${g.emp.dept || "-"}</td>
                     <td>${g.emp.company || "-"}</td>
                     <td>${[...new Set(g.logs.map(l => l.shiftName).filter(Boolean))].join(", ") || g.emp.shift || "-"}</td>
-                    <td><span class="badge ${isRepeat ? "badge-danger" : "badge-info"}">${g.count} Early Day${g.count > 1 ? "s" : ""}</span></td>
+                    <td>
+                        <span class="badge ${isRepeat ? "badge-danger" : "badge-info"}">${g.count} Early Day${g.count > 1 ? "s" : ""}</span>
+                    </td>
                 </tr>
             `;
         }).join("");
@@ -6481,17 +9222,14 @@ class AttendanceView {
         groups.forEach((g) => g.logs.forEach((log) => flatItems.push({ log, emp: g.emp, date: log.date })));
 
         this._lastData["early-out"] = flatItems.map(({ log, emp, date }) => ({
-            Code: emp.code,
-            Name: emp.name,
-            Dept: emp.dept,
-            Company: emp.company,
+            ...this._commonCols(emp),
             Shift: log?.shiftName || emp.shift,
-            ShiftStart: log?.shiftStart,
+            ShiftStart: log?.shiftStart, 
             ShiftEnd: log?.shiftEnd,
-            Date: this._formatDate(date),
-            In: log?.inTime,
+            Date: this._formatDate(date), 
+            In: log?.inTime, 
             Out: log?.outTime,
-            Hours: log?.hoursWorked,
+            Hours: log?.hoursWorked, 
             EarlyByMins: log?.earlyBy,
         }));
 
@@ -6503,8 +9241,7 @@ class AttendanceView {
         const endPage = Math.min(totalPages, currentPage + 2);
         for (let i = startPage; i <= endPage; i++) {
             pageButtons += `
-                <button class="btn-page ${i === currentPage ? "btn-page-active" : ""}"
-                    onclick="AppController.view._reRenderEarlyOutPage(${i})">
+                <button class="btn-page ${i === currentPage ? "btn-page-active" : ""}" onclick="AppController.view._reRenderEarlyOutPage(${i})">
                     ${i}
                 </button>
             `;
@@ -6668,13 +9405,7 @@ class AttendanceView {
 
     
     _reRenderNightShiftPage(page) {
-        const content = this._renderNightShift(
-            this._currentNightShiftLogs,
-            this._currentNightShiftEmps,
-            this._currentNightShiftEmpMap,
-            this._currentNightShiftModel,
-            page
-        );
+        const content = this._renderNightShift(this._currentNightShiftLogs, this._currentNightShiftEmps, this._currentNightShiftEmpMap, this._currentNightShiftModel, page);
         document.querySelector(".tab-pane-container").innerHTML = content.html;
         content.renderCharts();
     }
@@ -6792,13 +9523,7 @@ class AttendanceView {
     
     
     _reRenderDesignationWisePage(page) {
-        const content = this._renderDesignationWise(
-            this._currentDesignationWiseLogs,
-            this._currentDesignationWiseEmps,
-            this._currentDesignationWiseEmpMap,
-            this._currentDesignationWiseModel,
-            page
-        );
+        const content = this._renderDesignationWise(this._currentDesignationWiseLogs, this._currentDesignationWiseEmps, this._currentDesignationWiseEmpMap, this._currentDesignationWiseModel, page);
         document.querySelector(".tab-pane-container").innerHTML = content.html;
         content.renderCharts();
     }
@@ -6963,10 +9688,7 @@ class AttendanceView {
         const shiftOT = model.getOvertimeByShift();
 
         this._lastData["overtime"] = this._currentOvertimeItems.map(({ log, emp, date }) => ({
-            Code: emp.code,
-            Name: emp.name,
-            Dept: emp.dept,
-            Company: emp.company,
+            ...this._commonCols(emp),
             Shift: log.shiftName || emp.shift || 'No Shift',
             Date: this._formatDate(date),
             In: log.inTime,
@@ -7013,10 +9735,7 @@ class AttendanceView {
         const shiftMP = model.getManualPunchByShift();
 
         this._lastData["manual-punch"] = this._currentManualPunchItems.map(({ log, emp, date }) => ({
-            Code: emp.code,
-            Name: emp.name,
-            Dept: emp.dept,
-            Company: emp.company,
+            ...this._commonCols(emp),
             Shift: log.shiftName || emp.shift || "No Shift",
             Date: this._formatDate(date),
             In: log.inTime,
@@ -7054,13 +9773,7 @@ class AttendanceView {
 
 
     _reRenderShiftWisePage(page) {
-        const content = this._renderShiftWise(
-            this._currentShiftWiseLogs,
-            this._currentShiftWiseEmps,
-            this._currentShiftWiseEmpMap,
-            this._currentShiftWiseModel,
-            page
-        );
+        const content = this._renderShiftWise(this._currentShiftWiseLogs, this._currentShiftWiseEmps, this._currentShiftWiseEmpMap, this._currentShiftWiseModel, page);
         document.querySelector(".tab-pane-container").innerHTML = content.html;
         content.renderCharts();
     }
@@ -7074,7 +9787,7 @@ class AttendanceView {
 
         const trs = pageRows.map((r) => `
             <tr>${r.map((c) =>
-            `<td>${c}</td>`,).join("")}
+                `<td>${c}</td>`,).join("")}
             </tr>`,).join("") || `
             <tr>
                 <td colspan="${colCount}">None</td>
@@ -7376,7 +10089,6 @@ class AttendanceView {
                             </table>
                         </div>
 
-
                         <div class="pagination-bar">
                             <div class="pagination-text">
                                 Showing ${(noPunchCurrentPage - 1) * noPunchPageSize + 1} – ${Math.min(noPunchCurrentPage * noPunchPageSize, noPunchGroups.length)} of ${noPunchGroups.length} employees &nbsp;·&nbsp; Page ${noPunchCurrentPage} of ${totalNoPunchPages}
@@ -7474,9 +10186,7 @@ class AttendanceView {
             group.emp.designation || "-",
             group.emp.shift || "-",
             this._formatDate(date),
-            status === "weeklyOff"
-                ? "Weekly Off"
-                : "Absent",
+            status === "weeklyOff" ? "Weekly Off" : "Absent",
         ]);
 
         const headers = ["Code", "Name", "Company", "Department", "Designation", "Shift", "Date", "Status",]; 
@@ -7874,9 +10584,7 @@ class AttendanceView {
             ...Object.values(row).map(value => {
                 if (value === null || value === undefined)
                     return "";
-                return String(value)
-                    .replace(/<[^>]*>/g, "")
-                    .replace(/&nbsp;/g, " ");
+                return String(value).replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ");
             })
         ]);
         pdf.autoTable({
@@ -7892,6 +10600,7 @@ class AttendanceView {
 
     bindStatCardClick(handler) {
         this.app.addEventListener("click", (event) => {
+            if (event.target.closest(".stat-category-item")) return;
             const card = event.target.closest(".stat-card-clickable");
             if (!card) return;
             const key = card.dataset.cardKey;
@@ -7903,6 +10612,7 @@ class AttendanceView {
             if (key === "punches6to10") return;
 
             const wasActive = card.classList.contains("active");
+            if (key === "newJoined" || key === "resigned") this._resetJoinExitPanels();
             document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
             if (wasActive) {
                 this._closeStatCardDrilldown();
@@ -7974,9 +10684,11 @@ class AttendanceView {
         const isDashboardFamily = key.startsWith("dashboardFamily_") || key.startsWith("desigFamily_");
         const isWorkforceLocation = key.startsWith("staffList_") || key.startsWith("workerList_") || key.startsWith("contractList_") || key.startsWith("consultantList_") || key.startsWith("workforce");
         const isNewJoinedOnly = key === "newJoined";
-        const isNewJoinedRelated = key === "newJoined" || key.startsWith("njBreakdown_") || key.startsWith("newjoinedDesig_");
-        const isResignedRelated = key.startsWith("resBreakdown_") || key.startsWith("resignedDesig_");
+        
+        const isNewJoinedRelated = key === "newJoined" || key.startsWith("njBreakdown_") || key.startsWith("newjoinedDesig_") || key.startsWith("njDept_");
+        const isResignedRelated  = key.startsWith("resBreakdown_") || key.startsWith("resignedDesig_") || key.startsWith("resDept_");
         const isJoinExitRelated = isNewJoinedRelated || isResignedRelated;
+        
         const isStaffList = key === "staffList";
         const isWorkerList = key === "workerList";
         const isContractList = key === "contractList";
@@ -7984,7 +10696,8 @@ class AttendanceView {
         const isTotalHeadcount = key === "totalHeadcount";
         const isHalfPresent = key === "halfPresent";
         const isWeeklyOff = key === "weeklyOff";
-        const isDashboardMode = items.length > 0 && items[0].log === null && !isResignedOnly && !isNewJoinedOnly;
+
+        const isDashboardMode = items.length > 0 && items[0].log === null && !isResignedOnly && !isNewJoinedOnly && !isJoinExitRelated;
 
         if (isDashboardMode || isAgeGroup) {
             items = [...items].sort((a, b) => {
@@ -8013,22 +10726,22 @@ class AttendanceView {
                 headers = ["Sr.No", "Code", "Name", "Team", "Dept", "Company", "Designation", "Shift Group", "Location", "DOB", "Age", "Gender"];
             }
         } else {
-            headers = ["Sr.No", "Code", "Name", "Gender", "Dept", "Company", "Designation", "Shift", "In Time", "Out Time", "Status", "Action"];
+            headers = ["Sr.No", "Code", "Name", "Gender", "Dept", "Company", "Designation", "Attendance Date", "Shift", "In Time", "Out Time", "Status", "Action"];
             if (isAgeGroup) {
-                headers = ["Sr.No", "Code", "Name", "Gender", "Dept", "Company", "Designation", "Age", "Shift", "In Time", "Out Time", "Status", "Action"];
-            } else if (key === "resigned") {
+                headers = ["Sr.No", "Code", "Name", "Gender", "Dept", "Company", "Designation", "Attendance Date", "Age", "Shift", "In Time", "Out Time", "Status", "Action"];
+            } else if (key === "resigned" || isResignedRelated) {
                 headers = ["Sr.No", "Code", "Name", "Gender", "Dept", "Company", "Designation", "DOJ", "DOR", "Status", "Action"];
             }
-            else if (key === "newJoined") {
+            else if (key === "newJoined" || isNewJoinedRelated) {
                 headers = ["Sr.No", "Code", "Name", "Gender", "Dept", "Company", "Designation", "DOJ", "Status", "Action"];
             } else if (key === "lateIn") {
-                headers = ["Sr.No", "Code", "Name", "Gender", "Dept", "Company", "Designation", "Shift", "In Time", "Late By", "Out Time", "Status", "Action"];
+                headers = ["Sr.No", "Code", "Name", "Gender", "Dept", "Company", "Designation", "Attendance Date", "Shift", "In Time", "Late By", "Out Time", "Status", "Action"];
             } else if (key === "earlyOut") {
-                headers = ["Sr.No", "Code", "Name", "Gender", "Dept", "Company", "Designation", "Shift", "In Time", "Out Time", "Early By", "Status", "Action"];
+                headers = ["Sr.No", "Code", "Name", "Gender", "Dept", "Company", "Designation", "Attendance Date", "Shift", "In Time", "Out Time", "Early By", "Status", "Action"];
             } else if (key === "singlePunch") {
-                headers = ["Sr.No", "Code", "Name", "Gender", "Dept", "Company", "Designation", "Shift", "In Time", "Out Time", "Status", "Action"];
+                headers = ["Sr.No", "Code", "Name", "Gender", "Dept", "Company", "Designation", "Attendance Date", "Shift", "In Time", "Out Time", "Status", "Action"];
             } else if (key === "staffList" || key === "workerList" || key === "contractList" || key === "consultantList") {
-                headers = ["Sr.No", "Code", "Name", "Gender", "Team", "Dept", "Company", "Designation", "Shift", "In Time", "Out Time", "Status", "Action"];
+                headers = ["Sr.No", "Code", "Name", "Gender", "Team", "Dept", "Company", "Designation", "Attendance Date", "Shift", "In Time", "Out Time", "Status", "Action"];
             }
         }
 
@@ -8133,6 +10846,7 @@ class AttendanceView {
                         <td>${emp.dept || "–"}</td>
                         <td>${emp.company || "–"}</td>
                         <td>${emp.designation || "–"}</td>
+                        <td>${this._formatDate(date || log?.date)}</td>
                         <td>${this._calculateAge(emp.dobRaw)}</td>
                         <td>${log?.shiftName || emp?.shift || "–"}</td>
                         <td>${log?.inTime || "–"}</td>
@@ -8151,6 +10865,7 @@ class AttendanceView {
                         <td>${emp.dept || "–"}</td>
                         <td>${emp.company || "–"}</td>
                         <td>${emp.designation || "–"}</td>
+                        <td>${this._formatDate(date || log?.date)}</td>
                         <td>${log?.shiftName || emp?.shift || "–"}</td>
                         <td>${log?.inTime || "–"}</td>
                         <td>${log?.lateBy ? this._fmtMins(log.lateBy) : "–"}</td>
@@ -8169,6 +10884,7 @@ class AttendanceView {
                         <td>${emp.dept || "–"}</td>
                         <td>${emp.company || "–"}</td>
                         <td>${emp.designation || "–"}</td>
+                        <td>${this._formatDate(date || log?.date)}</td>
                         <td>${log?.shiftName || emp?.shift || "–"}</td>
                         <td>${log?.inTime || "–"}</td>
                         <td>${log?.outTime || "–"}</td>
@@ -8188,6 +10904,7 @@ class AttendanceView {
                         <td>${emp.dept || "–"}</td>
                         <td>${emp.company || "–"}</td>
                         <td>${emp.designation || "–"}</td>
+                        <td>${this._formatDate(date || log?.date)}</td>
                         <td>${log?.shiftName || emp?.shift || "–"}</td>
                         <td>${log?.inTime || "–"}</td>
                         <td>${log?.outTime || "–"}</td>
@@ -8195,7 +10912,7 @@ class AttendanceView {
                         <td>${this._actionViewLink(log, emp, date || log?.date)}</td>
                     </tr>
                 `;
-            } else if (key === "resigned") {
+            } else if (key === "resigned" || isResignedRelated) {
                 return `
                     <tr>
                         <td>${sr}</td>
@@ -8211,7 +10928,7 @@ class AttendanceView {
                         <td>${this._actionViewLink(null, emp, null)}</td>
                     </tr>
                 `;
-            } else if (key === "newJoined") {
+            } else if (key === "newJoined" || isNewJoinedRelated) {
                 return `
                     <tr>
                         <td>${sr}</td>
@@ -8236,6 +10953,7 @@ class AttendanceView {
                         <td>${emp.dept || "–"}</td>
                         <td>${emp.company || "–"}</td>
                         <td>${emp.designation || "–"}</td>
+                        <td>${this._formatDate(date || log?.date)}</td>
                         <td>${log?.shiftName || emp?.shift || "–"}</td>
                         <td>${log?.inTime || "–"}</td>
                         <td>${log?.outTime || "–"}</td>
@@ -8258,185 +10976,55 @@ class AttendanceView {
         }
 
         this._statCardExportData = items.map(({ log, emp, date }) => {
+            const base = this._commonCols(emp);
+            const dt = this._formatDate(date || log?.date);
+
             if (isDashboardMode) {
-                if (isAgeGroup || key.startsWith("ageLocation_")) {
-                    return {
-                        Code: emp?.code,
-                        Name: emp?.name,
-                        Age: this._calculateAge(emp?.dobRaw),
-                        DOB: this._formatDate(emp?.dobRaw),
-                        Gender: emp?.gender || "",
-                        Dept: emp?.dept,
-                        Company: emp?.company,
-                        Designation: emp?.designation,
-                        TeamName: emp?.teamName,
-                        ShiftGroup: emp?.shiftGroupName || "",
-                        Location: emp?.location || "",
-                    };
-                } else if (isGenderSummary || key.startsWith("genderLocation_") || key.startsWith("genderSummary_")) {
-                    return {
-                        Code: emp?.code,
-                        Name: emp?.name,
-                        Gender: emp?.gender || "",
-                        Dept: emp?.dept,
-                        Company: emp?.company,
-                        Designation: emp?.designation,
-                        TeamName: emp?.teamName,
-                        ShiftGroup: emp?.shiftGroupName || "",
-                        Location: emp?.location || "",
-                        DOB: this._formatDate(emp?.dobRaw),
-                        Age: this._calculateAge(emp?.dobRaw),
-                    };
-                } else if (key === "staffList" || key === "workerList" || key === "contractList" || key === "consultantList" || key.startsWith("staffList_") || key.startsWith("workerList_") || key.startsWith("contractList_") || key.startsWith("consultantList_") || key.startsWith("workforce")) {
-                    return {
-                        Code: emp?.code,
-                        Name: emp?.name,
-                        TeamName: emp?.teamName,
-                        Dept: emp?.dept,
-                        Company: emp?.company,
-                        Designation: emp?.designation,
-                        ShiftGroup: emp?.shiftGroupName || "",
-                        Location: emp?.location || "",
-                        DOB: this._formatDate(emp?.dobRaw),
-                        Age: this._calculateAge(emp?.dobRaw),
-                        Gender: emp?.gender || "",
-                    };
-                } else {
-                    return {
-                        Code: emp?.code,
-                        Name: emp?.name,
-                        Dept: emp?.dept,
-                        Company: emp?.company,
-                        Designation: emp?.designation,
-                        TeamName: emp?.teamName,
-                        ShiftGroup: emp?.shiftGroupName || "",
-                        Location: emp?.location || "",
-                        DOB: this._formatDate(emp?.dobRaw),
-                        Age: this._calculateAge(emp?.dobRaw),
-                        Gender: emp?.gender || "",
-                    };
-                }
+                return { ...base, Age: this._calculateAge(emp?.dobRaw), Gender: emp?.gender || "",
+                        TeamName: emp?.teamName, ShiftGroup: emp?.shiftGroupName || "" };
             }
-            if (key === "resigned") {
-                return {
-                    Code: emp?.code,
-                    Name: emp?.name,
-                    Gender: emp?.gender,
-                    Dept: emp?.dept,
-                    Company: emp?.company,
-                    Designation: emp?.designation,
-                    TeamName: emp?.teamName,
-                    shiftGroupName: emp?.shiftGroupName,
-                    DOJ: emp?.doj,
-                    DOR: emp?.dor,
-                    Status: emp?.status,
-                };
+            if (key === "resigned" || isResignedRelated) {
+                return { ...base, Gender: emp?.gender, TeamName: emp?.teamName,
+                        ShiftGroup: emp?.shiftGroupName, Status: emp?.status };
+            }
+            if (key === "newJoined" || isNewJoinedRelated) {
+                return { ...base, Gender: emp?.gender, TeamName: emp?.teamName,
+                        ShiftGroup: emp?.shiftGroupName, Status: emp?.status };
             }
             if (key === "totalHeadcount") {
-                return {
-                    Code: emp?.code,
-                    Name: emp?.name,
-                    Gender: emp?.gender,
-                    Dept: emp?.dept,
-                    Company: emp?.company,
-                    Designation: emp?.designation,
-                    TeamName: emp?.teamName,
-                    shiftGroupName: emp?.shiftGroupName,
-                    Shift: emp?.shift,
-                    ShiftStart: emp?.shiftStart || "",
-                    ShiftEnd: emp?.shiftEnd || "",
-                    Location: emp?.location || "",
-                };
+                return { ...base, Gender: emp?.gender, TeamName: emp?.teamName,
+                        ShiftGroup: emp?.shiftGroupName, Shift: emp?.shift,
+                        ShiftStart: emp?.shiftStart || "", ShiftEnd: emp?.shiftEnd || "" };
             }
-            if (key === "newJoined") {
-                return {
-                    Code: emp?.code,
-                    Name: emp?.name,
-                    Gender: emp?.gender,
-                    Dept: emp?.dept,
-                    Company: emp?.company,
-                    Designation: emp?.designation,
-                    TeamName: emp?.teamName,
-                    shiftGroupName: emp?.shiftGroupName,
-                    DOJ: emp?.doj,
-                    Status: emp?.status,
-                };
-            }
-
             if (key === "lateIn") {
-                return {
-                    Code: emp?.code,
-                    Name: emp?.name,
-                    Gender: emp?.gender,
-                    Dept: emp?.dept,
-                    Company: emp?.company,
-                    Designation: emp?.designation,
-                    Shift: log?.shiftName || emp?.shift || "",
-                    InTime: log?.inTime || "",
-                    LateBy: log?.lateBy ? this._fmtMins(log.lateBy) : "",
-                    OutTime: log?.outTime || "",
-                    Status: log?.status || "",
-                    Date: this._formatDate(date || log?.date),
-                };
+                return { ...base, Gender: emp?.gender, Shift: log?.shiftName || emp?.shift || "",
+                        Date: dt, InTime: log?.inTime || "",
+                        LateBy: log?.lateBy ? this._fmtMins(log.lateBy) : "",
+                        OutTime: log?.outTime || "", Status: log?.status || "" };
             }
-
             if (key === "earlyOut") {
-                return {
-                    Code: emp?.code,
-                    Name: emp?.name,
-                    Gender: emp?.gender,
-                    Dept: emp?.dept,
-                    Company: emp?.company,
-                    Designation: emp?.designation,
-                    Shift: log?.shiftName || emp?.shift || "",
-                    InTime: log?.inTime || "",
-                    OutTime: log?.outTime || "",
-                    EarlyBy: log?.earlyBy ? this._fmtMins(log.earlyBy) : "",
-                    Status: log?.status || "",
-                    Date: this._formatDate(date || log?.date),
-                };
+                return { ...base, Gender: emp?.gender, Shift: log?.shiftName || emp?.shift || "",
+                        Date: dt, InTime: log?.inTime || "", OutTime: log?.outTime || "",
+                        EarlyBy: log?.earlyBy ? this._fmtMins(log.earlyBy) : "",
+                        Status: log?.status || "" };
             }
-
             if (key === "staffList" || key === "workerList" || key === "contractList" || key === "consultantList") {
-                return {
-                    Code: emp?.code,
-                    Name: emp?.name,
-                    Gender: emp?.gender,
-                    TeamName: emp?.teamName,
-                    Dept: emp?.dept,
-                    Company: emp?.company,
-                    Designation: emp?.designation,
-                    Shift: log?.shiftName || emp?.shift || "",
-                    InTime: log?.inTime || "",
-                    OutTime: log?.outTime || "",
-                    Status: log?.status || "",
-                    Date: this._formatDate(date || log?.date),
-                };
+                return { ...base, Gender: emp?.gender, TeamName: emp?.teamName,
+                        Shift: log?.shiftName || emp?.shift || "", Date: dt,
+                        InTime: log?.inTime || "", OutTime: log?.outTime || "",
+                        Status: log?.status || "" };
             }
-
-            return {
-                Code: emp?.code,
-                Name: emp?.name,
-                Gender: emp?.gender,
-                Dept: emp?.dept,
-                Company: emp?.company,
-                Designation: emp?.designation,
-                TeamName: emp?.teamName,
-                shiftGroupName: emp?.shiftGroupName,
-                Shift: emp?.shift,
-                ShiftStart: log?.shiftStart || emp?.shiftStart || "",
-                ShiftEnd: log?.shiftEnd || emp?.shiftEnd || "",
-                Date: this._formatDate(date || log?.date),
-                In: log?.inTime || "",
-                Out: log?.outTime || "",
-                Hours: log?.hoursWorked ?? "",
-                LateBy: log?.lateBy ?? "",
-                EarlyBy: log?.earlyBy ?? "",
-                Status: key === "weeklyOff" ? "Weekly Off" : log?.status || "",
-                DetailedStatus: log?.detailedStatus || "",
-                DOB: this._formatDate(emp?.dobRaw),
-                Overtime: log?.overtime || 0,
-            };
+            // default: present, absent, weeklyOff, singlePunch, dept/gender/age/shift summaries, etc.
+            return { ...base, Gender: emp?.gender, TeamName: emp?.teamName,
+                    ShiftGroup: emp?.shiftGroupName, Shift: emp?.shift,
+                    ShiftStart: log?.shiftStart || emp?.shiftStart || "",
+                    ShiftEnd: log?.shiftEnd || emp?.shiftEnd || "",
+                    Date: dt, In: log?.inTime || "", Out: log?.outTime || "",
+                    Hours: log?.hoursWorked ?? "", LateBy: log?.lateBy ?? "",
+                    EarlyBy: log?.earlyBy ?? "",
+                    Status: key === "weeklyOff" ? "Weekly Off" : log?.status || "",
+                    DetailedStatus: log?.detailedStatus || "",
+                    Overtime: log?.overtime || 0 };
         });
 
         panel.style.display = "block";
@@ -9305,8 +11893,6 @@ class AttendanceView {
         });
 
         // ---- Feature 1: Search Filter ----
-        // For each tab, typing in the search box hides any row whose name
-        // doesn't include the typed text (case-insensitive substring match).
         const attachSearchFilter = (searchInputId, listContainerId) => {
             const searchInput = document.getElementById(searchInputId);
             const listContainer = document.getElementById(listContainerId);
@@ -9327,19 +11913,6 @@ class AttendanceView {
         attachSearchFilter("search-designations", "designations-list");
 
         // ---- Feature 2: Automatic Sort ----
-        // Reads every row's current input value (blank = treated as lowest
-        // priority / last), sorts them, then reassigns 1..N sequentially so
-        // there are never duplicates or gaps. Rows are also re-ordered in the
-        // DOM to match, so the visible list reflects the new order right away.
-        // Nothing is sent to the server here — this only updates the input
-        // boxes; the existing Save button/API persists them unchanged.
-        //
-        // Tie-break rule: if two rows end up with the same number (e.g. you
-        // typed 3 into a row that used to be 52, and another row already had
-        // 3), the row you just edited keeps that number. The row that
-        // previously held it — and everything after — shifts down by one.
-        // Rows that haven't been touched at all tie-break by their current
-        // on-screen order, same as before.
         const performAutoSort = (listContainerId) => {
             const listContainer = document.getElementById(listContainerId);
             if (!listContainer) return;
@@ -10269,13 +12842,7 @@ class AttendanceView {
     
     
     _reRenderStaffTabPage(page) {
-        const content = this._renderStaff(
-            this._currentStaffTabLogs,
-            this._currentStaffTabEmps,
-            this._currentStaffTabEmpMap,
-            this._currentStaffTabModel,
-            page
-        );
+        const content = this._renderStaff(this._currentStaffTabLogs, this._currentStaffTabEmps, this._currentStaffTabEmpMap, this._currentStaffTabModel, page);
         document.querySelector(".tab-pane-container").innerHTML = content.html;
         content.renderCharts();
     }
@@ -10380,13 +12947,7 @@ class AttendanceView {
     
     
     _reRenderWorkerTabPage(page) {
-        const content = this._renderWorker(
-            this._currentWorkerTabLogs,
-            this._currentWorkerTabEmps,
-            this._currentWorkerTabEmpMap,
-            this._currentWorkerTabModel,
-            page
-        );
+        const content = this._renderWorker(this._currentWorkerTabLogs, this._currentWorkerTabEmps, this._currentWorkerTabEmpMap, this._currentWorkerTabModel, page);
         document.querySelector(".tab-pane-container").innerHTML = content.html;
         content.renderCharts();
     }
@@ -10413,71 +12974,107 @@ class AttendanceView {
         const formattedDates = dates.map((d) => this._formatDate(d));
         const depts = [...new Set(items.map((it) => it.emp.dept))].sort();
 
-        const countByDate = {};
-        dates.forEach((d) => (countByDate[d] = 0));
-        items.forEach(({ emp }) => {
-            const d = emp[dateField];
-            if (countByDate[d] !== undefined) countByDate[d]++;
+        const companyCategoryColors = {
+            "On-Roll": "#2563EB",
+            "CC": "#7C3AED",
+            "Contractor": "#DB2777",
+            "Outsource": "#EA580C",
+            "Other": "#DC2626",
+        };
+
+        const getJoinExitCategory = (rawCat) => {
+            if (!rawCat) return "Other";
+
+            const c = String(rawCat).toUpperCase().trim();
+
+            if (c === "ON-ROLL" || c === "ONROLL") {
+                return "On-Roll";
+            }
+
+            if (c === "CC" || c === "COMPANY CONTRACT" || c === "COMPANY CONTRACT (CC)") {
+                return "CC";
+            }
+
+            if (c === "CONTRACTOR") {
+                return "Contractor";
+            }
+
+            if (c === "OUTSOURCE") {
+                return "Outsource";
+            }
+            return "Other";
+        };
+
+        const companyCategories = ["On-Roll", "CC", "Contractor", "Outsource", "Other"];
+
+        const countByCategory = {};
+
+        companyCategories.forEach((category) => {
+            countByCategory[category] = {};
+
+            dates.forEach((date) => {
+                countByCategory[category][date] = 0;
+            });
         });
-        const series = [
-            { name: isResigned ? "Resigned" : "Joined", data: dates.map((d) => countByDate[d] || 0), },
-        ];
 
-        const pageSize = 25;
-        const currentPage = page;
-        const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
-        const pageItems = items.slice((currentPage - 1) * pageSize, currentPage * pageSize,);
+        items.forEach(({ emp }) => {
+            const date = emp[dateField];
 
-        const rows = pageItems.map(({ emp }) =>
-            isResigned
-                ? [emp.code || "-", emp.name || "-", emp.dept || "-", emp.company || "-", emp.designation || "-", this._formatDate(emp.dobRaw), this._formatDate(emp.doj), this._formatDate(emp.dor), `<span class="badge badge-danger">${emp.status || "Resigned"}</span>`]
-                : [emp.code || "-", emp.name || "-", emp.dept || "-", emp.company || "-", emp.designation || "-", this._formatDate(emp.dobRaw), this._formatDate(emp.doj), `<span class="badge badge-success">${emp.status || "Working"}</span>`],
-        );
+            if (countByCategory["Other"] && countByCategory["Other"][date] !== undefined) {
+                const category = getJoinExitCategory(emp.companyCategory);
+                countByCategory[category][date]++;
+            }
+        });
+
+        const series = companyCategories.map((category) => ({
+            name: category,
+            data: dates.map((date) => countByCategory[category][date] || 0),
+        }));
+
+        const summaryRows = dates.map((date) => {
+            const onRoll = countByCategory["On-Roll"][date] || 0;
+            const cc = countByCategory["CC"][date] || 0;
+            const contractor = countByCategory["Contractor"][date] || 0;
+            const outsource = countByCategory["Outsource"][date] || 0;
+            const other = countByCategory["Other"][date] || 0;
+
+            const total = onRoll + cc + contractor + outsource + other;
+
+            return [this._formatDate(date), onRoll, cc, contractor, outsource, other, total,];
+        });
 
         const exportKey = isResigned ? "resigned-tab" : "newjoined-tab";
-        this._lastData[exportKey] = items.map(({ emp }) =>
-            isResigned
-                ? { Code: emp.code, Name: emp.name, Dept: emp.dept, Company: emp.company, Designation: emp.designation, DOB: this._formatDate(emp.dobRaw), DOJ: emp.doj, DOR: emp.dor, Status: emp.status, }
-                : { Code: emp.code, Name: emp.name, Dept: emp.dept, Company: emp.company, Designation: emp.designation, DOB: this._formatDate(emp.dobRaw), DOJ: emp.doj, Status: emp.status, },
-        );
 
-        let pageButtons = "";
-        const startPage = Math.max(1, currentPage - 2);
-        const endPage = Math.min(totalPages, currentPage + 2);
-        for (let i = startPage; i <= endPage; i++) {
-            pageButtons += `<button class="btn-page ${i === currentPage ? "btn-page-active" : ""}"
-                onclick="AppController.view._reRenderJoinExitPage('${mode}', ${i})">${i}</button>`;
-        }
+        this._lastData[exportKey] = summaryRows.map((row) => ({
+            Date: row[0],
+            "On-Roll": row[1],
+            CC: row[2],
+            Contractor: row[3],
+            Outsource: row[4],
+            Other: row[5],
+            Total: row[6],
+        }));
 
-        const headers = isResigned
-            ? ["Code", "Name", "Dept", "Company", "Designation", "DOB", "DOJ", "DOR", "Status"]
-            : ["Code", "Name", "Dept", "Company", "Designation", "DOB", "DOJ", "Status"];
+        const headers = ["Date", "On-Roll", "CC", "Contractor", "Outsource", "Other", "Total"];
 
         const chartId = isResigned ? "ch-resigned-date" : "ch-newjoined-date";
         const tableId = isResigned ? "tbl-resigned" : "tbl-newjoined";
         const title = isResigned ? "Resigned Employees" : "New Joined Employees";
         const icon = isResigned ? "ph-user-minus" : "ph-user-plus";
-        const chartTitle = isResigned ? "Resignations by Date (Dept-wise)" : "New Joins by Date (Dept-wise)";
+        const chartTitle = isResigned ? "Resignations by Date (Company Category-wise)" : "New Joins by Date (Company Category-wise)";
 
         return {
             html: `
                 <h2 class="section-title"><i class="ph-fill ${icon}"></i> ${title}</h2>
+                
                 <div class="charts-grid">
                     ${this._chartCard(chartId, `<i class="ph-fill ${icon}"></i>`, isResigned ? "danger" : "success", chartTitle, "Click a segment for detail")}
                 </div>
-                ${this._tableHTML(tableId, headers, rows, exportKey, (currentPage - 1) * pageSize)}
-                <div class="pagination-bar">
-                    <div class="pagination-text">
-                        Showing ${items.length ? (currentPage - 1) * pageSize + 1 : 0}–${Math.min(currentPage * pageSize, items.length)} of ${items.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
-                    </div>
-                    <div class="pagination-buttons">
-                        <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderJoinExitPage('${mode}', 1)">«</button>
-                        <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view._reRenderJoinExitPage('${mode}', ${currentPage - 1})">‹</button>
-                        ${pageButtons}
-                        <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderJoinExitPage('${mode}', ${currentPage + 1})">›</button>
-                        <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view._reRenderJoinExitPage('${mode}', ${totalPages})">»</button>
-                    </div>
+
+                <div id="main-table-wrap">
+                    ${this._tableHTML(tableId, headers, summaryRows, exportKey, 0)}
                 </div>
+            
                 <div id="drilldown-table" style="margin-top:16px"></div>
             `,
             renderCharts: () => {
@@ -10496,11 +13093,17 @@ class AttendanceView {
                 }
 
                 Charts.stacked(chartId, formattedDates, series, chartTitle,
-                    (category, index) => {
+                    (category, index, seriesIndex, seriesName) => {
                         const dateVal = dates[index];
-                        const filteredEmps = items.filter(({ emp }) => emp[dateField] === dateVal).map(({ emp }) => emp);
-                        this._renderJoinExitDrillDown(filteredEmps, `${isResigned ? "Resigned" : "Joined"} on ${this._formatDate(dateVal)}`, isResigned,);
+                        const filteredEmps = items.filter(({ emp }) => {
+                            const empCategory = getJoinExitCategory(emp.companyCategory);
+                            return (emp[dateField] === dateVal && empCategory === seriesName);
+                        }).map(({ emp }) => emp);
+
+                        this._renderJoinExitDrillDown(filteredEmps, `${isResigned ? "Resigned" : "Joined"} on ${this._formatDate(dateVal)} – ${seriesName}`, isResigned);
                     },
+
+                    false, companyCategoryColors
                 );
             },
         };
@@ -10508,6 +13111,7 @@ class AttendanceView {
 
     
     _renderJoinExitDrillDown(emps, title, isResigned, page = 1) {
+        if (page === 1) this._resetJoinExitPanels(); 
         this._joinExitDrillEmps = emps;
         this._joinExitDrillTitle = title;
         this._joinExitDrillIsResigned = isResigned;
@@ -10578,11 +13182,10 @@ class AttendanceView {
             }
         }).join("");
 
-        const exportData = emps.map((emp) =>
-            isResigned
-                ? { Code: emp.code, Name: emp.name, Dept: emp.dept, Company: emp.company, Designation: emp.designation, DOB: this._formatDate(emp.dobRaw), DOJ: emp.doj, DOR: emp.dor, Status: emp.status, }
-                : { Code: emp.code, Name: emp.name, Dept: emp.dept, Company: emp.company, Designation: emp.designation, DOB: this._formatDate(emp.dobRaw), DOJ: emp.doj, Status: emp.status, },
-        );
+        const exportData = emps.map((emp) => ({
+            ...this._commonCols(emp),
+            Status: emp.status,
+        }));
 
         this._joinExitDrillExportData = exportData;
 
@@ -10949,14 +13552,9 @@ class AttendanceView {
 
         const exportData = items.map(({ log, emp, date }) => {
             const base = {
-                Code: emp?.code,
-                Name: emp?.name,
-                Dept: emp?.dept,
-                Company: emp?.company,
-                Designation: emp?.designation,
+                ...this._commonCols(emp),
                 TeamName: emp?.teamName,
-                shiftGroupName: emp?.shiftGroupName,
-                Location: emp?.location || "",
+                ShiftGroup: emp?.shiftGroupName,
             };
             if (hasDates) {
                 base.Date = this._formatDate(date || log?.date);
@@ -10972,7 +13570,7 @@ class AttendanceView {
     }
 
     
-    _showPresentHeadcountDrilldown() {
+    _showPresentHeadcountDrilldown(category = null) {
         document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
 
         const card = this.app.querySelector('.stat-card-clickable[data-card-key="presentHeadcount"]');
@@ -10981,7 +13579,78 @@ class AttendanceView {
         const items = this._currentTabPresentHeadcountItems;
         if (!items) return;
 
-        this._renderStatCardDrilldown("presentHeadcount", items, 1);
+        const filteredItems = category ? items.filter(item => {
+            const emp = item.emp;
+            return emp?.companyCategory?.toUpperCase().trim() === category;
+        }) : items;
+
+        this._renderStatCardDrilldown("presentHeadcount", filteredItems, 1);
+    }
+
+
+    _showLateInDrilldown(category = null) {
+        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
+
+        const card = this.app.querySelector('.stat-card-clickable[data-card-key="lateIn"]');
+        if (card) card.classList.add("active");
+
+        const items = this._currentTabLateInItems;
+        if (!items) return;
+
+        const filteredItems = category ? items.filter(item => {
+            const emp = item.emp;
+            const rawCat = emp?.companyCategory;
+
+            if (!rawCat) return false;
+
+            const cat = String(rawCat).toUpperCase().trim();
+
+            if (category === "ON-ROLL") {
+                return cat === "ON-ROLL" || cat === "ONROLL";
+            }
+
+            if (category === "CC") {
+                return cat === "CC" ||
+                    cat === "COMPANY CONTRACT" ||
+                    cat === "COMPANY CONTRACT (CC)";
+            }
+
+            return cat === category;
+        }) : items;
+
+        this._renderStatCardDrilldown("lateIn", filteredItems, 1);
+    }
+
+
+    _showEarlyOutDrilldown(category = null) {
+        document.querySelectorAll(".stat-card-clickable").forEach((c) => c.classList.remove("active"));
+
+        const card = this.app.querySelector('.stat-card-clickable[data-card-key="earlyOut"]');
+        if (card) card.classList.add("active");
+
+        const items = this._currentTabEarlyOutItems;
+        if (!items) return;
+
+        const filteredItems = category ? items.filter(item => {
+            const emp = item.emp;
+            const rawCat = emp?.companyCategory;
+
+            if (!rawCat) return false;
+
+            const cat = String(rawCat).toUpperCase().trim();
+
+            if (category === "ON-ROLL") {
+                return cat === "ON-ROLL" || cat === "ONROLL";
+            }
+
+            if (category === "CC") {
+                return cat === "CC" || cat === "COMPANY CONTRACT" || cat === "COMPANY CONTRACT (CC)";
+            }
+
+            return cat === category;
+        }) : items;
+
+        this._renderStatCardDrilldown("earlyOut", filteredItems, 1);
     }
 
 
@@ -11174,9 +13843,7 @@ class AttendanceView {
         emps.forEach(e => counts[e.location || 'Unassigned']++);
 
         const cardsHtml = locations.map((loc, i) => `
-            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
-                data-available-location="${this._escapeAttr(loc)}"
-                onclick="AppController.view._showAvailableLocationEmployees('${this._escapeAttr(loc)}')">
+            <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable" data-available-location="${this._escapeAttr(loc)}" onclick="AppController.view._showAvailableLocationEmployees('${this._escapeAttr(loc)}')">
                 <div class="stat-icon"><i class="ph ph-map-pin"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">${this._escapeAttr(loc)}</span>

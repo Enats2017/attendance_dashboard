@@ -117,11 +117,24 @@ export default function DeptAttendance() {
             const data = await res.json();
 
             if (data.success && Array.isArray(data.data)) {
-                setAdminList(data.data);
+                const userSession = localStorage.getItem("hrms_user");
+                const user = JSON.parse(userSession);
 
-                if (data.data.length > 0) {
-                    const firstAdmin = data.data[0];
+                const currentUserId = Number(user.userId ?? user.UserId ?? user.id);
 
+                const sortedAdmins = [...data.data].sort((a, b) => {
+                    const aIsSelf = Number(a.id) === currentUserId;
+                    const bIsSelf = Number(b.id) === currentUserId;
+                    if (aIsSelf && !bIsSelf) return -1;
+                    if (!aIsSelf && bIsSelf) return 1;
+                    return String(a.name || "").localeCompare(String(b.name || ""));
+                });
+
+                setAdminList(sortedAdmins);
+
+                if (sortedAdmins.length > 0) {
+                    const selfAdmin = sortedAdmins.find((admin) => Number(admin.id) === currentUserId);
+                    const firstAdmin = selfAdmin || sortedAdmins[0];
                     setSelectedAdminId(firstAdmin.id);
                     await fetchLocations(firstAdmin.id);
                 }
@@ -505,11 +518,15 @@ export default function DeptAttendance() {
                     <div className="da-filter-group">
                         <label>Admin</label>
                         <select value={selectedAdminId ?? ""} onChange={(e) => handleAdminChange(Number(e.target.value))}>
-                            {adminList.map((admin) => (
-                                <option key={admin.id} value={admin.id}>
-                                    {admin.name}
-                                </option>
-                            ))}
+                            {adminList.map((admin) => {
+                                const currentUserId = Number(JSON.parse(localStorage.getItem("hrms_user"))?.id);
+                                const isSelf = Number(admin.id) === currentUserId;
+                                return (
+                                    <option key={admin.id} value={admin.id}>
+                                        {isSelf ? "Me (Self)" : admin.name}
+                                    </option>
+                                );
+                            })}
                         </select>
                     </div>
                 )}

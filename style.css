@@ -1586,3 +1586,84 @@ body {
     letter-spacing: 0.06em;
     text-transform: uppercase;
 }
+
+
+/* Attendance Logs cards — Figma style */
+.summary-grid-category .stat-card {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: left;
+    position: relative;
+    padding: 16px 18px;
+}
+
+.summary-grid-category .stat-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.summary-grid-category .stat-card-top-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.summary-grid-category .stat-content {
+    align-items: flex-start;
+    text-align: left;
+}
+
+.summary-grid-category .stat-card-chevron {
+    color: #94a3b8;
+    font-size: 18px;
+    flex-shrink: 0;
+    transition: transform .15s;
+}
+
+.summary-grid-category .stat-card-clickable.active .stat-card-chevron {
+    transform: rotate(90deg);
+    color: var(--primary);
+}
+
+.summary-grid-category .stat-category-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px dashed #e5e7eb;
+}
+
+.summary-grid-category .stat-category-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    cursor: pointer;
+    border-radius: 8px;
+    padding: 4px 2px;
+    transition: background .15s;
+}
+
+.summary-grid-category .stat-category-item:hover {
+    background: #f1f5f9;
+}
+
+.summary-grid-category .stat-category-item .cat-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+}
+
+.summary-grid-category .stat-category-item .cat-value {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--primary); /* uniform blue like Figma, not per-category color */
+}
+
+.summary-grid-category {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}

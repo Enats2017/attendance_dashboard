@@ -64,7 +64,7 @@ function getMySQL() {
 function getSQLServer() {
     global $sqlServerConn, $sqlConfig;
     if ($sqlServerConn) return $sqlServerConn;
-  sqlsrv_configure("WarningsReturnAsErrors", 0);  // ← YOU REMOVED THIS
+    sqlsrv_configure("WarningsReturnAsErrors", 0);  // ← YOU REMOVED THIS
     $connectionInfo = [
         "Database" => $sqlConfig['database'],
         "Uid" => $sqlConfig['uid'],
@@ -508,36 +508,56 @@ function setupPassword($data) {
 
 
 function resolveScope($conn, $input) {
-    $targetUserId = null;
-    if (!empty($_SESSION['isMaster']) && !empty($input['subadmin_user_id'])) {
-        $targetUserId = intval($input['subadmin_user_id']);
-    }
+    $loggedInUserId = intval($_SESSION['userId'] ?? 0);
 
-    if ($targetUserId) {
+    if (!empty($_SESSION['isMaster'])) {
+        $targetUserId = intval($input['targetUserId'] ?? $input['subadmin_user_id'] ?? 0);
+
+        if ($targetUserId <= 0) {
+            $targetUserId = $loggedInUserId;
+        }
+
+        if ($targetUserId === $loggedInUserId) {
+            return [
+                'locations' => $_SESSION['locations'] ?? [],
+                'companies' => $_SESSION['companies'] ?? [],
+                'departments' => $_SESSION['departments'] ?? []
+            ];
+        }
+
         $locations = [];
         $companies = [];
         $departments = [];
 
         $stmtLoc = sqlsrv_query($conn, "SELECT LocationId FROM UserLocations WHERE UserId = ?", [$targetUserId]);
+
         while ($row = sqlsrv_fetch_array($stmtLoc, SQLSRV_FETCH_ASSOC)) {
             $locations[] = intval($row['LocationId']);
         }
+
         $stmtComp = sqlsrv_query($conn, "SELECT CompanyId FROM UserCompanies WHERE UserId = ?", [$targetUserId]);
+
         while ($row = sqlsrv_fetch_array($stmtComp, SQLSRV_FETCH_ASSOC)) {
             $companies[] = intval($row['CompanyId']);
         }
+
         $stmtDept = sqlsrv_query($conn, "SELECT DepartmentId FROM UserDepartments WHERE UserId = ?", [$targetUserId]);
+
         while ($row = sqlsrv_fetch_array($stmtDept, SQLSRV_FETCH_ASSOC)) {
             $departments[] = intval($row['DepartmentId']);
         }
 
-        return ['locations' => $locations, 'companies' => $companies, 'departments' => $departments];
+        return [
+            'locations' => $locations,
+            'companies' => $companies,
+            'departments' => $departments
+        ];
     }
 
     return [
-        'locations'   => $_SESSION['locations'] ?? [],
-        'companies'   => $_SESSION['companies'] ?? [],
-        'departments' => $_SESSION['departments'] ?? [],
+        'locations' => $_SESSION['locations'] ?? [],
+        'companies' => $_SESSION['companies'] ?? [],
+        'departments' => $_SESSION['departments'] ?? []
     ];
 }
 
@@ -1033,7 +1053,7 @@ function handleDashboardData($input, $returnData = false) {
         return;
     }
 
-    $targetUserId = intval($input['targetUserId'] ?? 0);
+    $targetUserId = intval($input['targetUserId'] ?? $input['subadmin_user_id'] ?? 0);
 
     if (!empty($_SESSION['isMaster'])) {
         $targetUserId = $targetUserId > 0 ? $targetUserId : $loggedInUserId;
@@ -1148,18 +1168,19 @@ function handleDashboardData($input, $returnData = false) {
             case 'CONTRACTOR':
                 $category = 'CONTRACTOR';
                 break;
+
             case 'ONROLL':
                 $category = 'ON-ROLL';
                 break;
+            
             case 'CC':
                 $category = 'CC';
                 break;
-            case 'AUDITOR':
-                $category = 'AUDITOR';
-                break;
+
             case 'OUTSOURCE':
                 $category = 'OUTSOURCE';
                 break;
+                
             default:
                 $category = 'OTHER';
                 break;
@@ -1189,6 +1210,29 @@ function handleDashboardData($input, $returnData = false) {
     
     if ($stmtEmp) {
         while ($row = sqlsrv_fetch_array($stmtEmp, SQLSRV_FETCH_ASSOC)) {
+            $debugCode = trim((string)$row['EmployeeCode']);
+            if (in_array($debugCode, ['103240', '355579', '455775'], true)) {
+                $debugFile = __DIR__ . '/dashboard_debug.log';
+
+                file_put_contents(
+                    $debugFile,
+                    "\n" . str_repeat("=", 80) . "\n" .
+                    "EMPLOYEE FOUND IN MAIN EMPLOYEE QUERY\n" .
+                    "Time: " . date('Y-m-d H:i:s') . "\n" .
+                    "EmployeeCode: " . ($row['EmployeeCode'] ?? 'NULL') . "\n" .
+                    "EmployeeId: " . ($row['EmployeeId'] ?? 'NULL') . "\n" .
+                    "EmployeeName: " . ($row['EmployeeName'] ?? 'NULL') . "\n" .
+                    "CompanyId: " . ($row['CompanyId'] ?? 'NULL') . "\n" .
+                    "DepartmentId: " . ($row['DepartmentId'] ?? 'NULL') . "\n" .
+                    "LocationId: " . ($row['locationId'] ?? 'NULL') . "\n" .
+                    "ShiftGroupId: " . ($row['ShiftGroupId'] ?? 'NULL') . "\n" .
+                    "CategoryId: " . ($row['CategoryId'] ?? 'NULL') . "\n" .
+                    "DOJ: " . (isset($row['DOJ']) && $row['DOJ'] ? $row['DOJ']->format('Y-m-d') : 'NULL') . "\n" .
+                    "Team: " . ($row['Team'] ?? 'NULL') . "\n",
+                    FILE_APPEND
+                );
+            }
+
             $empId = (string)$row['EmployeeId'];
             $teamId = isset($row['Team']) ? (int)$row['Team'] : null;
             $teamName = $allTeams[$teamId] ?? 'No Team';
@@ -1298,7 +1342,7 @@ function handleDashboardData($input, $returnData = false) {
 
     $resignedEmployees = [];
 
-    $sqlResigned = "SELECT E.EmployeeId, E.CategoryId, E.Team, E.Location AS locationId, E.EmployeeName, E.ShiftGroupId, E.EmployeeCode, E.Gender, E.DOB, E.Designation, DG.DesignationsName AS DesignationName, C.CompanyFName AS company, D.DepartmentFName AS dept, E.DOJ, E.DOR, E.Status FROM Employees E WITH (NOLOCK) LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Resigned' AND E.DOR >= ? AND E.DOR <= ?";
+    $sqlResigned = "SELECT E.EmployeeId, E.CategoryId, E.Team, E.Location AS locationId, E.EmployeeName, E.ShiftGroupId, E.EmployeeCode, E.Gender, E.DOB, E.Designation, DG.DesignationsName AS DesignationName, C.CompanyFName AS company, D.DepartmentFName AS dept, C.ZoneId, E.DOJ, E.DOR, E.Status FROM Employees E WITH (NOLOCK) LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Resigned' AND E.DOR >= ? AND E.DOR <= ?";
 
     $paramsResigned = [$dayFrom, $dayTo];
 
@@ -1339,6 +1383,7 @@ function handleDashboardData($input, $returnData = false) {
             $locationId = (int)$row['locationId'];
             $genderRaw = trim($row['Gender'] ?? '');
             $gender = strtoupper($genderRaw);
+            $companyCategory = $zoneMap[(int)$row['ZoneId']] ?? 'OTHER';
 
             $resignedEmployees[] = [
                 'id' => $empId,
@@ -1348,6 +1393,7 @@ function handleDashboardData($input, $returnData = false) {
                 'gender' => ($gender === 'MALE' || $gender === 'M') ? 'Male' : 'Female',
                 'dept' => $row['dept'] ?: ('Dept ' . $row['DepartmentId']),
                 'company' => $row['company'] ?: 'Unknown',
+                'companyCategory' => $companyCategory,
                 'categoryId' => $categoryId,
                 'team' => $teamId,
                 'teamName' => $teamName,
@@ -1365,7 +1411,7 @@ function handleDashboardData($input, $returnData = false) {
 
     $newJoinedEmployees = [];
 
-    $sqlNewJoined = "SELECT E.EmployeeId, E.Location AS locationId, E.CategoryId, E.Team, E.ShiftGroupId, E.EmployeeName, E.EmployeeCode, E.Gender, E.DOB, E.Designation, DG.DesignationsName AS DesignationName, C.CompanyFName AS company, D.DepartmentFName AS dept, E.DOJ, E.DOR, E.Status FROM Employees E WITH (NOLOCK) LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.DOJ >= ? AND E.DOJ <= ?";
+    $sqlNewJoined = "SELECT E.EmployeeId, E.Location AS locationId, E.CategoryId, E.Team, E.ShiftGroupId, E.EmployeeName, E.EmployeeCode, E.Gender, E.DOB, E.Designation, DG.DesignationsName AS DesignationName, C.CompanyFName AS company, C.ZoneId, D.DepartmentFName AS dept, E.DOJ, E.DOR, E.Status FROM Employees E WITH (NOLOCK) LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.DOJ >= ? AND E.DOJ <= ?";
 
     $paramsNewJoined = [$dayFrom, $dayTo];
     if ($deptName) { 
@@ -1401,6 +1447,7 @@ function handleDashboardData($input, $returnData = false) {
             $locationId = (int)$row['locationId'];
             $genderRaw = trim($row['Gender'] ?? '');
             $gender = strtoupper($genderRaw);
+            $companyCategory = $zoneMap[(int)$row['ZoneId']] ?? 'OTHER';
 
             $newJoinedEmployees[] = [
                 'id' => $empId,
@@ -1410,6 +1457,7 @@ function handleDashboardData($input, $returnData = false) {
                 'gender' => ($gender === 'MALE' || $gender === 'M') ? 'Male' : 'Female',
                 'dept' => $row['dept'] ?: ('Dept ' . $row['DepartmentId']),
                 'company' => $row['company'] ?: 'Unknown',
+                'companyCategory' => $companyCategory,
                 'categoryId' => $categoryId,
                 'team' => $teamId,
                 'teamName' => $teamName,
@@ -1688,7 +1736,7 @@ function handleDashboardData($input, $returnData = false) {
     }
     
     $filteredEmployees = [];
-    $validEmpIdSet = [];
+    $NewFilteredEmployees = [];
 
     if ($shiftName) {
         $staffEmpIds = [];
@@ -1706,6 +1754,22 @@ function handleDashboardData($input, $returnData = false) {
         }
 
         if ($shiftName && $emp['shift'] !== $shiftName) {
+            continue;
+        }
+
+        if ($deptName && $emp['dept'] !== $deptName) {
+            continue;
+        }
+
+        if ($compName && $emp['company'] !== $compName) {
+            continue;
+        }
+
+        if ($locationFilter && $emp['location'] !== $locationFilter) {
+            continue;
+        }
+
+        if (empty($emp['doj']) || $emp['doj'] === '1900-01-01') {
             continue;
         }
 
@@ -1739,10 +1803,19 @@ function handleDashboardData($input, $returnData = false) {
         $desigLocAvailableMap[$deptId][$desigId][$locId]++;
 
         // Build valid employee set here
-        $validEmpIdSet[$emp['id']] = true;
-
+        $NewFilteredEmployees[] = $emp;
         $filteredEmployees[] = $emp;
     }
+
+    $validEmpIdSet = [];
+    foreach ($NewFilteredEmployees as $emp) {
+        $validEmpIdSet[$emp['id']] = true;
+    }
+
+    // Keep only attendance logs belonging to filtered attendance employees
+    $logs = array_values(array_filter($logs, function ($log) use ($validEmpIdSet) {
+        return isset($validEmpIdSet[$log['empId']]);
+    }));
 
     $deptLocHeadcountMap = [];
     foreach ($deptLocHcMap as $deptId => $locMap) {
@@ -1756,27 +1829,8 @@ function handleDashboardData($input, $returnData = false) {
         }
     }
     
-    $employees = $filteredEmployees;
+    $employees = $NewFilteredEmployees;
     $totalEmployees = count($employees);
-
-    $NewFilteredEmployees = $employees;
-
-    if ($deptName || $compName || $locationFilter) {
-        $NewFilteredEmployees = [];
-        foreach ($employees as $emp) {
-            if ($deptName && $emp['dept'] !== $deptName) {
-                continue;
-            }
-            if ($compName && $emp['company'] !== $compName) {
-                continue;
-            }
-            if ($locationFilter && $emp['location'] !== $locationFilter) {
-                continue;
-            }
-
-            $NewFilteredEmployees[] = $emp;
-        }
-    }
 
     // Designation-level headcount, per dept + location
     $desigLocHeadcountMap = []; 
@@ -1868,7 +1922,9 @@ function handleDashboardData($input, $returnData = false) {
 
     $requiredHeadcountByLocation = array_values($requiredHeadcountByLocation);
 
-    $totalGapHeadcount = $totalRequiredHeadcount - $totalEmployees;
+    $dashboardEmployeeCount = count($dashboardEmployees);
+    $totalGapHeadcount = $totalRequiredHeadcount - $dashboardEmployeeCount;
+    $totalGapHeadcount = $totalRequiredHeadcount - $dashboardEmployeeCount;
 
     $devicePresentDayCount = 0;
     $counts = ['in' => 0, 'out' => 0];
@@ -1877,6 +1933,10 @@ function handleDashboardData($input, $returnData = false) {
 
         // user's actually-selected range — not the padded deviceFrom/deviceTo window
         if ($date < $dayFrom || $date > $dayTo) {
+            continue;
+        }
+
+        if (!isset($validEmpIdSet[$empId])) {
             continue;
         }
 
@@ -1946,7 +2006,7 @@ function handleDashboardData($input, $returnData = false) {
     $today = date('Y-m-d');
 
     $empShiftGroupMap = [];
-    foreach ($dashboardEmployees as $e) {
+    foreach ($NewFilteredEmployees as $e) {
         $empShiftGroupMap[$e['id']] = $e['shiftGroupId'];
     }
 
@@ -2239,7 +2299,7 @@ function handleDashboardData($input, $returnData = false) {
 
     for ($d = clone $rangeStart; $d <= $rangeEnd; $d->modify('+1 day')) {
         $dateStr = $d->format('Y-m-d');
-        foreach ($employees as $e) {
+        foreach ($NewFilteredEmployees as $e) {
             $totalEmployeeDays++;    
             $k = $e['id'] . '_' . $dateStr;
             $empStatus = $statusKeyMap[$k] ?? 'absent';
@@ -2342,12 +2402,12 @@ function handleDashboardData($input, $returnData = false) {
     $halfPresentTotal = $halfPresentEmployeeDays;
     $weeklyOffTotal = $weeklyOffEmployeeDays;
 
-    $shiftStats = computeShiftStats($employees, $logs, $deviceEmployeeStats, $employeesInAttendanceLogs, $dayFrom, $dayTo, $conn, $singlePunchData);
+    $shiftStats = computeShiftStats($NewFilteredEmployees, $logs, $deviceEmployeeStats, $employeesInAttendanceLogs, $dayFrom, $dayTo, $conn, $singlePunchData);
 
     if ($returnData) {
         return [
             'conn' => $conn,
-            'employees' => $employees,
+            'employees' => $NewFilteredEmployees,
             'logs' => $logs,
             'devTables' => $devTables,
             'dayFrom' => $dayFrom,
@@ -2392,7 +2452,7 @@ function handleDashboardData($input, $returnData = false) {
     $zeroPunchDetails = [];
     $punches1to5Details = [];
     $punches6to10Details = [];
-    foreach ($employees as $emp) {
+    foreach ($NewFilteredEmployees as $emp) {
         $empId = $emp['id'];
         $days  = $punchDaysByEmp[$empId] ?? 0;
 
@@ -2544,46 +2604,69 @@ function handleDashboardData($input, $returnData = false) {
 
 function getSubAdmins() {
     if (empty($_SESSION['isMaster'])) {
-        echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Unauthorized'
+        ]);
         return;
     }
 
     $conn = getSQLServer();
 
-    $sql = "SELECT UserId, LoginName, RoleName FROM SystemUsers WHERE RecordStatus = 1 AND UserId != ?";
-    $stmt = sqlsrv_query($conn, $sql, [$_SESSION['userId']]);
+    $currentUserId = intval($_SESSION['userId'] ?? 0);
 
-    $userRows = [];
-    if ($stmt) {
-        while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
-            $userRows[] = $row;  
-        }
+    $sql = "SELECT UserId, LoginName, RoleName FROM SystemUsers WHERE RecordStatus = 1";
+
+    $stmt = sqlsrv_query($conn, $sql);
+
+    if ($stmt === false) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Failed to load users',
+            'errors' => sqlsrv_errors()
+        ]);
+        return;
     }
 
     $subAdmins = [];
-    foreach ($userRows as $row) {  
+    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
         $uid = intval($row['UserId']);
 
         $locations = [];
+
         $stmtLoc = sqlsrv_query($conn, "SELECT L.LocationName FROM UserLocations UL INNER JOIN Locations L ON UL.LocationId = L.LocationId WHERE UL.UserId = ?", [$uid]);
-        while ($r = sqlsrv_fetch_array($stmtLoc, SQLSRV_FETCH_ASSOC)) {
-            $locations[] = $r['LocationName'];
+
+        if ($stmtLoc !== false) {
+            while ($r = sqlsrv_fetch_array($stmtLoc, SQLSRV_FETCH_ASSOC)) {
+                $locations[] = $r['LocationName'];
+            }
         }
 
         $companies = [];
+
         $stmtComp = sqlsrv_query($conn, "SELECT C.CompanyFName FROM UserCompanies UC INNER JOIN Companies C ON UC.CompanyId = C.CompanyId WHERE UC.UserId = ?", [$uid]);
-        while ($r = sqlsrv_fetch_array($stmtComp, SQLSRV_FETCH_ASSOC)) {
-            $companies[] = $r['CompanyFName'];
+
+        if ($stmtComp !== false) {
+            while ($r = sqlsrv_fetch_array($stmtComp, SQLSRV_FETCH_ASSOC)) {
+                $companies[] = $r['CompanyFName'];
+            }
         }
 
         $departments = [];
+
         $stmtDept = sqlsrv_query($conn, "SELECT D.DepartmentFName FROM UserDepartments UD INNER JOIN Departments D ON UD.DepartmentId = D.DepartmentId WHERE UD.UserId = ?", [$uid]);
-        while ($r = sqlsrv_fetch_array($stmtDept, SQLSRV_FETCH_ASSOC)) {
-            $departments[] = $r['DepartmentFName'];
+
+        if ($stmtDept !== false) {
+            while ($r = sqlsrv_fetch_array($stmtDept, SQLSRV_FETCH_ASSOC)) {
+                $departments[] = $r['DepartmentFName'];
+            }
         }
 
         $isSubMaster = empty($locations) && empty($companies) && empty($departments);
-        if ($isSubMaster) continue;
+
+        if ($isSubMaster && $uid !== $currentUserId) {
+            continue;
+        }
 
         $subAdmins[] = [
             'id' => $uid,
@@ -2591,11 +2674,14 @@ function getSubAdmins() {
             'role' => $row['RoleName'],
             'locations' => $locations,
             'companies' => $companies,
-            'departments' => $departments,
+            'departments' => $departments
         ];
     }
 
-    echo json_encode(['success' => true, 'data' => $subAdmins]);
+    echo json_encode([
+        'success' => true,
+        'data' => $subAdmins
+    ]);
 }
 
 
@@ -4268,7 +4354,7 @@ function handleGetDailyMachines($input) {
     $locFilter = resolveLocationFilter($scope, $input);
 
     if ($locFilter['isAll']) {
-        $sql = "SELECT MachineDate, SUM(RunningMachines) AS RunningMachines FROM LocationDailyMachineCount WHERE UserId = ? AND LocationId IN ({$locFilter['list']}) AND MachineDate >= ? AND MachineDate <= ? GROUP BY MachineDateORDER BY MachineDate ASC";
+        $sql = "SELECT MachineDate, SUM(RunningMachines) AS RunningMachines FROM LocationDailyMachineCount WHERE UserId = ? AND LocationId IN ({$locFilter['list']}) AND MachineDate >= ? AND MachineDate <= ? GROUP BY MachineDate ORDER BY MachineDate ASC";
         $stmt = sqlsrv_query($sqlConn, $sql, [$targetUserId, $dateFrom, $dateTo]);
     } else {
         $sql = "SELECT MachineDate, RunningMachines FROM LocationDailyMachineCount WHERE UserId = ? AND LocationId = ? AND MachineDate >= ? AND MachineDate <= ? ORDER BY MachineDate ASC";
@@ -4348,38 +4434,98 @@ function resolveLocationFilter($scope, $input) {
 
 
 /**
- * Get simple list of Locations assigned to the logged-in admin
+ * Get simple list of Locations assigned to the selected admin
  */
 function handleGetLocations($input = []) {
-    $conn = getSQLServer();
-    $scope = resolveScope($conn, $input);
+    if (!empty($_SESSION['isMaster'])) {
+        $targetUserId = intval($input['targetUserId'] ?? 0);
+        if ($targetUserId <= 0) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Invalid Admin selected.'
+            ]);
+            return;
+        }
+    } else {
 
-    if (empty($scope['locations'])) {
-        echo json_encode(['success' => false, 'message' => 'Session expired. Please login again.']);
+        $targetUserId = intval($_SESSION['userId'] ?? 0);
+
+        if ($targetUserId <= 0) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Session expired. Please login again.'
+            ]);
+            return;
+        }
+    }
+
+    $conn = getSQLServer();
+
+    $currentUserId = intval($_SESSION['userId'] ?? 0);
+    $isMaster = !empty($_SESSION['isMaster']);
+
+    if ($isMaster && $targetUserId === $currentUserId) {
+        $sql = "SELECT LocationId, LocationName FROM Locations WITH (NOLOCK) WHERE IsActive = 1 ORDER BY LocationName ASC";
+
+        $stmt = sqlsrv_query($conn, $sql);
+
+        if ($stmt === false) {
+            $errors = sqlsrv_errors();
+            error_log('handleGetLocations Master SQL error: ' . print_r($errors, true));
+
+            echo json_encode([
+                'success' => false,
+                'message' => 'Database query failed'
+            ]);
+
+            return;
+        }
+
+        $data = [];
+
+        while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+
+            $data[] = [
+                'location_id' => intval($row['LocationId']),
+                'location_name' => $row['LocationName']
+            ];
+        }
+
+        echo json_encode([
+            'success' => true,
+            'data' => $data
+        ]);
+
         return;
     }
 
-    $locationList = implode(',', array_map('intval', $scope['locations']));
+    $sql = "SELECT L.LocationId, L.LocationName FROM UserLocations UL WITH (NOLOCK) INNER JOIN Locations L WITH (NOLOCK) ON UL.LocationId = L.LocationId WHERE UL.UserId = ? AND L.IsActive = 1 ORDER BY L.LocationName ASC";
 
-    $sql = "SELECT LocationId, LocationName FROM Locations WITH (NOLOCK) WHERE LocationId IN ($locationList) AND IsActive = 1 ORDER BY LocationName ASC";
-
-    $stmt = sqlsrv_query($conn, $sql);
+    $stmt = sqlsrv_query($conn, $sql, [$targetUserId]);
 
     if ($stmt === false) {
         $errors = sqlsrv_errors();
-        error_log('handleGetLocations SQL error: ' . print_r($errors, true));
-        echo json_encode(['success' => false, 'message' => 'Database query failed', 'sql_error' => $errors]);
+        error_log('handleGetLocations SQL error: '. print_r($errors, true));
+        echo json_encode([
+            'success' => false,
+            'message' => 'Database query failed'
+        ]);
+
         return;
     }
 
     $data = [];
     while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
         $data[] = [
-            'location_id' => $row['LocationId'],
+            'location_id' => intval($row['LocationId']),
             'location_name' => $row['LocationName']
         ];
     }
-    echo json_encode(['success' => true, 'data' => $data]);
+
+    echo json_encode([
+        'success' => true,
+        'data' => $data
+    ]);
 }
 
 
