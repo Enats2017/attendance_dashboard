@@ -5764,7 +5764,7 @@ class AttendanceView {
             });
 
             const colorCls = ["info", "success", "warning", "accent", "danger"];
-            const locationCards = Object.keys(locations).map((location, i) => `
+            const locationCards = AppController.model.sortLocations(Object.keys(locations)).map((location, i) => `
                 <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable" data-nj-location="${this._escapeAttr(location)}" onclick="AppController.view._showNewJoinedBreakdownDrilldown('location', '${this._escapeAttr(location)}')" style="position:relative;">
                     <button class="stat-card-download-btn" title="Download this card's employees" onclick="event.stopPropagation(); AppController.view._downloadJoinExitCardExcel('newJoined', 'location', '${this._escapeAttr(location)}')">
                         <i class="ph ph-download-simple"></i>
@@ -6095,7 +6095,7 @@ class AttendanceView {
             });
 
             const colorCls = ["info", "success", "warning", "accent", "danger"];
-            const locationCards = Object.keys(locations).map((location, i) => `
+            const locationCards = AppController.model.sortLocations(Object.keys(locations)).map((location, i) => `
                 <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable" data-res-location="${this._escapeAttr(location)}" onclick="AppController.view._showResignedBreakdownDrilldown('location', '${this._escapeAttr(location)}')" style="position:relative;">
                     <button class="stat-card-download-btn" title="Download this card's employees" onclick="event.stopPropagation(); AppController.view._downloadJoinExitCardExcel('resigned', 'location', '${this._escapeAttr(location)}')">
                         <i class="ph ph-download-simple"></i>
@@ -11497,13 +11497,14 @@ class AttendanceView {
         const contentEl = document.getElementById("sort-order-content");
         if (!contentEl) return;
 
-        const [compRes, deptRes, desigRes] = await Promise.all([
+        const [compRes, deptRes, desigRes, locRes] = await Promise.all([
             model.fetchCompaniesOrder(),
             model.fetchDepartmentsOrder(),
             model.fetchDesignationGlobalOrder(),
+            model.fetchLocationsOrder()
         ]);
 
-        if (!compRes.success || !deptRes.success || !desigRes.success) {
+        if (!compRes.success || !deptRes.success || !desigRes.success || !locRes.success) {
             contentEl.innerHTML = `
                 <div style="padding:24px;background:rgba(244,63,94,0.05);border:1px solid rgba(244,63,94,0.2);color:#f43f5e;border-radius:var(--radius-md);font-weight:500;">
                     <i class="ph-fill ph-warning-circle" style="font-size:20px;"></i>
@@ -11515,8 +11516,8 @@ class AttendanceView {
 
         const companies = compRes.data || [];
         const departments = deptRes.data || [];
-
         const designations = desigRes.data || [];
+        const locations = locRes.data || [];
 
         contentEl.innerHTML = `
             <style>
@@ -11698,6 +11699,9 @@ class AttendanceView {
                 <button class="sort-order-tab-btn" data-panel="designations">
                     <i class="ph ph-identification-badge"></i> Designations
                 </button>
+                <button class="sort-order-tab-btn" data-panel="locations">
+                    <i class="ph ph-map-pin"></i> Locations
+                </button>
             </div>
 
             <!-- Companies Panel -->
@@ -11840,6 +11844,58 @@ class AttendanceView {
                     </div>
                 </div>
             </div>
+
+            <div class="sort-order-panel" id="sort-panel-locations">
+                <div class="sort-order-card">
+                    <div class="sort-order-header-bar">
+                        <div>
+                            <h3>Location Sort Order</h3>
+                            <p>Lower number appears first. Leave blank to use alphabetical order.</p>
+                        </div>
+                    </div>
+
+                    <div class="sort-order-toolbar">
+                        <input type="text" class="sort-order-search" id="search-locations" placeholder="Search locations...">
+                        <div class="sort-order-toolbar-actions">
+                            <button class="btn-order-sort" id="btn-sort-locations" type="button">
+                                <i class="ph-bold ph-sort-ascending"></i> Sort
+                            </button>
+                            <button class="btn-order-save" id="btn-save-locations" type="button">
+                                <i class="ph-bold ph-floppy-disk"></i> Save
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="locations-list">
+                        ${locations.map((location) => `
+                            <div class="sort-order-item">
+                                <div style="display:flex;align-items:center;">
+                                    <i class="ph ph-map-pin" style="color:#6366f1;margin-right:10px;font-size:16px;"></i>
+                                    <span class="sort-order-item-name">${this._escapeAttr(location.name)}</span>
+                                    ${location.sortOrder === null ? '<span class="sort-order-null-badge">not set</span>' : ""}
+                                </div>
+
+                                <div style="display:flex;align-items:center;gap:6px;">
+                                    <div class="sort-order-control">
+                                        <button class="sort-order-btn btn-dec" type="button">
+                                            <i class="ph ph-minus"></i>
+                                        </button>
+                                        
+                                        <input type="number" class="sort-order-input location-order-input" data-id="${location.id}" data-original-order="${location.sortOrder !== null ? location.sortOrder : ""}" value="${location.sortOrder !== null ? location.sortOrder : ""}" placeholder="–" >
+                                        
+                                        <button class="sort-order-btn btn-inc" type="button">
+                                            <i class="ph ph-plus"></i>
+                                        </button>
+                                    </div>
+                                    <button class="sort-order-clear-btn" data-target="location" data-id="${location.id}" title="Clear (reset to NULL)">
+                                        <i class="ph ph-x"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        `).join("")}
+                    </div>
+                </div>
+            </div>
         `;
 
         contentEl.querySelectorAll(".sort-order-tab-btn").forEach((btn) => {
@@ -11911,6 +11967,7 @@ class AttendanceView {
         attachSearchFilter("search-companies", "companies-list");
         attachSearchFilter("search-departments", "departments-list");
         attachSearchFilter("search-designations", "designations-list");
+        attachSearchFilter("search-locations", "locations-list");
 
         // ---- Feature 2: Automatic Sort ----
         const performAutoSort = (listContainerId) => {
@@ -11927,21 +11984,96 @@ class AttendanceView {
             });
 
             withMeta.sort((a, b) => {
-                const av = a.val === null ? Infinity : a.val;
-                const bv = b.val === null ? Infinity : b.val;
-                if (av !== bv) return av - bv;
-                // Tie: the more recently edited row wins and goes first.
-                if (a.editSeq !== b.editSeq) return b.editSeq - a.editSeq;
-                // Neither was edited (or both edited at once, e.g. bulk load):
-                // fall back to current on-screen order.
+                if (a.editSeq && !b.editSeq) {
+                    const editedRowMovesDown = a.val > a.idx + 1;
+                    return editedRowMovesDown ? 1 : -1;
+                }
+
+                if (b.editSeq && !a.editSeq) {
+                    const editedRowMovesDown = b.val > b.idx + 1;
+                    return editedRowMovesDown ? -1 : 1;
+                }
+
+                if (a.editSeq !== b.editSeq) {
+                    return b.editSeq - a.editSeq;
+                }
+
                 return a.idx - b.idx;
             });
 
             withMeta.forEach((entry, i) => {
                 if (entry.input) entry.input.value = i + 1;
+                if (entry.input) delete entry.input.dataset.editSeq;
                 const badge = entry.item.querySelector(".sort-order-null-badge");
                 if (badge) badge.remove();
                 listContainer.appendChild(entry.item); // moves existing node -> reorders DOM
+            });
+        };
+
+        const performLocationSort = () => {
+            const listContainer = document.getElementById("locations-list");
+            if (!listContainer) return;
+
+            const items = Array.from(listContainer.querySelectorAll(".sort-order-item"));
+
+            const inputs = items.map((item) => ({
+                item,
+                input: item.querySelector(".location-order-input")
+            }));
+
+            const changed = inputs.filter(({ input }) => input && input.value !== (input.dataset.originalOrder || ""));
+
+            if (changed.length > 1) {
+                alert("Change one location order at a time, then click Sort.");
+                return;
+            }
+
+            if (changed.length === 1) {
+                const movedInput = changed[0].input;
+                const oldOrder = Number(movedInput.dataset.originalOrder);
+                const newOrder = Number(movedInput.value);
+
+                if (!Number.isInteger(newOrder) || newOrder < 1 || !Number.isInteger(oldOrder)) {
+                    alert("Enter a whole-number location order of 1 or higher.");
+                    return;
+                }
+
+                inputs.forEach(({ input }) => {
+                    if (!input || input === movedInput || input.value === "") return;
+
+                    const currentOrder = Number(input.value);
+
+                    if (newOrder > oldOrder && currentOrder >= newOrder) {
+                        input.value = currentOrder + 1;
+                    }
+
+                    if (newOrder < oldOrder && currentOrder >= newOrder && currentOrder < oldOrder) {
+                        input.value = currentOrder + 1;
+                    }
+                });
+            }
+
+            inputs.sort((a, b) => {
+                const orderA = a.input && a.input.value !== "" ? Number(a.input.value) : Infinity;
+                const orderB = b.input && b.input.value !== "" ? Number(b.input.value) : Infinity;
+
+                if (orderA !== orderB) return orderA - orderB;
+
+                const nameA = a.item.querySelector(".sort-order-item-name")?.textContent.trim() || "";
+                const nameB = b.item.querySelector(".sort-order-item-name")?.textContent.trim() || "";
+
+                return nameA.localeCompare(nameB, undefined, {
+                    numeric: true,
+                    sensitivity: "base"
+                });
+            });
+
+            inputs.forEach(({ item, input }) => {
+                listContainer.appendChild(item);
+
+                if (input) {
+                    input.dataset.originalOrder = input.value;
+                }
             });
         };
 
@@ -11953,6 +12085,9 @@ class AttendanceView {
         });
         document.getElementById("btn-sort-designations").addEventListener("click", () => {
             performAutoSort("designations-list");
+        });
+        document.getElementById("btn-sort-locations").addEventListener("click", () => {
+            performLocationSort();
         });
 
         document.getElementById("btn-save-companies").addEventListener("click", async () => {
@@ -12018,6 +12153,30 @@ class AttendanceView {
                 this.hideOverlay();
                 alert("Designation sort order saved successfully!");
                 model.state.filterLists = null;
+            } else {
+                this.hideOverlay();
+                alert("Failed: " + (res ? res.message : "Unknown error"));
+            }
+        });
+
+        document.getElementById("btn-save-locations").addEventListener("click", async () => {
+            const inputs = contentEl.querySelectorAll(".location-order-input");
+            const items = [];
+
+            inputs.forEach((input) => {
+                items.push({
+                    id: parseInt(input.dataset.id, 10),
+                    sortOrder: input.value !== "" ? parseInt(input.value, 10) : null
+                });
+            });
+
+            this.showOverlay("Saving location order...");
+            const res = await model.saveLocationsOrder(items);
+
+            if (res && res.success) {
+                await model.fetchData();
+                this.hideOverlay();
+                alert("Location sort order saved successfully!");
             } else {
                 this.hideOverlay();
                 alert("Failed: " + (res ? res.message : "Unknown error"));

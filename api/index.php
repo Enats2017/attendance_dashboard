@@ -10,7 +10,7 @@
 ini_set('display_errors', 0);
 error_reporting(0);
 ini_set('memory_limit', '5120M');        
-ini_set('max_execution_time', 300);      
+ini_set('max_execution_time', 800);      
 
 header('Content-Type: application/json');
 session_start();
@@ -164,6 +164,13 @@ switch ($action) {
         break;
     case 'save_companies_order':
         handleSaveCompaniesOrder($input);
+        break;
+    case 'get_locations_order':
+        handleGetLocationsOrder();
+        break;
+
+    case 'save_locations_order':
+        handleSaveLocationsOrder($input);
         break;
     case 'get_departments_order':
         handleGetDepartmentsOrder();
@@ -1191,9 +1198,12 @@ function handleDashboardData($input, $returnData = false) {
 
     $employeeStart = microtime(true);
 
-    $sqlEmp = "SELECT E.EmployeeId, E.CompanyId, E.DepartmentId, E.Location AS locationId, E.ShiftGroupId, E.EmployeeName, E.EmployeeCode, E.Gender, E.DOB, E.CategoryId, E.Designation, E.DOJ, E.Team, C.ZoneId, DG.DesignationsName AS DesignationName, ISNULL(DSO.SortOrder, 0) AS designationSortOrder, ISNULL(DG.SortOrder, 0) AS designationGlobalSortOrder, C.CompanyFName AS company, C.CompanyeMail AS companyEmail, D.DepartmentFName AS dept, D.std_hc FROM Employees E WITH (NOLOCK) LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId LEFT JOIN departmentDeginationSortOrder DSO WITH (NOLOCK) ON E.DepartmentId = DSO.DepartmentId AND E.Designation = DSO.DesignationId WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.DOJ <= ? AND (E.Status = 'Working' OR (E.Status = 'Resigned' AND E.DOR > ?))";
+    $sqlEmp = "SELECT E.EmployeeId, E.CompanyId, E.DepartmentId, E.Location AS locationId, E.ShiftGroupId, E.EmployeeName, E.EmployeeCode, E.Gender, E.DOB, E.CategoryId, E.Designation, E.DOJ, E.DOR, E.Status, E.Team, C.ZoneId, DG.DesignationsName AS DesignationName, ISNULL(DG.SortOrder, 0) AS designationSortOrder, ISNULL(DG.SortOrder, 0) AS designationGlobalSortOrder, C.CompanyFName AS company, C.CompanyeMail AS companyEmail, D.DepartmentFName AS dept, D.std_hc FROM Employees E WITH (NOLOCK) LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Designations DG WITH (NOLOCK) ON E.Designation = DG.DesignationId WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND (
+    (E.DOJ <= ? AND (E.Status = 'Working' OR (E.Status = 'Resigned' AND E.DOR > ?))) OR (E.DOJ <= ? AND (E.Status = 'Working' OR (E.Status = 'Resigned' AND E.DOR > ?))))";
 
-    $paramsEmp = [$dayTo, $dayTo];
+    $dashboardToday = date('Y-m-d');
+
+    $paramsEmp = [$dayTo, $dayTo, $dashboardToday, $dashboardToday];
 
     $sqlEmp .= " ORDER BY CASE WHEN C.SortOrder IS NULL THEN 1 ELSE 0 END, C.SortOrder ASC, CASE WHEN D.SortOrder IS NULL THEN 1 ELSE 0 END, D.SortOrder ASC, E.EmployeeName ASC";
 
@@ -1202,35 +1212,28 @@ function handleDashboardData($input, $returnData = false) {
     $queryTime = round((microtime(true) - $queryStart) * 1000, 2);
     
     $employees = [];
+    $dashboardEmployees = [];
     $staffEmpIds = [];
     $workerEmpIds = [];
     $contractEmpIds = [];
     $consultantEmpIds = [];
     $employeeLocationIds = [];  
     
+    $employeeLoopStart = microtime(true);
+    $employeeRowsFetched = 0;
+
     if ($stmtEmp) {
         while ($row = sqlsrv_fetch_array($stmtEmp, SQLSRV_FETCH_ASSOC)) {
-            $debugCode = trim((string)$row['EmployeeCode']);
-            if (in_array($debugCode, ['103240', '355579', '455775'], true)) {
-                $debugFile = __DIR__ . '/dashboard_debug.log';
+            $employeeRowsFetched++;
 
-                file_put_contents(
-                    $debugFile,
-                    "\n" . str_repeat("=", 80) . "\n" .
-                    "EMPLOYEE FOUND IN MAIN EMPLOYEE QUERY\n" .
-                    "Time: " . date('Y-m-d H:i:s') . "\n" .
-                    "EmployeeCode: " . ($row['EmployeeCode'] ?? 'NULL') . "\n" .
-                    "EmployeeId: " . ($row['EmployeeId'] ?? 'NULL') . "\n" .
-                    "EmployeeName: " . ($row['EmployeeName'] ?? 'NULL') . "\n" .
-                    "CompanyId: " . ($row['CompanyId'] ?? 'NULL') . "\n" .
-                    "DepartmentId: " . ($row['DepartmentId'] ?? 'NULL') . "\n" .
-                    "LocationId: " . ($row['locationId'] ?? 'NULL') . "\n" .
-                    "ShiftGroupId: " . ($row['ShiftGroupId'] ?? 'NULL') . "\n" .
-                    "CategoryId: " . ($row['CategoryId'] ?? 'NULL') . "\n" .
-                    "DOJ: " . (isset($row['DOJ']) && $row['DOJ'] ? $row['DOJ']->format('Y-m-d') : 'NULL') . "\n" .
-                    "Team: " . ($row['Team'] ?? 'NULL') . "\n",
-                    FILE_APPEND
-                );
+            $doj = $row['DOJ'] ? $row['DOJ']->format('Y-m-d') : null;
+            $dor = $row['DOR'] ? $row['DOR']->format('Y-m-d') : null;
+            $status = trim($row['Status'] ?? '');
+            $isAttendanceEmployee = $doj !== null && $doj <= $dayTo && ($status === 'Working' || ($status === 'Resigned' && $dor !== null && $dor > $dayTo));
+            $isDashboardEmployee = $doj !== null && $doj <= $dashboardToday && ($status === 'Working' || ($status === 'Resigned' && $dor !== null && $dor > $dashboardToday));
+
+            if (!$isAttendanceEmployee && !$isDashboardEmployee) {
+                continue;
             }
 
             $empId = (string)$row['EmployeeId'];
@@ -1241,8 +1244,6 @@ function handleDashboardData($input, $returnData = false) {
             $designationId = (int)$row['Designation'];
             $locationId = (int)$row['locationId'];
 
-            $employeeLocationIds[$locationId] = true;
-
             $shiftGroupId = (int)$row['ShiftGroupId'];
             $categoryId = (int)$row['CategoryId'];
 
@@ -1251,21 +1252,11 @@ function handleDashboardData($input, $returnData = false) {
             $genderRaw = trim($row['Gender'] ?? '');
             $gender = strtoupper($genderRaw);
 
-            if ($teamId === $staffTeamId) {
-                $staffEmpIds[$empId] = true;
-            } elseif ($teamId === $workerTeamId) {
-                $workerEmpIds[$empId] = true;
-            } elseif ($teamId === $contractTeamId) {
-                $contractEmpIds[$empId] = true;
-            } elseif ($teamId === $consultantTeamId) {
-                $consultantEmpIds[$empId] = true;
-            }
-
-            $employees[] = [
+            $emp = [
                 'id' => $empId,
                 'code' => $row['EmployeeCode'],
                 'name' => $row['EmployeeName'],
-                'dob' => $row['DOB']->format('Y-m-d'),
+                'dob' => $row['DOB'] ? $row['DOB']->format('Y-m-d') : null,
                 'dobRaw' => $row['DOB'] ? $row['DOB']->format('Y-m-d') : null,
                 'gender' => ($gender === 'MALE' || $gender === 'M') ? 'Male' : 'Female',
                 'genderRaw' => $genderRaw,
@@ -1295,10 +1286,30 @@ function handleDashboardData($input, $returnData = false) {
                 'team' => $teamId,
                 'teamName' => $teamName,
             ];
+
+            if ($isAttendanceEmployee) {
+                $employees[] = $emp;
+
+                $employeeLocationIds[$locationId] = true;
+
+                if ($teamId === $staffTeamId) {
+                    $staffEmpIds[$empId] = true;
+                } elseif ($teamId === $workerTeamId) {
+                    $workerEmpIds[$empId] = true;
+                } elseif ($teamId === $contractTeamId) {
+                    $contractEmpIds[$empId] = true;
+                } elseif ($teamId === $consultantTeamId) {
+                    $consultantEmpIds[$empId] = true;
+                }
+            }
+
+            if ($isDashboardEmployee) {
+                $dashboardEmployees[] = $emp;
+            }
         }
     }
 
-    $dashboardEmployees = $employees;
+    $employeeLoopTime = round((microtime(true) - $employeeLoopStart) * 1000, 2);
 
     $employeeLocationList = !empty($employeeLocationIds) ? implode(',', array_keys($employeeLocationIds)) : '0';
 
@@ -1485,10 +1496,13 @@ function handleDashboardData($input, $returnData = false) {
 
     $attendanceStart = microtime(true);
 
+    $attendanceQueryTime = 0;
+    $attendanceLoopTime = 0;
+
     $logs = [];
-    $shiftLearnFromDate = (clone (new DateTime($dayTo)))->modify('-45 days')->format('Y-m-d');
-    $loopStartDate = min(strtotime($dayFrom), strtotime($shiftLearnFromDate));
-    $curDate = new DateTime(date('Y-m-01', $loopStartDate));
+    $attendanceRowsFetched = 0;
+
+    $curDate = new DateTime(date('Y-m-01', strtotime($dayFrom)));
     $endDate = new DateTime(date('Y-m-01', strtotime($dayTo)));
 
     while ($curDate <= $endDate) {
@@ -1525,10 +1539,18 @@ function handleDashboardData($input, $returnData = false) {
                 }
             }
 
+            $attendanceQueryStart = microtime(true);
+
             $stmtLogs = sqlsrv_query($conn, $sqlLogs, $paramsLogs);
+
+            $attendanceQueryTime += (microtime(true) - $attendanceQueryStart) * 1000;
+
+            $attendanceLoopStart = microtime(true);
             
             if ($stmtLogs) {
                 while ($row = sqlsrv_fetch_array($stmtLogs, SQLSRV_FETCH_ASSOC)) {
+                    $attendanceRowsFetched++;
+                
                     $empId = (string)$row['EmployeeId'];
                     $attendanceDate = $row['AttendanceDate'];
                     $inTime = $row['InTime'];
@@ -1596,6 +1618,8 @@ function handleDashboardData($input, $returnData = false) {
             }
         }
 
+        $attendanceLoopTime += (microtime(true) - $attendanceLoopStart) * 1000;
+
         $curDate->modify('+1 month');
     }
 
@@ -1626,7 +1650,7 @@ function handleDashboardData($input, $returnData = false) {
         if ($tableExists) {
             $devTables[] = $devTable;
 
-            $sqlDevRaw = "SELECT D.AttDirection, D.LogDate, CAST(D.LogDate AS DATE) AS PunchDate, E.EmployeeId FROM $devTable D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON CAST(D.UserId AS VARCHAR(50)) = CAST(E.EmployeeCodeInDevice AS VARCHAR(50)) LEFT JOIN Departments De WITH (NOLOCK) ON E.DepartmentId = De.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND D.LogDate >= '$deviceFrom' AND D.LogDate <= '$deviceTo 23:59:59' AND (E.Status = 'Working' OR (E.Status = 'Resigned' AND E.DOR > ?)) AND E.RecordStatus = 1";
+            $sqlDevRaw = "SELECT D.AttDirection, D.LogDate, CAST(D.LogDate AS DATE) AS PunchDate, E.EmployeeId FROM $devTable D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON D.UserId = E.EmployeeCodeInDevice LEFT JOIN Departments De WITH (NOLOCK) ON E.DepartmentId = De.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Locations L WITH (NOLOCK) ON E.Location = L.LocationId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND D.LogDate >= '$deviceFrom' AND D.LogDate <= '$deviceTo 23:59:59' AND (E.Status = 'Working' OR (E.Status = 'Resigned' AND E.DOR > ?)) AND E.RecordStatus = 1";
 
             $paramsDevRaw = [$dayTo];
 
@@ -2489,18 +2513,34 @@ function handleDashboardData($input, $returnData = false) {
         }
     }
 
+    $performanceLog = [
+        'time' => date('Y-m-d H:i:s'),
+        'dateFrom' => $dayFrom,
+        'dateTo' => $dayTo,
+        'employeeRowsFetched' => $employeeRowsFetched,
+        'attendanceRowsFetched' => $attendanceRowsFetched,
+        'employeeQueryMs' => $queryTime,
+        'employeeLoopMs' => $employeeLoopTime,
+        'employeeMs' => $employeeTime,
+        'resignedQueryMs' => $resignedQueryTime,
+        'newJoinedQueryMs' => $newJoinedQueryTime,
+        'resignedJoinedMs' => $resignedJoinedTime,
+        'attendanceQueryMs' => round($attendanceQueryTime, 2),
+        'attendanceLoopMs' => round($attendanceLoopTime, 2),
+        'attendanceMs' => $attendanceTime,
+        'deviceMs' => $deviceTime,
+        'totalMs' => $totalTime
+    ];
+
+    file_put_contents(
+        __DIR__ . '/dashboard_debug.log',
+        json_encode($performanceLog, JSON_PRETTY_PRINT) . PHP_EOL,
+        FILE_APPEND | LOCK_EX
+    );
+
     echo json_encode([
         'success' => true,
-        'performance' => [
-            'employeeQueryMs'      => $queryTime,
-            'employeeMs'           => $employeeTime,
-            'resignedQueryMs'      => $resignedQueryTime,
-            'newJoinedQueryMs'     => $newJoinedQueryTime,
-            'resignedJoinedMs'     => $resignedJoinedTime,
-            'attendanceMs'         => $attendanceTime,
-            'deviceMs'             => $deviceTime,
-            'totalMs'              => $totalTime
-        ],
+
         'todayStats' => [
             'present' => $presentEmployees,
             'weeklyOffPresent' => $weeklyOffPresentDays,
@@ -4790,6 +4830,70 @@ function handleSaveCompaniesOrder($input) {
     echo json_encode([
         'success' => $success,
         'message' => $success ? 'Company order saved successfully' : 'Some updates failed'
+    ]);
+}
+
+function handleGetLocationsOrder() {
+    $conn = getSQLServer();
+
+    $sql = "SELECT LocationId, LocationName, SortOrder FROM Locations WITH (NOLOCK) WHERE IsActive = 1 ORDER BY CASE WHEN SortOrder IS NULL THEN 1 ELSE 0 END, SortOrder ASC, LocationName ASC";
+
+    $stmt = sqlsrv_query($conn, $sql);
+
+    if (!$stmt) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Could not load location sort order',
+            'errors' => sqlsrv_errors()
+        ]);
+        return;
+    }
+
+    $data = [];
+
+    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+        $data[] = [
+            'id' => (int)$row['LocationId'],
+            'name' => $row['LocationName'],
+            'sortOrder' => $row['SortOrder'] !== null ? (int)$row['SortOrder'] : null
+        ];
+    }
+
+    echo json_encode(['success' => true, 'data' => $data]);
+}
+
+function handleSaveLocationsOrder($input) {
+    $conn = getSQLServer();
+    $items = $input['items'] ?? [];
+    $success = true;
+    $errors = [];
+
+    foreach ($items as $item) {
+        $locationId = isset($item['id']) ? (int)$item['id'] : 0;
+
+        if ($locationId <= 0) {
+            $success = false;
+            $errors[] = 'Invalid location ID';
+            continue;
+        }
+
+        $sortOrder = (!isset($item['sortOrder']) || $item['sortOrder'] === '') ? null : (int)$item['sortOrder'];
+
+        $stmt = sqlsrv_query($conn, "UPDATE Locations SET SortOrder = ? WHERE LocationId = ?", [$sortOrder, $locationId]);
+
+        if (!$stmt) {
+            $success = false;
+            $errors[] = [
+                'id' => $locationId,
+                'errors' => sqlsrv_errors()
+            ];
+        }
+    }
+
+    echo json_encode([
+        'success' => $success,
+        'message' => $success ? 'Location order saved successfully' : 'Some location orders could not be saved',
+        'errors' => $errors
     ]);
 }
 

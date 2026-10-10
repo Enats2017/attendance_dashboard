@@ -4,12 +4,13 @@
             this.state = {
                 activeTab: 'feature',
                 lastUpdated: null,
+                locationOrder: [],
                 data: {
                     employees: [],
                     attendanceLogs: [],
                     counts: { In: 0, Out: 0 },
                     designationFamilies: [],
-                    designationToFamilyMap: {}
+                    designationToFamilyMap: {},
                 },
                 filterLists: null,
                 filters: {
@@ -151,6 +152,10 @@
                 const data = JSON.parse(responseText);
 
                 if (data.success) {
+                    const locationOrderRes = await this.fetchLocationsOrder();
+
+                    this.state.locationOrder = locationOrderRes && locationOrderRes.success ? (locationOrderRes.data || []) : [];
+
                     this.state.data = {
                         employees: data.employees,              
                         resignedEmployees: data.resignedEmployees || [],
@@ -653,7 +658,6 @@
             return (this.state.dashboardData?.totalMachines) || 0;    
         }                                                             
 
-
         getGapHeadcount() {
             return (this.state.dashboardData?.gapHeadcount) || 0;
         }
@@ -663,13 +667,44 @@
         }
 
         getRequiredHeadcountByLocation() {
-            return ((this.state.dashboardData?.requiredHeadcountByLocation) || []).slice().sort((a, b) =>
-                (a.locationName || "").localeCompare(b.locationName || "", undefined, { numeric: true, sensitivity: "base" })
-            );
+            const locations = (this.state.dashboardData?.requiredHeadcountByLocation || []).slice();
+
+            const orderById = new Map((this.state.locationOrder || []).map((location, index) => [Number(location.id),index]));
+
+            return locations.sort((a, b) => {
+                const indexA = orderById.get(Number(a.locationId)) ?? Infinity;
+                const indexB = orderById.get(Number(b.locationId)) ?? Infinity;
+
+                if (indexA !== indexB) return indexA - indexB;
+
+                return String(a.locationName || "").localeCompare(
+                    String(b.locationName || ""),
+                    undefined,
+                    { 
+                        numeric: true, 
+                        sensitivity: "base" 
+                    }
+                );
+            });
         }
 
         sortLocations(locations) {
-            return [...locations].sort((a, b) => (a || "").localeCompare(b || "", undefined, { numeric: true, sensitivity: "base" }));
+            const orderByName = new Map((this.state.locationOrder || []).map((location, index) => [String(location.name || "").trim().toLowerCase(),index]));
+
+            return [...locations].sort((a, b) => {
+                const nameA = String(a || "");
+                const nameB = String(b || "");
+
+                const indexA = orderByName.get(nameA.trim().toLowerCase()) ?? Infinity;
+                const indexB = orderByName.get(nameB.trim().toLowerCase()) ?? Infinity;
+
+                if (indexA !== indexB) return indexA - indexB;
+
+                return nameA.localeCompare(nameB, undefined, {
+                    numeric: true,
+                    sensitivity: "base"
+                });
+            });
         }
 
         getLocationScope() {
@@ -1442,6 +1477,43 @@
             }
         }
 
+        async fetchLocationsOrder() {
+            try {
+                const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
+                url.searchParams.set("action", "get_locations_order");
+
+                const response = await fetch(url.toString(), {
+                    credentials: "include"
+                });
+
+                return await response.json();
+            } catch (error) {
+                console.error("Fetch Locations Order Error:", error);
+                return { success: false, message: error.message };
+            }
+        }
+
+        async saveLocationsOrder(items) {
+            try {
+                const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
+                url.searchParams.set("action", "save_locations_order");
+
+                const response = await fetch(url.toString(), {
+                    method: "POST",
+                    credentials: "include",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        action: "save_locations_order",
+                        items
+                    })
+                });
+
+                return await response.json();
+            } catch (error) {
+                console.error("Save Locations Order Error:", error);
+                return { success: false, message: error.message };
+            }
+        }
 
         async fetchDepartmentsOrder() {
             try {
