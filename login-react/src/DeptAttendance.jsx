@@ -13,14 +13,13 @@ export default function DeptAttendance() {
     const [adminList, setAdminList] = useState([]);
     const [selectedAdminId, setSelectedAdminId] = useState(null);
     const [isMasterAdmin, setIsMasterAdmin] = useState(false);
-    const [month, setMonth] = useState(() => new Date().getMonth() + 1);
-    const [year, setYear] = useState(() => new Date().getFullYear());
-    const [dayFrom, setDayFrom] = useState(1);
-    
-    const [dayTo, setDayTo] = useState(() => {
-        const now = new Date();
-        return new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    });
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const [month, setMonth] = useState(() => yesterday.getMonth() + 1);
+    const [year, setYear] = useState(() => yesterday.getFullYear());
+    const [dayFrom, setDayFrom] = useState(() => yesterday.getDate());
+    const [dayTo, setDayTo] = useState(() => yesterday.getDate());
     
     const [reportData, setReportData] = useState(null);
     const [stdHcMap, setStdHcMap] = useState({});
@@ -96,12 +95,8 @@ export default function DeptAttendance() {
     useEffect(() => {
         const maxDays = new Date(year, month, 0).getDate();
         setDayFrom((prev) => Math.min(prev, maxDays));
-        setDayTo((prev) => Math.max(
-            Math.min(prev, maxDays),
-            Math.min(dayFrom, maxDays)
-        ));
+        setDayTo((prev) => Math.min(prev, maxDays));
     }, [month, year]);
-
 
     async function fetchSubAdmins() {
         try {

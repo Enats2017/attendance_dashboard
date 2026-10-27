@@ -1331,23 +1331,6 @@ function handleDashboardData($input, $returnData = false) {
             $deptNameMap[$deptId] = $row['DepartmentFName'];
         }
     }
-
-    $desigLocHcMap = [];
-    $designationNameMap = [];
-
-    $sqlDesigLocHc = "SELECT DDL.DepartmentId, DDL.DesignationId, DDL.LocationId, DDL.StandardHeadCount, DG.DesignationsName FROM DepartmentDesignationLocationHeadCount DDL WITH (NOLOCK) INNER JOIN Designations DG ON DDL.DesignationId = DG.DesignationId WHERE DDL.UserId = ? AND DDL.LocationId IN ($employeeLocationList) AND DDL.DepartmentId IN ($departmentList)";
-
-    $stmtDesigLocHc = sqlsrv_query($conn, $sqlDesigLocHc, [$targetUserId]);
-
-    if ($stmtDesigLocHc) {
-        while ($row = sqlsrv_fetch_array($stmtDesigLocHc, SQLSRV_FETCH_ASSOC)) {
-            $deptId = (int)$row['DepartmentId'];
-            $desigId = (int)$row['DesignationId'];
-            $locId = (int)$row['LocationId'];
-            $desigLocHcMap[$deptId][$desigId][$locId] = (int)$row['StandardHeadCount'];
-            $designationNameMap[$desigId] = $row['DesignationsName'];
-        }
-    }
     
     $resignedJoinedStart = microtime(true);
 
@@ -1841,18 +1824,64 @@ function handleDashboardData($input, $returnData = false) {
         return isset($validEmpIdSet[$log['empId']]);
     }));
 
+    $desigLocHcMap = [];
+    $designationNameMap = [];
+
+    $sqlDesigLocHc = "SELECT DDL.DepartmentId, DDL.DesignationId, DDL.LocationId, DDL.StandardHeadCount, DG.DesignationsName FROM DepartmentDesignationLocationHeadCount DDL WITH (NOLOCK) INNER JOIN Designations DG ON DDL.DesignationId = DG.DesignationId WHERE DDL.UserId = ? AND DDL.LocationId IN ($employeeLocationList) AND DDL.DepartmentId IN ($departmentList)";
+
+    $stmtDesigLocHc = sqlsrv_query($conn, $sqlDesigLocHc, [$targetUserId]);
+
+    $empHasDesigLoc = [];
+    foreach ($NewFilteredEmployees as $emp) {
+        $k = $emp['deptId'] . '_' . $emp['designationId'] . '_' . $emp['locationId'];
+        $empHasDesigLoc[$k] = true;
+    }
+
+    if ($stmtDesigLocHc) {
+        while ($row = sqlsrv_fetch_array($stmtDesigLocHc, SQLSRV_FETCH_ASSOC)) {
+            $deptId = (int)$row['DepartmentId'];
+            $desigId = (int)$row['DesignationId'];
+            $locId = (int)$row['LocationId'];
+            $stdHc = (int)$row['StandardHeadCount'];
+
+            $key = $deptId . '_' . $desigId . '_' . $locId;
+
+            if ($stdHc > 0 || isset($empHasDesigLoc[$key])) {
+                $desigLocHcMap[$deptId][$desigId][$locId] = $stdHc;
+                $designationNameMap[$desigId] = $row['DesignationsName'];
+            }
+        }
+    }
+
+    foreach ($NewFilteredEmployees as $emp) {
+        $dId = (int)$emp['deptId'];
+        $gId = (int)$emp['designationId'];
+        $lId = (int)$emp['locationId'];
+
+        if (!isset($desigLocHcMap[$dId][$gId][$lId])) {
+            $desigLocHcMap[$dId][$gId][$lId] = 0;
+            if (!isset($designationNameMap[$gId])) {
+                $designationNameMap[$gId] = $emp['designation'] ?? ('Designation ' . $gId);
+            }
+        }
+    }
+
     $deptLocHeadcountMap = [];
     foreach ($deptLocHcMap as $deptId => $locMap) {
         foreach ($locMap as $locId => $req) {
-            $deptLocHeadcountMap[$deptId][$locId] = [
-                'deptName' => $deptNameMap[$deptId] ?? ('Dept ' . $deptId),
-                'locationName' => $locationNameMap[$locId] ?? ('Location ' . $locId),
-                'required' => $req,
-                'available' => $deptLocAvailableMap[$deptId][$locId] ?? 0
-            ];
+            $avail = $deptLocAvailableMap[$deptId][$locId] ?? 0;
+
+            if ((int)$req > 0 || $avail > 0) {
+                $deptLocHeadcountMap[$deptId][$locId] = [
+                    'deptName'     => $deptNameMap[$deptId] ?? ('Dept ' . $deptId),
+                    'locationName' => $locationNameMap[$locId] ?? ('Location ' . $locId),
+                    'required'     => $req,
+                    'available'    => $avail
+                ];
+            }
         }
     }
-    
+
     $employees = $NewFilteredEmployees;
     $totalEmployees = count($employees);
 
@@ -1861,13 +1890,18 @@ function handleDashboardData($input, $returnData = false) {
     foreach ($desigLocHcMap as $deptId => $desigMap) {
         foreach ($desigMap as $desigId => $locMap) {
             foreach ($locMap as $locId => $req) {
-                $desigLocHeadcountMap[$deptId][$desigId][$locId] = [
-                    'deptName' => $deptNameMap[$deptId] ?? ('Dept ' . $deptId),
-                    'designationName' => $designationNameMap[$desigId] ?? ('Designation ' . $desigId),
-                    'locationName' => $locationNameMap[$locId] ?? ('Location ' . $locId),
-                    'required' => $req,
-                    'available' => $desigLocAvailableMap[$deptId][$desigId][$locId] ?? 0
-                ];
+                $avail = $desigLocAvailableMap[$deptId][$desigId][$locId] ?? 0;
+
+                // Only include designations with a real requirement OR real employees
+                if ((int)$req > 0 || $avail > 0) {
+                    $desigLocHeadcountMap[$deptId][$desigId][$locId] = [
+                        'deptName'        => $deptNameMap[$deptId] ?? ('Dept ' . $deptId),
+                        'designationName' => $designationNameMap[$desigId] ?? ('Designation ' . $desigId),
+                        'locationName'    => $locationNameMap[$locId] ?? ('Location ' . $locId),
+                        'required'        => $req,
+                        'available'       => $avail
+                    ];
+                }
             }
         }
     }
@@ -2477,8 +2511,19 @@ function handleDashboardData($input, $returnData = false) {
     $punches1to5Details = [];
     $punches6to10Details = [];
     foreach ($NewFilteredEmployees as $emp) {
+        if (empty($emp['doj']) || $emp['doj'] === '1900-01-01') {
+            continue;
+        }
+
         $empId = $emp['id'];
-        $days  = $punchDaysByEmp[$empId] ?? 0;
+        $effectiveStart = max($dayFrom, $emp['doj']);
+        $days = 0;
+        
+        foreach ($punchDetailsByEmp[$empId] ?? [] as $punch) {
+            if ($punch['date'] >= $effectiveStart && $punch['date'] <= $dayTo) {
+                $days++;
+            }
+        }
 
         if ($days === 0) {
             $zeroPunches++;
@@ -3207,7 +3252,17 @@ function handleBulkUpdateDesignationStdHC($input) {
                 $sql = "INSERT INTO DepartmentDesignationLocationHeadCount (UserId, DepartmentId, DesignationId, LocationId, StandardHeadCount, CreatedOn) VALUES (?, ?, ?, ?, ?, GETDATE())";
                 $params = [$targetUserId, $deptId, $desigId, $locationId, $hc];
             }
-            sqlsrv_query($sqlConn, $sql, $params);
+            
+            $saveStmt = sqlsrv_query($sqlConn, $sql, $params);
+
+            if ($saveStmt === false) {
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Failed to save designation STD HC.',
+                    'errors' => sqlsrv_errors(SQLSRV_ERR_ERRORS)
+                ]);
+                return;
+            }
         }
 
         $totalStdHC = 0;

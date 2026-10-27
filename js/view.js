@@ -7,7 +7,7 @@ class AttendanceView {
         this.TABS = [
             { id: "feature", label: "Dashboard", icon: "ph-house" },
             { id: "units", label: "Units List", icon: "ph-buildings", roles: ["master"] }, 
-            { id: "dept_designation_mapping", label: "Dept-Designation Mapping", icon: "ph-map-trifold" },
+            { id: "dept_designation_mapping", label: "Dept-Designation Mapping", icon: "ph-map-trifold", roles: ["master"] },
             { id: "all", label: "Attendance Logs", icon: "ph-list-dashes" },
             { id: "age", label: "Age Analysis", icon: "ph-user-circle" },
             { id: "company", label: "Company Stats", icon: "ph-buildings" },
@@ -26,9 +26,9 @@ class AttendanceView {
             { id: "overtime", label: "Overtime", icon: "ph-hourglass-high" },
             { id: "special", label: "Critical Alerts", icon: "ph-warning-circle", },
             { id: "data_quality", label: "Employee Data Alerts", icon: "ph-database", },
-            { id: "designation_order", label: "Designations Order", icon: "ph-sliders", },
-            { id: "designation_families", label: "Designation Families", icon: "ph-cards", },
-            { id: "sort_order", label: "Sort Order Settings", icon: "ph-sort-ascending", },
+            { id: "designation_order", label: "Designations Order", icon: "ph-sliders", roles: ["master"] },
+            { id: "designation_families", label: "Designation Families", icon: "ph-cards", roles: ["master"] },
+            { id: "sort_order", label: "Sort Order Settings", icon: "ph-sort-ascending", roles: ["master"] },
         ];
 
         this._lastData = {};
@@ -88,6 +88,11 @@ class AttendanceView {
     render(state, model) {
         this._renderToken++;
         const myToken = this._renderToken;
+
+        const allowedTabs = this._getVisibleTabs().map(t => t.id);
+        if (!allowedTabs.includes(state.activeTab)) {
+            state.activeTab = "feature";
+        }
 
         if (window.HRMS_USER && window.HRMS_USER.isMaster && !model.state.subAdminList) {
             model.fetchSubAdmins();
@@ -996,6 +1001,7 @@ class AttendanceView {
 
     _renderDashboardSummaryCards(emps, stats, model, logs, empMap) {
         const dayLogs = [];
+        this._dashChipSources = {};
         
         this._fullAvailableItems = emps.map(emp => ({ log: null, emp, date: null }));
 
@@ -1035,19 +1041,17 @@ class AttendanceView {
 
         const dashFamiliesWithCount = dashFamilies.filter((f) => famCounts[f.id] > 0);
 
-        const familyCardsHtml = dashFamiliesWithCount.map((f, i) => `
-            <div class="stat-card ${famColorCls[i % famColorCls.length]} stat-card-clickable" data-dashboard-family-id="${f.id}" onclick="AppController.view._showDashboardFamilyDrilldown(${f.id})" style="position:relative;">
-                <button class="stat-card-download-btn" title="Download ${this._escapeAttr(f.name)} Excel" onclick="event.stopPropagation(); AppController.view._downloadFamilyExcel(${f.id})">
-                    <i class="ph ph-download-simple"></i>
-                </button>
-                <div class="stat-icon"><i class="ph ph-cards"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">${this._escapeAttr(f.name)}</span>
-                    <span class="stat-value">${famCounts[f.id]}</span>
-                    <span class="stat-card-hint">↓ click to view</span>
-                </div>
-            </div>
-        `).join("");
+        const familyCardsHtml = dashFamiliesWithCount.map((f, i) => this._dashCardHtml({
+            cls: famColorCls[i % famColorCls.length],
+            attrs: `data-dashboard-family-id="${f.id}"`,
+            onclick: `AppController.view._showDashboardFamilyDrilldown(${f.id})`,
+            download: this._dashDownloadBtn(`Download ${f.name} Excel`, `AppController.view._downloadFamilyExcel(${f.id})`),
+            iconHtml: '<i class="ph ph-cards"></i>',
+            label: this._escapeAttr(f.name),
+            value: famCounts[f.id],
+            chipsLabel: "Family " + f.name,
+            emps: emps.filter((e) => { const fi = dashFamMap[e.designationId]; return fi && fi.familyId === f.id; }),
+        })).join("");
 
         // --- Headcount: Required / Available / Gap ---
         const requiredCount = model.getRequiredHeadcount();
@@ -1055,39 +1059,49 @@ class AttendanceView {
         const availableCount = emps.length;
         const gapCount = model.getGapHeadcount();
 
+        const availableCard = `
+            <div class="stat-card success stat-card-clickable" data-headcount="available" onclick="AppController.view._handleAvailableCardClick()" style="position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;">
+                <button class="stat-card-download-btn" title="Download Available Employees Excel"
+                    onclick="event.stopPropagation(); AppController.view.downloadFullAvailableExcel()">
+                    <i class="ph ph-download-simple"></i>
+                </button>
+                <div class="stat-icon" style="margin:0 auto 12px;">
+                    <i class="ph ph-users"></i>
+                </div>
+                <div class="stat-content" style="display:flex; flex-direction:column; align-items:center; width:100%; text-align:center;">
+                    <span class="stat-label">Available</span>
+                    <span class="stat-value">${availableCount}</span>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+            </div>
+        `;
+        
         const headcountCard = `
-            <div class="stat-card info stat-card-clickable" data-headcount="required" onclick="AppController.view._showHeadcountBreakdownDrilldown('required')">
-                <div class="stat-icon">
+            <div class="stat-card info stat-card-clickable" data-headcount="required" onclick="AppController.view._showHeadcountBreakdownDrilldown('required')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;">
+                <div class="stat-icon" style="margin:0 auto 12px;">
                     <i class="ph ph-target"></i>
                 </div>
-                <div class="stat-content">
+
+                <div class="stat-content" style="display:flex; flex-direction:column; align-items:center; width:100%; text-align:center;">
                     <span class="stat-label">Required</span>
                     <span class="stat-value">${requiredCount}</span>
                     <span class="stat-card-sub" style="color:#334155;font-weight:600;">(${totalMachines} m/c's)</span>
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
             </div>
-            <div class="stat-card success stat-card-clickable" data-headcount="available" onclick="AppController.view._handleAvailableCardClick()" style="position:relative;">
-                <button class="stat-card-download-btn" title="Download Available Employees Excel"
-                    onclick="event.stopPropagation(); AppController.view.downloadFullAvailableExcel()">
-                    <i class="ph ph-download-simple"></i>
-                </button>
-                <div class="stat-icon"><i class="ph ph-users"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">Available</span>
-                    <span class="stat-value">${availableCount}</span>
-                    <span class="stat-card-hint">↓ click to view</span>
+            ${availableCard}
+            <div class="stat-card ${gapCount > 0 ? "danger" : "success"} stat-card-clickable" data-headcount="gap" onclick="AppController.view._showHeadcountBreakdownDrilldown('gap')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;">
+                <div class="stat-icon" style="margin:0 auto 12px;">
+                    <i class="ph ${gapCount > 0 ? "ph-warning" : "ph-check-circle"}"></i>
                 </div>
-            </div>
-            <div class="stat-card ${gapCount > 0 ? "danger" : "success"} stat-card-clickable" data-headcount="gap" onclick="AppController.view._showHeadcountBreakdownDrilldown('gap')">
-                <div class="stat-icon"><i class="ph ${gapCount > 0 ? "ph-warning" : "ph-check-circle"}"></i></div>
-                <div class="stat-content">
+                <div class="stat-content" style="display:flex; flex-direction:column; align-items:center; width:100%; text-align:center;">
                     <span class="stat-label">Gap</span>
                     <span class="stat-value">${gapCount}</span>
                     <span class="stat-card-hint">↓ click to view</span>
                 </div>
             </div>
         `;
+
 
         this._currentCompanyData = { emps, model, dayLogs, empMap, isDashboard: true, };
 
@@ -1180,32 +1194,17 @@ class AttendanceView {
             if (genderCounts[e.gender] !== undefined) genderCounts[e.gender]++;
         });
 
-        const genderCards = `
-            <div class="stat-card info stat-card-clickable" data-gender="Male" onclick="AppController.view._showGenderSummaryDrilldown('Male')" style="position:relative;">
-                <button class="stat-card-download-btn" title="Download Male Employees Excel"
-                    onclick="event.stopPropagation(); AppController.view._downloadGenderExcel('Male')">
-                    <i class="ph ph-download-simple"></i>
-                </button>
-                <div class="stat-icon"><i class="ph ph-gender-male"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">Male</span>
-                    <span class="stat-value">${genderCounts.Male}</span>
-                    <span class="stat-card-hint">↓ click to view</span>
-                </div>
-            </div>
-            <div class="stat-card accent stat-card-clickable" data-gender="Female" onclick="AppController.view._showGenderSummaryDrilldown('Female')" style="position:relative;">
-                <button class="stat-card-download-btn" title="Download Female Employees Excel"
-                    onclick="event.stopPropagation(); AppController.view._downloadGenderExcel('Female')">
-                    <i class="ph ph-download-simple"></i>
-                </button>
-                <div class="stat-icon"><i class="ph ph-gender-female"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">Female</span>
-                    <span class="stat-value">${genderCounts.Female}</span>
-                    <span class="stat-card-hint">↓ click to view</span>
-                </div>
-            </div>
-        `;
+        const genderCards = ["Male", "Female"].map((g, i) => this._dashCardHtml({
+            cls: i === 0 ? "info" : "accent",
+            attrs: `data-gender="${g}"`,
+            onclick: `AppController.view._showGenderSummaryDrilldown('${g}')`,
+            download: this._dashDownloadBtn(`Download ${g} Employees Excel`, `AppController.view._downloadGenderExcel('${g}')`),
+            iconHtml: `<i class="ph ph-gender-${g.toLowerCase()}"></i>`,
+            label: g,
+            value: genderCounts[g],
+            chipsLabel: g,
+            emps: emps.filter((e) => e.gender === g),
+        })).join("");
 
         const staffTotal = this._currentStaffSummaryData.emps.length;
         const workerTotal = this._currentWorkerSummaryData.emps.length;
@@ -1214,56 +1213,22 @@ class AttendanceView {
         // const unassignedTotal = this._currentUnassignedSummaryData.emps.length;
 
         // --- Staff / Workmen ---
-        const swCards = `
-            <div class="stat-card info stat-card-clickable" data-workforce="Staff" onclick="AppController.view._showWorkforceSelected('Staff')" style="position:relative;">
-                <button class="stat-card-download-btn" title="Download Staff Employees Excel"
-                    onclick="event.stopPropagation(); AppController.view._downloadWorkforceExcel('Staff')">
-                    <i class="ph ph-download-simple"></i>
-                </button>
-                <div class="stat-icon"><i class="ph ph-identification-badge"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">Staff</span>
-                    <span class="stat-value">${staffTotal}</span>
-                    <span class="stat-card-hint">↓ click to view</span>
-                </div>
-            </div>
-            <div class="stat-card warning stat-card-clickable" data-workforce="Workmen" onclick="AppController.view._showWorkforceSelected('Workmen')" style="position:relative;">
-                <button class="stat-card-download-btn" title="Download Workmen Employees Excel"
-                    onclick="event.stopPropagation(); AppController.view._downloadWorkforceExcel('Workmen')">
-                    <i class="ph ph-download-simple"></i>
-                </button>
-                <div class="stat-icon"><i class="ph ph-hard-hat"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">Workmen</span>
-                    <span class="stat-value">${workerTotal}</span>
-                    <span class="stat-card-hint">↓ click to view</span>
-                </div>
-            </div>
-            <div class="stat-card accent stat-card-clickable" data-workforce="Contract" onclick="AppController.view._showWorkforceSelected('Contract')" style="position:relative;">
-                <button class="stat-card-download-btn" title="Download Contract Employees Excel"
-                    onclick="event.stopPropagation(); AppController.view._downloadWorkforceExcel('Contract')">
-                    <i class="ph ph-download-simple"></i>
-                </button>
-                <div class="stat-icon"><i class="ph ph-handshake"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">Contract</span>
-                    <span class="stat-value">${contractTotal}</span>
-                    <span class="stat-card-hint">↓ click to view</span>
-                </div>
-            </div>
-            <div class="stat-card info stat-card-clickable" data-workforce="Consultant" onclick="AppController.view._showWorkforceSelected('Consultant')" style="position:relative;">
-                <button class="stat-card-download-btn" title="Download Consultant Employees Excel"
-                    onclick="event.stopPropagation(); AppController.view._downloadWorkforceExcel('Consultant')">
-                    <i class="ph ph-download-simple"></i>
-                </button>
-                <div class="stat-icon"><i class="ph ph-briefcase-metal"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">Consultant</span>
-                    <span class="stat-value">${consultantTotal}</span>
-                    <span class="stat-card-hint">↓ click to view</span>
-                </div>
-            </div>
-        `;
+        const swCards = [
+            { type: "Staff", cls: "info", icon: "ph-identification-badge", data: this._currentStaffSummaryData },
+            { type: "Workmen", cls: "warning", icon: "ph-hard-hat", data: this._currentWorkerSummaryData },
+            { type: "Contract", cls: "accent", icon: "ph-handshake", data: this._currentContractSummaryData },
+            { type: "Consultant", cls: "info", icon: "ph-briefcase-metal", data: this._currentConsultantSummaryData },
+        ].map((w) => this._dashCardHtml({
+            cls: w.cls,
+            attrs: `data-workforce="${w.type}"`,
+            onclick: `AppController.view._showWorkforceSelected('${w.type}')`,
+            download: this._dashDownloadBtn(`Download ${w.type} Employees Excel`, `AppController.view._downloadWorkforceExcel('${w.type}')`),
+            iconHtml: `<i class="ph ${w.icon}"></i>`,
+            label: w.type,
+            value: w.data.emps.length,
+            chipsLabel: w.type,
+            emps: w.data.emps,
+        })).join("");
 
         // --- Age cards ---
         this._currentAgeData = { emps, model, dayLogs, empMap, isDashboard: true, };
@@ -1293,24 +1258,17 @@ class AttendanceView {
             if (ageCounts[g] !== undefined) ageCounts[g]++;
         });
 
-        const ageCards = ageGroups.filter((g) => ageCounts[g] > 0).map((g) => `
-            <div class="stat-card ${ageGroupCls[g]} stat-card-clickable" data-age-group="${this._escapeAttr(g)}" onclick="AppController.view._showAgeGroupDrilldown('${this._escapeAttr(g)}')" style="position:relative;">
-                <button class="stat-card-download-btn" title="Download ${this._escapeAttr(g)} Employees Excel"
-                    onclick="event.stopPropagation(); AppController.view._downloadAgeGroupExcel('${this._escapeAttr(g)}')">
-                    <i class="ph ph-download-simple"></i>
-                </button>
-                <div class="stat-icon">
-                    <span class="material-symbols-outlined">
-                        ${ageGroupIcons[g]}
-                    </span>
-                </div>
-                <div class="stat-content">
-                    <span class="stat-label">${g}</span>
-                    <span class="stat-value">${ageCounts[g]}</span>
-                    <span class="stat-card-hint">↓ click to view</span>
-                </div>
-            </div>
-        `,).join("");
+        const ageCards = ageGroups.filter((g) => ageCounts[g] > 0).map((g) => this._dashCardHtml({
+            cls: ageGroupCls[g],
+            attrs: `data-age-group="${this._escapeAttr(g)}"`,
+            onclick: `AppController.view._showAgeGroupDrilldown('${this._escapeAttr(g)}')`,
+            download: this._dashDownloadBtn(`Download ${g} Employees Excel`, `AppController.view._downloadAgeGroupExcel('${this._escapeAttr(g)}')`),
+            iconHtml: `<span class="material-symbols-outlined">${ageGroupIcons[g]}</span>`,
+            label: g,
+            value: ageCounts[g],
+            chipsLabel: "Age " + g,
+            emps: emps.filter((e) => model.getAgeGroup(e.dob) === g),
+        })).join("");
 
         // --- Department cards ---
         this._currentDashboardDeptData = { emps, model, dayLogs, empMap, isDashboard: true, };
@@ -1321,25 +1279,22 @@ class AttendanceView {
             if (dashDeptCounts[e.dept] !== undefined) dashDeptCounts[e.dept]++;
         });
         const dashDeptColorCls = ["info", "success", "warning", "accent", "danger"];
-        const dashDeptCards = dashDepts.filter((d) => dashDeptCounts[d] > 0).map((d, i) => `
-            <div class="stat-card ${dashDeptColorCls[i % dashDeptColorCls.length]} stat-card-clickable" data-dashboard-dept="${this._escapeAttr(d)}" onclick="AppController.view._showDashboardDeptDrilldown('${this._escapeAttr(d)}')" style="position:relative;">
-                <button class="stat-card-download-btn" title="Download ${this._escapeAttr(d)} Excel"
-                    onclick="event.stopPropagation(); AppController.view._downloadDeptExcel('${this._escapeAttr(d)}')">
-                    <i class="ph ph-download-simple"></i>
-                </button>
-                <div class="stat-icon"><i class="ph ph-briefcase"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">${d}</span>
-                    <span class="stat-value">${dashDeptCounts[d]}</span>
-                    <span class="stat-card-hint">↓ click to view</span>
-                </div>
-            </div>
-        `,).join("");
+        const dashDeptCards = dashDepts.filter((d) => dashDeptCounts[d] > 0).map((d, i) => this._dashCardHtml({
+            cls: dashDeptColorCls[i % dashDeptColorCls.length],
+            attrs: `data-dashboard-dept="${this._escapeAttr(d)}"`,
+            onclick: `AppController.view._showDashboardDeptDrilldown('${this._escapeAttr(d)}')`,
+            download: this._dashDownloadBtn(`Download ${d} Excel`, `AppController.view._downloadDeptExcel('${this._escapeAttr(d)}')`),
+            iconHtml: '<i class="ph ph-briefcase"></i>',
+            label: d,
+            value: dashDeptCounts[d],
+            chipsLabel: "Dept " + d,
+            emps: emps.filter((e) => e.dept === d),
+        })).join("");
 
         return `
             <div style="margin-bottom:28px;">
                 ${sectionLabel("Overview")}
-                <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                <div class="summary-grid summary-grid-category" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
                     ${headcountCard}
                 </div>
 
@@ -1352,7 +1307,7 @@ class AttendanceView {
                 <div id="dashboard-company-location-drilldown" style="margin-top:8px;"></div>
 
                 ${sectionLabel("Gender & Workforce Type")}
-                <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                <div class="summary-grid summary-grid-category" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
                     ${genderCards}
                     ${swCards}
                 </div>
@@ -1360,13 +1315,13 @@ class AttendanceView {
                 <div id="dashboard-workforce-location-drilldown" style="margin-top:8px;"></div>
 
                 ${sectionLabel("By Age Group")}
-                <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));">
+                <div class="summary-grid summary-grid-category" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
                     ${ageCards}
                 </div>
                 <div id="dashboard-age-location-drilldown" style="margin-top:8px;"></div>
 
                 ${sectionLabel("By Department")}
-                <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                <div class="summary-grid summary-grid-category" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
                     ${dashDeptCards}
                 </div>
                 <div id="dashboard-dept-drilldown" style="margin-top:8px;"></div>
@@ -1374,7 +1329,7 @@ class AttendanceView {
 
                 ${dashFamiliesWithCount.length ? `
                     ${sectionLabel("By Designation Family")}
-                    <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                    <div class="summary-grid summary-grid-category" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
                         ${familyCardsHtml}
                     </div>
                     <div id="dashboard-family-location-drilldown" style="margin-top:8px;"></div>
@@ -8124,11 +8079,123 @@ class AttendanceView {
         container.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
+    _dashCategoryOrder() {
+        return ["ON-ROLL", "CC", "CONTRACTOR", "OUTSOURCE"];
+    }
+
+    _dashChipsHtml(label, emps) {
+        this._dashChipSources = this._dashChipSources || {};
+        this._dashChipSeq = (this._dashChipSeq || 0) + 1;
+        const id = "c" + this._dashChipSeq;
+        const safeLabel = String(label || "").replace(/[^\w\- ]+/g, "").trim();
+        this._dashChipSources[id] = { label: safeLabel, emps: emps || [] };
+        const order = this._dashCategoryOrder();
+        const counts = {};
+        order.forEach((c) => (counts[c] = 0));
+        (emps || []).forEach((e) => {
+            const c = this._normalizeJoinExitCategory(e.companyCategory);
+            if (c) counts[c]++;
+        });
+
+        return `
+            <div class="stat-card-category-wrap stat-category-row" style="display:flex; flex-wrap:nowrap; justify-content:space-between; gap:4px; width:100%; box-sizing:border-box;">
+                ${order.map((cat) => `
+                    <div class="stat-category-item" title="View ${cat} only" onclick="event.stopPropagation(); AppController.view._showDashChipTable('${id}', '${cat}', this)" style="flex:1 1 0; min-width:0; max-width:25%; text-align:center; overflow:hidden; padding:2px 3px; box-sizing:border-box; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+                        <span class="cat-label" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:9px; letter-spacing:-0.02em; max-width:100%; display:block; line-height:1.1;">${cat}</span>
+                        <span class="cat-value" style="white-space:nowrap; font-size:10px; line-height:1.1; display:block;">${counts[cat]}</span>
+                    </div>
+                `).join("")}
+            </div>
+        `;
+    }
+
+    _showDashChipTable(id, cat, el) {
+        const src = (this._dashChipSources || {})[id];
+        if (!src) return;
+        document.querySelectorAll(".stat-category-item.active").forEach((c) => c.classList.remove("active"));
+        if (el) el.classList.add("active");
+        const items = src.emps.filter((e) => this._normalizeJoinExitCategory(e.companyCategory) === cat).map((emp) => ({ log: null, emp, date: null }));
+        this._renderStatCardDrilldown(`dashCat_${src.label}_${cat}`, items, 1);
+    }
+
+    _dashDownloadBtn(title, call) {
+        return `
+            <button class="stat-card-download-btn" title="${this._escapeAttr(title)}" onclick="event.stopPropagation(); ${call}">
+                <i class="ph ph-download-simple"></i>
+            </button>
+        `;
+    }
+
+    // one dashboard card with the chip row
+    _dashCardHtml({ cls, attrs = "", onclick, download = "", iconHtml, label, value, sub = "", chipsLabel, emps }) {
+        return `
+            <div class="stat-card ${cls} stat-card-clickable" ${attrs} onclick="${onclick}" style="position:relative;">
+                ${download}
+                <div class="stat-card-top">
+                    <div class="stat-card-top-left">
+                        <div class="stat-icon">${iconHtml}</div>
+                        <div class="stat-content">
+                            <span class="stat-label">${label}</span>
+                            <span class="stat-value">${value}</span>
+                            ${sub}
+                        </div>
+                    </div>
+                    <span class="stat-card-hint">↓ click to view</span>
+                </div>
+                ${this._dashChipsHtml(chipsLabel, emps)}
+            </div>
+        `;
+    }
+
+    // location cards (used under Available / Gender / Workforce / Age / Dept / Family)
+    _dashLocationCardsHtml(emps, attrName, handlerName) {
+        const locations = AppController.model.sortLocations([...new Set(emps.map((e) => e.location || "Unassigned"))]);
+        const colorCls = ["info", "success", "warning", "accent", "danger"];
+        return locations.map((loc, i) => {
+            const locEmps = emps.filter((e) => (e.location || "Unassigned") === loc);
+            return this._dashCardHtml({
+                cls: colorCls[i % colorCls.length],
+                attrs: `${attrName}="${this._escapeAttr(loc)}"`,
+                onclick: `AppController.view.${handlerName}('${this._escapeAttr(loc)}')`,
+                iconHtml: '<i class="ph ph-map-pin"></i>',
+                label: this._escapeAttr(loc),
+                value: locEmps.length,
+                chipsLabel: loc,
+                emps: locEmps,
+            });
+        }).join("");
+    }
+
+    // designation cards (used under Dept and Family)
+    _dashDesignationCardsHtml(emps, attrName, handlerName) {
+        const map = new Map();
+        emps.forEach((e) => {
+            const name = e.designation || "Staff";
+            const order = Number(e.designationSortOrder) || 0;
+            if (!map.has(name)) map.set(name, { name, order });
+            else if (order < map.get(name).order) map.get(name).order = order;
+        });
+        const list = [...map.values()].sort((a, b) => a.order !== b.order ? a.order - b.order : a.name.localeCompare(b.name));
+        const colorCls = ["info", "success", "warning", "accent", "danger"];
+
+        return list.map((d, i) => {
+            const dEmps = emps.filter((e) => (e.designation || "Staff") === d.name);
+            return this._dashCardHtml({
+                cls: colorCls[i % colorCls.length],
+                attrs: `${attrName}="${this._escapeAttr(d.name)}"`,
+                onclick: `AppController.view.${handlerName}('${this._escapeAttr(d.name)}')`,
+                iconHtml: '<i class="ph ph-identification-badge"></i>',
+                label: this._escapeAttr(d.name),
+                value: dEmps.length,
+                chipsLabel: d.name,
+                emps: dEmps,
+            });
+        }).join("");
+    }
 
     _escapeAttr(str) {
         return String(str).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
-
 
     _computeNiceAxis(maxValue, tickCount = 4) {
         if (maxValue <= 0) {
@@ -11034,6 +11101,7 @@ class AttendanceView {
 					<div class="drilldown-title">
                         ${(() => {
                             if (titleMap[key]) return titleMap[key];
+                            if (key.startsWith("dashCat_")) return "🏷️ " + key.replace("dashCat_", "").replace(/_/g, " — ");
                             if (isAgeGroup) return "🎂 Age Group: " + key.replace("ageGroup_", "");
                             if (isAgeLocation) {
                                 const rest = key.replace("ageLocation_", "");
@@ -11735,10 +11803,7 @@ class AttendanceView {
                                 <div style="display:flex;align-items:center;gap:6px;">
                                     <div class="sort-order-control">
                                         <button class="sort-order-btn btn-dec" type="button"><i class="ph ph-minus"></i></button>
-                                        <input type="number" class="sort-order-input company-order-input"
-                                            data-id="${c.id}"
-                                            value="${c.sortOrder !== null ? c.sortOrder : ""}"
-                                            placeholder="–">
+                                        <input type="number" class="sort-order-input company-order-input" data-id="${c.id}" data-original-order="${c.sortOrder !== null ? c.sortOrder : ""}" value="${c.sortOrder !== null ? c.sortOrder : ""}" placeholder="–">
                                         <button class="sort-order-btn btn-inc" type="button"><i class="ph ph-plus"></i></button>
                                     </div>
                                     <button class="sort-order-clear-btn" data-target="company" data-id="${c.id}" title="Clear (reset to NULL)">
@@ -11782,10 +11847,7 @@ class AttendanceView {
                                 <div style="display:flex;align-items:center;gap:6px;">
                                     <div class="sort-order-control">
                                         <button class="sort-order-btn btn-dec" type="button"><i class="ph ph-minus"></i></button>
-                                        <input type="number" class="sort-order-input dept-order-input"
-                                            data-id="${d.id}"
-                                            value="${d.sortOrder !== null ? d.sortOrder : ""}"
-                                            placeholder="–">
+                                        <input type="number" class="sort-order-input dept-order-input" data-id="${d.id}" data-original-order="${d.sortOrder !== null ? d.sortOrder : ""}" value="${d.sortOrder !== null ? d.sortOrder : ""}" placeholder="–">
                                         <button class="sort-order-btn btn-inc" type="button"><i class="ph ph-plus"></i></button>
                                     </div>
                                     <button class="sort-order-clear-btn" data-target="dept" data-id="${d.id}" title="Clear (reset to NULL)">
@@ -11829,10 +11891,7 @@ class AttendanceView {
                                 <div style="display:flex;align-items:center;gap:6px;">
                                     <div class="sort-order-control">
                                         <button class="sort-order-btn btn-dec" type="button"><i class="ph ph-minus"></i></button>
-                                        <input type="number" class="sort-order-input designation-order-input"
-                                            data-id="${d.id}"
-                                            value="${d.sortOrder !== null ? d.sortOrder : ""}"
-                                            placeholder="–">
+                                        <input type="number" class="sort-order-input designation-order-input" data-id="${d.id}" data-original-order="${d.sortOrder !== null ? d.sortOrder : ""}" value="${d.sortOrder !== null ? d.sortOrder : ""}" placeholder="–">
                                         <button class="sort-order-btn btn-inc" type="button"><i class="ph ph-plus"></i></button>
                                     </div>
                                     <button class="sort-order-clear-btn" data-target="designation" data-id="${d.id}" title="Clear (reset to NULL)">
@@ -11907,33 +11966,21 @@ class AttendanceView {
             });
         });
 
-        let editSeqCounter = 0;
-        const markEdited = (input) => {
-            if (!input) return;
-            editSeqCounter += 1;
-            input.dataset.editSeq = String(editSeqCounter);
-        };
-
         contentEl.querySelectorAll(".sort-order-item").forEach((item) => {
             const dec = item.querySelector(".btn-dec");
             const inc = item.querySelector(".btn-inc");
             const input = item.querySelector(".sort-order-input");
             if (!input) return;
 
-            // Direct typing into the box also counts as an edit.
-            input.addEventListener("input", () => markEdited(input));
-
             dec.addEventListener("click", () => {
                 const val = input.value === "" ? null : parseInt(input.value);
                 if (val === null) return;
                 input.value = Math.max(1, val - 1);
-                markEdited(input);
             });
 
             inc.addEventListener("click", () => {
                 const val = input.value === "" ? 1 : parseInt(input.value) + 1;
                 input.value = val;
-                markEdited(input);
             });
         });
 
@@ -11943,7 +11990,6 @@ class AttendanceView {
                 const input = item.querySelector(".sort-order-input");
                 if (input) {
                     input.value = "";
-                    delete input.dataset.editSeq; // blank has no priority; it always sorts last
                 }
             });
         });
@@ -11969,91 +12015,52 @@ class AttendanceView {
         attachSearchFilter("search-designations", "designations-list");
         attachSearchFilter("search-locations", "locations-list");
 
-        // ---- Feature 2: Automatic Sort ----
-        const performAutoSort = (listContainerId) => {
+        // ---- Feature 2: Ordered Sort (Insert & Shift) ----
+        const performOrderedSort = (listContainerId, inputSelector) => {
             const listContainer = document.getElementById(listContainerId);
             if (!listContainer) return;
 
             const items = Array.from(listContainer.querySelectorAll(".sort-order-item"));
-
-            const withMeta = items.map((item, idx) => {
-                const input = item.querySelector(".sort-order-input");
-                const raw = input && input.value !== "" ? parseInt(input.value, 10) : null;
-                const editSeq = input && input.dataset.editSeq ? parseInt(input.dataset.editSeq, 10) : 0;
-                return { item, input, val: Number.isNaN(raw) ? null : raw, idx, editSeq };
-            });
-
-            withMeta.sort((a, b) => {
-                if (a.editSeq && !b.editSeq) {
-                    const editedRowMovesDown = a.val > a.idx + 1;
-                    return editedRowMovesDown ? 1 : -1;
-                }
-
-                if (b.editSeq && !a.editSeq) {
-                    const editedRowMovesDown = b.val > b.idx + 1;
-                    return editedRowMovesDown ? -1 : 1;
-                }
-
-                if (a.editSeq !== b.editSeq) {
-                    return b.editSeq - a.editSeq;
-                }
-
-                return a.idx - b.idx;
-            });
-
-            withMeta.forEach((entry, i) => {
-                if (entry.input) entry.input.value = i + 1;
-                if (entry.input) delete entry.input.dataset.editSeq;
-                const badge = entry.item.querySelector(".sort-order-null-badge");
-                if (badge) badge.remove();
-                listContainer.appendChild(entry.item); // moves existing node -> reorders DOM
-            });
-        };
-
-        const performLocationSort = () => {
-            const listContainer = document.getElementById("locations-list");
-            if (!listContainer) return;
-
-            const items = Array.from(listContainer.querySelectorAll(".sort-order-item"));
-
-            const inputs = items.map((item) => ({
+            const entries = items.map((item) => ({
                 item,
-                input: item.querySelector(".location-order-input")
+                input: item.querySelector(inputSelector),
             }));
 
-            const changed = inputs.filter(({ input }) => input && input.value !== (input.dataset.originalOrder || ""));
+            // 1. Find exactly which input box the user changed
+            const changed = entries.filter(
+                ({ input }) => input && input.value !== (input.dataset.originalOrder || "")
+            );
 
             if (changed.length > 1) {
-                alert("Change one location order at a time, then click Sort.");
+                alert("Change one order value at a time, then click Sort.");
                 return;
             }
 
             if (changed.length === 1) {
                 const movedInput = changed[0].input;
-                const oldOrder = Number(movedInput.dataset.originalOrder);
                 const newOrder = Number(movedInput.value);
 
-                if (!Number.isInteger(newOrder) || newOrder < 1 || !Number.isInteger(oldOrder)) {
-                    alert("Enter a whole-number location order of 1 or higher.");
+                if (!Number.isInteger(newOrder) || newOrder < 1) {
+                    alert("Enter a whole-number order of 1 or higher.");
                     return;
                 }
 
-                inputs.forEach(({ input }) => {
+                // 2. Shift everyone else down
+                entries.forEach(({ input }) => {
                     if (!input || input === movedInput || input.value === "") return;
-
+                    
                     const currentOrder = Number(input.value);
-
-                    if (newOrder > oldOrder && currentOrder >= newOrder) {
-                        input.value = currentOrder + 1;
-                    }
-
-                    if (newOrder < oldOrder && currentOrder >= newOrder && currentOrder < oldOrder) {
+                    
+                    // If someone's number is greater than or equal to the new number, 
+                    // push them down by 1.
+                    if (currentOrder >= newOrder) {
                         input.value = currentOrder + 1;
                     }
                 });
             }
 
-            inputs.sort((a, b) => {
+            // 3. Sort the list by the new numbers
+            entries.sort((a, b) => {
                 const orderA = a.input && a.input.value !== "" ? Number(a.input.value) : Infinity;
                 const orderB = b.input && b.input.value !== "" ? Number(b.input.value) : Infinity;
 
@@ -12062,15 +12069,12 @@ class AttendanceView {
                 const nameA = a.item.querySelector(".sort-order-item-name")?.textContent.trim() || "";
                 const nameB = b.item.querySelector(".sort-order-item-name")?.textContent.trim() || "";
 
-                return nameA.localeCompare(nameB, undefined, {
-                    numeric: true,
-                    sensitivity: "base"
-                });
+                return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
             });
 
-            inputs.forEach(({ item, input }) => {
+            // 4. Put the rows back into the DOM and update the "original" tracking number
+            entries.forEach(({ item, input }) => {
                 listContainer.appendChild(item);
-
                 if (input) {
                     input.dataset.originalOrder = input.value;
                 }
@@ -12078,18 +12082,19 @@ class AttendanceView {
         };
 
         document.getElementById("btn-sort-companies").addEventListener("click", () => {
-            performAutoSort("companies-list");
+            performOrderedSort("companies-list", ".company-order-input");
         });
         document.getElementById("btn-sort-departments").addEventListener("click", () => {
-            performAutoSort("departments-list");
+            performOrderedSort("departments-list", ".dept-order-input");
         });
         document.getElementById("btn-sort-designations").addEventListener("click", () => {
-            performAutoSort("designations-list");
+            performOrderedSort("designations-list", ".designation-order-input");
         });
         document.getElementById("btn-sort-locations").addEventListener("click", () => {
-            performLocationSort();
+            performOrderedSort("locations-list", ".location-order-input");
         });
 
+        // ---- Save Handlers ----
         document.getElementById("btn-save-companies").addEventListener("click", async () => {
             const inputs = contentEl.querySelectorAll(".company-order-input",);
             const items = [];
@@ -13873,7 +13878,6 @@ class AttendanceView {
         panel.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
-
     _showHeadcountDeptTable(type, locationId) {
         document.querySelectorAll("[data-headcount-location]").forEach((c) => c.classList.remove("active"));
         if (locationId !== null) {
@@ -13881,59 +13885,57 @@ class AttendanceView {
             if (card) card.classList.add("active");
         }
 
-        let byDept, locationName;
+        let byDept, locationName, designationsRaw = [];
+        const byLocation = AppController.model.getRequiredHeadcountByLocation() || [];
+
         if (locationId === null) {
             byDept = (AppController.model.state.dashboardData?.requiredHeadcountByDept) || {};
             locationName = null;
+            byLocation.forEach((loc) => {
+                (loc.designations || []).forEach((d) => designationsRaw.push({ ...d, locationId: loc.locationId }));
+            });
         } else {
-            const byLocation = AppController.model.getRequiredHeadcountByLocation();
             const loc = byLocation.find((l) => l.locationId === locationId);
             byDept = loc ? loc.departments : {};
             locationName = loc ? loc.locationName : "";
+            designationsRaw = (loc?.designations || []).map((d) => ({ ...d, locationId }));
         }
+
+        this._hcContext = { type, locationId, byDept, designationsRaw, locationName };
 
         const depts = Object.keys(byDept).sort();
         let totalRequired = 0, totalAvailable = 0, totalGap = 0;
 
-        const rows = depts.map((d) => {
+        const rows = depts.map((d, idx) => {
             const info = byDept[d];
             const required = Number(info.required || 0);
             const available = Number(info.available || 0);
+            let gapDisplay = 0, gapColor = "#6b7280";
 
-            let gapDisplay = 0;
-            let gapColor = "#6b7280";
-            let gapValue = 0;
-
-            if (required === 0 && available === 0) {
-                gapDisplay = 0;
-                gapValue = 0;
-                gapColor = "#6b7280";
-            } else if (required > available) {
-                gapValue = required - available;
-                gapDisplay = gapValue;
+            if (required > available) {
+                gapDisplay = required - available;
                 gapColor = "#10b981";
             } else if (available > required) {
-                gapValue = available - required;
-                gapDisplay = `+${gapValue}`;
+                gapDisplay = `+${available - required}`;
                 gapColor = "#ef4444";
-            } else {
-                gapDisplay = 0;
-                gapValue = 0;
-                gapColor = "#6b7280";
             }
 
             totalRequired += required;
             totalAvailable += available;
-            totalGap += gapValue;
+            totalGap += (typeof gapDisplay === "number" ? gapDisplay : Math.abs(available - required));
 
+            const rowId = `hc-dept-${idx}`;
+            
             return `
-                <tr>
-                    <td><b>${this._escapeAttr(d)}</b></td>
-                    <td>${required}</td>
-                    <td>${available}</td>
-                    <td style="color:${gapColor};font-weight:700;">
-                        ${gapDisplay}
+                <tr class="hc-dept-row" data-row-id="${rowId}" style="cursor:pointer;" onclick="AppController.view._toggleHcDeptRow('${rowId}', '${this._escapeAttr(d)}')">
+                    <td style="text-align:left; padding-left: 16px;">
+                        <span id="chevron-${rowId}" style="display:inline-block;width:18px;color:#64748b;font-size:11px; margin-right: 8px;">▶</span>
+                        <b>${this._escapeAttr(d)}</b>
                     </td>
+                    <td style="text-align:center;">${required}</td>
+                    <td style="text-align:center;">${available}</td>
+                    <td style="text-align:center; color:${gapColor};font-weight:700;">${gapDisplay}</td>
+                    <td></td>
                 </tr>
             `;
         }).join("");
@@ -13948,17 +13950,24 @@ class AttendanceView {
                 <span style="flex:1;height:1px;background:#64748b;display:block;border-radius:2px;"></span>
             </div>
             <div style="overflow-x:auto;">
-                <table class="data-table">
+                <table class="data-table" id="hc-main-table">
                     <thead>
-                        <tr><th>Department</th><th>Required</th><th>Available</th><th>Gap</th></tr>
+                        <tr>
+                            <th style="width:40%; text-align:left; padding-left: 16px;">Name</th>
+                            <th style="text-align:center;">Required</th>
+                            <th style="text-align:center;">Available</th>
+                            <th style="text-align:center;">Gap</th>
+                            <th style="text-align:center;">Action</th>
+                        </tr>
                     </thead>
-                    <tbody>
-                        ${rows || `<tr><td colspan="4" style="text-align:center;padding:32px;color:#94a3b8;">No department data found</td></tr>`}
+                    <tbody id="hc-main-tbody">
+                        ${rows || `<tr><td colspan="5" style="text-align:center;padding:32px;color:#94a3b8;">No department data found</td></tr>`}
                         <tr style="background:#f8fafc;border-top:2px solid #cbd5e1;font-weight:700;">
-                            <td><b>Total</b></td>
-                            <td><b>${totalRequired}</b></td>
-                            <td><b>${totalAvailable}</b></td>
-                            <td style="color:${totalGap > 0 ? "#f43f5e" : "#10b981"};font-weight:700;"><b>${totalGap}</b></td>
+                            <td style="text-align:left; padding-left: 16px;"><b>Total</b></td>
+                            <td style="text-align:center;"><b>${totalRequired}</b></td>
+                            <td style="text-align:center;"><b>${totalAvailable}</b></td>
+                            <td style="text-align:center; color:${totalGap > 0 ? "#f43f5e" : "#10b981"};font-weight:700;"><b>${totalGap}</b></td>
+                            <td></td>
                         </tr>
                     </tbody>
                 </table>
@@ -13968,6 +13977,312 @@ class AttendanceView {
         panel.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
+    _toggleHcDeptRow(rowId, deptName) {
+        const deptRow = this.app.querySelector(`tr[data-row-id="${rowId}"]`);
+        const chevron = document.getElementById(`chevron-${rowId}`);
+        if (!deptRow) return;
+
+        // already open? → remove designation + employee rows
+        const next = deptRow.nextElementSibling;
+        if (next && next.classList.contains("hc-child-of-" + rowId)) {
+            let el = next;
+            while (el && el.classList.contains("hc-child-of-" + rowId)) {
+                const toRemove = el;
+                el = el.nextElementSibling;
+                toRemove.remove();
+            }
+            if (chevron) chevron.textContent = "▶";
+            return;
+        }
+
+        // close other open departments
+        document.querySelectorAll("tr[data-row-id^='hc-dept-']").forEach((tr) => {
+            const id = tr.getAttribute("data-row-id");
+            if (id === rowId) return;
+            const ch = document.getElementById(`chevron-${id}`);
+            if (ch && ch.textContent === "▼") {
+                this._toggleHcDeptRow(id, tr.querySelector("b")?.textContent || "");
+            }
+        });
+
+        if (chevron) chevron.textContent = "▼";
+
+        const ctx = this._hcContext || {};
+        const locationId = ctx.locationId;
+        let designations = [];
+
+        if (locationId === null) {
+            const map = {};
+            (ctx.designationsRaw || []).forEach((d) => {
+                if (d.deptName !== deptName) return;
+                if (!map[d.designationName]) {
+                    map[d.designationName] = { designationName: d.designationName, required: 0, available: 0 };
+                }
+                map[d.designationName].required += Number(d.required || 0);
+                map[d.designationName].available += Number(d.available || 0);
+            });
+            designations = Object.values(map);
+        } else {
+            designations = (ctx.designationsRaw || []).filter((d) => d.deptName === deptName);
+        }
+
+        designations = designations.filter((d) => Number(d.required || 0) > 0 || Number(d.available || 0) > 0);
+
+        designations.sort((a, b) => String(a.designationName).localeCompare(String(b.designationName)));
+
+        if (!designations.length) {
+            const emptyRow = document.createElement("tr");
+            emptyRow.className = `hc-child-of-${rowId}`;
+            emptyRow.innerHTML = `<td colspan="5" style="padding:10px 16px 10px 36px;color:#94a3b8;font-size:13px;">No designations found</td>`;
+            deptRow.after(emptyRow);
+            return;
+        }
+
+        // insert designation rows after dept row (reverse so order stays correct)
+        for (let i = designations.length - 1; i >= 0; i--) {
+            const d = designations[i];
+            const required = Number(d.required || 0);
+            const available = Number(d.available || 0);
+            let gapDisplay = 0, gapColor = "#6b7280";
+            if (required > available) { gapDisplay = required - available; gapColor = "#10b981"; }
+            else if (available > required) { gapDisplay = `+${available - required}`; gapColor = "#ef4444"; }
+
+            const desigRowId = `${rowId}-desig-${i}`;
+            const tr = document.createElement("tr");
+            tr.className = `hc-desig-row hc-child-of-${rowId}`;
+            tr.setAttribute("data-row-id", desigRowId);
+            tr.style.background = "#f8fafc";
+            tr.innerHTML = `
+                <td style="text-align:left; padding-left: 42px; font-weight: 500;">
+                    ${this._escapeAttr(d.designationName)}
+                </td>
+                <td style="text-align:center;">${required}</td>
+                <td style="text-align:center;">${available}</td>
+                <td style="text-align:center; color:${gapColor};font-weight:700;">${gapDisplay}</td>
+                <td style="text-align:center;">
+                    <button class="eye-btn" onclick="AppController.view._openHcEmployeePopup('${this._escapeAttr(deptName)}', '${this._escapeAttr(d.designationName)}', ${required}, ${available}, '${this._escapeAttr(ctx.locationName || "")}')">
+                        <i class="ph ph-eye"></i>
+                    </button>
+                </td>
+            `;
+            deptRow.after(tr);
+        }
+    }
+
+    _openHcEmployeePopup(deptName, designationName, required, available, locationName, currentPage = 1) {
+        const ctx = this._hcContext || {};
+        const locationId = ctx.locationId;
+
+        // Filter employees
+        const emps = (AppController.model.state.dashboardData?.employees || []).filter((e) => {
+            if ((e.dept || "") !== deptName) return false;
+            if ((e.designation || "Staff") !== designationName) return false;
+            if (locationId !== null) {
+                const locId = e.locationId != null ? Number(e.locationId) : null;
+                if (locId === Number(locationId)) return true;
+                const byLocation = AppController.model.getRequiredHeadcountByLocation() || [];
+                const loc = byLocation.find((l) => l.locationId === locationId);
+                return loc ? (e.location || "") === loc.locationName : false;
+            }
+            return true;
+        });
+
+        // Pagination Logic (5 records per page)
+        const pageSize = 5;
+        const totalPages = Math.max(1, Math.ceil(emps.length / pageSize));
+        const page = Math.min(currentPage, totalPages);
+        const startIndex = (page - 1) * pageSize;
+        const pageEmps = emps.slice(startIndex, startIndex + pageSize);
+
+        // Build Rows
+        const rows = pageEmps.map((e, i) => {
+            let statusColor = "#10b981", statusBg = "#d1fae5";
+            if (e.status === "Inactive" || e.status === "Resigned") { 
+                statusColor = "#ef4444"; 
+                statusBg = "#fee2e2"; 
+            } else if (e.status === "On Leave") { 
+                statusColor = "#f59e0b"; 
+                statusBg = "#fef3c7"; 
+            }
+
+            return `
+                <tr>
+                    <td>${startIndex + i + 1}</td>
+                    <td><b>${this._escapeAttr(e.code || "-")}</b></td>
+                    <td>${this._escapeAttr(e.name || "-")}</td>
+                    <td>${this._escapeAttr(e.company || "-")}</td>
+                    <td>${this._escapeAttr(e.location || "-")}</td>
+                    <td>${this._escapeAttr(e.teamName || "-")}</td>
+                    <td><span style="padding:4px 8px; border-radius:6px; font-size:12px; font-weight:600; background:${statusBg}; color:${statusColor};">${this._escapeAttr(e.status || "Working")}</span></td>
+                </tr>
+            `;
+        }).join("");
+
+        // Build Pagination Buttons
+        let pageButtons = "";
+        if (totalPages > 1) {
+            for (let i = 1; i <= totalPages; i++) {
+                const isActive = i === page;
+                const btnStyle = isActive 
+                    ? "background:#4f46e5; color:#fff; border-color:#4f46e5;" 
+                    : "background:#fff; color:#334155; border-color:#cbd5e1;";
+                pageButtons += `
+                    <button style="padding:4px 10px; border:1px solid; border-radius:6px; cursor:pointer; font-size:13px; ${btnStyle}"
+                        onclick="AppController.view._openHcEmployeePopup('${this._escapeAttr(deptName)}', '${this._escapeAttr(designationName)}', ${required}, ${available}, '${this._escapeAttr(locationName || "")}', ${i})">
+                        ${i}
+                    </button>
+                `;
+            }
+        }
+
+        const prevBtn = page > 1 
+            ? `<button style="padding:4px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#fff; cursor:pointer;" onclick="AppController.view._openHcEmployeePopup('${this._escapeAttr(deptName)}', '${this._escapeAttr(designationName)}', ${required}, ${available}, '${this._escapeAttr(locationName || "")}', ${page - 1})"><i class="ph ph-caret-left"></i></button>`
+            : `<button style="padding:4px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#f1f5f9; color:#94a3b8; cursor:not-allowed;" disabled><i class="ph ph-caret-left"></i></button>`;
+
+        const nextBtn = page < totalPages 
+            ? `<button style="padding:4px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#fff; cursor:pointer;" onclick="AppController.view._openHcEmployeePopup('${this._escapeAttr(deptName)}', '${this._escapeAttr(designationName)}', ${required}, ${available}, '${this._escapeAttr(locationName || "")}', ${page + 1})"><i class="ph ph-caret-right"></i></button>`
+            : `<button style="padding:4px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#f1f5f9; color:#94a3b8; cursor:not-allowed;" disabled><i class="ph ph-caret-right"></i></button>`;
+
+        // Create overlay
+        let overlay = document.getElementById("hc-popup-overlay");
+        if (!overlay) {
+            overlay = document.createElement("div");
+            overlay.id = "hc-popup-overlay";
+            overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;";
+            document.body.appendChild(overlay);
+        }
+
+        // Popup HTML
+        overlay.innerHTML = `
+            <div style="background:#fff; border-radius:12px; width:900px; max-width:95%; padding:24px; box-shadow:0 10px 25px rgba(0,0,0,0.2); display:flex; flex-direction:column; max-height:90vh;">
+                
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <h3 style="margin:0; font-size:18px; font-weight:700;">Employees - ${this._escapeAttr(deptName)} (${this._escapeAttr(designationName)})</h3>
+                    <button onclick="document.getElementById('hc-popup-overlay').style.display='none'" style="background:none; border:none; font-size:24px; cursor:pointer; color:#64748b;">&times;</button>
+                </div>
+
+                <div style="font-size:13px; color:#475569; margin-bottom:16px; display:flex; gap:24px;">
+                    <span>Department: <b>${this._escapeAttr(deptName)}</b></span>
+                    <span>Designation: <b>${this._escapeAttr(designationName)}</b></span>
+                    ${locationName ? `<span>Location: <b>${this._escapeAttr(locationName)}</b></span>` : ""}
+                </div>
+
+                <div style="overflow-y:auto; flex:1; border:1px solid #e2e8f0; border-radius:8px;">
+                    <table class="data-table" style="margin:0; width:100%;">
+                        <thead>
+                            <tr style="background:#f8fafc;">
+                                <th>#</th>
+                                <th>Employee Code</th>
+                                <th>Employee Name</th>
+                                <th>Company</th>
+                                <th>Location</th>
+                                <th>Team</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows || `<tr><td colspan="7" style="text-align:center;padding:24px;color:#94a3b8;">No employees found</td></tr>`}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
+                    <div style="font-size:13px; color:#64748b;">
+                        Showing ${emps.length > 0 ? startIndex + 1 : 0} to ${Math.min(startIndex + pageSize, emps.length)} of ${emps.length} employees
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        ${prevBtn}
+                        ${pageButtons}
+                        ${nextBtn}
+                    </div>
+                </div>
+
+            </div>
+        `;
+        
+        overlay.style.display = "flex";
+    }
+
+    _toggleHcDesigRow(desigRowId, deptName, designationName) {
+        const desigRow = this.app.querySelector(`tr[data-row-id="${desigRowId}"]`);
+        const chevron = document.getElementById(`chevron-${desigRowId}`);
+        if (!desigRow) return;
+
+        // already open? → remove employee rows
+        const next = desigRow.nextElementSibling;
+        if (next && next.classList.contains("hc-emp-of-" + desigRowId)) {
+            let el = next;
+            while (el && el.classList.contains("hc-emp-of-" + desigRowId)) {
+                const toRemove = el;
+                el = el.nextElementSibling;
+                toRemove.remove();
+            }
+            if (chevron) chevron.textContent = "▶";
+            return;
+        }
+
+        if (chevron) chevron.textContent = "▼";
+
+        const ctx = this._hcContext || {};
+        const locationId = ctx.locationId;
+
+        const emps = (AppController.model.state.dashboardData?.employees || []).filter((e) => {
+            if ((e.dept || "") !== deptName) return false;
+            if ((e.designation || "Staff") !== designationName) return false;
+            if (locationId !== null) {
+                const locId = e.locationId != null ? Number(e.locationId) : null;
+                if (locId === Number(locationId)) return true;
+                const byLocation = AppController.model.getRequiredHeadcountByLocation() || [];
+                const loc = byLocation.find((l) => l.locationId === locationId);
+                return loc ? (e.location || "") === loc.locationName : false;
+            }
+            return true;
+        });
+
+        if (!emps.length) {
+            const emptyRow = document.createElement("tr");
+            emptyRow.className = `hc-emp-of-${desigRowId}`;
+            emptyRow.innerHTML = `<td colspan="4" style="padding:8px 16px 8px 56px;color:#94a3b8;font-size:13px;">No employees found</td>`;
+            desigRow.after(emptyRow);
+            return;
+        }
+
+        // header + employee rows (reverse insert)
+        const headerTr = document.createElement("tr");
+        headerTr.className = `hc-emp-of-${desigRowId}`;
+        headerTr.style.background = "#e2e8f0";
+        headerTr.innerHTML = `
+            <td colspan="4" style="padding:6px 16px 6px 56px;font-size:11px;font-weight:600;color:#475569;letter-spacing:0.04em;">
+                CODE &nbsp;&nbsp; NAME &nbsp;&nbsp; COMPANY &nbsp;&nbsp; LOCATION &nbsp;&nbsp; TEAM
+                <span style="float:right;font-weight:500;">${emps.length} employee(s)</span>
+            </td>
+        `;
+
+        const empTrs = emps.map((e) => {
+            const tr = document.createElement("tr");
+            tr.className = `hc-emp-of-${desigRowId}`;
+            tr.style.background = "#fff";
+            tr.innerHTML = `
+                <td colspan="4" style="padding:6px 16px 6px 56px;font-size:13px;">
+                    <span style="display:inline-block;min-width:90px;color:#334155;">${this._escapeAttr(e.code || "")}</span>
+                    <span style="display:inline-block;min-width:160px;font-weight:500;">${this._escapeAttr(e.name || "")}</span>
+                    <span style="display:inline-block;min-width:120px;color:#64748b;">${this._escapeAttr(e.company || "")}</span>
+                    <span style="display:inline-block;min-width:80px;color:#64748b;">${this._escapeAttr(e.location || "")}</span>
+                    <span style="display:inline-block;color:#64748b;">${this._escapeAttr(e.teamName || "")}</span>
+                </td>
+            `;
+            return tr;
+        });
+
+        // insert header then employees after desig row
+        let insertAfter = desigRow;
+        insertAfter.after(headerTr);
+        insertAfter = headerTr;
+        empTrs.forEach((tr) => {
+            insertAfter.after(tr);
+            insertAfter = tr;
+        });
+    }
 
     _handleAvailableCardClick() {
         const card = this.app.querySelector('[data-headcount="available"]');
