@@ -4381,7 +4381,7 @@ function handleGetMachineStd($input) {
 
     $total = 0;
     if ($stmt && $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
-        $total = intval($row['TotalMachines']);
+        $total = (float)($row['TotalMachines'] ?? 0);
     }
 
     echo json_encode([
@@ -4411,7 +4411,18 @@ function handleUpdateMachineStd($input) {
         return;
     }
     
-    $totalMachines = intval($input['total_machines']);
+    $totalMachines = $input['total_machines'] ?? null;
+
+    if (!is_numeric($totalMachines) || !is_finite((float)$totalMachines) || (float)$totalMachines < 0 || (float)$totalMachines > 99999999.99) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Invalid total machines value.'
+        ]);
+        return;
+    }
+
+    $totalMachines = number_format((float)$totalMachines, 2, '.', '');
+
     $sqlConn = getSQLServer();
 
     $sql = "MERGE LocationMachineStdCount AS target USING (SELECT ? AS UserId, ? AS LocationId, ? AS TotalMachines) AS src ON target.UserId = src.UserId AND target.LocationId = src.LocationId WHEN MATCHED THEN UPDATE SET TotalMachines = src.TotalMachines, UpdatedAt = GETDATE() WHEN NOT MATCHED THEN INSERT (UserId, LocationId, TotalMachines, UpdatedAt) VALUES (src.UserId, src.LocationId, src.TotalMachines, GETDATE());";
@@ -4460,7 +4471,7 @@ function handleGetDailyMachines($input) {
     if ($stmt) {
         while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
             $dateStr = $row['MachineDate']->format('Y-m-d');
-            $data[$dateStr] = intval($row['RunningMachines']);
+            $data[$dateStr] = (float)($row['RunningMachines'] ?? 0);
         }
     }
 
@@ -4496,7 +4507,17 @@ function handleBulkUpdateDailyMachines($input) {
     $errors = [];
     foreach ($items as $item) {
         $date = $item['date'];
-        $count = intval($item['running_machines']);
+        $count = $item['running_machines'] ?? null;
+
+        if (!is_numeric($count) || !is_finite((float)$count) || (float)$count < 0 || (float)$count > 99999999.99) {
+            $errors[] = [
+                'date' => $item['date'] ?? null,
+                'message' => 'Invalid running machines value.'
+            ];
+            continue;
+        }
+
+        $count = number_format((float)$count, 2, '.', '');
 
         $sql = "MERGE LocationDailyMachineCount AS target USING (SELECT ? AS UserId, ? AS LocationId, ? AS MachineDate, ? AS RunningMachines) AS src ON target.UserId = src.UserId AND target.LocationId = src.LocationId AND target.MachineDate = src.MachineDate WHEN MATCHED THEN UPDATE SET RunningMachines = src.RunningMachines, UpdatedAt = GETDATE() WHEN NOT MATCHED THEN INSERT (UserId, LocationId, MachineDate, RunningMachines, UpdatedAt) VALUES (src.UserId, src.LocationId, src.MachineDate, src.RunningMachines, GETDATE());";
 

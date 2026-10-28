@@ -1,4 +1,4 @@
-/*! For license information please see main.e1c259e0.js.LICENSE.txt */
+/*! For license information please see main.85b7d477.js.LICENSE.txt */
 (() => {
     "use strict";
     var e = {
@@ -10008,7 +10008,7 @@
                         body: JSON.stringify({ action: "get_locations", targetUserId: e }),
                     }),
                     r = await n.json();
-                r.success && Array.isArray(r.data) ? (a(r.data), t(0)) : (a([]), t(0));
+                r.success && Array.isArray(r.data) ? (a(r.data), 1 === r.data.length ? t(Number(r.data[0].location_id)) : t(0)) : (a([]), t(0));
             } catch (n) {
                 (console.error("fetchLocations error:", n), a([]), t(0));
             }
@@ -10278,7 +10278,7 @@
                                     value: null !== e && void 0 !== e ? e : "",
                                     onChange: (e) => t(Number(e.target.value)),
                                     children: [
-                                        (0, c.jsx)("option", { value: 0, children: "All Locations" }),
+                                        1 !== n.length && (0, c.jsx)("option", { value: 0, children: "All Locations" }),
                                         n.map((e) => (0, c.jsx)("option", { value: e.location_id, children: e.location_name }, e.location_id)),
                                     ],
                                 }),
@@ -10356,7 +10356,7 @@
                                 (0, c.jsx)("button", { className: "da-btn da-btn-primary", disabled: Y, onClick: De, children: Y ? "\u23f3 Loading..." : "\ud83d\udd0d Generate" }),
                                 (0, c.jsx)("button", {
                                     className: "da-btn da-btn-warning",
-                                    disabled: null === e,
+                                    disabled: null === e || 0 === e,
                                     onClick: () => {
                                         (K(JSON.parse(JSON.stringify(B))), U(!0));
                                     },
@@ -10364,7 +10364,7 @@
                                 }),
                                 (0, c.jsx)("button", {
                                     className: "da-btn da-btn-warning",
-                                    disabled: null === e,
+                                    disabled: null === e || 0 === e,
                                     onClick: () => {
                                         (ve(he), ke(!0));
                                     },
@@ -10372,7 +10372,7 @@
                                 }),
                                 (0, c.jsx)("button", {
                                     className: "da-btn da-btn-warning",
-                                    disabled: null === e,
+                                    disabled: null === e || 0 === e,
                                     onClick: () => {
                                         const e = {};
                                         for (let n = Ve; n <= Ue; n++) {
@@ -11319,7 +11319,7 @@
                                                                         })(),
                                                                         onChange: (n) => {
                                                                             const a = n.target.value,
-                                                                                l = "" === a ? "" : Math.max(0, parseInt(a, 10) || 0);
+                                                                                l = "" === a ? "" : Math.max(0, Number(a) || 0);
                                                                             r((n) => u(u({}, n), {}, { [e.dept_id]: u(u({}, n[e.dept_id] || {}), {}, { [t.designation_id]: l }) }));
                                                                         },
                                                                         onBlur: (n) => {
@@ -11385,17 +11385,17 @@
                     (0, c.jsx)("input", {
                         type: "number",
                         min: 0,
-                        step: 1,
-                        inputMode: "numeric",
-                        placeholder: "0",
+                        step: "0.01",
+                        inputMode: "decimal",
+                        placeholder: "0.00",
                         value: 0 === t || null == t || "" === t ? "" : t,
                         onChange: (e) => {
-                            const t = e.target.value,
-                                r = "" === t ? "" : Math.max(0, parseInt(t, 10) || 0);
-                            n(r);
+                            const t = e.target.value;
+                            n("" === t ? "" : t);
                         },
                         onBlur: (e) => {
-                            "" === e.target.value && n(0);
+                            const t = e.target.value;
+                            "" === t ? n(0) : Number.isFinite(Number(t)) && Number(t) >= 0 && n(Number(t));
                         },
                         style: { width: "100%", padding: "8px 10px", fontSize: 14, textAlign: "right" },
                     }),
@@ -11413,7 +11413,7 @@
     }
     function D(e) {
         let { year: t, month: n, days: r, editDailyMachines: a, setEditDailyMachines: l, onSave: o, onClose: i } = e;
-        const s = Object.values(a).reduce((e, t) => e + (parseInt(t, 10) || 0), 0);
+        const s = Object.values(a).reduce((e, t) => e + (Number(t) || 0), 0);
         return (0, c.jsx)("div", {
             className: "da-modal-overlay",
             onClick: (e) => {
@@ -11453,9 +11453,9 @@
                                                         children: (0, c.jsx)("input", {
                                                             type: "number",
                                                             min: 0,
-                                                            step: 1,
-                                                            inputMode: "numeric",
-                                                            placeholder: "0",
+                                                            step: "0.01",
+                                                            inputMode: "decimal",
+                                                            placeholder: "0.00",
                                                             style: { textAlign: "right" },
                                                             value: (() => {
                                                                 const e = a[r];
@@ -11463,7 +11463,7 @@
                                                             })(),
                                                             onChange: (e) => {
                                                                 const t = e.target.value,
-                                                                    n = "" === t ? "" : Math.max(0, parseInt(t, 10) || 0);
+                                                                    n = "" === t ? "" : Math.max(0, Number(t) || 0);
                                                                 l((e) => u(u({}, e), {}, { [r]: n }));
                                                             },
                                                             onBlur: (e) => {
@@ -11570,4 +11570,4 @@
     }
     a.createRoot(document.getElementById("root")).render((0, c.jsx)(F, {}));
 })();
-//# sourceMappingURL=main.e1c259e0.js.map
+//# sourceMappingURL=main.85b7d477.js.map

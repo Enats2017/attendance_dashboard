@@ -156,7 +156,11 @@ export default function DeptAttendance() {
 
             if (data.success && Array.isArray(data.data)) {
                 setLocationList(data.data);
-                setLocationId(0);
+                if (data.data.length === 1) {
+                    setLocationId(Number(data.data[0].location_id));
+                } else {
+                    setLocationId(0);
+                }
             } else {
                 setLocationList([]);
                 setLocationId(0);
@@ -529,7 +533,10 @@ export default function DeptAttendance() {
                 <div className="da-filter-group">
                     <label>Location</label>
                     <select value={locationId ?? ""} onChange={(e) => setLocationId(Number(e.target.value))}>
-                        <option value={0}>All Locations</option>
+                        {locationList.length !== 1 && (
+                            <option value={0}>All Locations</option>
+                        )}
+
                         {locationList.map((loc) => (
                             <option key={loc.location_id} value={loc.location_id}>
                                 {loc.location_name}
@@ -594,15 +601,15 @@ export default function DeptAttendance() {
                         {loading ? "⏳ Loading..." : "🔍 Generate"}
                     </button>
                 
-                    <button className="da-btn da-btn-warning" disabled={locationId === null} onClick={() => { setEditDesigHc(JSON.parse(JSON.stringify(desigStdHcMap))); setShowDesigSettings(true); }}>
+                    <button className="da-btn da-btn-warning" disabled={locationId === null || locationId === 0} onClick={() => { setEditDesigHc(JSON.parse(JSON.stringify(desigStdHcMap))); setShowDesigSettings(true); }}>
                         ⚙️ Designation STD HC
                     </button>
                 
-                    <button className="da-btn da-btn-warning" disabled={locationId === null} onClick={() => { setEditMachineStd(machineStd); setShowMachineStdSettings(true); }}>
+                    <button className="da-btn da-btn-warning" disabled={locationId === null || locationId === 0} onClick={() => { setEditMachineStd(machineStd); setShowMachineStdSettings(true); }}>
                         ⚙️ Total Machines
                     </button>
                 
-                    <button className="da-btn da-btn-warning" disabled={locationId === null}
+                    <button className="da-btn da-btn-warning" disabled={locationId === null || locationId === 0}
                         onClick={() => {
                             const initial = {};
                             for (let d = clampedFrom; d <= clampedTo; d++) {
@@ -1337,7 +1344,7 @@ function DesigSettingsModal({ deptList, editDesigHc, setEditDesigHc, desigList, 
                                                 }
                                                 onChange={(e) => {
                                                     const raw = e.target.value;
-                                                    const val = raw === "" ? "" : Math.max(0, parseInt(raw, 10) || 0);
+                                                    const val = raw === "" ? "" : Math.max(0, Number(raw) || 0);
                                                     setEditDesigHc((prev) => ({
                                                         ...prev,
                                                         [dept.dept_id]: {
@@ -1395,18 +1402,31 @@ function MachineStdModal({ value, setValue, onSave, onClose }) {
                 <p style={{ color: "#64748b", fontSize: 13, marginBottom: 16 }}>
                     Fixed total machine count for this location. Shown in the report header.
                 </p>
-                <input type="number" min={0} step={1} inputMode="numeric" placeholder="0" value={value === 0 || value == null || value === "" ? "" : value}
+                
+                <input type="number" min={0} step="0.01" inputMode="decimal" placeholder="0.00" value={value === 0 || value == null || value === "" ? "" : value}
                     onChange={(e) => {
                         const raw = e.target.value;
-                        // IMPORTANT: keep empty as ""
-                        const val = raw === "" ? "" : Math.max(0, parseInt(raw, 10) || 0);
-                        setValue(val);
+                        setValue(raw === "" ? "" : raw);
                     }}
                     onBlur={(e) => {
-                        if (e.target.value === "") setValue(0);
+                        const raw = e.target.value;
+                        if (raw === "") {
+                            setValue(0);
+                        } else if (
+                            Number.isFinite(Number(raw)) &&
+                            Number(raw) >= 0
+                        ) {
+                            setValue(Number(raw));
+                        }
                     }}
-                    style={{ width: "100%", padding: "8px 10px", fontSize: 14, textAlign: "right" }}
+                    style={{
+                        width: "100%",
+                        padding: "8px 10px",
+                        fontSize: 14,
+                        textAlign: "right"
+                    }}
                 />
+
                 <div className="da-modal-footer" style={{ marginTop: 16 }}>
                     <button className="da-btn da-btn-sm" style={{ background: "#e2e8f0", color: "#475569" }} onClick={onClose}>
                         Cancel
@@ -1426,7 +1446,7 @@ function DailyMachineModal({ year, month, days, editDailyMachines, setEditDailyM
         return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
     }
 
-    const total = Object.values(editDailyMachines).reduce((a, b) => a + (parseInt(b, 10) || 0), 0);
+    const total = Object.values(editDailyMachines).reduce((sum, value) => sum + (Number(value) || 0), 0);
 
     return (
         <div className="da-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -1453,7 +1473,7 @@ function DailyMachineModal({ year, month, days, editDailyMachines, setEditDailyM
                                     <tr key={ds}>
                                         <td style={{ fontWeight: 600 }}>{ds}</td>
                                         <td>
-                                            <input type="number" min={0} step={1} inputMode="numeric" placeholder="0" style={{ textAlign: "right" }}
+                                            <input type="number" min={0} step="0.01" inputMode="decimal" placeholder="0.00" style={{ textAlign: "right" }}
                                                 value={
                                                     (() => {
                                                         const v = editDailyMachines[ds];
@@ -1463,7 +1483,7 @@ function DailyMachineModal({ year, month, days, editDailyMachines, setEditDailyM
                                                 onChange={(e) => {
                                                     const raw = e.target.value;
                                                     // IMPORTANT: keep empty as ""
-                                                    const val = raw === "" ? "" : Math.max(0, parseInt(raw, 10) || 0);
+                                                    const val = raw === "" ? "" : Math.max(0, Number(raw) || 0);
                                                     setEditDailyMachines((prev) => ({
                                                         ...prev,
                                                         [ds]: val,
