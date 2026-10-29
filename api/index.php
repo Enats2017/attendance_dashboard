@@ -2983,7 +2983,7 @@ function handleSaveDepartmentDesignationMapping($input) {
 }
 
 
-// Delete Department - Designation mapping
+// Delete Department - Designation mapping and its headcount
 function handleDeleteDepartmentDesignationMapping($input) {
     $conn = getSQLServer();
 
@@ -3011,6 +3011,18 @@ function handleDeleteDepartmentDesignationMapping($input) {
         $targetUserId = $loggedInUserId;
     }
 
+    $departmentId = intval($input['departmentId'] ?? 0);
+    $designationId = intval($input['designationId'] ?? 0);
+
+    if ($departmentId <= 0 || $designationId <= 0) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Invalid Department or Designation.'
+        ]);
+        return;
+    }
+
+    // Verify target user
     $checkUserSql = "SELECT UserId FROM SystemUsers WHERE UserId = ? AND RecordStatus = 1";
 
     $checkUserStmt = sqlsrv_query($conn, $checkUserSql, [$targetUserId]);
@@ -3025,25 +3037,51 @@ function handleDeleteDepartmentDesignationMapping($input) {
         return;
     }
 
-    $departmentId = intval($input['departmentId'] ?? 0);
-    $designationId = intval($input['designationId'] ?? 0);
-
-    if ($departmentId <= 0 || $designationId <= 0) {
+    // Start transaction so both changes succeed or fail together
+    if (!sqlsrv_begin_transaction($conn)) {
         echo json_encode([
             'success' => false,
-            'message' => 'Invalid Department or Designation.'
+            'message' => 'Unable to start database transaction.',
+            'errors' => sqlsrv_errors()
         ]);
         return;
     }
 
-    $sql = "UPDATE DepartmentDesignationMapping SET IsActive = 0, UpdatedAt = GETDATE() WHERE UserId = ? AND DepartmentId = ? AND DesignationId = ?";
+    // Step 1: Deactivate the department-designation mapping
+    $mappingSql = "UPDATE DepartmentDesignationMapping SET IsActive = 0, UpdatedAt = GETDATE() WHERE UserId = ? AND DepartmentId = ? AND DesignationId = ?";
 
-    $stmt = sqlsrv_query($conn, $sql, [$targetUserId, $departmentId, $designationId]);
+    $mappingStmt = sqlsrv_query($conn, $mappingSql, [$targetUserId, $departmentId, $designationId]);
 
-    if (!$stmt) {
+    if ($mappingStmt === false) {
+        sqlsrv_rollback($conn);
         echo json_encode([
             'success' => false,
-            'message' => 'Unable to remove mapping.',
+            'message' => 'Unable to deactivate mapping.',
+            'errors' => sqlsrv_errors()
+        ]);
+        return;
+    }
+
+    // Step 2: Delete the associated designation headcount
+    $headcountSql = "DELETE FROM DepartmentDesignationLocationHeadCount WHERE UserId = ? AND DepartmentId = ? AND DesignationId = ?";
+
+    $headcountStmt = sqlsrv_query($conn, $headcountSql, [$targetUserId, $departmentId, $designationId]);
+
+    if ($headcountStmt === false) {
+        sqlsrv_rollback($conn);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Mapping could not be removed because headcount deletion failed.',
+            'errors' => sqlsrv_errors()
+        ]);
+        return;
+    }
+
+    if (!sqlsrv_commit($conn)) {
+        sqlsrv_rollback($conn);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Unable to commit mapping deletion.',
             'errors' => sqlsrv_errors()
         ]);
         return;
@@ -3051,10 +3089,66 @@ function handleDeleteDepartmentDesignationMapping($input) {
 
     echo json_encode([
         'success' => true,
-        'message' => 'Mapping removed successfully.'
+        'message' => 'Mapping and associated designation headcount removed successfully.',
+        'deletedHeadcountRows' => sqlsrv_rows_affected($headcountStmt)
     ]);
 }
 
+
+function AutoDepartmentDesignationMappings($sqlConn, $targetUserId, $locationList, $companyList, $departmentList) {
+    $targetUserId = (int)$targetUserId;
+
+    $sqlEmployees = "SELECT DISTINCT DepartmentId, Designation AS DesignationId FROM Employees WHERE Location IN ($locationList) AND CompanyId IN ($companyList) AND DepartmentId IN ($departmentList) AND Status = 'Working' AND DepartmentId IS NOT NULL AND Designation IS NOT NULL";
+
+    $stmtEmployees = sqlsrv_query($sqlConn, $sqlEmployees);
+
+    if ($stmtEmployees === false) {
+        error_log(print_r(sqlsrv_errors(), true));
+        return false;
+    }
+
+    $sqlExisting = "SELECT DepartmentId, DesignationId FROM DepartmentDesignationMapping WHERE UserId = ?";
+
+    $stmtExisting = sqlsrv_query($sqlConn, $sqlExisting, [$targetUserId]);
+
+    if ($stmtExisting === false) {
+        error_log(print_r(sqlsrv_errors(), true));
+        return false;
+    }
+
+    $existingMappings = [];
+
+    while ($row = sqlsrv_fetch_array($stmtExisting, SQLSRV_FETCH_ASSOC)) {
+        $key = (int)$row['DepartmentId'] . '_' . (int)$row['DesignationId'];
+        $existingMappings[$key] = true;
+    }
+
+    while ($row = sqlsrv_fetch_array($stmtEmployees, SQLSRV_FETCH_ASSOC)) {
+        $departmentId = (int)$row['DepartmentId'];
+        $designationId = (int)$row['DesignationId'];
+
+        $key = $departmentId . '_' . $designationId;
+
+        if (isset($existingMappings[$key])) {
+            continue;
+        }
+
+        $sqlInsert = "INSERT INTO DepartmentDesignationMapping (DepartmentId, DesignationId, IsActive, UserId) VALUES (?, ?, 1, ?)";
+
+        $params = [$departmentId, $designationId, $targetUserId];
+
+        $stmtInsert = sqlsrv_query($sqlConn, $sqlInsert, $params);
+
+        if ($stmtInsert === false) {
+            error_log(print_r(sqlsrv_errors(), true));
+            return false;
+        }
+
+        $existingMappings[$key] = true;
+    }
+
+    return true;
+}
 
 /**
  * Handle Dept Report - Get STD Headcounts
@@ -3449,28 +3543,32 @@ function handleGetReport($input) {
 
     $companyList = !empty($scope['companies']) ? implode(',', array_map('intval', $scope['companies'])) : '0';
     $departmentList = !empty($scope['departments']) ? implode(',', array_map('intval', $scope['departments'])) : '0';
+    
+    AutoDepartmentDesignationMappings($sqlConn, $targetUserId, $locationList, $companyList, $departmentList);
+
     $allLocationsList = !empty($scope['locations']) ? implode(',', array_map('intval', $scope['locations'])) : '0';
 
-    $totalStdMachines = 0;
-    
+    $totalStdMachines = '0.00';
+
     $sqlMachStd = "SELECT SUM(TotalMachines) as total FROM LocationMachineStdCount WITH (NOLOCK) WHERE UserId = ? AND LocationId IN ($locationList)";
 
     $stmtMachStd = sqlsrv_query($sqlConn, $sqlMachStd, [$targetUserId]);
-    
+
     if ($stmtMachStd && $rowMS = sqlsrv_fetch_array($stmtMachStd, SQLSRV_FETCH_ASSOC)) {
-        $totalStdMachines = intval($rowMS['total']);
+        $totalStdMachines = number_format((float)($rowMS['total'] ?? 0), 2, '.', '');
     }
 
     $dailyMachMap = [];
-    
+
     $sqlMachDaily = "SELECT MachineDate, SUM(RunningMachines) as total FROM LocationDailyMachineCount WITH (NOLOCK) WHERE UserId = ? AND LocationId IN ($locationList) AND MachineDate >= ? AND MachineDate <= ? GROUP BY MachineDate";
 
     $stmtMachDaily = sqlsrv_query($sqlConn, $sqlMachDaily, [$targetUserId, $dayFrom, $dayTo]);
-    
+
     if ($stmtMachDaily) {
         while ($rowMD = sqlsrv_fetch_array($stmtMachDaily, SQLSRV_FETCH_ASSOC)) {
             $d = intval(date('j', strtotime($rowMD['MachineDate']->format('Y-m-d'))));
-            $dailyMachMap[$d] = intval($rowMD['total']);
+
+            $dailyMachMap[$d] = number_format((float)($rowMD['total'] ?? 0), 2, '.', '');
         }
     }
  
@@ -4317,14 +4415,15 @@ function handleGetReport($input) {
     for ($d = $fromDay; $d <= $toDay; $d++) {
         $summary['overtime_paid'][$d] = count($otEmployeesByDay[$d] ?? []);
         $summary['on_leave'][$d] = count($leaveEmployeesByDay[$d] ?? []);
-        $summary['running_machines'][$d] = $dailyMachMap[$d] ?? 0;
+        $summary['running_machines'][$d] = $dailyMachMap[$d] ?? '0.00';
         $summary['labor_per_machine'][$d] = $summary['running_machines'][$d] > 0 ? round($summary['total_present'][$d] / $summary['running_machines'][$d], 1) : 0;
     }
  
     $summary_avg = [];
     foreach ($summary as $key => $values) {
         if (is_array($values)) {
-            $summary_avg[$key] = round(array_sum($values) / $numDays);
+            $average = array_sum($values) / $numDays;
+            $summary_avg[$key] = ($key === 'running_machines') ? round($average, 2) : round($average);
         }
     }
  
@@ -4379,9 +4478,9 @@ function handleGetMachineStd($input) {
 
     $stmt = sqlsrv_query($sqlConn, $sql, [$targetUserId]);
 
-    $total = 0;
+    $total = '0.00';
     if ($stmt && $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
-        $total = (float)($row['TotalMachines'] ?? 0);
+        $total = number_format((float)($row['TotalMachines'] ?? 0), 2, '.', '');
     }
 
     echo json_encode([
@@ -4471,7 +4570,7 @@ function handleGetDailyMachines($input) {
     if ($stmt) {
         while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
             $dateStr = $row['MachineDate']->format('Y-m-d');
-            $data[$dateStr] = (float)($row['RunningMachines'] ?? 0);
+            $data[$dateStr] = number_format((float)($row['RunningMachines'] ?? 0), 2, '.', '');
         }
     }
 
