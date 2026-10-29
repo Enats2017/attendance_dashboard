@@ -95,76 +95,115 @@ switch ($action) {
     case 'login':
         handleLogin($input);
         break;
+
     case 'setup_password':
         setupPassword($input);
         break;
+
     case 'dashboard_data':
         handleDashboardData($input);
         break;
+
     case 'get_subadmins':
         if (!checkModulePermission('get_subadmins')) return;
         getSubAdmins();
         break;
+
     case 'get_department_designation_mapping':
         if (!checkModulePermission('department_designation_mapping')) return;
         handleGetDepartmentDesignationMapping($input);
         break;
+
     case 'save_department_designation_mapping':
         if (!checkModulePermission('department_designation_mapping')) return;
         handleSaveDepartmentDesignationMapping($input);
         break;
+
     case 'delete_department_designation_mapping':
         if (!checkModulePermission('department_designation_mapping')) return;
         handleDeleteDepartmentDesignationMapping($input);
         break;
+
+    case 'get_department_groups':
+        handleGetDepartmentGroups($input);
+        break;
+
+    case 'save_department_group':
+        handleSaveDepartmentGroup($input);
+        break;
+
+    case 'delete_department_group':
+        handleDeleteDepartmentGroup($input);
+        break;
+
+    case 'get_group_departments':
+        handleGetGroupDepartments($input);
+        break;
+
     case 'get_std_hc':
         handleGetStdHC($input);
         break;
+
     case 'get_designation_std_hc':
         handleGetDesignationStdHC($input);
         break;
+
     case 'bulk_update_designation_std_hc':
         handleBulkUpdateDesignationStdHC($input);
         break;
+
     case 'get_machine_std':
         handleGetMachineStd($input);
         break;
+
     case 'update_machine_std':
         handleUpdateMachineStd($input);
         break;
+
     case 'get_daily_machines':
         handleGetDailyMachines($input);
         break;
+
     case 'bulk_update_daily_machines':
         handleBulkUpdateDailyMachines($input);
         break;
+
     case 'get_report':
         handleGetReport($input);
         break;
+
     case 'get_depts':
         handleGetDepts($input);
         break;
+
     case 'get_locations':
         handleGetLocations($input);
         break;
+
     case 'get_companies':
         handleGetCompanies($input);
         break;
+
     case 'get_shifts':
         handleGetShifts($input);
         break;
+        
     case 'get_designations_order':
         handleGetDesignationsOrder();
         break;
+
     case 'save_designations_order':
         handleSaveDesignationsOrder($input);
         break;
+
     case 'get_companies_order':
         handleGetCompaniesOrder();
         break;
+
     case 'save_companies_order':
         handleSaveCompaniesOrder($input);
         break;
+
     case 'get_locations_order':
         handleGetLocationsOrder();
         break;
@@ -172,39 +211,51 @@ switch ($action) {
     case 'save_locations_order':
         handleSaveLocationsOrder($input);
         break;
+
     case 'get_departments_order':
         handleGetDepartmentsOrder();
         break;
+
     case 'save_departments_order':
         handleSaveDepartmentsOrder($input);
         break;
+        
     case 'get_designation_global_order':
         handleGetDesignationGlobalOrder();
         break;
+
     case 'save_designation_global_order':
         handleSaveDesignationGlobalOrder($input);
         break;
+
     case 'setup_db':
         handleSetupDB();
         break;
+
     case 'get_designation_families':
         handleGetDesignationFamilies();
         break;
+
     case 'save_designation_family':
         handleSaveDesignationFamily($input);
         break;
+
     case 'delete_designation_family':
         handleDeleteDesignationFamily($input);
         break;
+
     case 'save_designation_family_mapping':
         handleSaveDesignationFamilyMapping($input);
         break;
+
     case 'get_unmapped_designations':
         handleGetUnmappedDesignations();
         break;
+
     case 'logout':
         handleLogout();
         break;
+
     default:
         echo json_encode(['success' => false, 'message' => 'Invalid or missing action: ' . $action]);
         break;
@@ -3149,6 +3200,449 @@ function AutoDepartmentDesignationMappings($sqlConn, $targetUserId, $locationLis
 
     return true;
 }
+
+function handleGetDepartmentGroups($input = []) {
+    $conn = getSQLServer();
+
+    $loggedInUserId = (int)($_SESSION['userId'] ?? 0);
+    $isMaster = !empty($_SESSION['isMaster']);
+
+    if ($loggedInUserId <= 0) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Unauthorized'
+        ]);
+        return;
+    }
+
+    $targetUserId = $isMaster ? (int)($input['targetUserId'] ?? 0) : $loggedInUserId;
+
+    if ($targetUserId <= 0) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Target user is required'
+        ]);
+        return;
+    }
+
+    $sql = "SELECT GroupId, GroupName, SortOrder, Status, CreatedAt, UpdatedAt FROM DepartmentGroups WHERE UserId = ? AND Status = 1 ORDER BY SortOrder, GroupId";
+
+    $stmt = sqlsrv_query($conn, $sql, [$targetUserId]);
+
+    if ($stmt === false) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Failed to fetch department groups'
+        ]);
+        return;
+    }
+
+    $groups = [];
+
+    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+        $groups[] = $row;
+    }
+
+    echo json_encode([
+        'success' => true,
+        'data' => $groups
+    ]);
+}
+
+function handleSaveDepartmentGroup($input) {
+    $conn = getSQLServer();
+
+    $loggedInUserId = (int)($_SESSION['userId'] ?? 0);
+    $isMaster = !empty($_SESSION['isMaster']);
+
+    if ($loggedInUserId <= 0) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Unauthorized'
+        ]);
+        return;
+    }
+
+    $targetUserId = $isMaster ? (int)($input['targetUserId'] ?? 0) : $loggedInUserId;
+
+    if ($targetUserId <= 0) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Target user is required'
+        ]);
+        return;
+    }
+
+    $groupId = (int)($input['groupId'] ?? 0);
+    $groupName = trim($input['groupName'] ?? '');
+    $sortOrder = (int)($input['sortOrder'] ?? 0);
+    $departmentIds = $input['departmentIds'] ?? [];
+
+    if ($groupName === '') {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Group name is required'
+        ]);
+        return;
+    }
+
+    if (!is_array($departmentIds)) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Department IDs must be an array'
+        ]);
+        return;
+    }
+
+    // Keep only unique, positive department IDs.
+    $departmentIds = array_values(array_unique(
+        array_filter(
+            array_map('intval', $departmentIds),
+            function ($id) {
+                return $id > 0;
+            }
+        )
+    ));
+
+    $allowedDepartmentIds = array_map('intval', $_SESSION['departments'] ?? []);
+
+    $invalidDepartmentIds = array_diff($departmentIds, $allowedDepartmentIds);
+
+    if (!empty($invalidDepartmentIds)) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Invalid department selection'
+        ]);
+        return;
+    }
+
+    if (!sqlsrv_begin_transaction($conn)) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Failed to start transaction'
+        ]);
+        return;
+    }
+
+    // UPDATE existing group.
+    if ($groupId > 0) {
+        $checkSql = "SELECT GroupId FROM DepartmentGroups WHERE GroupId = ? AND UserId = ? AND Status = 1";
+
+        $checkStmt = sqlsrv_query($conn, $checkSql, [$groupId, $targetUserId]);
+
+        if ($checkStmt === false ||
+            !sqlsrv_fetch_array($checkStmt, SQLSRV_FETCH_ASSOC)) {
+            sqlsrv_rollback($conn);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Department group not found'
+            ]);
+            return;
+        }
+
+        $sql = "UPDATE DepartmentGroups SET GroupName = ?, SortOrder = ?, UpdatedAt = GETDATE() WHERE GroupId = ? AND UserId = ? AND Status = 1";
+
+        $stmt = sqlsrv_query($conn, $sql, [$groupName, $sortOrder, $groupId, $targetUserId]);
+
+        if ($stmt === false) {
+            sqlsrv_rollback($conn);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Failed to update department group'
+            ]);
+            return;
+        }
+    } else {
+        $sql = "INSERT INTO DepartmentGroups (UserId, GroupName, SortOrder, Status, CreatedAt) OUTPUT INSERTED.GroupId VALUES (?, ?, ?, 1, GETDATE())";
+
+        $stmt = sqlsrv_query($conn, $sql, [$targetUserId, $groupName, $sortOrder]);
+
+        if ($stmt === false) {
+            sqlsrv_rollback($conn);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Failed to create department group'
+            ]);
+            return;
+        }
+
+        $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
+
+        if (!$row) {
+            sqlsrv_rollback($conn);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Failed to get new group ID'
+            ]);
+            return;
+        }
+
+        $groupId = (int)$row['GroupId'];
+    }
+
+    $sql = "SELECT DISTINCT DepartmentId FROM DepartmentGroupMapping WHERE GroupId = ?";
+
+    $stmt = sqlsrv_query($conn, $sql, [$groupId]);
+
+    if ($stmt === false) {
+        sqlsrv_rollback($conn);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Failed to fetch department mappings'
+        ]);
+        return;
+    }
+
+    $existingIds = [];
+
+    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+        $existingIds[] = (int)$row['DepartmentId'];
+    }
+
+    foreach ($departmentIds as $departmentId) {
+        if (in_array($departmentId, $existingIds, true)) {
+            $sql = "UPDATE DepartmentGroupMapping SET Status = 1, UpdatedAt = GETDATE() WHERE GroupId = ? AND DepartmentId = ? AND Status <> 1";
+
+            $stmt = sqlsrv_query($conn, $sql, [$groupId, $departmentId]);
+        } else {
+            $sql = "INSERT INTO DepartmentGroupMapping (GroupId, DepartmentId, Status, CreatedAt) VALUES (?, ?, 1, GETDATE())";
+
+            $stmt = sqlsrv_query($conn, $sql, [$groupId, $departmentId]);
+        }
+
+        if ($stmt === false) {
+            sqlsrv_rollback($conn);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Failed to save department mapping'
+            ]);
+            return;
+        }
+    }
+
+    // Deactivate only mappings that are no longer selected.
+    foreach ($existingIds as $departmentId) {
+        if (!in_array($departmentId, $departmentIds, true)) {
+            $sql = "UPDATE DepartmentGroupMapping SET Status = 0, UpdatedAt = GETDATE() WHERE GroupId = ? AND DepartmentId = ? AND Status = 1";
+
+            $stmt = sqlsrv_query($conn, $sql, [$groupId, $departmentId]);
+
+            if ($stmt === false) {
+                sqlsrv_rollback($conn);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Failed to deactivate department mapping'
+                ]);
+                return;
+            }
+        }
+    }
+
+    if (!sqlsrv_commit($conn)) {
+        sqlsrv_rollback($conn);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Failed to save department group'
+        ]);
+        return;
+    }
+
+    echo json_encode([
+        'success' => true,
+        'message' => 'Department group saved successfully',
+        'groupId' => $groupId
+    ]);
+}
+
+function handleDeleteDepartmentGroup($input) {
+    $conn = getSQLServer();
+
+    $loggedInUserId = (int)($_SESSION['userId'] ?? 0);
+    $isMaster = !empty($_SESSION['isMaster']);
+
+    if ($loggedInUserId <= 0) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Unauthorized'
+        ]);
+        return;
+    }
+
+    $targetUserId = $isMaster ? (int)($input['targetUserId'] ?? 0) : $loggedInUserId;
+
+    $groupId = (int)($input['groupId'] ?? 0);
+
+    if ($targetUserId <= 0 || $groupId <= 0) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Group ID and target user are required'
+        ]);
+        return;
+    }
+
+    $sql = "UPDATE DepartmentGroups SET Status = 0, UpdatedAt = GETDATE() WHERE GroupId = ? AND UserId = ? AND Status = 1";
+
+    $stmt = sqlsrv_query($conn, $sql, [$groupId, $targetUserId]);
+
+    if ($stmt === false) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Failed to deactivate department group'
+        ]);
+        return;
+    }
+
+    if (sqlsrv_rows_affected($stmt) === 0) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Active department group not found'
+        ]);
+        return;
+    }
+
+    echo json_encode([
+        'success' => true,
+        'message' => 'Department group deactivated successfully'
+    ]);
+}
+
+
+
+function handleGetGroupDepartments($input = []) {
+    $conn = getSQLServer();
+
+    $loggedInUserId = (int)($_SESSION['userId'] ?? 0);
+    $isMaster = !empty($_SESSION['isMaster']);
+
+    if ($loggedInUserId <= 0) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Unauthorized'
+        ]);
+        return;
+    }
+
+    $targetUserId = $isMaster ? (int)($input['targetUserId'] ?? 0) : $loggedInUserId;
+
+    $groupId = (int)($input['groupId'] ?? 0);
+
+    if ($targetUserId <= 0) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Target user is required'
+        ]);
+        return;
+    }
+
+    $departmentIds = $_SESSION['departments'] ?? [];
+
+    $departmentIds = array_values(array_unique(
+        array_filter(array_map('intval', $departmentIds), function ($id) {
+            return $id > 0;
+        })
+    ));
+
+    if (empty($departmentIds)) {
+        echo json_encode([
+            'success' => true,
+            'data' => []
+        ]);
+        return;
+    }
+
+    $inClause = implode(',', array_fill(0, count($departmentIds), '?'));
+
+    // Validate the group when editing.
+    if ($groupId > 0) {
+        $checkSql = "SELECT GroupId FROM DepartmentGroups WHERE GroupId = ? AND UserId = ? AND Status = 1";
+
+        $checkStmt = sqlsrv_query($conn, $checkSql, [$groupId, $targetUserId]);
+
+        if ($checkStmt === false || !sqlsrv_fetch_array($checkStmt, SQLSRV_FETCH_ASSOC)) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Department group not found'
+            ]);
+            return;
+        }
+    }
+
+    $sql = "SELECT DepartmentId, DepartmentFName, SortOrder FROM Departments WHERE DepartmentId IN ($inClause) ORDER BY SortOrder, DepartmentFName";
+
+    $stmt = sqlsrv_query($conn, $sql, $departmentIds);
+
+    if ($stmt === false) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Failed to fetch departments'
+        ]);
+        return;
+    }
+
+    $allDepartments = [];
+
+    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+        $allDepartments[] = $row;
+    }
+
+    // Fetch departments already assigned to active groups of this user.
+    $assignedSql = "SELECT m.DepartmentId, m.GroupId FROM DepartmentGroupMapping m INNER JOIN DepartmentGroups g ON g.GroupId = m.GroupId WHERE g.UserId = ? AND g.Status = 1 AND m.Status = 1";
+
+    $assignedStmt = sqlsrv_query($conn, $assignedSql, [$targetUserId]);
+
+    if ($assignedStmt === false) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Failed to fetch assigned departments'
+        ]);
+        return;
+    }
+
+    $assignedToOtherGroups = [];
+    $assignedToCurrentGroup = [];
+
+    while ($row = sqlsrv_fetch_array($assignedStmt, SQLSRV_FETCH_ASSOC)) {
+        $departmentId = (int)$row['DepartmentId'];
+        $assignedGroupId = (int)$row['GroupId'];
+
+        if ($groupId > 0 && $assignedGroupId === $groupId) {
+            $assignedToCurrentGroup[$departmentId] = true;
+        } else {
+            $assignedToOtherGroups[$departmentId] = true;
+        }
+    }
+
+    // Build the final department list.
+    $departments = [];
+
+    foreach ($allDepartments as $row) {
+        $departmentId = (int)$row['DepartmentId'];
+
+        if (isset($assignedToCurrentGroup[$departmentId])) {
+            // Keep this group's own departments selected.
+            $row['IsAssigned'] = 1;
+            $departments[] = $row;
+
+        } elseif (!isset($assignedToOtherGroups[$departmentId])) {
+            // Include only departments not assigned to another group.
+            $row['IsAssigned'] = 0;
+            $departments[] = $row;
+        }
+    }
+
+    foreach ($departments as &$row) {
+        $row['DepartmentId'] = (int)$row['DepartmentId'];
+        $row['SortOrder'] = (int)$row['SortOrder'];
+        $row['IsAssigned'] = (int)$row['IsAssigned'];
+    }
+    unset($row);
+
+    echo json_encode([
+        'success' => true,
+        'data' => $departments
+    ]);
+}
+
 
 /**
  * Handle Dept Report - Get STD Headcounts

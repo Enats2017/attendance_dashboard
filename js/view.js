@@ -7,7 +7,8 @@ class AttendanceView {
         this.TABS = [
             { id: "feature", label: "Dashboard", icon: "ph-house" },
             { id: "units", label: "Units List", icon: "ph-buildings", roles: ["master"] }, 
-            { id: "dept_designation_mapping", label: "Dept-Designation Mapping", icon: "ph-map-trifold", roles: ["master"] },
+            { id: "dept_designation_mapping", label: "Dept-Designation Mapping", icon: "ph-map-trifold", },
+            { id: "department_groups", label: "Department Groups", icon: "ph-folders", },
             { id: "all", label: "Attendance Logs", icon: "ph-list-dashes" },
             { id: "age", label: "Age Analysis", icon: "ph-user-circle" },
             { id: "company", label: "Company Stats", icon: "ph-buildings" },
@@ -133,32 +134,57 @@ class AttendanceView {
 				<div class="main-content">
 					${this._renderTopbar(state)}
 					<div class="content-body">
-                        ${(state.activeTab !== "feature" && state.activeTab !== "units" && state.activeTab !== "dept_designation_mapping") ? this._renderFilters(state.filters, filterOpts, state) : ""}
+                        ${(state.activeTab !== "feature" && state.activeTab !== "units" && state.activeTab !== "dept_designation_mapping" && state.activeTab !== "department_groups") ? this._renderFilters(state.filters, filterOpts, state) : ""}
                         ${
                             state.activeTab === "designation"
-                                ? this._renderDesignationFamilySummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "age"
-                                ? this._renderAgeSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "company"
-                                ? this._renderCompanySummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "dept"
-                                ? this._renderDeptSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "gender"
-                                ? this._renderGenderSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "latein"
-                                ? this._renderLateInSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "earlyout"
-                                ? this._renderEarlyOutSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "shift"
-                                ? this._renderShiftSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "manual_punch"
-                                ? this._renderManualPunchSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "night"
-                                ? this._renderNightSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "staff"
-                                ? this._renderStaffSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "worker"
-                                ? this._renderWorkerSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "resigned"
-                                ? this._renderResignedSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "newjoined"
-                                ? this._renderNewJoinedSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "special"
-                                ? "" : state.activeTab === "data_quality"
-                                ? "" : state.activeTab === "designation_order"
-                                ? "" : state.activeTab === "sort_order"
-                                ? "" : state.activeTab === "designation_families"
-                                ? "" : state.activeTab === "dept_designation_mapping"
-                                ? "" : state.activeTab === "overtime"
-                                ? "" : state.activeTab === "units"
-                                ? "" : state.activeTab === "feature"
-                                ? this._renderDashboardSummaryCards(emps, stats, model, logs, empMap) : this._renderSummaryCards(stats, emps, logs, empMap, model)
+                                ? this._renderDesignationFamilySummaryCards(emps, stats, model, logs, empMap)
+                                : state.activeTab === "age"
+                                ? this._renderAgeSummaryCards(emps, stats, model, logs, empMap)
+                                : state.activeTab === "company"
+                                ? this._renderCompanySummaryCards(emps, stats, model, logs, empMap)
+                                : state.activeTab === "dept"
+                                ? this._renderDeptSummaryCards(emps, stats, model, logs, empMap)
+                                : state.activeTab === "gender"
+                                ? this._renderGenderSummaryCards(emps, stats, model, logs, empMap)
+                                : state.activeTab === "latein"
+                                ? this._renderLateInSummaryCards(emps, stats, model, logs, empMap)
+                                : state.activeTab === "earlyout"
+                                ? this._renderEarlyOutSummaryCards(emps, stats, model, logs, empMap)
+                                : state.activeTab === "shift"
+                                ? this._renderShiftSummaryCards(emps, stats, model, logs, empMap)
+                                : state.activeTab === "manual_punch"
+                                ? this._renderManualPunchSummaryCards(emps, stats, model, logs, empMap)
+                                : state.activeTab === "night"
+                                ? this._renderNightSummaryCards(emps, stats, model, logs, empMap)
+                                : state.activeTab === "staff"
+                                ? this._renderStaffSummaryCards(emps, stats, model, logs, empMap)
+                                : state.activeTab === "worker"
+                                ? this._renderWorkerSummaryCards(emps, stats, model, logs, empMap)
+                                : state.activeTab === "resigned"
+                                ? this._renderResignedSummaryCards(emps, stats, model, logs, empMap)
+                                : state.activeTab === "newjoined"
+                                ? this._renderNewJoinedSummaryCards(emps, stats, model, logs, empMap)
+                                : state.activeTab === "special"
+                                ? ""
+                                : state.activeTab === "data_quality"
+                                ? ""
+                                : state.activeTab === "designation_order"
+                                ? ""
+                                : state.activeTab === "sort_order"
+                                ? ""
+                                : state.activeTab === "designation_families"
+                                ? ""
+                                : state.activeTab === "dept_designation_mapping"
+                                ? ""
+                                : state.activeTab === "department_groups"
+                                ? ""
+                                : state.activeTab === "overtime"
+                                ? ""
+                                : state.activeTab === "units"
+                                ? ""
+                                : state.activeTab === "feature"
+                                ? this._renderDashboardSummaryCards(emps, stats, model, logs, empMap)
+                                : this._renderSummaryCards(stats, emps, logs, empMap, model)
                         }
 						
                         <div id="stat-card-drilldown" class="stat-drilldown-panel" style="display:none;"></div>
@@ -6430,6 +6456,25 @@ class AttendanceView {
                         </div>
                     `,
                 };
+                break;
+            case "department_groups":
+                content = {
+                    html: `
+                        <div class="designation-order-container">
+                            <h2 class="section-title">
+                                <i class="ph-fill ph-folders"></i>
+                                Department Groups
+                            </h2>
+
+                            <div id="department-groups-content">
+                                <div style="display:flex; align-items:center; gap:12px; padding:32px; color:#64748b;">
+                                    <div class="auth-spinner" style="width:24px; height:24px; border-width:2px; border-top-color:#6366f1;"></div>
+                                    <span>Loading department groups...</span>
+                                </div>
+                            </div>
+                        </div>
+                    `,
+                };
                 break;            
             case "designation_families":
                 content = {
@@ -6476,6 +6521,11 @@ class AttendanceView {
         }
         if (tabId === "dept_designation_mapping") {
             setTimeout(() => this._initDeptDesignationMappingTab(model), 50);
+            return;
+        }
+
+        if (tabId === "department_groups") {
+            setTimeout(() => this._initDepartmentGroupsTab(model), 50);
             return;
         }
 
@@ -12348,188 +12398,663 @@ class AttendanceView {
     }
 
     
-    async _initDeptDesignationMappingTab(model, selectedUserId = null) {
-        const contentEl = document.getElementById("dept-designation-mapping-content");
+    async _initDepartmentGroupsTab(model, selectedUserId = null) {
+        const contentEl = document.getElementById("department-groups-content");
         if (!contentEl) return;
-        
-        this._ddmModel = model;
+
+        this._departmentGroupsModel = model;
+
         const isMaster = !!model.state.isMaster;
         let targetUserId = null;
         let subAdminList = [];
-        
+
         if (isMaster) {
             const subAdminRes = await model.fetchSubAdmins();
+
             if (subAdminRes && subAdminRes.success) {
                 subAdminList = model.state.subAdminList || [];
             }
 
-            targetUserId = selectedUserId !== null ? Number(selectedUserId) : Number((window.HRMS_USER || {}).id || 0);
+            targetUserId = selectedUserId !== null
+                ? Number(selectedUserId)
+                : Number((window.HRMS_USER || {}).id || 0);
         }
 
-        const res = await model.fetchDepartmentDesignationMapping(targetUserId);
+        this._departmentGroupsTargetUserId = targetUserId;
+        this._departmentGroupsSubAdmins = subAdminList;
 
-        if (!res || !res.success) {
+        contentEl.innerHTML = `
+            <div style="padding:32px;color:#64748b;">
+                Loading department groups...
+            </div>
+        `;
+
+        try {
+            const res = await model.fetchDepartmentGroups(targetUserId);
+
+            if (!res || !res.success) {
+                contentEl.innerHTML = `
+                    <div style="padding:18px;border-radius:10px;
+                        background:#fff1f2;color:#dc2626;">
+                        ${this._escapeAttr(
+                            res?.message || res?.error || "Failed to load department groups."
+                        )}
+                    </div>
+                `;
+                return;
+            }
+
+            const groups = Array.isArray(res.data) ? res.data : [];
+
+            this._departmentGroupsData = groups;
+
+            this._renderDepartmentGroupsTab(
+                model,
+                groups,
+                isMaster,
+                subAdminList,
+                targetUserId
+            );
+        } catch (error) {
+            console.error("Department Groups Error:", error);
+
             contentEl.innerHTML = `
-                <div style="background:#fff1f2; color:#dc2626; padding:18px; border-radius:10px; border:1px solid #fecdd3; font-weight:600;">
-                    Error loading mapping
+                <div style="padding:18px;color:#dc2626;">
+                    Failed to load department groups. Please try again.
                 </div>
             `;
-            return;
         }
+    }
 
-        const { departments, designations, mappingByDept, targetUserId: resolvedTargetUserId } = res;
-        const pageSize = 25;
-        let currentPage = 1;
-        let filteredDepartments = [...departments];
-        let searchText = "";
-        this._currentDeptDesigMappingData = { departments, designations, mappingByDept, targetUserId: resolvedTargetUserId };
-        
-        this._ddmSelectedUserId = resolvedTargetUserId;
-        this._ddmSubAdminList = subAdminList;
 
-        contentEl.innerHTML = `<div id="ddm-main-container"></div>`;
+    _renderDepartmentGroupsTab(
+        model,
+        groups,
+        isMaster,
+        subAdminList,
+        targetUserId
+    ) {
+        const contentEl = document.getElementById("department-groups-content");
+        if (!contentEl) return;
 
-        const mainContainer = document.getElementById("ddm-main-container");
+        const escape = value => this._escapeAttr(String(value ?? ""));
 
-        const renderTable = () => {
-            const start = (currentPage - 1) * pageSize;
-            const end = start + pageSize;
-            const pageDepartments = filteredDepartments.slice(start, end);
+        contentEl.innerHTML = `
+            <div style="background:#fff;border:1px solid #e5e7eb;
+                border-radius:14px;overflow:hidden;">
 
-            mainContainer.innerHTML = `
-                <div style="background:#ffffff; border-radius:14px; border:1px solid #e5e7eb; box-shadow:0 4px 12px rgba(0,0,0,.06); overflow:hidden;">
-                    <div style="padding:22px 25px; border-bottom:1px solid #e5e7eb; display:flex; justify-content:space-between; align-items:center;">
-                        <div>
-                            <h2 style="margin:0; font-size:24px; font-weight:700; color:#111827;">Department Designation Mapping</h2>
-                            <p style="margin:6px 0 0; color:#6b7280; font-size:14px;">Manage designation mapping department wise.</p>
-                        </div>
+                <div style="padding:22px 24px;border-bottom:1px solid #e5e7eb;
+                    display:flex;justify-content:space-between;align-items:center;
+                    gap:16px;flex-wrap:wrap;">
 
+                    <div>
+                        <h3 style="margin:0;font-size:22px;color:#111827;">
+                            Department Groups
+                        </h3>
+                        <p style="margin:6px 0 0;color:#6b7280;">
+                            Organize permitted departments into groups.
+                        </p>
+                    </div>
+
+                    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
                         ${
-                            isMaster ? `
-                                <div style="display:flex; align-items:center; gap:10px;">
-                                    <label for="ddm-user-selector" style="font-size:14px; font-weight:600; color:#374151;">Manage For:</label>
-                                    <select id="ddm-user-selector" style="min-width:240px; padding:10px 14px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; background:#fff; outline:none;">
-                                        <option value="${(window.HRMS_USER || {}).id || ""}">My Own Mapping</option>
+                            isMaster
+                                ? `
+                                    <label for="dg-user-selector"
+                                        style="font-weight:600;color:#374151;">
+                                        Manage For:
+                                    </label>
+
+                                    <select id="dg-user-selector"
+                                        style="padding:10px 12px;border:1px solid #d1d5db;
+                                        border-radius:8px;background:#fff;min-width:220px;">
+                                        <option value="${escape((window.HRMS_USER || {}).id || "")}">
+                                            My Own Groups
+                                        </option>
+
                                         ${subAdminList.map(user => `
-                                            <option value="${user.id}">
-                                                ${this._escapeAttr(user.name || user.username || user.user_name || "Sub Admin")}
+                                            <option value="${escape(user.id)}">
+                                                ${escape(
+                                                    user.name ||
+                                                    user.username ||
+                                                    user.user_name ||
+                                                    "Sub Admin"
+                                                )}
                                             </option>
                                         `).join("")}
                                     </select>
-                                </div>
-                            `
-                            : ""
+                                `
+                                : ""
                         }
 
+                        <button id="dg-create-btn"
+                            style="padding:10px 16px;background:#4f46e5;color:#fff;
+                            border:0;border-radius:8px;cursor:pointer;font-weight:600;">
+                            + Create Group
+                        </button>
                     </div>
+                </div>
 
-                    <div style="padding:20px; border-bottom:1px solid #e5e7eb;">
-                        <input type="text" value="${searchText}" id="ddm-department-search" placeholder="Search Department..." style="width:320px; padding:10px 14px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; outline:none;">
-                    </div>
+                <div style="padding:20px 24px;">
+                    <input id="dg-search" type="text"
+                        placeholder="Search groups..."
+                        style="width:100%;max-width:360px;padding:10px 12px;
+                        border:1px solid #d1d5db;border-radius:8px;">
 
-                    <div style="overflow:auto;">
-                        <table style="width:100%; border-collapse:collapse;">
+                    <div style="margin-top:18px;overflow-x:auto;">
+                        <table style="width:100%;border-collapse:collapse;">
                             <thead>
-                                <tr style="background:#f8fafc; border-bottom:1px solid #e5e7eb;">
-                                    <th style="padding:16px; text-align:left; font-size:14px; font-weight:700; color:#374151;">Department</th>
-                                    <th style="padding:16px; text-align:center; font-size:14px; font-weight:700; color:#374151;">Assigned</th>
-                                    <th style="padding:16px; text-align:center; font-size:14px; font-weight:700; color:#374151; width:150px;">Action</th>
+                                <tr style="background:#f8fafc;text-align:left;">
+                                    <th style="padding:14px;border-bottom:1px solid #e5e7eb;">
+                                        Group Name
+                                    </th>
+                                    <th style="padding:14px;border-bottom:1px solid #e5e7eb;
+                                        text-align:center;">
+                                        Sort Order
+                                    </th>
+                                    <th style="padding:14px;border-bottom:1px solid #e5e7eb;
+                                        text-align:center;">
+                                        Actions
+                                    </th>
                                 </tr>
                             </thead>
 
-                            <tbody>
-                                ${
-                                    pageDepartments.length > 0 ? pageDepartments.map(dept => {
-                                        const assigned = mappingByDept[dept.id] || [];
-                                        return `
-                                            <tr class="ddm-row" style="border-bottom:1px solid #f1f5f9;">
-                                                <td class="ddm-department-name" style="padding:18px 16px;font-size:15px;font-weight:600;color:#1f2937;">${this._escapeAttr(dept.name)}</td>
-                                                <td style="text-align:center;padding:18px;">
-                                                    <span style="display:inline-flex;justify-content:center;align-items:center;min-width:38px;height:38px;padding:0 12px;border-radius:999px;background:#eef2ff;color:#4338ca;font-weight:700;">
-                                                        ${assigned.length}
-                                                    </span>
-                                                </td>
-                                                <td style="text-align:center;padding:18px;">
-                                                    <button class="ddm-edit-btn" data-id="${dept.id}" style="background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;">
-                                                        Edit
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        `;
-                                    }).join("") : `
-                                        <tr>
-                                            <td colspan="3" style="padding:30px;text-align:center;color:#6b7280;">No departments found.</td>
-                                        </tr>
-                                    `
-                                }
-                            </tbody>
+                            <tbody id="dg-table-body"></tbody>
                         </table>
-
-                        <div style="display:flex; justify-content:center; align-items:center; gap:12px; padding:20px;">
-                            <button id="prev-page" ${currentPage === 1 ? "disabled" : ""} style="padding:8px 16px; cursor:pointer;">
-                                Previous
-                            </button>
-
-                            <span>
-                                Page ${currentPage} of ${Math.ceil(filteredDepartments.length / pageSize)}
-                            </span>
-
-                            <button id="next-page" ${currentPage === Math.ceil(filteredDepartments.length / pageSize) ? "disabled" : ""} style="padding:8px 16px; cursor:pointer;">
-                                Next
-                            </button>
-                        </div>
                     </div>
                 </div>
-            `;
+            </div>
 
-            mainContainer.querySelectorAll(".ddm-edit-btn").forEach(btn => {
-                btn.onclick = () => {
-                    const deptId = Number(btn.dataset.id);
-                    this._renderDeptDesigMappingCheckboxes(deptId);
-                };
+            <div id="dg-form-container"></div>
+        `;
+
+        const userSelector = document.getElementById("dg-user-selector");
+
+        if (userSelector) {
+            userSelector.value = String(
+                targetUserId || (window.HRMS_USER || {}).id || ""
+            );
+
+            userSelector.addEventListener("change", async event => {
+                const nextUserId = event.target.value
+                    ? Number(event.target.value)
+                    : null;
+
+                await this._initDepartmentGroupsTab(model, nextUserId);
             });
+        }
 
-            if (isMaster) {
-                const userSelector = document.getElementById("ddm-user-selector");
-                if (userSelector) {
-                    userSelector.value = String(this._ddmSelectedUserId || (window.HRMS_USER || {}).id ||"");
-                    userSelector.addEventListener("change", async (e) => {
-                        const selectedUserId = e.target.value ? Number(e.target.value) : null;
-                        this._ddmSelectedUserId = selectedUserId;
-                        await this._initDeptDesignationMappingTab(model, selectedUserId);
-                    });
-                }
+        const renderRows = searchText => {
+            const tbody = document.getElementById("dg-table-body");
+            if (!tbody) return;
+
+            const query = (searchText || "").trim().toLowerCase();
+
+            const filteredGroups = groups.filter(group =>
+                String(group.GroupName || "").toLowerCase().includes(query)
+            );
+
+            if (!filteredGroups.length) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="3" style="padding:28px;text-align:center;color:#6b7280;">
+                            ${query ? "No matching groups found." : "No department groups created yet."}
+                        </td>
+                    </tr>
+                `;
+                return;
             }
 
-            const deptSearch = document.getElementById("ddm-department-search");
+            tbody.innerHTML = filteredGroups.map(group => `
+                <tr style="border-bottom:1px solid #f1f5f9;">
+                    <td style="padding:15px;font-weight:600;color:#111827;">
+                        ${escape(group.GroupName)}
+                    </td>
 
-            if (deptSearch) {
-                deptSearch.focus();
-                deptSearch.setSelectionRange(searchText.length, searchText.length);
-                deptSearch.addEventListener("input", (e) => {
-                    searchText = e.target.value.toLowerCase().trim();
-                    filteredDepartments = departments.filter(dept => dept.name .toLowerCase() .includes(searchText));
-                    currentPage = 1;
-                    renderTable();
+                    <td style="padding:15px;text-align:center;">
+                        ${Number(group.SortOrder || 0)}
+                    </td>
+
+                    <td style="padding:15px;text-align:center;white-space:nowrap;">
+                        <button class="dg-edit-btn"
+                            data-id="${Number(group.GroupId)}"
+                            style="padding:8px 13px;background:#eef2ff;color:#4338ca;
+                            border:0;border-radius:7px;cursor:pointer;margin-right:6px;">
+                            Edit
+                        </button>
+
+                        <button class="dg-delete-btn"
+                            data-id="${Number(group.GroupId)}"
+                            style="padding:8px 13px;background:#fff1f2;color:#dc2626;
+                            border:0;border-radius:7px;cursor:pointer;">
+                            Deactivate
+                        </button>
+                    </td>
+                </tr>
+            `).join("");
+
+            tbody.querySelectorAll(".dg-edit-btn").forEach(button => {
+                button.addEventListener("click", () => {
+                    const group = groups.find(item =>
+                        Number(item.GroupId) === Number(button.dataset.id)
+                    );
+
+                    if (group) {
+                        this._renderDepartmentGroupForm(
+                            model,
+                            group,
+                            targetUserId
+                        );
+                    }
                 });
-            }
-
-            document.getElementById("prev-page")?.addEventListener("click", () => {
-                if (currentPage > 1) {
-                    currentPage--;
-                    renderTable();
-                }
             });
 
-            document.getElementById("next-page")?.addEventListener("click", () => {
-                if (currentPage < Math.ceil(filteredDepartments.length / pageSize)) {
-                    currentPage++;
-                    renderTable();
-                }
+            tbody.querySelectorAll(".dg-delete-btn").forEach(button => {
+                button.addEventListener("click", async () => {
+                    const groupId = Number(button.dataset.id);
+                    const group = groups.find(item =>
+                        Number(item.GroupId) === groupId
+                    );
+
+                    if (!group) return;
+
+                    if (!confirm(
+                        `Deactivate department group "${group.GroupName}"?`
+                    )) {
+                        return;
+                    }
+
+                    this.showOverlay("Deactivating department group...");
+
+                    try {
+                        const deleteRes = await model.deleteDepartmentGroup(
+                            groupId,
+                            targetUserId
+                        );
+
+                        this.hideOverlay();
+
+                        if (deleteRes && deleteRes.success) {
+                            this.showToast(
+                                deleteRes.message || "Department group deactivated.",
+                                "success"
+                            );
+
+                            await this._initDepartmentGroupsTab(model, targetUserId);
+                        } else {
+                            this.showToast(
+                                deleteRes?.message ||
+                                deleteRes?.error ||
+                                "Failed to deactivate department group.",
+                                "error"
+                            );
+                        }
+                    } catch (error) {
+                        this.hideOverlay();
+                        console.error("Deactivate Department Group Error:", error);
+                        this.showToast("Failed to deactivate department group.", "error");
+                    }
+                });
             });
         };
 
-        renderTable();
+        document.getElementById("dg-search").addEventListener("input", event => {
+            renderRows(event.target.value);
+        });
+
+        document.getElementById("dg-create-btn").addEventListener("click", () => {
+            this._renderDepartmentGroupForm(model, null, targetUserId);
+        });
+
+        renderRows("");
+    }
+
+
+    async _renderDepartmentGroupForm(model, group = null, targetUserId = null) {
+        const contentEl = document.getElementById("department-groups-content");
+        if (!contentEl) return;
+
+        const groupId = Number(group?.GroupId || 0);
+        const isEditing = groupId > 0;
+        const escape = value => this._escapeAttr(String(value ?? ""));
+
+        // Store current list context so Back returns to the correct user.
+        this._departmentGroupsTargetUserId = targetUserId;
+
+        // Replace the list with a full-page-style form.
+        contentEl.innerHTML = `
+            <div style="min-height:calc(100vh - 180px);background:#fff;
+                border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
+
+                <!-- Page Header -->
+                <div style="padding:20px 26px;border-bottom:1px solid #e5e7eb;
+                    background:#fff;">
+
+                    <button id="dg-back-btn" type="button"
+                        style="display:inline-flex;align-items:center;gap:8px;
+                        padding:9px 13px;background:#f3f4f6;color:#374151;
+                        border:1px solid #e5e7eb;border-radius:8px;
+                        cursor:pointer;font-size:14px;font-weight:600;">
+                        ← Back to Department Groups
+                    </button>
+
+                    <div style="margin-top:22px;">
+                        <h2 style="margin:0;font-size:25px;font-weight:700;
+                            color:#111827;">
+                            ${isEditing ? "Edit Department Group" : "Create Department Group"}
+                        </h2>
+
+                        <p style="margin:8px 0 0;color:#6b7280;font-size:14px;">
+                            ${isEditing
+                                ? "Update the group details and assigned departments."
+                                : "Create a group and assign the departments that belong to it."}
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Form Body -->
+                <div style="padding:26px;max-width:1100px;">
+
+                    <div style="padding:22px;border:1px solid #e5e7eb;
+                        border-radius:12px;background:#fff;">
+
+                        <h3 style="margin:0 0 20px;font-size:17px;color:#111827;">
+                            Basic Information
+                        </h3>
+
+                        <div style="display:grid;
+                            grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+                            gap:20px;">
+
+                            <div>
+                                <label for="dg-group-name"
+                                    style="display:block;margin-bottom:8px;
+                                    color:#374151;font-size:14px;font-weight:600;">
+                                    Group Name <span style="color:#dc2626;">*</span>
+                                </label>
+
+                                <input id="dg-group-name" type="text" maxlength="100"
+                                    value="${escape(group?.GroupName || "")}"
+                                    placeholder="Enter group name"
+                                    style="box-sizing:border-box;width:100%;padding:12px;
+                                    border:1px solid #d1d5db;border-radius:8px;
+                                    font-size:14px;outline:none;">
+                            </div>
+
+                            <div>
+                                <label for="dg-sort-order"
+                                    style="display:block;margin-bottom:8px;
+                                    color:#374151;font-size:14px;font-weight:600;">
+                                    Sort Order
+                                </label>
+
+                                <input id="dg-sort-order" type="number"
+                                    value="${Number(group?.SortOrder || 0)}"
+                                    placeholder="0"
+                                    style="box-sizing:border-box;width:100%;padding:12px;
+                                    border:1px solid #d1d5db;border-radius:8px;
+                                    font-size:14px;outline:none;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top:22px;padding:22px;
+                        border:1px solid #e5e7eb;border-radius:12px;background:#fff;">
+
+                        <div style="display:flex;justify-content:space-between;
+                            align-items:flex-start;gap:14px;flex-wrap:wrap;">
+
+                            <div>
+                                <h3 style="margin:0;font-size:17px;color:#111827;">
+                                    Assign Departments
+                                </h3>
+                                <p style="margin:7px 0 0;color:#6b7280;font-size:13px;">
+                                    Select the departments to include in this group.
+                                </p>
+                            </div>
+
+                            <span id="dg-selected-count"
+                                style="padding:6px 10px;background:#eef2ff;
+                                color:#4338ca;border-radius:20px;font-size:13px;
+                                font-weight:600;">
+                                0 selected
+                            </span>
+                        </div>
+
+                        <div style="margin-top:18px;">
+                            <input id="dg-department-search" type="text"
+                                placeholder="Search departments..."
+                                style="box-sizing:border-box;width:100%;max-width:420px;
+                                padding:11px 12px;border:1px solid #d1d5db;
+                                border-radius:8px;font-size:14px;">
+
+                            <div id="dg-department-list"
+                                style="margin-top:16px;display:grid;
+                                grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+                                gap:12px;">
+                                <div style="padding:18px;color:#64748b;">
+                                    Loading departments...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Footer Actions -->
+                    <div style="display:flex;justify-content:flex-end;
+                        align-items:center;gap:12px;margin-top:24px;
+                        padding:18px 0;flex-wrap:wrap;">
+
+                        <button id="dg-cancel-btn" type="button"
+                            style="padding:12px 20px;background:#fff;color:#374151;
+                            border:1px solid #d1d5db;border-radius:8px;
+                            cursor:pointer;font-weight:600;">
+                            Cancel
+                        </button>
+
+                        <button id="dg-save-btn" type="button"
+                            style="padding:12px 22px;background:#4f46e5;color:#fff;
+                            border:0;border-radius:8px;cursor:pointer;
+                            font-weight:600;">
+                            ${isEditing ? "Save Changes" : "Create Group"}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Back and Cancel return to the list.
+        const goBackToList = async () => {
+            await this._initDepartmentGroupsTab(model, targetUserId);
+        };
+
+        document.getElementById("dg-back-btn").addEventListener("click", goBackToList);
+        document.getElementById("dg-cancel-btn").addEventListener("click", goBackToList);
+
+        // Load departments from the existing model method.
+        let departmentData = [];
+
+        try {
+            const deptRes = await model.fetchGroupDepartments(groupId, targetUserId);
+
+            if (!deptRes || !deptRes.success) {
+                document.getElementById("dg-department-list").innerHTML = `
+                    <div style="padding:16px;color:#dc2626;">
+                        ${escape(
+                            deptRes?.message ||
+                            deptRes?.error ||
+                            "Failed to load departments."
+                        )}
+                    </div>
+                `;
+                return;
+            }
+
+            departmentData = Array.isArray(deptRes.data) ? deptRes.data : [];
+
+            const renderDepartments = searchText => {
+                const listEl = document.getElementById("dg-department-list");
+                if (!listEl) return;
+
+                const query = String(searchText || "").trim().toLowerCase();
+
+                const filtered = departmentData.filter(dept =>
+                    String(dept.DepartmentFName || "")
+                        .toLowerCase()
+                        .includes(query)
+                );
+
+                const selectedCount = departmentData.filter(dept => {
+                    const checkbox = listEl.querySelector(
+                        `.dg-department-checkbox[value="${Number(dept.DepartmentId)}"]`
+                    );
+
+                    return checkbox ? checkbox.checked : Number(dept.IsAssigned) === 1;
+                }).length;
+
+                const countEl = document.getElementById("dg-selected-count");
+                if (countEl) countEl.textContent = `${selectedCount} selected`;
+
+                if (!filtered.length) {
+                    listEl.innerHTML = `
+                        <div style="padding:18px;color:#6b7280;">
+                            No departments found.
+                        </div>
+                    `;
+                    return;
+                }
+
+                listEl.innerHTML = filtered.map(dept => `
+                    <label style="display:flex;align-items:center;gap:11px;
+                        padding:14px;border:1px solid #e5e7eb;border-radius:9px;
+                        background:#fff;cursor:pointer;">
+
+                        <input class="dg-department-checkbox" type="checkbox"
+                            value="${Number(dept.DepartmentId)}"
+                            ${Number(dept.IsAssigned) === 1 ? "checked" : ""}
+                            style="width:16px;height:16px;accent-color:#4f46e5;">
+
+                        <span style="font-size:14px;color:#374151;">
+                            ${escape(dept.DepartmentFName || "")}
+                        </span>
+                    </label>
+                `).join("");
+
+                listEl.querySelectorAll(".dg-department-checkbox").forEach(checkbox => {
+                    checkbox.addEventListener("change", () => {
+                        const count = listEl.querySelectorAll(
+                            ".dg-department-checkbox:checked"
+                        ).length;
+
+                        const countEl = document.getElementById("dg-selected-count");
+                        if (countEl) countEl.textContent = `${count} selected`;
+                    });
+                });
+
+                // Count all selected departments, including any hidden by search.
+                const allSelected = departmentData.filter(dept => {
+                    const checkbox = listEl.querySelector(
+                        `.dg-department-checkbox[value="${Number(dept.DepartmentId)}"]`
+                    );
+
+                    return checkbox
+                        ? checkbox.checked
+                        : Number(dept.IsAssigned) === 1;
+                }).length;
+
+                if (countEl) countEl.textContent = `${allSelected} selected`;
+            };
+
+            renderDepartments("");
+
+            document.getElementById("dg-department-search")
+                .addEventListener("input", event => {
+                    // Preserve checkbox selections while filtering.
+                    const selectedIds = new Set(
+                        Array.from(
+                            document.querySelectorAll(".dg-department-checkbox:checked")
+                        ).map(cb => Number(cb.value))
+                    );
+
+                    departmentData.forEach(dept => {
+                        dept.IsAssigned = selectedIds.has(Number(dept.DepartmentId)) ? 1 : 0;
+                    });
+
+                    renderDepartments(event.target.value);
+                });
+
+        } catch (error) {
+            console.error("Load Group Departments Error:", error);
+
+            const listEl = document.getElementById("dg-department-list");
+            if (listEl) {
+                listEl.innerHTML = `
+                    <div style="padding:16px;color:#dc2626;">
+                        Failed to load departments.
+                    </div>
+                `;
+            }
+            return;
+        }
+
+        // Save group and selected departments.
+        document.getElementById("dg-save-btn").addEventListener("click", async () => {
+            const groupName = document.getElementById("dg-group-name").value.trim();
+            const sortOrder = Number.parseInt(
+                document.getElementById("dg-sort-order").value || "0",
+                10
+            );
+
+            if (!groupName) {
+                alert("Please enter a group name.");
+                document.getElementById("dg-group-name").focus();
+                return;
+            }
+
+            const departmentIds = Array.from(
+                document.querySelectorAll(".dg-department-checkbox:checked")
+            ).map(cb => Number(cb.value));
+
+            const saveButton = document.getElementById("dg-save-btn");
+            saveButton.disabled = true;
+            saveButton.textContent = "Saving...";
+
+            this.showOverlay("Saving department group...");
+
+            try {
+                const saveRes = await model.saveDepartmentGroup(
+                    groupId,
+                    groupName,
+                    Number.isFinite(sortOrder) ? sortOrder : 0,
+                    departmentIds,
+                    targetUserId
+                );
+
+                this.hideOverlay();
+
+                if (saveRes && saveRes.success) {
+                    alert(saveRes.message || "Department group saved successfully.");
+                    await this._initDepartmentGroupsTab(model, targetUserId);
+                } else {
+                    alert(
+                        saveRes?.message ||
+                        saveRes?.error ||
+                        "Failed to save department group."
+                    );
+
+                    saveButton.disabled = false;
+                    saveButton.textContent = isEditing ? "Save Changes" : "Create Group";
+                }
+            } catch (error) {
+                this.hideOverlay();
+                console.error("Save Department Group Error:", error);
+                alert("Failed to save department group.");
+
+                saveButton.disabled = false;
+                saveButton.textContent = isEditing ? "Save Changes" : "Create Group";
+            }
+        });
+
+        contentEl.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
     _renderDeptDesigMappingCheckboxes(deptId) {
