@@ -219,7 +219,7 @@ switch ($action) {
     case 'save_departments_order':
         handleSaveDepartmentsOrder($input);
         break;
-        
+
     case 'get_designation_global_order':
         handleGetDesignationGlobalOrder();
         break;
@@ -4140,68 +4140,74 @@ function handleGetReport($input) {
         return;
     }
  
+    
     $tempDesig = [];
+
     if ($stmtDesig) {
         while ($row = sqlsrv_fetch_array($stmtDesig, SQLSRV_FETCH_ASSOC)) {
-
             $deptId = intval($row['DepartmentId']);
+            $designationId = intval($row['DesignationId']);
 
-            $tempDesig[$deptId][] = [
-                'id' => intval($row['DesignationId']),
-                'name' => $row['DesignationsName'],
-                'sortOrder' => intval($row['DesigSortOrder']),
-                'parentId' => $row['ParentDesignationId'] !== null
-                    ? intval($row['ParentDesignationId'])
-                    : null
-            ];
+            if (!isset($tempDesig[$deptId][$designationId])) {
+                $tempDesig[$deptId][$designationId] = [
+                    'id' => $designationId,
+                    'name' => $row['DesignationsName'],
+                    'sortOrder' => intval($row['DesigSortOrder']),
+                    'parentId' => $row['ParentDesignationId'] !== null ? intval($row['ParentDesignationId']) : null
+                ];
+            }
         }
     }
 
     $desigByDept = [];
     $reportingDesigMap = [];
-    foreach ($tempDesig as $deptId => $designations) {
-        $designationMap = [];
-        foreach ($designations as $d) {
-            $designationMap[$d['id']] = $d;
-        }
 
-        foreach ($designations as $d) {
-            $currentId = $d['id'];
+    foreach ($tempDesig as $deptId => $designations) {
+        $designationMap = $designations;
+
+        foreach ($designationMap as $designationId => $d) {
+            $currentId = $designationId;
             $visited = [];
+
             while (isset($designationMap[$currentId]) && $designationMap[$currentId]['parentId'] !== null) {
                 if (isset($visited[$currentId])) {
                     break;
                 }
+
                 $visited[$currentId] = true;
                 $currentId = $designationMap[$currentId]['parentId'];
             }
 
-            $reportingDesigMap[$deptId][$d['id']] = $currentId;
+            $reportingDesigMap[$deptId][$designationId] = $currentId;
         }
 
-        foreach ($designations as $d) {
+        foreach ($designationMap as $d) {
             if ($d['parentId'] === null) {
                 $d['parentName'] = null;
                 $desigByDept[$deptId][] = $d;
             }
         }
 
-        usort($desigByDept[$deptId], function ($a, $b) {
-            $aEmpty = empty($a['sortOrder']);
-            $bEmpty = empty($b['sortOrder']);
+        if (!empty($desigByDept[$deptId])) {
+            usort($desigByDept[$deptId], function ($a, $b) {
+                $aEmpty = empty($a['sortOrder']);
+                $bEmpty = empty($b['sortOrder']);
 
-            if ($aEmpty != $bEmpty) {
-                return $aEmpty ? 1 : -1;
-            }
-            if ($a['sortOrder'] != $b['sortOrder']) {
-                return $a['sortOrder'] <=> $b['sortOrder'];
-            }
+                if ($aEmpty != $bEmpty) {
+                    return $aEmpty ? 1 : -1;
+                }
 
-            return strcmp($a['name'], $b['name']);
-        });
+                if ($a['sortOrder'] != $b['sortOrder']) {
+                    return $a['sortOrder'] <=> $b['sortOrder'];
+                }
+
+                return strcmp($a['name'], $b['name']);
+            });
+        }
     }
 
     $numDays = $toDay - $fromDay + 1;
+
     $summary = [
         'total_present' => array_fill($fromDay, $numDays, 0),
         'present' => array_fill($fromDay, $numDays, 0),
