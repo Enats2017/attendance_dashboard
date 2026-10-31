@@ -136,6 +136,10 @@ switch ($action) {
         handleDeleteDepartmentGroup($input);
         break;
 
+    case 'set_department_group_status':
+        handleSetDepartmentGroupStatus($input);
+        break;
+
     case 'get_group_departments':
         handleGetGroupDepartments($input);
         break;
@@ -3201,6 +3205,53 @@ function AutoDepartmentDesignationMappings($sqlConn, $targetUserId, $locationLis
     return true;
 }
 
+function resolveDepartmentGroupScopeIds($conn, $input) {
+    $loggedInUserId = (int)($_SESSION['userId'] ?? 0);
+    $targetUserId = $loggedInUserId;
+    $isMaster = !empty($_SESSION['isMaster']);
+
+    if ($isMaster) {
+        $targetUserId = (int)($input['targetUserId'] ?? $input['subadmin_user_id'] ?? $loggedInUserId);
+        if ($targetUserId <= 0) {
+            $targetUserId = $loggedInUserId;
+        }
+    }
+
+    if ($isMaster && $targetUserId !== $loggedInUserId) {
+        $stmt = sqlsrv_query($conn, "SELECT DepartmentId FROM UserDepartments WHERE UserId = ?", [$targetUserId]);
+        if ($stmt === false) {
+            return false;
+        }
+
+        $departments = [];
+        while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+            $departments[] = (int)$row['DepartmentId'];
+        }
+    } else {
+        $departments = $_SESSION['departments'] ?? [];
+    }
+
+    $ids = array_values(array_unique(array_filter(
+        array_map('intval', $departments),
+        function ($id) {
+            return $id > 0;
+        }
+    )));
+
+    if (empty($ids)) {
+        $stmt = sqlsrv_query($conn, "SELECT DepartmentId FROM Departments WITH (NOLOCK) WHERE RecordStatus = 1");
+        if ($stmt === false) {
+            return false;
+        }
+
+        while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+            $ids[] = (int)$row['DepartmentId'];
+        }
+    }
+
+    return $ids;
+}
+
 function handleGetDepartmentGroups($input = []) {
     $conn = getSQLServer();
 
@@ -3225,7 +3276,7 @@ function handleGetDepartmentGroups($input = []) {
         return;
     }
 
-    $sql = "SELECT GroupId, GroupName, SortOrder, Status, CreatedAt, UpdatedAt FROM DepartmentGroups WHERE UserId = ? AND Status = 1 ORDER BY SortOrder, GroupId";
+    $sql = "SELECT g.GroupId, g.GroupName, g.SortOrder, g.Status, g.CreatedAt, g.UpdatedAt, (SELECT COUNT(DISTINCT m.DepartmentId) FROM DepartmentGroupMapping m WHERE m.GroupId = g.GroupId AND m.Status = 1) AS DepartmentCount FROM DepartmentGroups g WHERE g.UserId = ? ORDER BY g.SortOrder, g.GroupId";
 
     $stmt = sqlsrv_query($conn, $sql, [$targetUserId]);
 
@@ -3240,7 +3291,13 @@ function handleGetDepartmentGroups($input = []) {
     $groups = [];
 
     while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
-        $groups[] = $row;
+        $groups[] = [
+            'GroupId' => (int)$row['GroupId'],
+            'GroupName' => $row['GroupName'],
+            'SortOrder' => (int)$row['SortOrder'],
+            'Status' => (int)$row['Status'],
+            'DepartmentCount' => (int)$row['DepartmentCount']
+        ];
     }
 
     echo json_encode([
@@ -3304,7 +3361,15 @@ function handleSaveDepartmentGroup($input) {
         )
     ));
 
-    $allowedDepartmentIds = array_map('intval', $_SESSION['departments'] ?? []);
+    $allowedDepartmentIds = resolveDepartmentGroupScopeIds($conn, $input);
+
+    if ($allowedDepartmentIds === false) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Failed to resolve department access'
+        ]);
+        return;
+    }
 
     $invalidDepartmentIds = array_diff($departmentIds, $allowedDepartmentIds);
 
@@ -3314,6 +3379,38 @@ function handleSaveDepartmentGroup($input) {
             'message' => 'Invalid department selection'
         ]);
         return;
+    }
+
+    if (!empty($departmentIds)) {
+        $in = implode(',', array_fill(0, count($departmentIds), '?'));
+        $duplicateSql = "SELECT DISTINCT m.DepartmentId, d.DepartmentFName, g.GroupName FROM DepartmentGroupMapping m INNER JOIN DepartmentGroups g ON g.GroupId = m.GroupId INNER JOIN Departments d ON d.DepartmentId = m.DepartmentId WHERE g.UserId = ? AND g.Status = 1 AND m.Status = 1 AND m.GroupId <> ? AND m.DepartmentId IN ($in) ORDER BY d.DepartmentFName, g.GroupName";
+        $duplicateStmt = sqlsrv_query($conn, $duplicateSql, array_merge([$targetUserId, $groupId], $departmentIds));
+
+        if ($duplicateStmt === false) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Failed to validate department group assignments'
+            ]);
+            return;
+        }
+
+        $conflicts = [];
+        while ($row = sqlsrv_fetch_array($duplicateStmt, SQLSRV_FETCH_ASSOC)) {
+            $conflicts[] = [
+                'departmentId' => (int)$row['DepartmentId'],
+                'departmentName' => $row['DepartmentFName'],
+                'groupName' => $row['GroupName']
+            ];
+        }
+
+        if (!empty($conflicts)) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Some selected departments are already assigned to another active group',
+                'conflicts' => $conflicts
+            ]);
+            return;
+        }
     }
 
     if (!sqlsrv_begin_transaction($conn)) {
@@ -3506,6 +3603,76 @@ function handleDeleteDepartmentGroup($input) {
     ]);
 }
 
+function handleSetDepartmentGroupStatus($input) {
+    $conn = getSQLServer();
+    $loggedInUserId = (int)($_SESSION['userId'] ?? 0);
+    $isMaster = !empty($_SESSION['isMaster']);
+    $targetUserId = $isMaster ? (int)($input['targetUserId'] ?? 0) : $loggedInUserId;
+    $groupId = (int)($input['groupId'] ?? 0);
+    $status = isset($input['status']) ? (int)$input['status'] : -1;
+
+    if ($loggedInUserId <= 0) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Unauthorized'
+        ]);
+        return;
+    }
+
+    if ($targetUserId <= 0 || $groupId <= 0 || !in_array($status, [0, 1], true)) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Group, target user, and valid status are required'
+        ]);
+        return;
+    }
+
+    if ($status === 1) {
+        $conflictSql = "SELECT TOP 1 m.DepartmentId FROM DepartmentGroupMapping m INNER JOIN DepartmentGroups g ON g.GroupId = m.GroupId WHERE g.GroupId = ? AND g.UserId = ? AND m.Status = 1 AND EXISTS (SELECT 1 FROM DepartmentGroupMapping otherMapping INNER JOIN DepartmentGroups otherGroup ON otherGroup.GroupId = otherMapping.GroupId WHERE otherMapping.DepartmentId = m.DepartmentId AND otherMapping.Status = 1 AND otherGroup.UserId = g.UserId AND otherGroup.Status = 1 AND otherGroup.GroupId <> g.GroupId)";
+        $conflictStmt = sqlsrv_query($conn, $conflictSql, [$groupId, $targetUserId]);
+
+        if ($conflictStmt === false) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Failed to validate department group assignments'
+            ]);
+            return;
+        }
+
+        if (sqlsrv_fetch_array($conflictStmt, SQLSRV_FETCH_ASSOC)) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Cannot activate this group because one or more departments are assigned to another active group'
+            ]);
+            return;
+        }
+    }
+
+    $sql = "UPDATE DepartmentGroups SET Status = ?, UpdatedAt = GETDATE() WHERE GroupId = ? AND UserId = ?";
+    $stmt = sqlsrv_query($conn, $sql, [$status, $groupId, $targetUserId]);
+
+    if ($stmt === false) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Failed to update department group status'
+        ]);
+        return;
+    }
+
+    if (sqlsrv_rows_affected($stmt) === 0) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Department group not found'
+        ]);
+        return;
+    }
+
+    echo json_encode([
+        'success' => true,
+        'message' => $status === 1 ? 'Department group activated successfully' : 'Department group deactivated successfully'
+    ]);
+}
+
 
 
 function handleGetGroupDepartments($input = []) {
@@ -3534,13 +3701,15 @@ function handleGetGroupDepartments($input = []) {
         return;
     }
 
-    $departmentIds = $_SESSION['departments'] ?? [];
+    $departmentIds = resolveDepartmentGroupScopeIds($conn, $input);
 
-    $departmentIds = array_values(array_unique(
-        array_filter(array_map('intval', $departmentIds), function ($id) {
-            return $id > 0;
-        })
-    ));
+    if ($departmentIds === false) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Failed to resolve department access'
+        ]);
+        return;
+    }
 
     if (empty($departmentIds)) {
         echo json_encode([
@@ -3567,7 +3736,7 @@ function handleGetGroupDepartments($input = []) {
         }
     }
 
-    $sql = "SELECT DepartmentId, DepartmentFName, SortOrder FROM Departments WHERE DepartmentId IN ($inClause) ORDER BY SortOrder, DepartmentFName";
+    $sql = "SELECT DepartmentId, DepartmentFName, SortOrder FROM Departments WHERE RecordStatus = 1 AND DepartmentId IN ($inClause) ORDER BY CASE WHEN SortOrder IS NULL THEN 1 ELSE 0 END, SortOrder, DepartmentFName";
 
     $stmt = sqlsrv_query($conn, $sql, $departmentIds);
 
@@ -3586,7 +3755,7 @@ function handleGetGroupDepartments($input = []) {
     }
 
     // Fetch departments already assigned to active groups of this user.
-    $assignedSql = "SELECT m.DepartmentId, m.GroupId FROM DepartmentGroupMapping m INNER JOIN DepartmentGroups g ON g.GroupId = m.GroupId WHERE g.UserId = ? AND g.Status = 1 AND m.Status = 1";
+    $assignedSql = "SELECT m.DepartmentId, m.GroupId, g.GroupName FROM DepartmentGroupMapping m INNER JOIN DepartmentGroups g ON g.GroupId = m.GroupId WHERE g.UserId = ? AND g.Status = 1 AND m.Status = 1";
 
     $assignedStmt = sqlsrv_query($conn, $assignedSql, [$targetUserId]);
 
@@ -3600,6 +3769,7 @@ function handleGetGroupDepartments($input = []) {
 
     $assignedToOtherGroups = [];
     $assignedToCurrentGroup = [];
+    $assignedGroupNames = [];
 
     while ($row = sqlsrv_fetch_array($assignedStmt, SQLSRV_FETCH_ASSOC)) {
         $departmentId = (int)$row['DepartmentId'];
@@ -3609,31 +3779,26 @@ function handleGetGroupDepartments($input = []) {
             $assignedToCurrentGroup[$departmentId] = true;
         } else {
             $assignedToOtherGroups[$departmentId] = true;
+            $assignedGroupNames[$departmentId] = $row['GroupName'];
         }
     }
 
-    // Build the final department list.
+    // Include all in-scope active departments; mark assignments that belong to another active group.
     $departments = [];
 
     foreach ($allDepartments as $row) {
         $departmentId = (int)$row['DepartmentId'];
-
-        if (isset($assignedToCurrentGroup[$departmentId])) {
-            // Keep this group's own departments selected.
-            $row['IsAssigned'] = 1;
-            $departments[] = $row;
-
-        } elseif (!isset($assignedToOtherGroups[$departmentId])) {
-            // Include only departments not assigned to another group.
-            $row['IsAssigned'] = 0;
-            $departments[] = $row;
-        }
+        $row['IsAssigned'] = isset($assignedToCurrentGroup[$departmentId]) ? 1 : 0;
+        $row['IsAssignedToOtherGroup'] = isset($assignedToOtherGroups[$departmentId]) ? 1 : 0;
+        $row['AssignedGroupName'] = $assignedGroupNames[$departmentId] ?? null;
+        $departments[] = $row;
     }
 
     foreach ($departments as &$row) {
         $row['DepartmentId'] = (int)$row['DepartmentId'];
         $row['SortOrder'] = (int)$row['SortOrder'];
         $row['IsAssigned'] = (int)$row['IsAssigned'];
+        $row['IsAssignedToOtherGroup'] = (int)$row['IsAssignedToOtherGroup'];
     }
     unset($row);
 

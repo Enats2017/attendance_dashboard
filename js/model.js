@@ -1660,6 +1660,36 @@
             }
         }
 
+        async setDepartmentGroupStatus(groupId, status, targetUserId = null) {
+            try {
+                const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
+                url.searchParams.set('action', 'set_department_group_status');
+
+                const payload = {
+                    action: 'set_department_group_status',
+                    groupId,
+                    status
+                };
+
+                if (targetUserId) {
+                    payload.targetUserId = targetUserId;
+                }
+
+                const response = await fetch(url.toString(), {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                return await response.json();
+            } catch (error) {
+                console.error('Set Department Group Status Error:', error);
+                return { success: false, message: error.message };
+            }
+        }
+
+
         async fetchDesignationGlobalOrder() {
             try {
                 const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
