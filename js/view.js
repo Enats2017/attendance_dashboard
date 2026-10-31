@@ -7,8 +7,7 @@ class AttendanceView {
         this.TABS = [
             { id: "feature", label: "Dashboard", icon: "ph-house" },
             { id: "units", label: "Units List", icon: "ph-buildings", roles: ["master"] }, 
-            { id: "dept_designation_mapping", label: "Dept-Designation Mapping", icon: "ph-map-trifold", },
-            { id: "department_groups", label: "Department Groups", icon: "ph-folders", },
+            { id: "dept_designation_mapping", label: "Dept-Designation Mapping", icon: "ph-map-trifold" },
             { id: "all", label: "Attendance Logs", icon: "ph-list-dashes" },
             { id: "age", label: "Age Analysis", icon: "ph-user-circle" },
             { id: "company", label: "Company Stats", icon: "ph-buildings" },
@@ -129,73 +128,48 @@ class AttendanceView {
         this._staffWorkerStats = { ...(state.staffWorkerStats || {}) };
 
         this.app.innerHTML = `
-			<div class="dashboard-layout">
-				${this._renderSidebar(state.activeTab)}
-				<div class="main-content">
-					${this._renderTopbar(state)}
-					<div class="content-body">
-                        ${(state.activeTab !== "feature" && state.activeTab !== "units" && state.activeTab !== "dept_designation_mapping" && state.activeTab !== "department_groups") ? this._renderFilters(state.filters, filterOpts, state) : ""}
+            <div class="dashboard-layout">
+                ${this._renderSidebar(state.activeTab)}
+                <div class="main-content">
+                    ${this._renderTopbar(state)}
+                    <div class="content-body">
+                        ${(state.activeTab !== "feature" && state.activeTab !== "units" && state.activeTab !== "dept_designation_mapping") ? this._renderFilters(state.filters, filterOpts, state) : ""}
                         ${
                             state.activeTab === "designation"
-                                ? this._renderDesignationFamilySummaryCards(emps, stats, model, logs, empMap)
-                                : state.activeTab === "age"
-                                ? this._renderAgeSummaryCards(emps, stats, model, logs, empMap)
-                                : state.activeTab === "company"
-                                ? this._renderCompanySummaryCards(emps, stats, model, logs, empMap)
-                                : state.activeTab === "dept"
-                                ? this._renderDeptSummaryCards(emps, stats, model, logs, empMap)
-                                : state.activeTab === "gender"
-                                ? this._renderGenderSummaryCards(emps, stats, model, logs, empMap)
-                                : state.activeTab === "latein"
-                                ? this._renderLateInSummaryCards(emps, stats, model, logs, empMap)
-                                : state.activeTab === "earlyout"
-                                ? this._renderEarlyOutSummaryCards(emps, stats, model, logs, empMap)
-                                : state.activeTab === "shift"
-                                ? this._renderShiftSummaryCards(emps, stats, model, logs, empMap)
-                                : state.activeTab === "manual_punch"
-                                ? this._renderManualPunchSummaryCards(emps, stats, model, logs, empMap)
-                                : state.activeTab === "night"
-                                ? this._renderNightSummaryCards(emps, stats, model, logs, empMap)
-                                : state.activeTab === "staff"
-                                ? this._renderStaffSummaryCards(emps, stats, model, logs, empMap)
-                                : state.activeTab === "worker"
-                                ? this._renderWorkerSummaryCards(emps, stats, model, logs, empMap)
-                                : state.activeTab === "resigned"
-                                ? this._renderResignedSummaryCards(emps, stats, model, logs, empMap)
-                                : state.activeTab === "newjoined"
-                                ? this._renderNewJoinedSummaryCards(emps, stats, model, logs, empMap)
-                                : state.activeTab === "special"
-                                ? ""
-                                : state.activeTab === "data_quality"
-                                ? ""
-                                : state.activeTab === "designation_order"
-                                ? ""
-                                : state.activeTab === "sort_order"
-                                ? ""
-                                : state.activeTab === "designation_families"
-                                ? ""
-                                : state.activeTab === "dept_designation_mapping"
-                                ? ""
-                                : state.activeTab === "department_groups"
-                                ? ""
-                                : state.activeTab === "overtime"
-                                ? ""
-                                : state.activeTab === "units"
-                                ? ""
-                                : state.activeTab === "feature"
-                                ? this._renderDashboardSummaryCards(emps, stats, model, logs, empMap)
-                                : this._renderSummaryCards(stats, emps, logs, empMap, model)
+                                ? this._renderDesignationFamilySummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "age"
+                                ? this._renderAgeSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "company"
+                                ? this._renderCompanySummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "dept"
+                                ? this._renderDeptSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "gender"
+                                ? this._renderGenderSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "latein"
+                                ? this._renderLateInSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "earlyout"
+                                ? this._renderEarlyOutSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "shift"
+                                ? this._renderShiftSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "manual_punch"
+                                ? this._renderManualPunchSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "night"
+                                ? this._renderNightSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "staff"
+                                ? this._renderStaffSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "worker"
+                                ? this._renderWorkerSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "resigned"
+                                ? this._renderResignedSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "newjoined"
+                                ? this._renderNewJoinedSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "special"
+                                ? "" : state.activeTab === "data_quality"
+                                ? "" : state.activeTab === "designation_order"
+                                ? "" : state.activeTab === "sort_order"
+                                ? "" : state.activeTab === "designation_families"
+                                ? "" : state.activeTab === "dept_designation_mapping"
+                                ? "" : state.activeTab === "overtime"
+                                ? "" : state.activeTab === "units"
+                                ? "" : state.activeTab === "feature"
+                                ? this._renderDashboardSummaryCards(emps, stats, model, logs, empMap) : this._renderSummaryCards(stats, emps, logs, empMap, model)
                         }
-						
+                        
                         <div id="stat-card-drilldown" class="stat-drilldown-panel" style="display:none;"></div>
-						<div class="tab-pane-container">
-							${this._renderTabContent(state.activeTab, logs, emps, empMap, state.filters, state.data.counts, model)}
-						</div>
-					</div>
-				</div>
-			</div>
-			<div id="drilldown-overlay" class="overlay hidden"></div>
-		`;
+                        <div class="tab-pane-container">
+                            ${this._renderTabContent(state.activeTab, logs, emps, empMap, state.filters, state.data.counts, model)}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="drilldown-overlay" class="overlay hidden"></div>
+        `;
 
         this._restoreFilterValues(state.filters);
         this._initChartRendering(state.activeTab, logs, emps, empMap, state.filters, state.data.counts, model, myToken);
@@ -444,30 +418,30 @@ class AttendanceView {
         }
 
         tip.innerHTML = `
-			<div style="font-weight:700;margin-bottom:8px;">
-				${label}
-			</div>
+            <div style="font-weight:700;margin-bottom:8px;">
+                ${label}
+            </div>
 
-			<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
-				<span style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block;"></span> Present: 
-				<b style="margin-left:auto;">${stats.present}</b>
-			</div>
-			
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
-				<span style="width:8px;height:8px;border-radius:50%;background:#f59e0b;display:inline-block;"></span> Half Present: 
-				<b style="margin-left:auto;">${stats.half}</b>
-			</div>
-			
+                <span style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block;"></span> Present: 
+                <b style="margin-left:auto;">${stats.present}</b>
+            </div>
+            
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
-				<span style="width:8px;height:8px;border-radius:50%;background:#8b5cf6;display:inline-block;"></span> WO Present: 
-				<b style="margin-left:auto;">${stats.woPresent}</b>
-			</div>
-			
+                <span style="width:8px;height:8px;border-radius:50%;background:#f59e0b;display:inline-block;"></span> Half Present: 
+                <b style="margin-left:auto;">${stats.half}</b>
+            </div>
+            
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
-				<span style="width:8px;height:8px;border-radius:50%;background:#eab308;display:inline-block;"></span> WO Half Present: 
-				<b style="margin-left:auto;">${stats.woHalfPresent}</b>
-			</div>
-			
+                <span style="width:8px;height:8px;border-radius:50%;background:#8b5cf6;display:inline-block;"></span> WO Present: 
+                <b style="margin-left:auto;">${stats.woPresent}</b>
+            </div>
+            
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+                <span style="width:8px;height:8px;border-radius:50%;background:#eab308;display:inline-block;"></span> WO Half Present: 
+                <b style="margin-left:auto;">${stats.woHalfPresent}</b>
+            </div>
+            
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
                 <span style="width:8px;height:8px;border-radius:50%;background:#3b82f6;display:inline-block;"></span> Weekly Off: 
                 <b style="margin-left:auto;">${stats.weeklyOff}</b>
@@ -482,12 +456,12 @@ class AttendanceView {
                 <span style="width:8px;height:8px;border-radius:50%;background:#f43f5e;display:inline-block;"></span> Absent: 
                 <b style="margin-left:auto;">${stats.absent}</b>
             </div>
-			
+            
             <div style="display:flex;align-items:center;gap:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.15);">
-				<span style="width:8px;height:8px;border-radius:50%;background:#94a3b8;display:inline-block;"></span> Total: 
-				<b style="margin-left:auto;">${stats.total}</b>
-			</div>
-		`;
+                <span style="width:8px;height:8px;border-radius:50%;background:#94a3b8;display:inline-block;"></span> Total: 
+                <b style="margin-left:auto;">${stats.total}</b>
+            </div>
+        `;
 
         tip.style.display = "block";
         tip.style.left = e.clientX + 16 + "px";
@@ -503,36 +477,36 @@ class AttendanceView {
 
     _renderSidebar(activeTab) {
         return `
-			<aside class="sidebar">
-				<div class="sidebar-header">
-					<div class="logo-box">
-						<i class="ph-fill ph-buildings"></i>
-					</div>
-					<div class="logo-text">
-						<span>HRMS</span>
-						<small>Attendance</small>
-					</div>
-				</div>
-				<nav class="sidebar-nav">
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <div class="logo-box">
+                        <i class="ph-fill ph-buildings"></i>
+                    </div>
+                    <div class="logo-text">
+                        <span>HRMS</span>
+                        <small>Attendance</small>
+                    </div>
+                </div>
+                <nav class="sidebar-nav">
                     ${this._getVisibleTabs().map((tab) => `
-						<button class="nav-item ${activeTab === tab.id ? "active" : ""}" data-tab="${tab.id}">
-							<i class="ph ${tab.icon}"></i>
-							<span>${tab.label}</span>
-						</button>
-					`,).join("")}
-					<button class="nav-item" onclick="window.open('/attendance-dashboard/login/#/dept-attendance', '_blank')">
-						<i class="ph ph-table"></i>
-						<span>Unit HC Report</span>
-					</button>
-				</nav>
-				<div class="sidebar-footer">
-					<button class="btn-logout-alt" onclick="doLogout()">
-						<i class="ph ph-sign-out"></i>
-						<span>Logout System</span>
-					</button>
-				</div>
-			</aside>
-		`;
+                        <button class="nav-item ${activeTab === tab.id ? "active" : ""}" data-tab="${tab.id}">
+                            <i class="ph ${tab.icon}"></i>
+                            <span>${tab.label}</span>
+                        </button>
+                    `,).join("")}
+                    <button class="nav-item" onclick="window.open('/attendance-dashboard/login/#/dept-attendance', '_blank')">
+                        <i class="ph ph-table"></i>
+                        <span>Unit HC Report</span>
+                    </button>
+                </nav>
+                <div class="sidebar-footer">
+                    <button class="btn-logout-alt" onclick="doLogout()">
+                        <i class="ph ph-sign-out"></i>
+                        <span>Logout System</span>
+                    </button>
+                </div>
+            </aside>
+        `;
     }
     
 
@@ -6415,16 +6389,16 @@ class AttendanceView {
             case "designation_order":
                 content = {
                     html: `
-						<div class="designation-order-container">
-							<h2 class="section-title"><i class="ph-fill ph-sliders"></i> Designations Order Settings</h2>
-							<div id="designation-order-content">
-								<div style="display:flex; align-items:center; gap:12px; padding:32px; color:#64748b;">
-									<div class="auth-spinner" style="width:24px; height:24px; border-width:2px; border-top-color:#6366f1;"></div>
-									<span>Loading designations data...</span>
-								</div>
-							</div>
-						</div>
-					`,
+                        <div class="designation-order-container">
+                            <h2 class="section-title"><i class="ph-fill ph-sliders"></i> Designations Order Settings</h2>
+                            <div id="designation-order-content">
+                                <div style="display:flex; align-items:center; gap:12px; padding:32px; color:#64748b;">
+                                    <div class="auth-spinner" style="width:24px; height:24px; border-width:2px; border-top-color:#6366f1;"></div>
+                                    <span>Loading designations data...</span>
+                                </div>
+                            </div>
+                        </div>
+                    `,
                 };
                 break;
             case "sort_order":
@@ -6451,25 +6425,6 @@ class AttendanceView {
                                 <div style="display:flex; align-items:center; gap:12px; padding:32px; color:#64748b;">
                                     <div class="auth-spinner" style="width:24px; height:24px; border-width:2px; border-top-color:#6366f1;"></div>
                                     <span>Loading mapping data...</span>
-                                </div>
-                            </div>
-                        </div>
-                    `,
-                };
-                break;
-            case "department_groups":
-                content = {
-                    html: `
-                        <div class="designation-order-container">
-                            <h2 class="section-title">
-                                <i class="ph-fill ph-folders"></i>
-                                Department Groups
-                            </h2>
-
-                            <div id="department-groups-content">
-                                <div style="display:flex; align-items:center; gap:12px; padding:32px; color:#64748b;">
-                                    <div class="auth-spinner" style="width:24px; height:24px; border-width:2px; border-top-color:#6366f1;"></div>
-                                    <span>Loading department groups...</span>
                                 </div>
                             </div>
                         </div>
@@ -6521,11 +6476,6 @@ class AttendanceView {
         }
         if (tabId === "dept_designation_mapping") {
             setTimeout(() => this._initDeptDesignationMappingTab(model), 50);
-            return;
-        }
-
-        if (tabId === "department_groups") {
-            setTimeout(() => this._initDepartmentGroupsTab(model), 50);
             return;
         }
 
@@ -7340,17 +7290,17 @@ class AttendanceView {
 
     _chartCard(id, icon, iconClass, title, hint) {
         return `
-			<div class="chart-card">
-				<div class="chart-card-header">
-					<div class="chart-card-title">
-						<div class="chart-card-icon ${iconClass || "violet"}">${icon}</div>
-						<h3>${title}</h3>
-					</div>
-					${hint ? `<span class="chart-card-drill">🖱 ${hint}</span>` : ""}
-				</div>
-				<div class="chart-body"><div id="${id}"></div></div>
-			</div>
-		`;
+            <div class="chart-card">
+                <div class="chart-card-header">
+                    <div class="chart-card-title">
+                        <div class="chart-card-icon ${iconClass || "violet"}">${icon}</div>
+                        <h3>${title}</h3>
+                    </div>
+                    ${hint ? `<span class="chart-card-drill">🖱 ${hint}</span>` : ""}
+                </div>
+                <div class="chart-body"><div id="${id}"></div></div>
+            </div>
+        `;
     }
 
     
@@ -7393,27 +7343,27 @@ class AttendanceView {
     _renderFeature(counts) {
         return {
             html: `
-				<h2 class="section-title"><i class="ph-fill ph-chart-bar"></i> Employee Entry/Exit Overview</h2>
-				<div class="summary-cards" style="margin-bottom:24px; display:flex; gap:16px;">
-					<div class="stat-card info" style="flex:1">
-						<div class="stat-icon"><i class="ph ph-sign-in"></i></div>
-						<div class="stat-content">
-							<span class="stat-label">Total In Punches</span>
-							<span class="stat-value">${counts.in || 0}</span>
-						</div>
-					</div>
-					<div class="stat-card accent" style="flex:1">
-						<div class="stat-icon"><i class="ph ph-sign-out"></i></div>
-						<div class="stat-content">
-							<span class="stat-label">Total Out Punches</span>
-							<span class="stat-value">${counts.out || 0}</span>
-						</div>
-					</div>
-				</div>
-				<div class="charts-grid">
-					${this._chartCard("ch-feat-io", '<i class="ph-fill ph-chart-pie-slice"></i>', "sky", "In vs Out Distribution")}
-				</div>
-			`,
+                <h2 class="section-title"><i class="ph-fill ph-chart-bar"></i> Employee Entry/Exit Overview</h2>
+                <div class="summary-cards" style="margin-bottom:24px; display:flex; gap:16px;">
+                    <div class="stat-card info" style="flex:1">
+                        <div class="stat-icon"><i class="ph ph-sign-in"></i></div>
+                        <div class="stat-content">
+                            <span class="stat-label">Total In Punches</span>
+                            <span class="stat-value">${counts.in || 0}</span>
+                        </div>
+                    </div>
+                    <div class="stat-card accent" style="flex:1">
+                        <div class="stat-icon"><i class="ph ph-sign-out"></i></div>
+                        <div class="stat-content">
+                            <span class="stat-label">Total Out Punches</span>
+                            <span class="stat-value">${counts.out || 0}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="charts-grid">
+                    ${this._chartCard("ch-feat-io", '<i class="ph-fill ph-chart-pie-slice"></i>', "sky", "In vs Out Distribution")}
+                </div>
+            `,
 
             // ← This was missing entirely
             renderCharts: () => {
@@ -7835,18 +7785,18 @@ class AttendanceView {
 
         if (!logs || logs.length === 0) {
             container.innerHTML = `
-				<div class="drilldown-box">
-					<div class="drilldown-header">
-						<span class="drilldown-title">🔍 ${title}</span>
-						<div class="drilldown-btn-group">
-							<button class="btn-drill btn-drill-back" onclick="AppController.view.closeDrillDown()">
-								← Back
-							</button>
-						</div>
-					</div>
-					<p style="padding:32px; color:#6b7280;">No records found.</p>
-				</div>
-			`;
+                <div class="drilldown-box">
+                    <div class="drilldown-header">
+                        <span class="drilldown-title">🔍 ${title}</span>
+                        <div class="drilldown-btn-group">
+                            <button class="btn-drill btn-drill-back" onclick="AppController.view.closeDrillDown()">
+                                ← Back
+                            </button>
+                        </div>
+                    </div>
+                    <p style="padding:32px; color:#6b7280;">No records found.</p>
+                </div>
+            `;
             return;
         }
 
@@ -7905,88 +7855,88 @@ class AttendanceView {
         const endPage = Math.min(totalPages, currentPage + 2);
         for (let i = startPage; i <= endPage; i++) {
             pageButtons += `
-				<button class="btn-page ${i === currentPage ? "btn-page-active" : ""}"
-					onclick="AppController.view._renderDrillDown(
-						AppController.view._currentDrillLogs,
-						AppController.view._currentDrillTitle,
-						AppController.view._currentDrillEmpMap,
-						${i})">
-					${i}
-				</button>
-			`;
+                <button class="btn-page ${i === currentPage ? "btn-page-active" : ""}"
+                    onclick="AppController.view._renderDrillDown(
+                        AppController.view._currentDrillLogs,
+                        AppController.view._currentDrillTitle,
+                        AppController.view._currentDrillEmpMap,
+                        ${i})">
+                    ${i}
+                </button>
+            `;
         }
 
         container.innerHTML = `
-	        <div class="drilldown-box">
-	            <div class="drilldown-header">
-	                <div class="drilldown-title">
-	                    🔍 ${title}
-	                    <small>${logs.length} records</small>
-	                </div>
-	                <div class="drilldown-btn-group">
-	                    <button class="btn-drill btn-drill-excel"
-	                        onclick="AppController.view.exportExcel(AppController.view._drillData, 'drilldown')">
-	                        ↓ Excel
-	                    </button>
-	                    <button class="btn-drill btn-drill-back"
-	                        onclick="AppController.view.closeDrillDown()">
-	                        ← Back
-	                    </button>
-	                </div>
-	            </div>
+            <div class="drilldown-box">
+                <div class="drilldown-header">
+                    <div class="drilldown-title">
+                        🔍 ${title}
+                        <small>${logs.length} records</small>
+                    </div>
+                    <div class="drilldown-btn-group">
+                        <button class="btn-drill btn-drill-excel"
+                            onclick="AppController.view.exportExcel(AppController.view._drillData, 'drilldown')">
+                            ↓ Excel
+                        </button>
+                        <button class="btn-drill btn-drill-back"
+                            onclick="AppController.view.closeDrillDown()">
+                            ← Back
+                        </button>
+                    </div>
+                </div>
 
-	            <div style="overflow-x:auto;">
-	                <table class="data-table">
-	                    <thead>
-	                        <tr>
-	                            <th>Sr.No</th>
-								<th>Code</th>
-								<th>Name</th>
+                <div style="overflow-x:auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Sr.No</th>
+                                <th>Code</th>
+                                <th>Name</th>
                                 <th>Gender</th>
-								<th>Company</th>
-								<th>Department</th>
+                                <th>Company</th>
+                                <th>Department</th>
                                 <th>Designation</th>
                                 <th>Attendance Date</th>
                                 <th>Age</th>
                                 <th>Shift Group</th>
                                 <th>Shift</th>
-								<th>In Time</th>
-								<th>Out Time</th>
-								<th>Status</th>
-								<th>Action</th>
-	                        </tr>
-	                    </thead>
-	                    <tbody>${rows}</tbody>
-	                </table>
-	            </div>
+                                <th>In Time</th>
+                                <th>Out Time</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
 
-	            <div class="pagination-bar">
-	                <div class="pagination-text">
-	                    Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, logs.length)} of ${logs.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
-	                </div>
-	                <div class="pagination-buttons">
-	                    <button class="btn-page" ${currentPage === 1 ? "disabled" : ""}
-	                        onclick="AppController.view._renderDrillDown(AppController.view._currentDrillLogs,AppController.view._currentDrillTitle,AppController.view._currentDrillEmpMap,1)">
-	                        «
-	                    </button>
-	                    <button class="btn-page" ${currentPage === 1 ? "disabled" : ""}
-	                        onclick="AppController.view._renderDrillDown(AppController.view._currentDrillLogs,AppController.view._currentDrillTitle,AppController.view._currentDrillEmpMap,${currentPage - 1})">
-	                        ‹
-	                    </button>
-	                    ${pageButtons}
-	                    <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""}
-	                        onclick="AppController.view._renderDrillDown(AppController.view._currentDrillLogs,AppController.view._currentDrillTitle,AppController.view._currentDrillEmpMap,${currentPage + 1})">
-	                        ›
-	                    </button>
-	                    <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""}
-	                        onclick="AppController.view._renderDrillDown(AppController.view._currentDrillLogs,AppController.view._currentDrillTitle,AppController.view._currentDrillEmpMap,${totalPages})">
-	                        »
-	                    </button>
-	                </div>
-	            </div>
+                <div class="pagination-bar">
+                    <div class="pagination-text">
+                        Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, logs.length)} of ${logs.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
+                    </div>
+                    <div class="pagination-buttons">
+                        <button class="btn-page" ${currentPage === 1 ? "disabled" : ""}
+                            onclick="AppController.view._renderDrillDown(AppController.view._currentDrillLogs,AppController.view._currentDrillTitle,AppController.view._currentDrillEmpMap,1)">
+                            «
+                        </button>
+                        <button class="btn-page" ${currentPage === 1 ? "disabled" : ""}
+                            onclick="AppController.view._renderDrillDown(AppController.view._currentDrillLogs,AppController.view._currentDrillTitle,AppController.view._currentDrillEmpMap,${currentPage - 1})">
+                            ‹
+                        </button>
+                        ${pageButtons}
+                        <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""}
+                            onclick="AppController.view._renderDrillDown(AppController.view._currentDrillLogs,AppController.view._currentDrillTitle,AppController.view._currentDrillEmpMap,${currentPage + 1})">
+                            ›
+                        </button>
+                        <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""}
+                            onclick="AppController.view._renderDrillDown(AppController.view._currentDrillLogs,AppController.view._currentDrillTitle,AppController.view._currentDrillEmpMap,${totalPages})">
+                            »
+                        </button>
+                    </div>
+                </div>
 
-	        </div>
-		`;
+            </div>
+        `;
 
         container.scrollIntoView({ behavior: "smooth", block: "start" });
     }
@@ -8324,23 +8274,23 @@ class AttendanceView {
         }).join("");
 
         return `
-			<div class="dept-accordion">
+            <div class="dept-accordion">
                 <div class="dept-acc-legend">
-					<span data-legend="present"><i class="dot present"></i>Present</span>
-					<span data-legend="half"><i class="dot half"></i>Half Present</span>
-					<span data-legend="wopresent"><i class="dot wopresent"></i>WO Present</span>
-					<span data-legend="wohalfpresent"><i class="dot wohalfpresent"></i>WO Half Present</span>
-					<span data-legend="weeklyoff"><i class="dot weeklyoff"></i>Weekly Off</span>
+                    <span data-legend="present"><i class="dot present"></i>Present</span>
+                    <span data-legend="half"><i class="dot half"></i>Half Present</span>
+                    <span data-legend="wopresent"><i class="dot wopresent"></i>WO Present</span>
+                    <span data-legend="wohalfpresent"><i class="dot wohalfpresent"></i>WO Half Present</span>
+                    <span data-legend="weeklyoff"><i class="dot weeklyoff"></i>Weekly Off</span>
                     <span data-legend="single"><i class="dot single"></i>Single Punch</span>
                     <span data-legend="absent"><i class="dot absent"></i>Absent</span>
-				</div>
+                </div>
 
-				${rowsHtml}
-				<div class="dept-acc-axis">
-					${ticks.map((t) => `<span>${t}</span>`).join("")}
-				</div>
-			</div>
-		`;
+                ${rowsHtml}
+                <div class="dept-acc-axis">
+                    ${ticks.map((t) => `<span>${t}</span>`).join("")}
+                </div>
+            </div>
+        `;
     }
 
 
@@ -8410,12 +8360,12 @@ class AttendanceView {
         }).join("");
 
         expandEl.innerHTML = `
-			<div class="dept-acc-sub-title">🔍 ${dept} — Designation Breakdown</div>
-			${rowsHtml}
-			<div class="dept-acc-sub-axis">
-				${ticks.map((t) => `<span>${t}</span>`).join("")}
-			</div>
-		`;
+            <div class="dept-acc-sub-title">🔍 ${dept} — Designation Breakdown</div>
+            ${rowsHtml}
+            <div class="dept-acc-sub-axis">
+                ${ticks.map((t) => `<span>${t}</span>`).join("")}
+            </div>
+        `;
         expandEl.style.display = "block";
     }
 
@@ -8525,14 +8475,14 @@ class AttendanceView {
         }
         return {
             html: `
-				<h2 class="section-title">
-					<i class="ph-fill ph-users-three"></i>
-					Age-Wise Analysis
-				</h2>
+                <h2 class="section-title">
+                    <i class="ph-fill ph-users-three"></i>
+                    Age-Wise Analysis
+                </h2>
 
-				<div class="charts-grid">
-					${this._chartCard("ch-age-bar", '<i class="ph-fill ph-chart-bar"></i>', "amber", "Attendance by Age Group")}
-				</div>
+                <div class="charts-grid">
+                    ${this._chartCard("ch-age-bar", '<i class="ph-fill ph-chart-bar"></i>', "amber", "Attendance by Age Group")}
+                </div>
 
               <div id="main-table-wrap">
                     ${this._tableHTML("tbl-age", ["Age Group", "Total Emp", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Single Punch", "Absent", "Attendance %"], pageRows, "age-wise", (currentPage - 1) * pageSize)}
@@ -8550,7 +8500,7 @@ class AttendanceView {
                     </div>
                 </div>
                 <div id="drilldown-table" style="margin-top:16px"></div>
-			`,
+            `,
 
             renderCharts: () => {
                 Charts.stacked(
@@ -8751,10 +8701,10 @@ class AttendanceView {
         }
         return {
             html: `
-				<h2 class="section-title"><i class="ph-fill ph-buildings"></i> Company Statistics</h2>
-				<div class="charts-grid">
-					${this._chartCard("ch-comp-bar", '<i class="ph-fill ph-chart-bar"></i>', "violet", "Company Breakdown")}
-				</div>
+                <h2 class="section-title"><i class="ph-fill ph-buildings"></i> Company Statistics</h2>
+                <div class="charts-grid">
+                    ${this._chartCard("ch-comp-bar", '<i class="ph-fill ph-chart-bar"></i>', "violet", "Company Breakdown")}
+                </div>
 
                <div id="main-table-wrap">
                     ${this._tableHTML("tbl-comp", ["Company", "Total", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Single Punch", "Absent", "Rate"], pageRows, "company-wise", (currentPage - 1) * pageSize)}
@@ -8771,9 +8721,9 @@ class AttendanceView {
                         </div>
                     </div>
                 </div>
-				
+                
                 <div id="drilldown-table" style="margin-top:16px"></div>
-			`,
+            `,
 
             renderCharts: () => {
                 Charts.stacked(
@@ -8986,12 +8936,12 @@ class AttendanceView {
         popover.style.zIndex = "50";
 
         popover.innerHTML = `
-			<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-				<strong>🔍 Dept: ${dept} - Designation Breakdown</strong>
-				<button class="btn-drill btn-drill-back" id="dept-desig-popover-close">✕ Close</button>
-			</div>
-			<div id="ch-dept-desig-drill" style="min-height:200px;"></div>
-		`;
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <strong>🔍 Dept: ${dept} - Designation Breakdown</strong>
+                <button class="btn-drill btn-drill-back" id="dept-desig-popover-close">✕ Close</button>
+            </div>
+            <div id="ch-dept-desig-drill" style="min-height:200px;"></div>
+        `;
 
         chartCard.appendChild(popover);
 
@@ -9916,31 +9866,31 @@ class AttendanceView {
         const endPage = Math.min(totalPages, currentPage + 2);
         for (let i = startPage; i <= endPage; i++) {
             pageButtons += `
-				<button class="btn-page ${i === currentPage ? "btn-page-active" : ""}"
-					onclick="AppController.view.${reRenderFnName}(${i})">
-					${i}
-				</button>
-			`;
+                <button class="btn-page ${i === currentPage ? "btn-page-active" : ""}"
+                    onclick="AppController.view.${reRenderFnName}(${i})">
+                    ${i}
+                </button>
+            `;
         }
 
         return `
-			<table class="data-table" id="${tableId}">
-				<thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
-				<tbody>${trs}</tbody>
-			</table>
-			<div class="pagination-bar">
-				<div class="pagination-text">
-					Showing ${rows.length ? (currentPage - 1) * pageSize + 1 : 0}–${Math.min(currentPage * pageSize, rows.length)} of ${rows.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
-				</div>
-				<div class="pagination-buttons">
-					<button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view.${reRenderFnName}(1)">«</button>
-					<button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view.${reRenderFnName}(${currentPage - 1})">‹</button>
-					${pageButtons}
-					<button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view.${reRenderFnName}(${currentPage + 1})">›</button>
-					<button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view.${reRenderFnName}(${totalPages})">»</button>
-				</div>
-			</div>
-		`;
+            <table class="data-table" id="${tableId}">
+                <thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
+                <tbody>${trs}</tbody>
+            </table>
+            <div class="pagination-bar">
+                <div class="pagination-text">
+                    Showing ${rows.length ? (currentPage - 1) * pageSize + 1 : 0}–${Math.min(currentPage * pageSize, rows.length)} of ${rows.length} records &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
+                </div>
+                <div class="pagination-buttons">
+                    <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view.${reRenderFnName}(1)">«</button>
+                    <button class="btn-page" ${currentPage === 1 ? "disabled" : ""} onclick="AppController.view.${reRenderFnName}(${currentPage - 1})">‹</button>
+                    ${pageButtons}
+                    <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view.${reRenderFnName}(${currentPage + 1})">›</button>
+                    <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""} onclick="AppController.view.${reRenderFnName}(${totalPages})">»</button>
+                </div>
+            </div>
+        `;
     }
 
     
@@ -11146,9 +11096,9 @@ class AttendanceView {
 
         panel.style.display = "block";
         panel.innerHTML = `
-			<div class="drilldown-box">
-				<div class="drilldown-header">
-					<div class="drilldown-title">
+            <div class="drilldown-box">
+                <div class="drilldown-header">
+                    <div class="drilldown-title">
                         ${(() => {
                             if (titleMap[key]) return titleMap[key];
                             if (key.startsWith("dashCat_")) return "🏷️ " + key.replace("dashCat_", "").replace(/_/g, " — ");
@@ -11193,50 +11143,50 @@ class AttendanceView {
                             return key.replace(/_/g, " — ");
                         })()}
                         <small>${items.length} records</small>
-					</div>
-					<div class="drilldown-btn-group">
-						<button class="btn-drill btn-drill-excel" onclick="AppController.view.exportExcel(AppController.view._statCardExportData, '${key}-employees')">
-							↓ Excel
-						</button>
+                    </div>
+                    <div class="drilldown-btn-group">
+                        <button class="btn-drill btn-drill-excel" onclick="AppController.view.exportExcel(AppController.view._statCardExportData, '${key}-employees')">
+                            ↓ Excel
+                        </button>
                         ${this._statCardFullItems && this._statCardFullItems.length ? `
                             <button class="btn-drill btn-drill-excel" onclick="AppController.view.downloadFullExcel()">
                                 ↓ Full Excel
                             </button>
                         ` : ""}
-						<button class="btn-drill btn-drill-back" onclick="${closeHandler}">
+                        <button class="btn-drill btn-drill-back" onclick="${closeHandler}">
                             ✕ Close
                         </button>
-					</div>
-				</div>
+                    </div>
+                </div>
 
-				<div style="overflow-x:auto;">
-					<table class="data-table">
-						<thead><tr>${ths}</tr></thead>
-						<tbody>
-							${trs || `<tr><td colspan="${headers.length}" style="text-align:center;padding:32px;color:#94a3b8;">No records found</td></tr>`}
-						</tbody>
-					</table>
-				</div>
+                <div style="overflow-x:auto;">
+                    <table class="data-table">
+                        <thead><tr>${ths}</tr></thead>
+                        <tbody>
+                            ${trs || `<tr><td colspan="${headers.length}" style="text-align:center;padding:32px;color:#94a3b8;">No records found</td></tr>`}
+                        </tbody>
+                    </table>
+                </div>
 
-				<div class="pagination-bar">
-					<div class="pagination-text">
-						Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, items.length)}
-						of ${items.length} &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
-					</div>
-					<div class="pagination-buttons">
-						<button class="btn-page" ${currentPage === 1 ? "disabled" : ""}
+                <div class="pagination-bar">
+                    <div class="pagination-text">
+                        Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, items.length)}
+                        of ${items.length} &nbsp;·&nbsp; Page ${currentPage} of ${totalPages}
+                    </div>
+                    <div class="pagination-buttons">
+                        <button class="btn-page" ${currentPage === 1 ? "disabled" : ""}
                             onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, 1, '${containerId}', '${closeHandler}', AppController.view._statCardFullItems, AppController.view._statCardFullExportName)">«</button>
-						<button class="btn-page" ${currentPage === 1 ? "disabled" : ""}
+                        <button class="btn-page" ${currentPage === 1 ? "disabled" : ""}
                             onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, ${currentPage - 1}, '${containerId}', '${closeHandler}', AppController.view._statCardFullItems, AppController.view._statCardFullExportName)">‹</button>
-						${pageButtons}
+                        ${pageButtons}
                         <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""}
-							onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, ${currentPage + 1}, '${containerId}', '${closeHandler}', AppController.view._statCardFullItems, AppController.view._statCardFullExportName)">›</button>
-						<button class="btn-page" ${currentPage === totalPages ? "disabled" : ""}
-							onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, ${totalPages}, '${containerId}', '${closeHandler}', AppController.view._statCardFullItems, AppController.view._statCardFullExportName)">»</button>
-					</div>
-				</div>
-			</div>
-		`;
+                            onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, ${currentPage + 1}, '${containerId}', '${closeHandler}', AppController.view._statCardFullItems, AppController.view._statCardFullExportName)">›</button>
+                        <button class="btn-page" ${currentPage === totalPages ? "disabled" : ""}
+                            onclick="AppController.view._renderStatCardDrilldown(AppController.view._statCardKey, AppController.view._statCardItems, ${totalPages}, '${containerId}', '${closeHandler}', AppController.view._statCardFullItems, AppController.view._statCardFullExportName)">»</button>
+                    </div>
+                </div>
+            </div>
+        `;
         panel.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
@@ -11258,252 +11208,252 @@ class AttendanceView {
         const response = await model.fetchDesignationsOrder();
         if (!response || !response.success) {
             contentEl.innerHTML = `
-				<div class="alert-error-panel" style="padding: 24px; background: rgba(244,63,94,0.05); border: 1px solid rgba(244,63,94,0.2); color: #f43f5e; border-radius: var(--radius-md); display: flex; align-items: center; gap: 12px; font-weight: 500;">
-					<i class="ph-fill ph-warning-circle" style="font-size: 24px;"></i>
-					<span><strong>Error loading designations:</strong> ${response ? response.message : "Unknown error"}</span>
-				</div>
-			`;
+                <div class="alert-error-panel" style="padding: 24px; background: rgba(244,63,94,0.05); border: 1px solid rgba(244,63,94,0.2); color: #f43f5e; border-radius: var(--radius-md); display: flex; align-items: center; gap: 12px; font-weight: 500;">
+                    <i class="ph-fill ph-warning-circle" style="font-size: 24px;"></i>
+                    <span><strong>Error loading designations:</strong> ${response ? response.message : "Unknown error"}</span>
+                </div>
+            `;
             return;
         }
 
         const departments = response.data;
         if (!departments || departments.length === 0) {
             contentEl.innerHTML = `
-				<div class="empty-state-panel" style="padding: 48px; text-align: center; color: var(--text-muted); background: var(--white); border-radius: var(--radius-md); box-shadow: var(--shadow-sm);">
-					<i class="ph ph-mask-sad" style="font-size: 48px; color: #cbd5e1; margin-bottom: 12px; display: block;"></i>
-					<span>No departments or designations found.</span>
-				</div>
-			`;
+                <div class="empty-state-panel" style="padding: 48px; text-align: center; color: var(--text-muted); background: var(--white); border-radius: var(--radius-md); box-shadow: var(--shadow-sm);">
+                    <i class="ph ph-mask-sad" style="font-size: 48px; color: #cbd5e1; margin-bottom: 12px; display: block;"></i>
+                    <span>No departments or designations found.</span>
+                </div>
+            `;
             return;
         }
 
         let html = `
-			<style>
-				.designation-order-header {
-					display: flex;
-					justify-content: space-between;
-					align-items: center;
-					margin-bottom: 24px;
-					background: var(--white);
-					padding: 20px 24px;
-					border-radius: var(--radius-md);
-					box-shadow: var(--shadow-sm);
-					border: 1px solid var(--border-color);
-					gap: 16px;
-					flex-wrap: wrap;
-				}
-				.designation-order-header-text h3 {
-					font-size: 16px;
-					font-weight: 700;
-					color: var(--text-main);
-					margin-bottom: 4px;
-				}
-				.designation-order-header-text p {
-					font-size: 13px;
-					color: var(--text-muted);
-				}
-				.designation-order-controls {
-					display: flex;
-					align-items: center;
-					gap: 12px;
-				}
-				.select-order-dept {
-					min-width: 240px;
-					padding: 10px 16px;
-					border: 1px solid var(--border-color);
-					border-radius: 10px;
-					font-weight: 500;
-					font-size: 14px;
-					outline: none;
-					background: var(--white);
-					color: var(--text-main);
-					cursor: pointer;
-					transition: border-color 0.2s, box-shadow 0.2s;
-				}
-				.select-order-dept:focus {
-					border-color: var(--primary);
-					box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
-				}
-				.order-card-container {
-					max-width: 600px;
-					margin: 0 auto 32px auto;
-				}
-				.dept-order-card {
-					background: var(--white);
-					border: 1px solid var(--border-color);
-					border-radius: var(--radius-md);
-					box-shadow: var(--shadow-sm);
-					padding: 28px;
-					display: flex;
-					flex-direction: column;
-					gap: 20px;
-					animation: fadeIn 0.25s ease-out;
-				}
-				@keyframes fadeIn {
-					from { opacity: 0; transform: translateY(8px); }
-					to { opacity: 1; transform: translateY(0); }
-				}
-				.dept-order-title {
-					font-size: 17px;
-					font-weight: 700;
-					color: var(--text-main);
-					display: flex;
-					align-items: center;
-					justify-content: space-between;
-					border-bottom: 1px solid var(--border-color);
-					padding-bottom: 16px;
-				}
-				.dept-order-title-left {
-					display: flex;
-					align-items: center;
-					gap: 12px;
-				}
-				.dept-order-title-left i {
-					font-size: 22px;
-					color: var(--primary);
-					background: rgba(99, 102, 241, 0.1);
-					width: 42px;
-					height: 42px;
-					border-radius: 10px;
-					display: flex;
-					align-items: center;
-					justify-content: center;
-				}
-				.dept-order-badge {
-					font-size: 12px;
-					font-weight: 600;
-					background: #f1f5f9;
-					color: #475569;
-					padding: 4px 10px;
-					border-radius: 9999px;
-				}
-				.desig-order-list {
-					display: flex;
-					flex-direction: column;
-					gap: 12px;
-				}
-				.desig-order-item {
-					display: flex;
-					align-items: center;
-					justify-content: space-between;
-					padding: 12px 16px;
-					background: #f8fafc;
-					border: 1px solid #f1f5f9;
-					border-radius: 10px;
-					font-size: 14px;
-					transition: border-color 0.2s, background-color 0.2s;
-				}
-				.desig-order-item:hover {
-					background: #f1f5f9;
-					border-color: #e2e8f0;
-				}
-				.desig-order-name-wrap {
-					display: flex;
-					align-items: center;
-					gap: 10px;
-				}
-				.desig-order-drag-handle {
-					color: #94a3b8;
-					font-size: 18px;
-				}
-				.desig-order-name {
-					font-weight: 600;
-					color: #334155;
-				}
-				.desig-order-control-wrap {
-					display: flex;
-					align-items: center;
-					background: var(--white);
-					border: 1px solid #cbd5e1;
-					border-radius: 8px;
-					overflow: hidden;
-					box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-				}
-				.desig-order-btn {
-					background: none;
-					border: none;
-					width: 32px;
-					height: 32px;
-					display: flex;
-					align-items: center;
-					justify-content: center;
-					color: #64748b;
-					cursor: pointer;
-					transition: background-color 0.15s, color 0.15s;
-					font-size: 14px;
-				}
-				.desig-order-btn:hover {
-					background: #f1f5f9;
-					color: var(--primary);
-				}
-				.desig-order-btn:active {
-					background: #e2e8f0;
-				}
-				.desig-order-input {
-					width: 44px;
-					border: none;
-					border-left: 1px solid #cbd5e1;
-					border-right: 1px solid #cbd5e1;
-					text-align: center;
-					font-size: 14px;
-					font-weight: 700;
-					color: #0f172a;
-					padding: 4px 0;
-					outline: none;
-					-moz-appearance: textfield;
-				}
-				.desig-order-input::-webkit-outer-spin-button,
-				.desig-order-input::-webkit-inner-spin-button {
-					-webkit-appearance: none;
-					margin: 0;
-				}
-				.btn-order-save {
-					background: var(--primary);
-					color: var(--white);
-					border: none;
-					padding: 10px 20px;
-					border-radius: 10px;
-					font-size: 14px;
-					font-weight: 600;
-					cursor: pointer;
-					display: flex;
-					align-items: center;
-					gap: 8px;
-					box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
-					transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
-				}
-				.btn-order-save:hover {
-					background: var(--primary-hover);
-					box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
-				}
-				.btn-order-save:active {
-					transform: scale(0.97);
-				}
-			</style>
-			<div class="designation-order-header">
-				<div class="designation-order-header-text">
-					<h3>Designations Sorting Order</h3>
-					<p>Set custom sorting priority for designations grouped under each department. Lower numbers show first.</p>
-				</div>
-				<div class="designation-order-controls">
-					<select class="select-order-dept" id="select-order-dept">
-						<option value="">-- Choose Department --</option>
-						${departments.map((d) => `<option value="${d.id}">${d.name}</option>`).join("")}
-					</select>
-					<button class="btn-order-save" id="btn-save-designation-order" style="display: none;">
-						<i class="ph-bold ph-floppy-disk"></i>
-						Save Changes
-					</button>
-				</div>
-			</div>
-			<div id="designation-order-details-container">
-				<div class="empty-state-panel" style="padding: 64px 32px; text-align: center; color: var(--text-muted); background: var(--white); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); border: 1px solid var(--border-color);">
-					<i class="ph ph-hand-pointing" style="font-size: 48px; color: var(--primary); opacity: 0.7; margin-bottom: 16px; display: block; margin-left: auto; margin-right: auto;"></i>
-					<h4 style="font-size: 15px; font-weight: 600; color: var(--text-main); margin-bottom: 4px;">Choose a Department</h4>
-					<p style="font-size: 13px;">Select a department from the dropdown menu above to manage its designation priority.</p>
-				</div>
-			</div>
-		`;
+            <style>
+                .designation-order-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 24px;
+                    background: var(--white);
+                    padding: 20px 24px;
+                    border-radius: var(--radius-md);
+                    box-shadow: var(--shadow-sm);
+                    border: 1px solid var(--border-color);
+                    gap: 16px;
+                    flex-wrap: wrap;
+                }
+                .designation-order-header-text h3 {
+                    font-size: 16px;
+                    font-weight: 700;
+                    color: var(--text-main);
+                    margin-bottom: 4px;
+                }
+                .designation-order-header-text p {
+                    font-size: 13px;
+                    color: var(--text-muted);
+                }
+                .designation-order-controls {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                }
+                .select-order-dept {
+                    min-width: 240px;
+                    padding: 10px 16px;
+                    border: 1px solid var(--border-color);
+                    border-radius: 10px;
+                    font-weight: 500;
+                    font-size: 14px;
+                    outline: none;
+                    background: var(--white);
+                    color: var(--text-main);
+                    cursor: pointer;
+                    transition: border-color 0.2s, box-shadow 0.2s;
+                }
+                .select-order-dept:focus {
+                    border-color: var(--primary);
+                    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+                }
+                .order-card-container {
+                    max-width: 600px;
+                    margin: 0 auto 32px auto;
+                }
+                .dept-order-card {
+                    background: var(--white);
+                    border: 1px solid var(--border-color);
+                    border-radius: var(--radius-md);
+                    box-shadow: var(--shadow-sm);
+                    padding: 28px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 20px;
+                    animation: fadeIn 0.25s ease-out;
+                }
+                @keyframes fadeIn {
+                    from { opacity: 0; transform: translateY(8px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                .dept-order-title {
+                    font-size: 17px;
+                    font-weight: 700;
+                    color: var(--text-main);
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    border-bottom: 1px solid var(--border-color);
+                    padding-bottom: 16px;
+                }
+                .dept-order-title-left {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                }
+                .dept-order-title-left i {
+                    font-size: 22px;
+                    color: var(--primary);
+                    background: rgba(99, 102, 241, 0.1);
+                    width: 42px;
+                    height: 42px;
+                    border-radius: 10px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .dept-order-badge {
+                    font-size: 12px;
+                    font-weight: 600;
+                    background: #f1f5f9;
+                    color: #475569;
+                    padding: 4px 10px;
+                    border-radius: 9999px;
+                }
+                .desig-order-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                }
+                .desig-order-item {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    padding: 12px 16px;
+                    background: #f8fafc;
+                    border: 1px solid #f1f5f9;
+                    border-radius: 10px;
+                    font-size: 14px;
+                    transition: border-color 0.2s, background-color 0.2s;
+                }
+                .desig-order-item:hover {
+                    background: #f1f5f9;
+                    border-color: #e2e8f0;
+                }
+                .desig-order-name-wrap {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                }
+                .desig-order-drag-handle {
+                    color: #94a3b8;
+                    font-size: 18px;
+                }
+                .desig-order-name {
+                    font-weight: 600;
+                    color: #334155;
+                }
+                .desig-order-control-wrap {
+                    display: flex;
+                    align-items: center;
+                    background: var(--white);
+                    border: 1px solid #cbd5e1;
+                    border-radius: 8px;
+                    overflow: hidden;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+                }
+                .desig-order-btn {
+                    background: none;
+                    border: none;
+                    width: 32px;
+                    height: 32px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: #64748b;
+                    cursor: pointer;
+                    transition: background-color 0.15s, color 0.15s;
+                    font-size: 14px;
+                }
+                .desig-order-btn:hover {
+                    background: #f1f5f9;
+                    color: var(--primary);
+                }
+                .desig-order-btn:active {
+                    background: #e2e8f0;
+                }
+                .desig-order-input {
+                    width: 44px;
+                    border: none;
+                    border-left: 1px solid #cbd5e1;
+                    border-right: 1px solid #cbd5e1;
+                    text-align: center;
+                    font-size: 14px;
+                    font-weight: 700;
+                    color: #0f172a;
+                    padding: 4px 0;
+                    outline: none;
+                    -moz-appearance: textfield;
+                }
+                .desig-order-input::-webkit-outer-spin-button,
+                .desig-order-input::-webkit-inner-spin-button {
+                    -webkit-appearance: none;
+                    margin: 0;
+                }
+                .btn-order-save {
+                    background: var(--primary);
+                    color: var(--white);
+                    border: none;
+                    padding: 10px 20px;
+                    border-radius: 10px;
+                    font-size: 14px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
+                    transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
+                }
+                .btn-order-save:hover {
+                    background: var(--primary-hover);
+                    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+                }
+                .btn-order-save:active {
+                    transform: scale(0.97);
+                }
+            </style>
+            <div class="designation-order-header">
+                <div class="designation-order-header-text">
+                    <h3>Designations Sorting Order</h3>
+                    <p>Set custom sorting priority for designations grouped under each department. Lower numbers show first.</p>
+                </div>
+                <div class="designation-order-controls">
+                    <select class="select-order-dept" id="select-order-dept">
+                        <option value="">-- Choose Department --</option>
+                        ${departments.map((d) => `<option value="${d.id}">${d.name}</option>`).join("")}
+                    </select>
+                    <button class="btn-order-save" id="btn-save-designation-order" style="display: none;">
+                        <i class="ph-bold ph-floppy-disk"></i>
+                        Save Changes
+                    </button>
+                </div>
+            </div>
+            <div id="designation-order-details-container">
+                <div class="empty-state-panel" style="padding: 64px 32px; text-align: center; color: var(--text-muted); background: var(--white); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); border: 1px solid var(--border-color);">
+                    <i class="ph ph-hand-pointing" style="font-size: 48px; color: var(--primary); opacity: 0.7; margin-bottom: 16px; display: block; margin-left: auto; margin-right: auto;"></i>
+                    <h4 style="font-size: 15px; font-weight: 600; color: var(--text-main); margin-bottom: 4px;">Choose a Department</h4>
+                    <p style="font-size: 13px;">Select a department from the dropdown menu above to manage its designation priority.</p>
+                </div>
+            </div>
+        `;
 
         contentEl.innerHTML = html;
 
@@ -11516,12 +11466,12 @@ class AttendanceView {
             if (!deptId) {
                 saveBtn.style.display = "none";
                 detailsContainer.innerHTML = `
-					<div class="empty-state-panel" style="padding: 64px 32px; text-align: center; color: var(--text-muted); background: var(--white); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); border: 1px solid var(--border-color);">
-						<i class="ph ph-hand-pointing" style="font-size: 48px; color: var(--primary); opacity: 0.7; margin-bottom: 16px; display: block; margin-left: auto; margin-right: auto;"></i>
-						<h4 style="font-size: 15px; font-weight: 600; color: var(--text-main); margin-bottom: 4px;">Choose a Department</h4>
-						<p style="font-size: 13px;">Select a department from the dropdown menu above to manage its designation priority.</p>
-					</div>
-				`;
+                    <div class="empty-state-panel" style="padding: 64px 32px; text-align: center; color: var(--text-muted); background: var(--white); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); border: 1px solid var(--border-color);">
+                        <i class="ph ph-hand-pointing" style="font-size: 48px; color: var(--primary); opacity: 0.7; margin-bottom: 16px; display: block; margin-left: auto; margin-right: auto;"></i>
+                        <h4 style="font-size: 15px; font-weight: 600; color: var(--text-main); margin-bottom: 4px;">Choose a Department</h4>
+                        <p style="font-size: 13px;">Select a department from the dropdown menu above to manage its designation priority.</p>
+                    </div>
+                `;
                 return;
             }
 
@@ -11531,39 +11481,39 @@ class AttendanceView {
             if (!dept) return;
 
             let cardHtml = `
-				<div class="order-card-container">
-					<div class="dept-order-card">
-						<div class="dept-order-title">
-							<div class="dept-order-title-left">
-								<i class="ph ph-briefcase"></i>
-								<span>${dept.name}</span>
-							</div>
-							<span class="dept-order-badge">${dept.designations.length} designations</span>
-						</div>
-						<div class="desig-order-list">
-			`;
+                <div class="order-card-container">
+                    <div class="dept-order-card">
+                        <div class="dept-order-title">
+                            <div class="dept-order-title-left">
+                                <i class="ph ph-briefcase"></i>
+                                <span>${dept.name}</span>
+                            </div>
+                            <span class="dept-order-badge">${dept.designations.length} designations</span>
+                        </div>
+                        <div class="desig-order-list">
+            `;
 
             dept.designations.forEach((desig) => {
                 cardHtml += `
-					<div class="desig-order-item">
-						<div class="desig-order-name-wrap">
-							<i class="ph ph-dots-six-vertical desig-order-drag-handle"></i>
-							<span class="desig-order-name">${desig.name}</span>
-						</div>
-						<div class="desig-order-control-wrap">
-							<button class="desig-order-btn btn-dec" type="button"><i class="ph ph-minus"></i></button>
-							<input type="number" class="desig-order-input" data-desig-id="${desig.id}" data-dept-id="${dept.id}" value="${desig.sortOrder}">
-							<button class="desig-order-btn btn-inc" type="button"><i class="ph ph-plus"></i></button>
-						</div>
-					</div>
-				`;
+                    <div class="desig-order-item">
+                        <div class="desig-order-name-wrap">
+                            <i class="ph ph-dots-six-vertical desig-order-drag-handle"></i>
+                            <span class="desig-order-name">${desig.name}</span>
+                        </div>
+                        <div class="desig-order-control-wrap">
+                            <button class="desig-order-btn btn-dec" type="button"><i class="ph ph-minus"></i></button>
+                            <input type="number" class="desig-order-input" data-desig-id="${desig.id}" data-dept-id="${dept.id}" value="${desig.sortOrder}">
+                            <button class="desig-order-btn btn-inc" type="button"><i class="ph ph-plus"></i></button>
+                        </div>
+                    </div>
+                `;
             });
 
             cardHtml += `
-						</div>
-					</div>
-				</div>
-			`;
+                        </div>
+                    </div>
+                </div>
+            `;
 
             detailsContainer.innerHTML = cardHtml;
 
@@ -12398,663 +12348,188 @@ class AttendanceView {
     }
 
     
-    async _initDepartmentGroupsTab(model, selectedUserId = null) {
-        const contentEl = document.getElementById("department-groups-content");
+    async _initDeptDesignationMappingTab(model, selectedUserId = null) {
+        const contentEl = document.getElementById("dept-designation-mapping-content");
         if (!contentEl) return;
-
-        this._departmentGroupsModel = model;
-
+        
+        this._ddmModel = model;
         const isMaster = !!model.state.isMaster;
         let targetUserId = null;
         let subAdminList = [];
-
+        
         if (isMaster) {
             const subAdminRes = await model.fetchSubAdmins();
-
             if (subAdminRes && subAdminRes.success) {
                 subAdminList = model.state.subAdminList || [];
             }
 
-            targetUserId = selectedUserId !== null
-                ? Number(selectedUserId)
-                : Number((window.HRMS_USER || {}).id || 0);
+            targetUserId = selectedUserId !== null ? Number(selectedUserId) : Number((window.HRMS_USER || {}).id || 0);
         }
 
-        this._departmentGroupsTargetUserId = targetUserId;
-        this._departmentGroupsSubAdmins = subAdminList;
+        const res = await model.fetchDepartmentDesignationMapping(targetUserId);
 
-        contentEl.innerHTML = `
-            <div style="padding:32px;color:#64748b;">
-                Loading department groups...
-            </div>
-        `;
-
-        try {
-            const res = await model.fetchDepartmentGroups(targetUserId);
-
-            if (!res || !res.success) {
-                contentEl.innerHTML = `
-                    <div style="padding:18px;border-radius:10px;
-                        background:#fff1f2;color:#dc2626;">
-                        ${this._escapeAttr(
-                            res?.message || res?.error || "Failed to load department groups."
-                        )}
-                    </div>
-                `;
-                return;
-            }
-
-            const groups = Array.isArray(res.data) ? res.data : [];
-
-            this._departmentGroupsData = groups;
-
-            this._renderDepartmentGroupsTab(
-                model,
-                groups,
-                isMaster,
-                subAdminList,
-                targetUserId
-            );
-        } catch (error) {
-            console.error("Department Groups Error:", error);
-
+        if (!res || !res.success) {
             contentEl.innerHTML = `
-                <div style="padding:18px;color:#dc2626;">
-                    Failed to load department groups. Please try again.
+                <div style="background:#fff1f2; color:#dc2626; padding:18px; border-radius:10px; border:1px solid #fecdd3; font-weight:600;">
+                    Error loading mapping
                 </div>
             `;
-        }
-    }
-
-
-    _renderDepartmentGroupsTab(
-        model,
-        groups,
-        isMaster,
-        subAdminList,
-        targetUserId
-    ) {
-        const contentEl = document.getElementById("department-groups-content");
-        if (!contentEl) return;
-
-        const escape = value => this._escapeAttr(String(value ?? ""));
-
-        contentEl.innerHTML = `
-            <div style="background:#fff;border:1px solid #e5e7eb;
-                border-radius:14px;overflow:hidden;">
-
-                <div style="padding:22px 24px;border-bottom:1px solid #e5e7eb;
-                    display:flex;justify-content:space-between;align-items:center;
-                    gap:16px;flex-wrap:wrap;">
-
-                    <div>
-                        <h3 style="margin:0;font-size:22px;color:#111827;">
-                            Department Groups
-                        </h3>
-                        <p style="margin:6px 0 0;color:#6b7280;">
-                            Organize permitted departments into groups.
-                        </p>
-                    </div>
-
-                    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
-                        ${
-                            isMaster
-                                ? `
-                                    <label for="dg-user-selector"
-                                        style="font-weight:600;color:#374151;">
-                                        Manage For:
-                                    </label>
-
-                                    <select id="dg-user-selector"
-                                        style="padding:10px 12px;border:1px solid #d1d5db;
-                                        border-radius:8px;background:#fff;min-width:220px;">
-                                        <option value="${escape((window.HRMS_USER || {}).id || "")}">
-                                            My Own Groups
-                                        </option>
-
-                                        ${subAdminList.map(user => `
-                                            <option value="${escape(user.id)}">
-                                                ${escape(
-                                                    user.name ||
-                                                    user.username ||
-                                                    user.user_name ||
-                                                    "Sub Admin"
-                                                )}
-                                            </option>
-                                        `).join("")}
-                                    </select>
-                                `
-                                : ""
-                        }
-
-                        <button id="dg-create-btn"
-                            style="padding:10px 16px;background:#4f46e5;color:#fff;
-                            border:0;border-radius:8px;cursor:pointer;font-weight:600;">
-                            + Create Group
-                        </button>
-                    </div>
-                </div>
-
-                <div style="padding:20px 24px;">
-                    <input id="dg-search" type="text"
-                        placeholder="Search groups..."
-                        style="width:100%;max-width:360px;padding:10px 12px;
-                        border:1px solid #d1d5db;border-radius:8px;">
-
-                    <div style="margin-top:18px;overflow-x:auto;">
-                        <table style="width:100%;border-collapse:collapse;">
-                            <thead>
-                                <tr style="background:#f8fafc;text-align:left;">
-                                    <th style="padding:14px;border-bottom:1px solid #e5e7eb;">
-                                        Group Name
-                                    </th>
-                                    <th style="padding:14px;border-bottom:1px solid #e5e7eb;
-                                        text-align:center;">
-                                        Sort Order
-                                    </th>
-                                    <th style="padding:14px;border-bottom:1px solid #e5e7eb;
-                                        text-align:center;">
-                                        Actions
-                                    </th>
-                                </tr>
-                            </thead>
-
-                            <tbody id="dg-table-body"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <div id="dg-form-container"></div>
-        `;
-
-        const userSelector = document.getElementById("dg-user-selector");
-
-        if (userSelector) {
-            userSelector.value = String(
-                targetUserId || (window.HRMS_USER || {}).id || ""
-            );
-
-            userSelector.addEventListener("change", async event => {
-                const nextUserId = event.target.value
-                    ? Number(event.target.value)
-                    : null;
-
-                await this._initDepartmentGroupsTab(model, nextUserId);
-            });
-        }
-
-        const renderRows = searchText => {
-            const tbody = document.getElementById("dg-table-body");
-            if (!tbody) return;
-
-            const query = (searchText || "").trim().toLowerCase();
-
-            const filteredGroups = groups.filter(group =>
-                String(group.GroupName || "").toLowerCase().includes(query)
-            );
-
-            if (!filteredGroups.length) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="3" style="padding:28px;text-align:center;color:#6b7280;">
-                            ${query ? "No matching groups found." : "No department groups created yet."}
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-
-            tbody.innerHTML = filteredGroups.map(group => `
-                <tr style="border-bottom:1px solid #f1f5f9;">
-                    <td style="padding:15px;font-weight:600;color:#111827;">
-                        ${escape(group.GroupName)}
-                    </td>
-
-                    <td style="padding:15px;text-align:center;">
-                        ${Number(group.SortOrder || 0)}
-                    </td>
-
-                    <td style="padding:15px;text-align:center;white-space:nowrap;">
-                        <button class="dg-edit-btn"
-                            data-id="${Number(group.GroupId)}"
-                            style="padding:8px 13px;background:#eef2ff;color:#4338ca;
-                            border:0;border-radius:7px;cursor:pointer;margin-right:6px;">
-                            Edit
-                        </button>
-
-                        <button class="dg-delete-btn"
-                            data-id="${Number(group.GroupId)}"
-                            style="padding:8px 13px;background:#fff1f2;color:#dc2626;
-                            border:0;border-radius:7px;cursor:pointer;">
-                            Deactivate
-                        </button>
-                    </td>
-                </tr>
-            `).join("");
-
-            tbody.querySelectorAll(".dg-edit-btn").forEach(button => {
-                button.addEventListener("click", () => {
-                    const group = groups.find(item =>
-                        Number(item.GroupId) === Number(button.dataset.id)
-                    );
-
-                    if (group) {
-                        this._renderDepartmentGroupForm(
-                            model,
-                            group,
-                            targetUserId
-                        );
-                    }
-                });
-            });
-
-            tbody.querySelectorAll(".dg-delete-btn").forEach(button => {
-                button.addEventListener("click", async () => {
-                    const groupId = Number(button.dataset.id);
-                    const group = groups.find(item =>
-                        Number(item.GroupId) === groupId
-                    );
-
-                    if (!group) return;
-
-                    if (!confirm(
-                        `Deactivate department group "${group.GroupName}"?`
-                    )) {
-                        return;
-                    }
-
-                    this.showOverlay("Deactivating department group...");
-
-                    try {
-                        const deleteRes = await model.deleteDepartmentGroup(
-                            groupId,
-                            targetUserId
-                        );
-
-                        this.hideOverlay();
-
-                        if (deleteRes && deleteRes.success) {
-                            this.showToast(
-                                deleteRes.message || "Department group deactivated.",
-                                "success"
-                            );
-
-                            await this._initDepartmentGroupsTab(model, targetUserId);
-                        } else {
-                            this.showToast(
-                                deleteRes?.message ||
-                                deleteRes?.error ||
-                                "Failed to deactivate department group.",
-                                "error"
-                            );
-                        }
-                    } catch (error) {
-                        this.hideOverlay();
-                        console.error("Deactivate Department Group Error:", error);
-                        this.showToast("Failed to deactivate department group.", "error");
-                    }
-                });
-            });
-        };
-
-        document.getElementById("dg-search").addEventListener("input", event => {
-            renderRows(event.target.value);
-        });
-
-        document.getElementById("dg-create-btn").addEventListener("click", () => {
-            this._renderDepartmentGroupForm(model, null, targetUserId);
-        });
-
-        renderRows("");
-    }
-
-
-    async _renderDepartmentGroupForm(model, group = null, targetUserId = null) {
-        const contentEl = document.getElementById("department-groups-content");
-        if (!contentEl) return;
-
-        const groupId = Number(group?.GroupId || 0);
-        const isEditing = groupId > 0;
-        const escape = value => this._escapeAttr(String(value ?? ""));
-
-        // Store current list context so Back returns to the correct user.
-        this._departmentGroupsTargetUserId = targetUserId;
-
-        // Replace the list with a full-page-style form.
-        contentEl.innerHTML = `
-            <div style="min-height:calc(100vh - 180px);background:#fff;
-                border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
-
-                <!-- Page Header -->
-                <div style="padding:20px 26px;border-bottom:1px solid #e5e7eb;
-                    background:#fff;">
-
-                    <button id="dg-back-btn" type="button"
-                        style="display:inline-flex;align-items:center;gap:8px;
-                        padding:9px 13px;background:#f3f4f6;color:#374151;
-                        border:1px solid #e5e7eb;border-radius:8px;
-                        cursor:pointer;font-size:14px;font-weight:600;">
-                        ← Back to Department Groups
-                    </button>
-
-                    <div style="margin-top:22px;">
-                        <h2 style="margin:0;font-size:25px;font-weight:700;
-                            color:#111827;">
-                            ${isEditing ? "Edit Department Group" : "Create Department Group"}
-                        </h2>
-
-                        <p style="margin:8px 0 0;color:#6b7280;font-size:14px;">
-                            ${isEditing
-                                ? "Update the group details and assigned departments."
-                                : "Create a group and assign the departments that belong to it."}
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Form Body -->
-                <div style="padding:26px;max-width:1100px;">
-
-                    <div style="padding:22px;border:1px solid #e5e7eb;
-                        border-radius:12px;background:#fff;">
-
-                        <h3 style="margin:0 0 20px;font-size:17px;color:#111827;">
-                            Basic Information
-                        </h3>
-
-                        <div style="display:grid;
-                            grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
-                            gap:20px;">
-
-                            <div>
-                                <label for="dg-group-name"
-                                    style="display:block;margin-bottom:8px;
-                                    color:#374151;font-size:14px;font-weight:600;">
-                                    Group Name <span style="color:#dc2626;">*</span>
-                                </label>
-
-                                <input id="dg-group-name" type="text" maxlength="100"
-                                    value="${escape(group?.GroupName || "")}"
-                                    placeholder="Enter group name"
-                                    style="box-sizing:border-box;width:100%;padding:12px;
-                                    border:1px solid #d1d5db;border-radius:8px;
-                                    font-size:14px;outline:none;">
-                            </div>
-
-                            <div>
-                                <label for="dg-sort-order"
-                                    style="display:block;margin-bottom:8px;
-                                    color:#374151;font-size:14px;font-weight:600;">
-                                    Sort Order
-                                </label>
-
-                                <input id="dg-sort-order" type="number"
-                                    value="${Number(group?.SortOrder || 0)}"
-                                    placeholder="0"
-                                    style="box-sizing:border-box;width:100%;padding:12px;
-                                    border:1px solid #d1d5db;border-radius:8px;
-                                    font-size:14px;outline:none;">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div style="margin-top:22px;padding:22px;
-                        border:1px solid #e5e7eb;border-radius:12px;background:#fff;">
-
-                        <div style="display:flex;justify-content:space-between;
-                            align-items:flex-start;gap:14px;flex-wrap:wrap;">
-
-                            <div>
-                                <h3 style="margin:0;font-size:17px;color:#111827;">
-                                    Assign Departments
-                                </h3>
-                                <p style="margin:7px 0 0;color:#6b7280;font-size:13px;">
-                                    Select the departments to include in this group.
-                                </p>
-                            </div>
-
-                            <span id="dg-selected-count"
-                                style="padding:6px 10px;background:#eef2ff;
-                                color:#4338ca;border-radius:20px;font-size:13px;
-                                font-weight:600;">
-                                0 selected
-                            </span>
-                        </div>
-
-                        <div style="margin-top:18px;">
-                            <input id="dg-department-search" type="text"
-                                placeholder="Search departments..."
-                                style="box-sizing:border-box;width:100%;max-width:420px;
-                                padding:11px 12px;border:1px solid #d1d5db;
-                                border-radius:8px;font-size:14px;">
-
-                            <div id="dg-department-list"
-                                style="margin-top:16px;display:grid;
-                                grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
-                                gap:12px;">
-                                <div style="padding:18px;color:#64748b;">
-                                    Loading departments...
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Footer Actions -->
-                    <div style="display:flex;justify-content:flex-end;
-                        align-items:center;gap:12px;margin-top:24px;
-                        padding:18px 0;flex-wrap:wrap;">
-
-                        <button id="dg-cancel-btn" type="button"
-                            style="padding:12px 20px;background:#fff;color:#374151;
-                            border:1px solid #d1d5db;border-radius:8px;
-                            cursor:pointer;font-weight:600;">
-                            Cancel
-                        </button>
-
-                        <button id="dg-save-btn" type="button"
-                            style="padding:12px 22px;background:#4f46e5;color:#fff;
-                            border:0;border-radius:8px;cursor:pointer;
-                            font-weight:600;">
-                            ${isEditing ? "Save Changes" : "Create Group"}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        // Back and Cancel return to the list.
-        const goBackToList = async () => {
-            await this._initDepartmentGroupsTab(model, targetUserId);
-        };
-
-        document.getElementById("dg-back-btn").addEventListener("click", goBackToList);
-        document.getElementById("dg-cancel-btn").addEventListener("click", goBackToList);
-
-        // Load departments from the existing model method.
-        let departmentData = [];
-
-        try {
-            const deptRes = await model.fetchGroupDepartments(groupId, targetUserId);
-
-            if (!deptRes || !deptRes.success) {
-                document.getElementById("dg-department-list").innerHTML = `
-                    <div style="padding:16px;color:#dc2626;">
-                        ${escape(
-                            deptRes?.message ||
-                            deptRes?.error ||
-                            "Failed to load departments."
-                        )}
-                    </div>
-                `;
-                return;
-            }
-
-            departmentData = Array.isArray(deptRes.data) ? deptRes.data : [];
-
-            const renderDepartments = searchText => {
-                const listEl = document.getElementById("dg-department-list");
-                if (!listEl) return;
-
-                const query = String(searchText || "").trim().toLowerCase();
-
-                const filtered = departmentData.filter(dept =>
-                    String(dept.DepartmentFName || "")
-                        .toLowerCase()
-                        .includes(query)
-                );
-
-                const selectedCount = departmentData.filter(dept => {
-                    const checkbox = listEl.querySelector(
-                        `.dg-department-checkbox[value="${Number(dept.DepartmentId)}"]`
-                    );
-
-                    return checkbox ? checkbox.checked : Number(dept.IsAssigned) === 1;
-                }).length;
-
-                const countEl = document.getElementById("dg-selected-count");
-                if (countEl) countEl.textContent = `${selectedCount} selected`;
-
-                if (!filtered.length) {
-                    listEl.innerHTML = `
-                        <div style="padding:18px;color:#6b7280;">
-                            No departments found.
-                        </div>
-                    `;
-                    return;
-                }
-
-                listEl.innerHTML = filtered.map(dept => `
-                    <label style="display:flex;align-items:center;gap:11px;
-                        padding:14px;border:1px solid #e5e7eb;border-radius:9px;
-                        background:#fff;cursor:pointer;">
-
-                        <input class="dg-department-checkbox" type="checkbox"
-                            value="${Number(dept.DepartmentId)}"
-                            ${Number(dept.IsAssigned) === 1 ? "checked" : ""}
-                            style="width:16px;height:16px;accent-color:#4f46e5;">
-
-                        <span style="font-size:14px;color:#374151;">
-                            ${escape(dept.DepartmentFName || "")}
-                        </span>
-                    </label>
-                `).join("");
-
-                listEl.querySelectorAll(".dg-department-checkbox").forEach(checkbox => {
-                    checkbox.addEventListener("change", () => {
-                        const count = listEl.querySelectorAll(
-                            ".dg-department-checkbox:checked"
-                        ).length;
-
-                        const countEl = document.getElementById("dg-selected-count");
-                        if (countEl) countEl.textContent = `${count} selected`;
-                    });
-                });
-
-                // Count all selected departments, including any hidden by search.
-                const allSelected = departmentData.filter(dept => {
-                    const checkbox = listEl.querySelector(
-                        `.dg-department-checkbox[value="${Number(dept.DepartmentId)}"]`
-                    );
-
-                    return checkbox
-                        ? checkbox.checked
-                        : Number(dept.IsAssigned) === 1;
-                }).length;
-
-                if (countEl) countEl.textContent = `${allSelected} selected`;
-            };
-
-            renderDepartments("");
-
-            document.getElementById("dg-department-search")
-                .addEventListener("input", event => {
-                    // Preserve checkbox selections while filtering.
-                    const selectedIds = new Set(
-                        Array.from(
-                            document.querySelectorAll(".dg-department-checkbox:checked")
-                        ).map(cb => Number(cb.value))
-                    );
-
-                    departmentData.forEach(dept => {
-                        dept.IsAssigned = selectedIds.has(Number(dept.DepartmentId)) ? 1 : 0;
-                    });
-
-                    renderDepartments(event.target.value);
-                });
-
-        } catch (error) {
-            console.error("Load Group Departments Error:", error);
-
-            const listEl = document.getElementById("dg-department-list");
-            if (listEl) {
-                listEl.innerHTML = `
-                    <div style="padding:16px;color:#dc2626;">
-                        Failed to load departments.
-                    </div>
-                `;
-            }
             return;
         }
 
-        // Save group and selected departments.
-        document.getElementById("dg-save-btn").addEventListener("click", async () => {
-            const groupName = document.getElementById("dg-group-name").value.trim();
-            const sortOrder = Number.parseInt(
-                document.getElementById("dg-sort-order").value || "0",
-                10
-            );
+        const { departments, designations, mappingByDept, targetUserId: resolvedTargetUserId } = res;
+        const pageSize = 25;
+        let currentPage = 1;
+        let filteredDepartments = [...departments];
+        let searchText = "";
+        this._currentDeptDesigMappingData = { departments, designations, mappingByDept, targetUserId: resolvedTargetUserId };
+        
+        this._ddmSelectedUserId = resolvedTargetUserId;
+        this._ddmSubAdminList = subAdminList;
 
-            if (!groupName) {
-                alert("Please enter a group name.");
-                document.getElementById("dg-group-name").focus();
-                return;
-            }
+        contentEl.innerHTML = `<div id="ddm-main-container"></div>`;
 
-            const departmentIds = Array.from(
-                document.querySelectorAll(".dg-department-checkbox:checked")
-            ).map(cb => Number(cb.value));
+        const mainContainer = document.getElementById("ddm-main-container");
 
-            const saveButton = document.getElementById("dg-save-btn");
-            saveButton.disabled = true;
-            saveButton.textContent = "Saving...";
+        const renderTable = () => {
+            const start = (currentPage - 1) * pageSize;
+            const end = start + pageSize;
+            const pageDepartments = filteredDepartments.slice(start, end);
 
-            this.showOverlay("Saving department group...");
+            mainContainer.innerHTML = `
+                <div style="background:#ffffff; border-radius:14px; border:1px solid #e5e7eb; box-shadow:0 4px 12px rgba(0,0,0,.06); overflow:hidden;">
+                    <div style="padding:22px 25px; border-bottom:1px solid #e5e7eb; display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <h2 style="margin:0; font-size:24px; font-weight:700; color:#111827;">Department Designation Mapping</h2>
+                            <p style="margin:6px 0 0; color:#6b7280; font-size:14px;">Manage designation mapping department wise.</p>
+                        </div>
 
-            try {
-                const saveRes = await model.saveDepartmentGroup(
-                    groupId,
-                    groupName,
-                    Number.isFinite(sortOrder) ? sortOrder : 0,
-                    departmentIds,
-                    targetUserId
-                );
+                        ${
+                            isMaster ? `
+                                <div style="display:flex; align-items:center; gap:10px;">
+                                    <label for="ddm-user-selector" style="font-size:14px; font-weight:600; color:#374151;">Manage For:</label>
+                                    <select id="ddm-user-selector" style="min-width:240px; padding:10px 14px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; background:#fff; outline:none;">
+                                        <option value="${(window.HRMS_USER || {}).id || ""}">My Own Mapping</option>
+                                        ${subAdminList.map(user => `
+                                            <option value="${user.id}">
+                                                ${this._escapeAttr(user.name || user.username || user.user_name || "Sub Admin")}
+                                            </option>
+                                        `).join("")}
+                                    </select>
+                                </div>
+                            `
+                            : ""
+                        }
 
-                this.hideOverlay();
+                    </div>
 
-                if (saveRes && saveRes.success) {
-                    alert(saveRes.message || "Department group saved successfully.");
-                    await this._initDepartmentGroupsTab(model, targetUserId);
-                } else {
-                    alert(
-                        saveRes?.message ||
-                        saveRes?.error ||
-                        "Failed to save department group."
-                    );
+                    <div style="padding:20px; border-bottom:1px solid #e5e7eb;">
+                        <input type="text" value="${searchText}" id="ddm-department-search" placeholder="Search Department..." style="width:320px; padding:10px 14px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; outline:none;">
+                    </div>
 
-                    saveButton.disabled = false;
-                    saveButton.textContent = isEditing ? "Save Changes" : "Create Group";
+                    <div style="overflow:auto;">
+                        <table style="width:100%; border-collapse:collapse;">
+                            <thead>
+                                <tr style="background:#f8fafc; border-bottom:1px solid #e5e7eb;">
+                                    <th style="padding:16px; text-align:left; font-size:14px; font-weight:700; color:#374151;">Department</th>
+                                    <th style="padding:16px; text-align:center; font-size:14px; font-weight:700; color:#374151;">Assigned</th>
+                                    <th style="padding:16px; text-align:center; font-size:14px; font-weight:700; color:#374151; width:150px;">Action</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                ${
+                                    pageDepartments.length > 0 ? pageDepartments.map(dept => {
+                                        const assigned = mappingByDept[dept.id] || [];
+                                        return `
+                                            <tr class="ddm-row" style="border-bottom:1px solid #f1f5f9;">
+                                                <td class="ddm-department-name" style="padding:18px 16px;font-size:15px;font-weight:600;color:#1f2937;">${this._escapeAttr(dept.name)}</td>
+                                                <td style="text-align:center;padding:18px;">
+                                                    <span style="display:inline-flex;justify-content:center;align-items:center;min-width:38px;height:38px;padding:0 12px;border-radius:999px;background:#eef2ff;color:#4338ca;font-weight:700;">
+                                                        ${assigned.length}
+                                                    </span>
+                                                </td>
+                                                <td style="text-align:center;padding:18px;">
+                                                    <button class="ddm-edit-btn" data-id="${dept.id}" style="background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;">
+                                                        Edit
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        `;
+                                    }).join("") : `
+                                        <tr>
+                                            <td colspan="3" style="padding:30px;text-align:center;color:#6b7280;">No departments found.</td>
+                                        </tr>
+                                    `
+                                }
+                            </tbody>
+                        </table>
+
+                        <div style="display:flex; justify-content:center; align-items:center; gap:12px; padding:20px;">
+                            <button id="prev-page" ${currentPage === 1 ? "disabled" : ""} style="padding:8px 16px; cursor:pointer;">
+                                Previous
+                            </button>
+
+                            <span>
+                                Page ${currentPage} of ${Math.ceil(filteredDepartments.length / pageSize)}
+                            </span>
+
+                            <button id="next-page" ${currentPage === Math.ceil(filteredDepartments.length / pageSize) ? "disabled" : ""} style="padding:8px 16px; cursor:pointer;">
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            mainContainer.querySelectorAll(".ddm-edit-btn").forEach(btn => {
+                btn.onclick = () => {
+                    const deptId = Number(btn.dataset.id);
+                    this._renderDeptDesigMappingCheckboxes(deptId);
+                };
+            });
+
+            if (isMaster) {
+                const userSelector = document.getElementById("ddm-user-selector");
+                if (userSelector) {
+                    userSelector.value = String(this._ddmSelectedUserId || (window.HRMS_USER || {}).id ||"");
+                    userSelector.addEventListener("change", async (e) => {
+                        const selectedUserId = e.target.value ? Number(e.target.value) : null;
+                        this._ddmSelectedUserId = selectedUserId;
+                        await this._initDeptDesignationMappingTab(model, selectedUserId);
+                    });
                 }
-            } catch (error) {
-                this.hideOverlay();
-                console.error("Save Department Group Error:", error);
-                alert("Failed to save department group.");
-
-                saveButton.disabled = false;
-                saveButton.textContent = isEditing ? "Save Changes" : "Create Group";
             }
-        });
 
-        contentEl.scrollIntoView({ behavior: "smooth", block: "start" });
+            const deptSearch = document.getElementById("ddm-department-search");
+
+            if (deptSearch) {
+                deptSearch.focus();
+                deptSearch.setSelectionRange(searchText.length, searchText.length);
+                deptSearch.addEventListener("input", (e) => {
+                    searchText = e.target.value.toLowerCase().trim();
+                    filteredDepartments = departments.filter(dept => dept.name .toLowerCase() .includes(searchText));
+                    currentPage = 1;
+                    renderTable();
+                });
+            }
+
+            document.getElementById("prev-page")?.addEventListener("click", () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    renderTable();
+                }
+            });
+
+            document.getElementById("next-page")?.addEventListener("click", () => {
+                if (currentPage < Math.ceil(filteredDepartments.length / pageSize)) {
+                    currentPage++;
+                    renderTable();
+                }
+            });
+        };
+
+        renderTable();
     }
 
     _renderDeptDesigMappingCheckboxes(deptId) {
@@ -13474,14 +12949,14 @@ class AttendanceView {
         }
         return {
             html: `
-				<h2 class="section-title">
-					<i class="ph-fill ph-identification-badge"></i> Staff Statistics
-				</h2>
-				
+                <h2 class="section-title">
+                    <i class="ph-fill ph-identification-badge"></i> Staff Statistics
+                </h2>
+                
                 <div class="charts-grid">
-					${this._chartCard("ch-staff-dept", '<i class="ph-fill ph-chart-bar"></i>', "violet", "Staff Attendance by Department", "Click bar for detail")}
-				</div>
-				
+                    ${this._chartCard("ch-staff-dept", '<i class="ph-fill ph-chart-bar"></i>', "violet", "Staff Attendance by Department", "Click bar for detail")}
+                </div>
+                
               <div id="main-table-wrap">
                     ${this._tableHTML("tbl-staff", ["Dept", "Total", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Single Punch", "Absent", "Rate"], pageRows, "staff-wise", (currentPage - 1) * pageSize)}
                     <div class="pagination-bar">
@@ -13497,9 +12972,9 @@ class AttendanceView {
                         </div>
                     </div>
                 </div>
-				
+                
                 <div id="drilldown-table" style="margin-top:16px"></div>
-			`,
+            `,
 
             renderCharts: () => {
                 Charts.stacked(
@@ -13584,13 +13059,13 @@ class AttendanceView {
         }
         return {
             html: `
-				<h2 class="section-title">
-					<i class="ph-fill ph-hard-hat"></i> Workmen Statistics
-				</h2>
-				<div class="charts-grid">
-					${this._chartCard("ch-worker-dept", '<i class="ph-fill ph-chart-bar"></i>', "amber", "Workmen Attendance by Department", "Click bar for detail")}
-				</div>
-				<div id="main-table-wrap">
+                <h2 class="section-title">
+                    <i class="ph-fill ph-hard-hat"></i> Workmen Statistics
+                </h2>
+                <div class="charts-grid">
+                    ${this._chartCard("ch-worker-dept", '<i class="ph-fill ph-chart-bar"></i>', "amber", "Workmen Attendance by Department", "Click bar for detail")}
+                </div>
+                <div id="main-table-wrap">
                     ${this._tableHTML("tbl-worker", ["Dept", "Total", "Present", "Half Present", "WO Present", "WO Half Present", "Weekly Off", "Absent", "Rate"], pageRows, "worker-wise", (currentPage - 1) * pageSize)}
                     <div class="pagination-bar">
                         <div class="pagination-text">
@@ -13605,8 +13080,8 @@ class AttendanceView {
                         </div>
                     </div>
                 </div>
-				<div id="drilldown-table" style="margin-top:16px"></div>
-			`,
+                <div id="drilldown-table" style="margin-top:16px"></div>
+            `,
             renderCharts: () => {
                 Charts.stacked(
                     "ch-worker-dept",
