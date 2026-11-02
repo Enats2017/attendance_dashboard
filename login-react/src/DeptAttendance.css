@@ -52,6 +52,11 @@
 /* FIX: combined "Total Present" row (summary.total_present) — blue, NOT clickable, plain numbers only. */
 .da-row-combined td { font-weight: 800 !important; color: #1e40af !important; background: rgba(219,234,254,0.6) !important; border-top: 2.5px solid #1e40af !important; border-bottom: 1px solid #93c5fd !important; }
 .da-row-combined td:first-child { background: rgba(219,234,254,0.6) !important; cursor: default !important; }
+/* Department Group Total rows reuse the blue Total Present style. */
+.da-group-total-row td { border-top: 2.5px solid #1e40af !important; border-bottom: 2.5px solid #1e40af !important; font-weight: 800 !important; }
+.da-group-total-row td:first-child,
+.da-group-total-row td:nth-child(2) { background: #e8f0fe !important; }
+.da-group-total-row .da-group-total-label { padding-left: 16px !important; }
 
 .da-row-total td { font-weight: 700; color: #374151; }
 .da-row-ot td { color: #7c3aed; background: rgba(237,233,254,0.3); }

@@ -395,6 +395,7 @@ export default function DeptAttendance() {
 				setLoading(false);
 				return;
 			}
+            
 			console.error("get_report failed:", data.message, data.errors);
 			showToast(data.message || "Failed to load report — showing sample data", "error");
 		} catch (err) {
@@ -789,6 +790,46 @@ function ReportTable({ data, days, unitName, unitCapacity, loginName, month, yea
     const total_running_machines = data.total_running_machines || 0;   
     const colSpan = days.length + 3;
 
+    // ---- Department Group totals (dynamic, driven by groupId/groupName from API) ----
+    const groupDeptMap = {};     // groupId -> { name, sortOrder, firstIndex, depts: [] }
+
+    departments.forEach((dept, i) => {
+        if (dept.groupId === null || dept.groupId === undefined) return;
+        const gid = String(dept.groupId);
+        if (!groupDeptMap[gid]) {
+            groupDeptMap[gid] = {
+                name: dept.groupName,
+                sortOrder: Number(dept.groupSortOrder) || 0,
+                firstIndex: i,
+                depts: []
+            };
+        }
+        groupDeptMap[gid].depts.push(dept);
+    });
+
+    const orderedDepartments = Object.values(groupDeptMap)
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.firstIndex - b.firstIndex)
+        .flatMap((group) => group.depts.map((dept, i) => ({
+            dept,
+            isGroupLast: i === group.depts.length - 1
+        })))
+        .concat(
+            departments
+                .filter((dept) => dept.groupId === null || dept.groupId === undefined)
+                .map((dept) => ({ dept, isGroupLast: false }))
+        );
+
+    function getGroupTotals(gid) {
+        const group = groupDeptMap[gid];
+        const std = group.depts.reduce((sum, dept) => sum + (Number(dept.std_hc) || 0), 0);
+        const avg = group.depts.reduce((sum, dept) => sum + (Number(dept.avg_hc) || 0), 0);
+        const dayTotals = {};
+        days.forEach((d) => {
+            dayTotals[d] = group.depts.reduce((sum, dept) => sum + (Number(dept.days && dept.days[d]) || 0), 0);
+        });
+        return { name: group.name, std, avg, dayTotals };
+    }
+
     function makeDayClickHandler(statusKey, statusLabel) {
         return (key, day, count) => {
             const employees = summary_employees?.[day]?.[statusKey] || [];
@@ -822,7 +863,7 @@ function ReportTable({ data, days, unitName, unitCapacity, loginName, month, yea
                         </tr>
                     </thead>
                     <tbody>
-                        {departments.map((dept, i) => (
+                        {orderedDepartments.map(({ dept, isGroupLast }, i) => (
                             <React.Fragment key={dept.departmentId ?? i}>
                                 <tr
                                     onClick={() => dept.designations && dept.designations.length > 0 && onToggleDept(dept.departmentId)}
@@ -895,6 +936,24 @@ function ReportTable({ data, days, unitName, unitCapacity, loginName, month, yea
 										)}
 									</>
 								)}
+								{isGroupLast && (() => {
+									const g = getGroupTotals(String(dept.groupId));
+									return (
+										<tr className="da-row-combined da-group-total-row">
+										    <td className="da-group-total-label">{g.name} Total</td>
+										    <td>{g.std}</td>
+										    {days.map((d) => {
+										        const val = g.dayTotals[d];
+										        return (
+										            <td key={d} className={!val ? "da-empty" : ""}>
+										                {val || ""}
+										            </td>
+										        );
+										    })}
+										    <td>{g.avg}</td>
+										</tr>
+									);
+								})()}
                             </React.Fragment>
                         ))}
                     </tbody>
@@ -1583,5 +1642,3 @@ function StatusEmployeeModal({ statusLabel, date, employees, onClose }) {
         </div>
     );
 }
-
-
