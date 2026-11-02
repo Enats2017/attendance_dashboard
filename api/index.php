@@ -4920,6 +4920,28 @@ function handleGetReport($input) {
             $reportingDesigHcMap[$deptId][$reportDesigId] += intval($hc);
         }
     }
+
+    // ---- Department Group mapping (active groups of the target user only) ----
+    $deptGroupMap = [];
+
+    $sqlGroupMap = "SELECT m.DepartmentId, g.GroupId, g.GroupName, g.SortOrder FROM DepartmentGroupMapping m WITH (NOLOCK) INNER JOIN DepartmentGroups g WITH (NOLOCK) ON g.GroupId = m.GroupId WHERE g.UserId = ? AND g.Status = 1 AND m.Status = 1 AND m.DepartmentId IN ($departmentList) ORDER BY g.SortOrder ASC, g.GroupId ASC";
+
+    $stmtGroupMap = sqlsrv_query($sqlConn, $sqlGroupMap, [$targetUserId]);
+
+    if ($stmtGroupMap) {
+        while ($row = sqlsrv_fetch_array($stmtGroupMap, SQLSRV_FETCH_ASSOC)) {
+            $gDeptId = intval($row['DepartmentId']);
+
+            // A department belongs to only one active group, but keep the first match to be safe
+            if (!isset($deptGroupMap[$gDeptId])) {
+                $deptGroupMap[$gDeptId] = [
+                    'groupId' => intval($row['GroupId']),
+                    'groupName' => $row['GroupName'],
+                    'groupSortOrder' => intval($row['SortOrder'])
+                ];
+            }
+        }
+    }
     
     foreach ($allIds as $id) {
         $stdHc = isset($hcMap[$id]) ? intval($hcMap[$id]) : 0;
@@ -5073,7 +5095,10 @@ function handleGetReport($input) {
             'days' => $days,
             'avg_hc' => round($deptSum / $numDays),
             'designations' => $designations,
-            'summary' => $deptSummary
+            'summary' => $deptSummary,
+            'groupId' => $deptGroupMap[intval($id)]['groupId'] ?? null,
+            'groupName' => $deptGroupMap[intval($id)]['groupName'] ?? null,
+            'groupSortOrder' => $deptGroupMap[intval($id)]['groupSortOrder'] ?? null
         ];
     }
  
