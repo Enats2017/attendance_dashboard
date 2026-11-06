@@ -789,6 +789,9 @@ function ReportTable({ data, days, unitName, unitCapacity, loginName, month, yea
     const total_std_hc = data.total_std_hc || 0;
     const total_running_machines = data.total_running_machines || 0;   
     const colSpan = days.length + 3;
+    const totalMachinesNum = Number(total_running_machines) || 0;
+    const stdLabourPerMachine = (totalLabour) =>
+        totalMachinesNum > 0 ? (Number(totalLabour) / totalMachinesNum).toFixed(1) : "";
 
     // ---- Department Group totals (dynamic, driven by groupId/groupName from API) ----
     const groupDeptMap = {};     // groupId -> { name, sortOrder, firstIndex, depts: [] }
@@ -976,7 +979,7 @@ function ReportTable({ data, days, unitName, unitCapacity, loginName, month, yea
                                                 <td className="da-group-total-label" style={{ color: "#475569", fontSize: "11px", paddingLeft: "16px" }}>
                                                     No. of Running Machines
                                                 </td>
-                                                <td>–</td>
+                                                <td>{total_running_machines}</td>
                                                 {days.map((d) => {
                                                     const val = g.machinesArray[d];
                                                     return (
@@ -992,7 +995,7 @@ function ReportTable({ data, days, unitName, unitCapacity, loginName, month, yea
                                                 <td className="da-group-total-label" style={{ color: "#475569", fontSize: "11px", paddingLeft: "16px" }}>
                                                     Labour Per Machine Per Day
                                                 </td>
-                                                <td>–</td>
+                                                <td>{stdLabourPerMachine(g.std)}</td>
                                                 {days.map((d) => {
                                                     const val = g.groupLaborPerMachine[d];
                                                     return (
@@ -1011,8 +1014,8 @@ function ReportTable({ data, days, unitName, unitCapacity, loginName, month, yea
                     </tbody>
                     <tfoot>
                         <SummaryRow label="Overall Present" stdValue={total_std_hc} dayValues={summary.total_present} avgValue={summary_avg.total_present} days={days} className="da-row-combined da-row-grand-total" />
-                        <SummaryRow label="No. of Running Machines" stdValue="" dayValues={summary.running_machines} avgValue={summary_avg.running_machines} days={days} className="da-row-heading" />
-                        <SummaryRow label="Labour Per Machine Per Day" stdValue="" dayValues={summary.labor_per_machine} avgValue={summary_avg.labor_per_machine} days={days} className="da-row-heading da-row-labor-border" />
+                        <SummaryRow label="No. of Running Machines" stdValue={total_running_machines} dayValues={summary.running_machines} avgValue={summary_avg.running_machines} days={days} className="da-row-heading" />
+                        <SummaryRow label="Labour Per Machine Per Day" stdValue={stdLabourPerMachine(total_std_hc)} dayValues={summary.labor_per_machine} avgValue={summary_avg.labor_per_machine} days={days} className="da-row-heading da-row-labor-border" />
                         <SummaryRow label="Total Present" statusKey="present" stdValue="" dayValues={summary.present} avgValue={summary_avg.present} days={days} className="da-row-total" onDayClick={makeDayClickHandler("present", "Total Present")} />
                         <SummaryRow label="Total Half Present" statusKey="half_present" stdValue="" dayValues={summary.half_present} avgValue={summary_avg.half_present} days={days} className="da-row-heading" onDayClick={makeDayClickHandler("half_present", "Total Half Present")} />
                         <SummaryRow label="Total Weekly-Off Present" statusKey="wo_present" stdValue="" dayValues={summary.wo_present} avgValue={summary_avg.wo_present} days={days} className="da-row-heading" onDayClick={makeDayClickHandler("wo_present", "Total Weekly-Off Present")} />
