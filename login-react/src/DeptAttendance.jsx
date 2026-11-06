@@ -1011,7 +1011,7 @@ function ReportTable({ data, days, unitName, unitCapacity, loginName, month, yea
                     </tbody>
                     <tfoot>
                         <SummaryRow label="Overall Present" stdValue={total_std_hc} dayValues={summary.total_present} avgValue={summary_avg.total_present} days={days} className="da-row-combined da-row-grand-total" />
-                        <SummaryRow label="No. of Running Machines" stdValue="" dayValues={summary.running_machines} avgValue={summary_avg.running_machines} days={days} className="da-row-heading" />
+                        <SummaryRow label="No. of Running Machines" stdValue={total_running_machines} dayValues={summary.running_machines} avgValue={summary_avg.running_machines} days={days} className="da-row-heading" />
                         <SummaryRow label="Labour Per Machine Per Day" stdValue="" dayValues={summary.labor_per_machine} avgValue={summary_avg.labor_per_machine} days={days} className="da-row-heading da-row-labor-border" />
                         <SummaryRow label="Total Present" statusKey="present" stdValue="" dayValues={summary.present} avgValue={summary_avg.present} days={days} className="da-row-total" onDayClick={makeDayClickHandler("present", "Total Present")} />
                         <SummaryRow label="Total Half Present" statusKey="half_present" stdValue="" dayValues={summary.half_present} avgValue={summary_avg.half_present} days={days} className="da-row-heading" onDayClick={makeDayClickHandler("half_present", "Total Half Present")} />
