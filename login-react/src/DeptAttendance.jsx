@@ -824,10 +824,19 @@ function ReportTable({ data, days, unitName, unitCapacity, loginName, month, yea
         const std = group.depts.reduce((sum, dept) => sum + (Number(dept.std_hc) || 0), 0);
         const avg = group.depts.reduce((sum, dept) => sum + (Number(dept.avg_hc) || 0), 0);
         const dayTotals = {};
+        const groupLaborPerMachine = {};
+        const machinesArray = {}; 
+        
         days.forEach((d) => {
-            dayTotals[d] = group.depts.reduce((sum, dept) => sum + (Number(dept.days && dept.days[d]) || 0), 0);
+            const dayPresentTotal = group.depts.reduce((sum, dept) => sum + (Number(dept.days && dept.days[d]) || 0), 0);
+            dayTotals[d] = dayPresentTotal;
+
+            const machines = Number(summary.running_machines?.[d]) || 0;
+            machinesArray[d] = summary.running_machines?.[d] || "";
+            groupLaborPerMachine[d] = machines > 0 ? (dayPresentTotal / machines).toFixed(1) : 0;
         });
-        return { name: group.name, std, avg, dayTotals };
+
+        return { name: group.name, std, avg, dayTotals, groupLaborPerMachine, machinesArray };
     }
 
     function makeDayClickHandler(statusKey, statusLabel) {
@@ -867,7 +876,10 @@ function ReportTable({ data, days, unitName, unitCapacity, loginName, month, yea
                             <React.Fragment key={dept.departmentId ?? i}>
                                 <tr
                                     onClick={() => dept.designations && dept.designations.length > 0 && onToggleDept(dept.departmentId)}
-                                    style={{ cursor: dept.designations && dept.designations.length > 0 ? "pointer" : "default" }}
+                                    style={{ 
+                                        cursor: dept.designations && dept.designations.length > 0 ? "pointer" : "default",
+                                        borderTop: (i === 0 || orderedDepartments[i - 1]?.dept.groupId !== dept.groupId) && dept.groupId ? "2.5px solid #1e40af" : "none"
+                                    }}
                                     className={`da-dept-row ${expandedDept === dept.departmentId ? "da-dept-row-open" : ""}`}
                                 >
                                     <td>{dept.department}</td>
@@ -883,46 +895,46 @@ function ReportTable({ data, days, unitName, unitCapacity, loginName, month, yea
                                     <td>{dept.avg_hc}</td>
                                 </tr>
 
-                                    {expandedDept === dept.departmentId && (dept.designations || []).map((desig, j) => {
-										const desigKey = `${dept.departmentId}-${desig.designationId}`;
-										const hasEmployees = desig.employees && desig.employees.length > 0;
-										return (
-											<React.Fragment key={desigKey}>
-												<tr className="da-designation-row" onClick={() => hasEmployees && onToggleDesig(desigKey)} style={{ cursor: hasEmployees ? "pointer" : "default" }}>
-													<td className="da-designation-cell">{desig.designationName}</td>
-													<td>{desig.std_hc ?? 0}</td>
-													{days.map((d) => {
-														const val = desig.days && desig.days[d] !== undefined ? desig.days[d] : "";
-														return (
-															<td key={d} className={val === 0 || val === "" ? "da-empty" : ""}>
-																{val === 0 ? "" : val}
-															</td>
-														);
-													})}
-													<td>{desig.avg_hc}</td>
-												</tr>
+                                {expandedDept === dept.departmentId && (dept.designations || []).map((desig, j) => {
+                                    const desigKey = `${dept.departmentId}-${desig.designationId}`;
+                                    const hasEmployees = desig.employees && desig.employees.length > 0;
+                                    return (
+                                        <React.Fragment key={desigKey}>
+                                            <tr className="da-designation-row" onClick={() => hasEmployees && onToggleDesig(desigKey)} style={{ cursor: hasEmployees ? "pointer" : "default" }}>
+                                                <td className="da-designation-cell">{desig.designationName}</td>
+                                                <td>{desig.std_hc ?? 0}</td>
+                                                {days.map((d) => {
+                                                    const val = desig.days && desig.days[d] !== undefined ? desig.days[d] : "";
+                                                    return (
+                                                        <td key={d} className={val === 0 || val === "" ? "da-empty" : ""}>
+                                                            {val === 0 ? "" : val}
+                                                        </td>
+                                                    );
+                                                })}
+                                                <td>{desig.avg_hc}</td>
+                                            </tr>
 
-												{expandedDesig === desigKey &&
-													desig.employees.map((emp) => (
-														<tr key={emp.employeeId} className="da-employee-row">
-															<td className="da-employee-cell">
-																{emp.employeeName} <span className="da-emp-code">({emp.employeeCode})</span>
-															</td>
-															<td>–</td>
-															{days.map((d) => {
-																const status = emp.days && emp.days[d];
-																return (
-																	<td key={d} className={status ? `da-emp-status da-status-${status.toLowerCase()}` : "da-empty"}>
-																		{status || ""}
-																	</td>
-																);
-															})}
-															<td>–</td>
-														</tr>
-													))}
-											</React.Fragment>
-										);
-									})}
+                                            {expandedDesig === desigKey &&
+                                                desig.employees.map((emp) => (
+                                                    <tr key={emp.employeeId} className="da-employee-row">
+                                                        <td className="da-employee-cell">
+                                                            {emp.employeeName} <span className="da-emp-code">({emp.employeeCode})</span>
+                                                        </td>
+                                                        <td>–</td>
+                                                        {days.map((d) => {
+                                                            const status = emp.days && emp.days[d];
+                                                            return (
+                                                                <td key={d} className={status ? `da-emp-status da-status-${status.toLowerCase()}` : "da-empty"}>
+                                                                    {status || ""}
+                                                                </td>
+                                                            );
+                                                        })}
+                                                        <td>–</td>
+                                                    </tr>
+                                                ))}
+                                        </React.Fragment>
+                                    );
+                                })}
 
 								{expandedDept === dept.departmentId && dept.summary && (
 									<>
@@ -936,31 +948,71 @@ function ReportTable({ data, days, unitName, unitCapacity, loginName, month, yea
 										)}
 									</>
 								)}
-								{isGroupLast && (() => {
-									const g = getGroupTotals(String(dept.groupId));
-									return (
-										<tr className="da-row-combined da-group-total-row">
-										    <td className="da-group-total-label">{g.name} Total</td>
-										    <td>{g.std}</td>
-										    {days.map((d) => {
-										        const val = g.dayTotals[d];
-										        return (
-										            <td key={d} className={!val ? "da-empty" : ""}>
-										                {val || ""}
-										            </td>
-										        );
-										    })}
-										    <td>{g.avg}</td>
-										</tr>
-									);
-								})()}
+
+                                {isGroupLast && (() => {
+                                    const g = getGroupTotals(String(dept.groupId));
+                                    return (
+                                        <>
+                                            <tr className="da-group-total-row" style={{ backgroundColor: "#f8fafc", borderTop: "2.5px solid #1e40af" }}>
+                                                <td className="da-group-total-label" style={{ color: "#334155", fontWeight: "bold", paddingLeft: "16px" }}>
+                                                    Total Present
+                                                </td>
+                                                <td style={{ fontWeight: "bold", color: "#334155" }}>
+                                                    {g.std}
+                                                </td>
+                                                {days.map((d) => {
+                                                    const val = g.dayTotals[d];
+                                                    return (
+                                                        <td key={d} style={{ fontWeight: "bold", color: "#334155" }}>
+                                                            {val || ""}
+                                                        </td>
+                                                    );
+                                                })}
+                                                <td style={{ fontWeight: "bold", color: "#334155" }}>{g.avg}</td>
+                                            </tr>
+
+                                            {/* Group Running Machines Row */}
+                                            <tr className="da-group-total-row" style={{ backgroundColor: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
+                                                <td className="da-group-total-label" style={{ color: "#475569", fontSize: "11px", paddingLeft: "16px" }}>
+                                                    No. of Running Machines
+                                                </td>
+                                                <td>–</td>
+                                                {days.map((d) => {
+                                                    const val = g.machinesArray[d];
+                                                    return (
+                                                        <td key={d} style={{ color: "#475569", fontSize: "11px" }}>
+                                                            {val || ""}
+                                                        </td>
+                                                    );
+                                                })}
+                                                <td>–</td>
+                                            </tr>
+                                            
+                                            <tr className="da-group-total-row" style={{ backgroundColor: "#f8fafc", borderBottom: "2.5px solid #1e40af" }}>
+                                                <td className="da-group-total-label" style={{ color: "#475569", fontSize: "11px", paddingLeft: "16px" }}>
+                                                    Labour Per Machine Per Day
+                                                </td>
+                                                <td>–</td>
+                                                {days.map((d) => {
+                                                    const val = g.groupLaborPerMachine[d];
+                                                    return (
+                                                        <td key={d} style={{ color: "#475569", fontSize: "11px" }}>
+                                                            {val || ""}
+                                                        </td>
+                                                    );
+                                                })}
+                                                <td>–</td>
+                                            </tr>
+                                        </>
+                                    );
+                                })()}
                             </React.Fragment>
                         ))}
                     </tbody>
                     <tfoot>
-                        <SummaryRow label="Total Present" stdValue={total_std_hc} dayValues={summary.total_present} avgValue={summary_avg.total_present} days={days} className="da-row-combined" />
+                        <SummaryRow label="Overall Present" stdValue={total_std_hc} dayValues={summary.total_present} avgValue={summary_avg.total_present} days={days} className="da-row-combined da-row-grand-total" />
                         <SummaryRow label="No. of Running Machines" stdValue="" dayValues={summary.running_machines} avgValue={summary_avg.running_machines} days={days} className="da-row-heading" />
-                        <SummaryRow label="Labor Per Machine Per Day" stdValue="" dayValues={summary.labor_per_machine} avgValue={summary_avg.labor_per_machine} days={days} className="da-row-heading da-row-labor-border" />
+                        <SummaryRow label="Labour Per Machine Per Day" stdValue="" dayValues={summary.labor_per_machine} avgValue={summary_avg.labor_per_machine} days={days} className="da-row-heading da-row-labor-border" />
                         <SummaryRow label="Total Present" statusKey="present" stdValue="" dayValues={summary.present} avgValue={summary_avg.present} days={days} className="da-row-total" onDayClick={makeDayClickHandler("present", "Total Present")} />
                         <SummaryRow label="Total Half Present" statusKey="half_present" stdValue="" dayValues={summary.half_present} avgValue={summary_avg.half_present} days={days} className="da-row-heading" onDayClick={makeDayClickHandler("half_present", "Total Half Present")} />
                         <SummaryRow label="Total Weekly-Off Present" statusKey="wo_present" stdValue="" dayValues={summary.wo_present} avgValue={summary_avg.wo_present} days={days} className="da-row-heading" onDayClick={makeDayClickHandler("wo_present", "Total Weekly-Off Present")} />

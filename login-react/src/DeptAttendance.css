@@ -49,14 +49,36 @@
 .da-table tbody td:last-child { font-weight: 800; color: #065f46; background: rgba(209,250,229,0.4); }
 .da-table tfoot td { font-size: 13px; font-weight: 500; color: #374151; }
 
-/* FIX: combined "Total Present" row (summary.total_present) — blue, NOT clickable, plain numbers only. */
-.da-row-combined td { font-weight: 800 !important; color: #1e40af !important; background: rgba(219,234,254,0.6) !important; border-top: 2.5px solid #1e40af !important; border-bottom: 1px solid #93c5fd !important; }
-.da-row-combined td:first-child { background: rgba(219,234,254,0.6) !important; cursor: default !important; }
-/* Department Group Total rows reuse the blue Total Present style. */
-.da-group-total-row td { border-top: 2.5px solid #1e40af !important; border-bottom: 2.5px solid #1e40af !important; font-weight: 800 !important; }
+/* --- GRAND TOTAL (Bottom Row - Overall Present) --- */
+.da-row-combined td { 
+    font-weight: 800 !important; 
+    color: #ffffff !important; /* White text */
+    background: #1e3a8a !important; /* Deep Dark Blue */
+    border-top: 3px solid #0f172a !important; /* Heavy top border */
+    border-bottom: 3px solid #0f172a !important; /* Heavy bottom border */
+}
+.da-row-combined td:first-child { 
+    background: #1e3a8a !important; 
+    cursor: default !important; 
+    color: #ffffff !important;
+}
+
+/* --- GROUP TOTALS (Middle Rows - Total Present per group) --- */
+.da-group-total-row td { 
+    background: #f1f5f9 !important; /* Light grey background */
+    color: #334155 !important; /* Dark grey text */
+    font-weight: 700 !important; 
+    border-top: 1px solid #cbd5e1 !important; 
+    border-bottom: 2px solid #94a3b8 !important; /* Distinct grey bottom border */
+}
 .da-group-total-row td:first-child,
-.da-group-total-row td:nth-child(2) { background: #e8f0fe !important; }
-.da-group-total-row .da-group-total-label { padding-left: 16px !important; }
+.da-group-total-row td:nth-child(2) { 
+    background: #f1f5f9 !important; 
+}
+.da-group-total-row .da-group-total-label { 
+    padding-left: 16px !important; 
+    color: #1e40af !important; /* Blue text for the label */
+}
 
 .da-row-total td { font-weight: 700; color: #374151; }
 .da-row-ot td { color: #7c3aed; background: rgba(237,233,254,0.3); }
