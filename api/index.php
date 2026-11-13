@@ -144,6 +144,21 @@ switch ($action) {
         handleGetGroupDepartments($input);
         break;
 
+    case 'get_custom_location_groups':
+        if (!checkModulePermission('manage_custom_location_groups')) return;
+        handleGetCustomLocationGroups($input);
+        break;
+
+    case 'save_custom_location_group':
+        if (!checkModulePermission('manage_custom_location_groups')) return;
+        handleSaveCustomLocationGroup($input);
+        break;
+
+    case 'set_custom_location_group_status':
+        if (!checkModulePermission('manage_custom_location_groups')) return;
+        handleSetCustomLocationGroupStatus($input);
+        break;
+
     case 'get_std_hc':
         handleGetStdHC($input);
         break;
@@ -292,7 +307,8 @@ function getPlaceholderIds($conn, $table, $idCol, $nameCol) {
 function getModulePermissionMap() {
     return [
         'master_module' => ['master'],
-        'get_subadmins' => ['master']
+        'get_subadmins' => ['master'],
+        'manage_custom_location_groups' => ['master']
     ];
 }
 
@@ -1146,9 +1162,78 @@ function handleDashboardData($input, $returnData = false) {
         'designation' => [], 'department' => [], 'company' => [], 'shiftGroup' => [], 'location' => []
     ];
 
+
     $locationList = !empty($userLocations) ? implode(',', array_map('intval', $userLocations)) : '0';
     $companyList = !empty($userCompanies) ? implode(',', array_map('intval', $userCompanies)) : '0';
     $departmentList = !empty($userDepartments) ? implode(',', array_map('intval', $userDepartments)) : '0';
+
+    if (isset($input['location_ids']) && $input['location_ids'] !== '') {
+        $requestedLocationIds = json_decode($input['location_ids'], true);
+
+        if (!is_array($requestedLocationIds) || empty($requestedLocationIds)) {
+            $errorResponse = [
+                'success' => false,
+                'message' => 'Invalid or empty location IDs.'
+            ];
+
+            if ($returnData) {
+                return $errorResponse;
+            }
+
+            echo json_encode($errorResponse);
+            return;
+        }
+
+        $requestedLocationIds = array_values(array_unique(
+            array_filter(
+                array_map('intval', $requestedLocationIds),
+                function ($id) {
+                    return $id > 0;
+                }
+            )
+        ));
+
+        if (empty($requestedLocationIds)) {
+            $errorResponse = [
+                'success' => false,
+                'message' => 'No valid locations selected.'
+            ];
+
+            if ($returnData) {
+                return $errorResponse;
+            }
+
+            echo json_encode($errorResponse);
+            return;
+        }
+
+        // Check that every requested location is within the user's permitted scope.
+        $allowedLocationIds = array_map('intval', $userLocations);
+
+        $unauthorizedIds = array_diff($requestedLocationIds, $allowedLocationIds);
+
+        if (!empty($unauthorizedIds)) {
+            $errorResponse = [
+                'success' => false,
+                'message' => 'Access denied for selected locations.'
+            ];
+
+            if ($returnData) {
+                return $errorResponse;
+            }
+
+            echo json_encode($errorResponse);
+            return;
+        }
+
+        $locationList = implode(',', $requestedLocationIds);
+
+        $locationFilter = null;
+
+        $selectedLocationIds = $requestedLocationIds;
+    } else {
+        $selectedLocationIds = array_map('intval', $userLocations);
+    }
 
     // === NEW: shift group -> shift ids, and shift begin/end lookup ===
     $shiftGroupShiftIdsMap = [];
@@ -1210,13 +1295,13 @@ function handleDashboardData($input, $returnData = false) {
     }
 
     $locationScope = [
-        'count' => count($userLocations),
+        'count' => count($selectedLocationIds),
         'locations' => array_map(function ($locId) use ($locationNameMap) {
             return [
                 'locationId' => intval($locId),
                 'locationName' => $locationNameMap[intval($locId)] ?? ('Location ' . $locId)
             ];
-        }, $userLocations)
+        }, $selectedLocationIds)
     ];
 
     $zoneMap = [];
@@ -3808,6 +3893,379 @@ function handleGetGroupDepartments($input = []) {
     ]);
 }
 
+function handleGetCustomLocationGroups($input = []) {
+    if (empty($_SESSION['userId']) || empty($_SESSION['isMaster'])) {
+        http_response_code(403);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Access denied'
+        ]);
+        return;
+    }
+
+    $conn = getSQLServer();
+
+    $sql = "SELECT GroupId, GroupName, Status, CreatedAt, UpdatedAt FROM CustomLocationGroups ORDER BY GroupName ASC";
+
+    $stmt = sqlsrv_query($conn, $sql);
+
+    if ($stmt === false) {
+        error_log('handleGetCustomLocationGroups: ' . print_r(sqlsrv_errors(), true));
+        echo json_encode([
+            'success' => false,
+            'message' => 'Failed to fetch custom location groups'
+        ]);
+        return;
+    }
+
+    $groups = [];
+    $groupIds = [];
+
+    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+
+        $groupId = (int)$row['GroupId'];
+
+        $groups[$groupId] = [
+            'GroupId' => $groupId,
+            'GroupName' => $row['GroupName'],
+            'Status' => (int)$row['Status'],
+            'CreatedAt' => $row['CreatedAt'] instanceof DateTime ? $row['CreatedAt']->format('Y-m-d H:i:s') : $row['CreatedAt'],
+            'UpdatedAt' => $row['UpdatedAt'] instanceof DateTime ? $row['UpdatedAt']->format('Y-m-d H:i:s') : $row['UpdatedAt'],
+            'LocationIds' => [],
+            'Locations' => []
+        ];
+
+        $groupIds[] = $groupId;
+    }
+
+    if (!empty($groupIds)) {
+        $placeholders = implode(',', array_fill(0, count($groupIds), '?'));
+
+        $mappingSql = "SELECT GroupId, LocationId, LocationName FROM CustomLocationGroupMapping WHERE GroupId IN ($placeholders) ORDER BY LocationName ASC";
+
+        $mappingStmt = sqlsrv_query($conn, $mappingSql, $groupIds);
+
+        if ($mappingStmt === false) {
+            error_log('handleGetCustomLocationGroups mapping error: ' . print_r(sqlsrv_errors(), true));
+            echo json_encode([
+                'success' => false,
+                'message' => 'Failed to fetch group locations'
+            ]);
+            return;
+        }
+
+        while ($row = sqlsrv_fetch_array($mappingStmt, SQLSRV_FETCH_ASSOC)) {
+            $groupId = (int)$row['GroupId'];
+
+            if (isset($groups[$groupId])) {
+                $groups[$groupId]['LocationIds'][] = (int)$row['LocationId'];
+                $groups[$groupId]['Locations'][] = [
+                    'location_id' => (int)$row['LocationId'],
+                    'location_name' => $row['LocationName']
+                ];
+            }
+        }
+    }
+
+    echo json_encode([
+        'success' => true,
+        'data' => array_values($groups)
+    ]);
+}
+
+function handleSaveCustomLocationGroup($input) {
+    if (empty($_SESSION['userId']) || empty($_SESSION['isMaster'])) {
+        http_response_code(403);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Access denied'
+        ]);
+        return;
+    }
+
+    $conn = getSQLServer();
+
+    $groupId = (int)($input['groupId'] ?? 0);
+    $groupName = trim($input['groupName'] ?? '');
+    $locationIds = $input['locationIds'] ?? [];
+
+    // Validate group name.
+    if ($groupName === '') {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Group name is required'
+        ]);
+        return;
+    }
+
+    if (mb_strlen($groupName) > 100) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Group name cannot exceed 100 characters'
+        ]);
+        return;
+    }
+
+    if (!is_array($locationIds) || empty($locationIds)) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Please select at least one location'
+        ]);
+        return;
+    }
+
+    $locationIds = array_values(array_unique(
+        array_filter(
+            array_map('intval', $locationIds),
+            function ($id) {
+                return $id > 0;
+            }
+        )
+    ));
+
+    if (empty($locationIds)) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Invalid location selection'
+        ]);
+        return;
+    }
+
+    $placeholders = implode(',', array_fill(0, count($locationIds), '?'));
+
+    $validateSql = "SELECT LocationId FROM Locations WHERE IsActive = 1 AND LocationId IN ($placeholders)";
+
+    $validateStmt = sqlsrv_query($conn, $validateSql, $locationIds);
+
+    if ($validateStmt === false) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Failed to validate selected locations'
+        ]);
+        return;
+    }
+
+    $validLocationIds = [];
+
+    while ($row = sqlsrv_fetch_array($validateStmt, SQLSRV_FETCH_ASSOC)) {
+        $validLocationIds[] = (int)$row['LocationId'];
+    }
+
+    if (count($validLocationIds) !== count($locationIds)) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'One or more selected locations are invalid or inactive'
+        ]);
+        return;
+    }
+
+    if (!sqlsrv_begin_transaction($conn)) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Failed to start transaction'
+        ]);
+        return;
+    }
+
+    if ($groupId > 0) {
+        $checkSql = "SELECT GroupId FROM CustomLocationGroups WHERE GroupId = ?";
+
+        $checkStmt = sqlsrv_query($conn, $checkSql, [$groupId]);
+
+        if ($checkStmt === false || !sqlsrv_fetch_array($checkStmt, SQLSRV_FETCH_ASSOC)) {
+            sqlsrv_rollback($conn);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Custom location group not found'
+            ]);
+            return;
+        }
+
+        $updateSql = "UPDATE CustomLocationGroups SET GroupName = ?, UpdatedAt = GETDATE() WHERE GroupId = ?";
+
+        $updateStmt = sqlsrv_query($conn, $updateSql, [$groupName, $groupId]);
+
+        if ($updateStmt === false) {
+            sqlsrv_rollback($conn);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Failed to update custom location group'
+            ]);
+            return;
+        }
+
+    } else {
+        $insertGroupSql = "INSERT INTO CustomLocationGroups (GroupName, Status, CreatedAt) OUTPUT INSERTED.GroupId VALUES (?, 1, GETDATE())";
+
+        $insertGroupStmt = sqlsrv_query($conn, $insertGroupSql, [$groupName]);
+
+        if ($insertGroupStmt === false) {
+            sqlsrv_rollback($conn);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Failed to create custom location group'
+            ]);
+            return;
+        }
+
+        $newGroup = sqlsrv_fetch_array($insertGroupStmt, SQLSRV_FETCH_ASSOC);
+
+        if (!$newGroup) {
+            sqlsrv_rollback($conn);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Failed to get new group ID'
+            ]);
+            return;
+        }
+
+        $groupId = (int)$newGroup['GroupId'];
+    }
+
+    $existingSql = "SELECT LocationId FROM CustomLocationGroupMapping WHERE GroupId = ?";
+
+    $existingStmt = sqlsrv_query($conn, $existingSql, [$groupId]);
+
+    if ($existingStmt === false) {
+        sqlsrv_rollback($conn);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Failed to fetch existing location mappings'
+        ]);
+
+        return;
+    }
+
+    $existingLocationIds = [];
+    while ($row = sqlsrv_fetch_array($existingStmt, SQLSRV_FETCH_ASSOC)) {
+        $existingLocationIds[] = (int)$row['LocationId'];
+    }
+
+    $existingLocationIds = array_values(array_unique($existingLocationIds));
+
+    $locationsToRemove = array_diff($existingLocationIds, $locationIds);
+
+    foreach ($locationsToRemove as $locationId) {
+        $deleteSql = "DELETE FROM CustomLocationGroupMapping WHERE GroupId = ? AND LocationId = ?";
+
+        $deleteStmt = sqlsrv_query($conn, $deleteSql, [$groupId, $locationId]);
+
+        if ($deleteStmt === false) {
+            sqlsrv_rollback($conn);
+
+            echo json_encode([
+                'success' => false,
+                'message' => 'Failed to remove location from group'
+            ]);
+            
+            return;
+        }
+    }
+
+    $locationsToAdd = array_diff($locationIds, $existingLocationIds);
+
+    foreach ($locationsToAdd as $locationId) {
+        $insertMappingSql = "INSERT INTO CustomLocationGroupMapping (GroupId, LocationId, LocationName, UpdatedAt) SELECT ?, LocationId, LocationName, GETDATE() FROM Locations WHERE LocationId = ? AND IsActive = 1 ";
+
+        $insertMappingStmt = sqlsrv_query($conn, $insertMappingSql, [$groupId, $locationId]);
+
+        if ($insertMappingStmt === false || sqlsrv_rows_affected($insertMappingStmt) !== 1) {
+            sqlsrv_rollback($conn);
+
+            echo json_encode([
+                'success' => false,
+                'message' => 'Failed to add location to group'
+            ]);
+           
+            return;
+        }
+    }
+
+    $syncSql = "UPDATE M SET M.LocationName = L.LocationName, M.UpdatedAt = GETDATE() FROM CustomLocationGroupMapping M INNER JOIN Locations L ON L.LocationId = M.LocationId WHERE M.GroupId = ?";
+
+    $syncStmt = sqlsrv_query($conn, $syncSql, [$groupId]);
+
+    if ($syncStmt === false) {
+        sqlsrv_rollback($conn);
+
+        echo json_encode([
+            'success' => false,
+            'message' => 'Failed to synchronize location names'
+        ]);
+
+        return;
+    }
+
+    if (!sqlsrv_commit($conn)) {
+        sqlsrv_rollback($conn);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Failed to save custom location group'
+        ]);
+        return;
+    }
+
+    echo json_encode([
+        'success' => true,
+        'message' => 'Custom location group saved successfully',
+        'groupId' => $groupId
+    ]);
+}
+
+function handleSetCustomLocationGroupStatus($input) {
+    if (empty($_SESSION['userId']) || empty($_SESSION['isMaster'])) {
+        http_response_code(403);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Access denied'
+        ]);
+        return;
+    }
+
+    $conn = getSQLServer();
+
+    $groupId = (int)($input['groupId'] ?? 0);
+    $status = isset($input['status']) ? (int)$input['status'] : -1;
+
+    if ($groupId <= 0 || !in_array($status, [0, 1], true)) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Valid group ID and status are required'
+        ]);
+        return;
+    }
+
+    $sql = "UPDATE CustomLocationGroups SET Status = ?, UpdatedAt = GETDATE() WHERE GroupId = ?";
+
+    $stmt = sqlsrv_query($conn, $sql, [$status, $groupId]);
+
+    if ($stmt === false) {
+        error_log('handleSetCustomLocationGroupStatus: ' . print_r(sqlsrv_errors(), true));
+
+        echo json_encode([
+            'success' => false,
+            'message' => 'Failed to update group status'
+        ]);
+        return;
+    }
+
+    if (sqlsrv_rows_affected($stmt) === 0) {
+        $checkStmt = sqlsrv_query($conn, "SELECT GroupId FROM CustomLocationGroups WHERE GroupId = ?", [$groupId]);
+
+        if ($checkStmt === false || !sqlsrv_fetch_array($checkStmt, SQLSRV_FETCH_ASSOC)) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Custom location group not found'
+            ]);
+            return;
+        }
+    }
+
+    echo json_encode([
+        'success' => true,
+        'message' => $status === 1 ? 'Custom location group activated successfully' : 'Custom location group deactivated successfully'
+    ]);
+}
 
 /**
  * Handle Dept Report - Get STD Headcounts
@@ -4138,9 +4596,9 @@ function handleGetReport($input) {
  
     $sqlConn = getSQLServer();
     $scope = resolveScope($sqlConn, $input);
-
+ 
     $loggedInUserId = intval($_SESSION['userId'] ?? 0);
-
+ 
     if ($loggedInUserId <= 0) {
         echo json_encode([
             'success' => false,
@@ -4148,9 +4606,9 @@ function handleGetReport($input) {
         ]);
         return;
     }
-
+ 
     $targetUserId = intval($input['targetUserId'] ?? 0);
-
+ 
     if (!empty($_SESSION['isMaster'])) {
         if ($targetUserId <= 0) {
             $targetUserId = $loggedInUserId;
@@ -4158,7 +4616,7 @@ function handleGetReport($input) {
     } else {
         $targetUserId = $loggedInUserId;
     }
-
+ 
     $shiftGroupShiftIdsMap = [];
     $shiftGroupNameMap = [];
     $stmtShiftGroupShifts = sqlsrv_query($sqlConn, "SELECT ShiftGroupId, ShiftGroupName, ShiftIds FROM ShiftGroups");
@@ -4172,15 +4630,15 @@ function handleGetReport($input) {
             $shiftGroupShiftIdsMap[intval($r['ShiftGroupId'])] = array_values(array_unique($ids));
         }
     }
-
+ 
     $shiftDetailsMap = [];
     $stmtShiftDetails = sqlsrv_query($sqlConn,"SELECT ShiftId, ShiftName, BeginTime, EndTime FROM Shifts WITH (NOLOCK)");
-
+ 
     if ($stmtShiftDetails) {
         while ($r = sqlsrv_fetch_array($stmtShiftDetails, SQLSRV_FETCH_ASSOC)) {
             $beginRaw = $r['BeginTime'];
             $endRaw = $r['EndTime'];
-
+ 
             $shiftDetailsMap[(int)$r['ShiftId']] = [
                 'begin' => $beginRaw ? (is_object($beginRaw) ? $beginRaw->format('H:i:s') : $beginRaw) : null,
                 'end' => $endRaw ? (is_object($endRaw) ? $endRaw->format('H:i:s') : $endRaw) : null,
@@ -4188,50 +4646,62 @@ function handleGetReport($input) {
             ];
         }
     }
-
-    if (!empty($input['location_id'])) {
-        $selectedLocation = intval($input['location_id']);
-        if (in_array($selectedLocation, $scope['locations'] ?? [])) {
-            $locationList = (string) $selectedLocation;
+ 
+    if (!empty($input['location_id']) && $input['location_id'] != '0') {
+        $inputIds = explode(',', (string)$input['location_id']);
+        $validIds = [];
+        
+        foreach ($inputIds as $id) {
+            $id = intval(trim($id));
+            if (in_array($id, $scope['locations'] ?? [])) {
+                $validIds[] = $id;
+            }
+        }
+        
+        if (!empty($validIds)) {
+            $locationList = implode(',', $validIds);
         } else {
-            $locationList = '0'; 
+            $locationList = '0';
         }
     } else {
         $locationList = !empty($scope['locations']) ? implode(',', array_map('intval', $scope['locations'])) : '0';
     }
-
+ 
     $companyList = !empty($scope['companies']) ? implode(',', array_map('intval', $scope['companies'])) : '0';
     $departmentList = !empty($scope['departments']) ? implode(',', array_map('intval', $scope['departments'])) : '0';
     
     AutoDepartmentDesignationMappings($sqlConn, $targetUserId, $locationList, $companyList, $departmentList);
-
+ 
     $allLocationsList = !empty($scope['locations']) ? implode(',', array_map('intval', $scope['locations'])) : '0';
-
+ 
     $totalStdMachines = '0.00';
-
+ 
     $sqlMachStd = "SELECT SUM(TotalMachines) as total FROM LocationMachineStdCount WITH (NOLOCK) WHERE UserId = ? AND LocationId IN ($locationList)";
-
+ 
     $stmtMachStd = sqlsrv_query($sqlConn, $sqlMachStd, [$targetUserId]);
-
+ 
     if ($stmtMachStd && $rowMS = sqlsrv_fetch_array($stmtMachStd, SQLSRV_FETCH_ASSOC)) {
         $totalStdMachines = number_format((float)($rowMS['total'] ?? 0), 2, '.', '');
     }
-
+ 
     $dailyMachMap = [];
-
+ 
     $sqlMachDaily = "SELECT MachineDate, SUM(RunningMachines) as total FROM LocationDailyMachineCount WITH (NOLOCK) WHERE UserId = ? AND LocationId IN ($locationList) AND MachineDate >= ? AND MachineDate <= ? GROUP BY MachineDate";
-
+ 
     $stmtMachDaily = sqlsrv_query($sqlConn, $sqlMachDaily, [$targetUserId, $dayFrom, $dayTo]);
-
+ 
     if ($stmtMachDaily) {
         while ($rowMD = sqlsrv_fetch_array($stmtMachDaily, SQLSRV_FETCH_ASSOC)) {
             $d = intval(date('j', strtotime($rowMD['MachineDate']->format('Y-m-d'))));
-
+ 
             $dailyMachMap[$d] = number_format((float)($rowMD['total'] ?? 0), 2, '.', '');
         }
     }
  
-    $sqlD = "SELECT D.DepartmentId, D.DepartmentFName as DepartmentName, D.SortOrder FROM Departments D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON D.DepartmentId = E.DepartmentId WHERE E.Location IN ($allLocationsList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working' GROUP BY D.DepartmentId, D.DepartmentFName, D.SortOrder ORDER BY CASE WHEN D.SortOrder IS NULL OR D.SortOrder = 0 THEN 1 ELSE 0 END, D.SortOrder ASC, D.DepartmentFName ASC";
+    // ---- Departments: Working employees (original query) + departments with STD headcount ----
+ 
+    // 1) Departments that have Working employees (original query, ORDER BY removed - sorting is done in PHP below)
+    $sqlD = "SELECT D.DepartmentId, D.DepartmentFName as DepartmentName, D.SortOrder FROM Departments D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON D.DepartmentId = E.DepartmentId WHERE E.Location IN ($allLocationsList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working' GROUP BY D.DepartmentId, D.DepartmentFName, D.SortOrder";
  
     $stmtD = sqlsrv_query($sqlConn, $sqlD);
  
@@ -4245,20 +4715,49 @@ function handleGetReport($input) {
         return;
     }
  
+    $deptRows = [];
+    while ($row = sqlsrv_fetch_array($stmtD, SQLSRV_FETCH_ASSOC)) {
+        $deptRows[intval($row['DepartmentId'])] = $row;
+    }
+ 
+    // 2) Departments that have STD headcount set (separate simple query)
+    $sqlHcDept = "SELECT D.DepartmentId, D.DepartmentFName as DepartmentName, D.SortOrder FROM Departments D WITH (NOLOCK) INNER JOIN DepartmentLocationHeadCount H WITH (NOLOCK) ON D.DepartmentId = H.DepartmentId WHERE H.UserId = ? AND H.LocationId IN ($locationList) AND H.DepartmentId IN ($departmentList) AND H.StandardHeadCount > 0 GROUP BY D.DepartmentId, D.DepartmentFName, D.SortOrder";
+ 
+    $stmtHcDept = sqlsrv_query($sqlConn, $sqlHcDept, [$targetUserId]);
+ 
+    if ($stmtHcDept) {
+        while ($row = sqlsrv_fetch_array($stmtHcDept, SQLSRV_FETCH_ASSOC)) {
+            $id = intval($row['DepartmentId']);
+            if (!isset($deptRows[$id])) {      // add only if not already there
+                $deptRows[$id] = $row;
+            }
+        }
+    }
+ 
+    // 3) Sort in PHP (same order as the old ORDER BY)
+    $deptRows = array_values($deptRows);
+    usort($deptRows, function ($a, $b) {
+        $aEmpty = empty($a['SortOrder']) ? 1 : 0;
+        $bEmpty = empty($b['SortOrder']) ? 1 : 0;
+        if ($aEmpty != $bEmpty) return $aEmpty <=> $bEmpty;
+        if ($a['SortOrder'] != $b['SortOrder']) return $a['SortOrder'] <=> $b['SortOrder'];
+        return strcmp($a['DepartmentName'], $b['DepartmentName']);
+    });
+ 
     $depts = [];
     $deptOrder = [];
     $deptSortOrder = [];
-    while ($row = sqlsrv_fetch_array($stmtD, SQLSRV_FETCH_ASSOC)) {
+    foreach ($deptRows as $row) {
         $deptId = $row['DepartmentId'];
         $depts[$deptId] = $row['DepartmentName'];
         $deptSortOrder[$deptId] = $row['SortOrder'];
         $deptOrder[] = $deptId;
     }
-
+ 
     $hcMap = [];
-
+ 
     $sqlHc = "SELECT DepartmentId, SUM(StandardHeadCount) AS std_hc FROM DepartmentLocationHeadCount WITH (NOLOCK) WHERE UserId = ? AND LocationId IN ($locationList) AND DepartmentId IN ($departmentList) GROUP BY DepartmentId";
-
+ 
     $stmtHc = sqlsrv_query($sqlConn, $sqlHc, [$targetUserId]);
     
     if ($stmtHc) {
@@ -4266,11 +4765,11 @@ function handleGetReport($input) {
             $hcMap[$row['DepartmentId']] = intval($row['std_hc']);
         }
     }
-
+ 
     $desigHcMap = [];
-
+ 
     $sqlDesigHc = "SELECT DepartmentId, DesignationId, SUM(StandardHeadCount) AS std_hc FROM DepartmentDesignationLocationHeadCount WITH (NOLOCK) WHERE UserId = ? AND LocationId IN ($locationList) AND DepartmentId IN ($departmentList) GROUP BY DepartmentId, DesignationId";
-
+ 
     $stmtDesigHc = sqlsrv_query($sqlConn, $sqlDesigHc, [$targetUserId]);
     
     if ($stmtDesigHc) {
@@ -4281,7 +4780,7 @@ function handleGetReport($input) {
  
     $designationMaster = [];
     $stmtDesignationMaster = sqlsrv_query($sqlConn, "SELECT DesignationId, DesignationsName, SortOrder FROM Designations WITH (NOLOCK)");
-
+ 
     if ($stmtDesignationMaster) {
         while ($row = sqlsrv_fetch_array($stmtDesignationMaster, SQLSRV_FETCH_ASSOC)) {
             $designationMaster[(int)$row['DesignationId']] = [
@@ -4290,7 +4789,7 @@ function handleGetReport($input) {
             ];
         }
     }
-
+ 
     $sqlDesig = "SELECT DDM.DepartmentId, DG.DesignationId, DG.DesignationsName, DG.SortOrder AS DesigSortOrder, DDM.ParentDesignationId FROM DepartmentDesignationMapping DDM WITH (NOLOCK) INNER JOIN Designations DG WITH (NOLOCK) ON DDM.DesignationId = DG.DesignationId WHERE DDM.IsActive = 1 AND DDM.UserId = ? AND DDM.DepartmentId IN ($departmentList) ORDER BY CASE WHEN DG.SortOrder IS NULL OR DG.SortOrder = 0 THEN 1 ELSE 0 END, DG.SortOrder ASC, DG.DesignationsName ASC";
  
     $stmtDesig = sqlsrv_query($sqlConn, $sqlDesig, [$targetUserId]);
@@ -4307,12 +4806,12 @@ function handleGetReport($input) {
  
     
     $tempDesig = [];
-
+ 
     if ($stmtDesig) {
         while ($row = sqlsrv_fetch_array($stmtDesig, SQLSRV_FETCH_ASSOC)) {
             $deptId = intval($row['DepartmentId']);
             $designationId = intval($row['DesignationId']);
-
+ 
             if (!isset($tempDesig[$deptId][$designationId])) {
                 $tempDesig[$deptId][$designationId] = [
                     'id' => $designationId,
@@ -4323,56 +4822,56 @@ function handleGetReport($input) {
             }
         }
     }
-
+ 
     $desigByDept = [];
     $reportingDesigMap = [];
-
+ 
     foreach ($tempDesig as $deptId => $designations) {
         $designationMap = $designations;
-
+ 
         foreach ($designationMap as $designationId => $d) {
             $currentId = $designationId;
             $visited = [];
-
+ 
             while (isset($designationMap[$currentId]) && $designationMap[$currentId]['parentId'] !== null) {
                 if (isset($visited[$currentId])) {
                     break;
                 }
-
+ 
                 $visited[$currentId] = true;
                 $currentId = $designationMap[$currentId]['parentId'];
             }
-
+ 
             $reportingDesigMap[$deptId][$designationId] = $currentId;
         }
-
+ 
         foreach ($designationMap as $d) {
             if ($d['parentId'] === null) {
                 $d['parentName'] = null;
                 $desigByDept[$deptId][] = $d;
             }
         }
-
+ 
         if (!empty($desigByDept[$deptId])) {
             usort($desigByDept[$deptId], function ($a, $b) {
                 $aEmpty = empty($a['sortOrder']);
                 $bEmpty = empty($b['sortOrder']);
-
+ 
                 if ($aEmpty != $bEmpty) {
                     return $aEmpty ? 1 : -1;
                 }
-
+ 
                 if ($a['sortOrder'] != $b['sortOrder']) {
                     return $a['sortOrder'] <=> $b['sortOrder'];
                 }
-
+ 
                 return strcmp($a['name'], $b['name']);
             });
         }
     }
-
+ 
     $numDays = $toDay - $fromDay + 1;
-
+ 
     $summary = [
         'total_present' => array_fill($fromDay, $numDays, 0),
         'present' => array_fill($fromDay, $numDays, 0),
@@ -4391,14 +4890,14 @@ function handleGetReport($input) {
         'running_machines' => array_fill($fromDay, $numDays, 0),   
         'labor_per_machine' => array_fill($fromDay, $numDays, 0),  
     ];
-
+ 
     $employees = [];
     $empDateRows = [];
     $empMeta = [];
     $employeesByDeptDesig = [];
     $newJoineeEmployeesByDay = [];
     $leftEmployeesByDay = [];
-
+ 
     // Fetch Company and Location Maps
     $companyMap = [];
     $stmtCompany = sqlsrv_query($sqlConn, "SELECT CompanyId, CompanyFName FROM Companies WITH (NOLOCK)");
@@ -4407,7 +4906,7 @@ function handleGetReport($input) {
             $companyMap[(int)$row['CompanyId']] = $row['CompanyFName'];
         }
     }
-
+ 
     $locationMap = [];
     $stmtLocation = sqlsrv_query($sqlConn, "SELECT LocationId, LocationName FROM Locations WITH (NOLOCK) WHERE LocationId IN ($locationList)");
     if ($stmtLocation) {
@@ -4415,13 +4914,13 @@ function handleGetReport($input) {
             $locationMap[(int)$row['LocationId']] = $row['LocationName'];
         }
     }
-
-    $sqlMasterEmployees = "SELECT E.EmployeeId, E.EmployeeCode, E.EmployeeName, E.DepartmentId, E.Designation AS DesignationId, E.DOJ, E.DOR, E.Status, E.ShiftGroupId, E.CompanyId, E.Location FROM Employees E WITH (NOLOCK) WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList)";
-
+ 
+    $sqlMasterEmployees = "SELECT E.EmployeeId, E.EmployeeCode, E.EmployeeName, E.DepartmentId, E.Designation AS DesignationId, E.DOJ, E.DOR, E.Status, E.ShiftGroupId, E.CompanyId, E.Location FROM Employees E WITH (NOLOCK) WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList)";
+ 
     $empShiftGroupMap = [];
-
+ 
     $stmtMasterEmployees = sqlsrv_query($sqlConn, $sqlMasterEmployees);
-
+ 
     if ($stmtMasterEmployees) {
         while ($row = sqlsrv_fetch_array($stmtMasterEmployees, SQLSRV_FETCH_ASSOC)) {
             $empId = (string)$row['EmployeeId'];
@@ -4433,9 +4932,9 @@ function handleGetReport($input) {
             $status = $row['Status'];
             $doj = $row['DOJ'] ? $row['DOJ']->format('Y-m-d') : null;
             $dor = $row['DOR'] ? $row['DOR']->format('Y-m-d') : null;
-
+ 
             $empShiftGroupMap[$empId] = intval($row['ShiftGroupId']);
-
+ 
             // Resolve shift details for the employee
             $empCompanyId = intval($row['CompanyId']);
             $empLocationId = intval($row['Location']);
@@ -4452,7 +4951,7 @@ function handleGetReport($input) {
                     ];
                 }
             }
-
+ 
             $employees[$empId] = [
                 'employeeId' => $empId,
                 'employeeCode' => $code,
@@ -4463,14 +4962,14 @@ function handleGetReport($input) {
                 'doj' => $doj,
                 'dor' => $dor
             ];
-
+ 
             $empDateRows[$empId] = [
                 'deptId' => $deptId,
                 'doj' => $doj,
                 'dor' => $dor,
                 'status' => $status
             ];
-
+ 
             $empMeta[$empId] = [
                 'dept' => $deptId,
                 'desig' => $desigId,
@@ -4483,7 +4982,7 @@ function handleGetReport($input) {
                 'shiftStartTime' => $empShiftDetails['start'],
                 'shiftEndTime' => $empShiftDetails['end']
             ];
-
+ 
             if ($status == 'Working') {
                 $employeesByDeptDesig[$deptId][$reportDesigId][] = [
                     'id' => $empId,
@@ -4491,13 +4990,13 @@ function handleGetReport($input) {
                     'name' => $name
                 ];
             }
-
+ 
             if ($doj && $doj >= $dayFrom && $doj <= $dayTo) {
                 $joinDay = intval(date('j', strtotime($doj)));
                 if (isset($summary['new_joinee'][$joinDay])) {
                     $summary['new_joinee'][$joinDay]++;
                 }
-
+ 
                 $newJoineeEmployeesByDay[$joinDay][] = [
                     'employeeId' => $empId,
                     'employeeCode' => $code,
@@ -4517,13 +5016,13 @@ function handleGetReport($input) {
                     'detailStatus' => null
                 ];
             }
-
+ 
             if ($status == 'Resigned' && $dor && $dor >= $dayFrom && $dor <= $dayTo) {
                 $leaveDay = intval(date('j', strtotime($dor)));
                 if (isset($summary['left'][$leaveDay])) {
                     $summary['left'][$leaveDay]++;
                 }
-
+ 
                 $leftEmployeesByDay[$leaveDay][] = [
                     'employeeId' => $empId,
                     'employeeCode' => $code,
@@ -4545,16 +5044,16 @@ function handleGetReport($input) {
             }
         }
     }
-
+ 
     foreach ($employeesByDeptDesig as $deptId => $designationEmployees) {
         $existingIds = [];
-
+ 
         if (isset($desigByDept[$deptId])) {
             foreach ($desigByDept[$deptId] as $d) {
                 $existingIds[$d['id']] = true;
             }
         }
-
+ 
         foreach ($designationEmployees as $designationId => $emps) {
             if (isset($existingIds[$designationId])) {
                 continue;
@@ -4562,7 +5061,7 @@ function handleGetReport($input) {
             if (!isset($designationMaster[$designationId])) {
                 continue;
             }
-
+ 
             $desigByDept[$deptId][] = [
                 'id' => $designationId,
                 'name' => $designationMaster[$designationId]['name'],
@@ -4570,24 +5069,24 @@ function handleGetReport($input) {
                 'parentId' => null,
                 'parentName' => null
             ];
-
+ 
             $existingIds[$designationId] = true;
         }
-
+ 
         $groupSortOrder = [];
         foreach ($desigByDept[$deptId] as $d) {
             if ($d['parentId'] === null) {
                 $groupSortOrder[$d['id']] = $d['sortOrder'];
             }
         }
-
+ 
         usort($desigByDept[$deptId], function ($a, $b) use ($groupSortOrder) {
             $aGroupId = $a['parentId'] ?? $a['id'];
             $bGroupId = $b['parentId'] ?? $b['id'];
-
+ 
             $aGroupSort = $groupSortOrder[$aGroupId] ?? null;
             $bGroupSort = $groupSortOrder[$bGroupId] ?? null;
-
+ 
             $aGroupEmpty = empty($aGroupSort);
             $bGroupEmpty = empty($bGroupSort);
             if ($aGroupEmpty != $bGroupEmpty) {
@@ -4596,13 +5095,13 @@ function handleGetReport($input) {
             if ($aGroupSort != $bGroupSort) {
                 return $aGroupSort <=> $bGroupSort;
             }
-
+ 
             $aIsChild = $a['parentId'] !== null ? 1 : 0;
             $bIsChild = $b['parentId'] !== null ? 1 : 0;
             if ($aIsChild != $bIsChild) {
                 return $aIsChild <=> $bIsChild;
             }
-
+ 
             $aEmpty = empty($a['sortOrder']);
             $bEmpty = empty($b['sortOrder']);
             if ($aEmpty != $bEmpty) {
@@ -4629,16 +5128,16 @@ function handleGetReport($input) {
     // DeviceLogs fetch for single-punch fallback (+1 day buffer for overnight/flexi shifts)
     $deviceFrom = (new DateTime($dayFrom))->modify('-1 day')->format('Y-m-d');
     $deviceTo = (new DateTime($dayTo))->modify('+1 day')->format('Y-m-d');
-
+ 
     $deviceEmployeeStats = [];
-
+ 
     $devCurDate = new DateTime(date('Y-m-01', strtotime($deviceFrom)));
     $devEndDate = new DateTime(date('Y-m-01', strtotime($deviceTo)));
-
+ 
     while ($devCurDate <= $devEndDate) {
         $dm = (int)$devCurDate->format('n');
         $dy = (int)$devCurDate->format('Y');
-
+ 
         $devTable = "DeviceLogs_{$dm}_{$dy}";
         $devTableExists = false;
         $checkDevTable = sqlsrv_query($sqlConn, "SELECT 1 FROM sys.tables WHERE name = ?", array($devTable));
@@ -4649,22 +5148,22 @@ function handleGetReport($input) {
             $checkDevTable = sqlsrv_query($sqlConn, "SELECT 1 FROM sys.tables WHERE name = ?", array($devTable));
             if ($checkDevTable && sqlsrv_fetch_array($checkDevTable)) $devTableExists = true;
         }
-
+ 
         if ($devTableExists) {
             $sqlDevRaw = "SELECT D.AttDirection, D.LogDate, E.EmployeeId FROM $devTable D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON CAST(D.UserId AS VARCHAR(50)) = CAST(E.EmployeeCodeInDevice AS VARCHAR(50)) WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND D.LogDate >= '$deviceFrom' AND D.LogDate <= '$deviceTo 23:59:59' AND E.Status = 'Working'";
-
+ 
             $stmtDevRaw = sqlsrv_query($sqlConn, $sqlDevRaw);
-
+ 
             if ($stmtDevRaw) {
                 while ($row = sqlsrv_fetch_array($stmtDevRaw, SQLSRV_FETCH_ASSOC)) {
                     $empId = (string)$row['EmployeeId'];
                     $rowDateStr = $row['LogDate']->format('Y-m-d');
                     $key = $empId . '_' . $rowDateStr;
-
+ 
                     if (!isset($deviceEmployeeStats[$key])) {
                         $deviceEmployeeStats[$key] = ['punches' => []];
                     }
-
+ 
                     $deviceEmployeeStats[$key]['punches'][] = [
                         'dateTime'  => clone $row['LogDate'],
                         'direction' => strtoupper(trim($row['AttDirection'])),
@@ -4672,10 +5171,10 @@ function handleGetReport($input) {
                 }
             }
         }
-
+ 
         $devCurDate->modify('+1 month');
     }
-
+ 
     $liveData = [];
     $liveDataByDesig = [];
     $empDayStatus = [];
@@ -4704,31 +5203,31 @@ function handleGetReport($input) {
             }
         }
     }
-
+ 
     // Device-log fallback: rescue true absences (Gate 1: not already single-punch, Gate 2: code === 'A')
     foreach ($empDayStatus as $empId => &$days) {
         foreach ($days as $day => &$rec) {
             if (isSinglePunchDay($rec)) {
                 continue;
             }
-
+ 
             $code = resolveAttendanceStatusCode($rec['code'], $rec['wo']);
             if ($code !== 'A') {
                 continue;
             }
-
+ 
             $shiftGroupId = $empShiftGroupMap[$empId] ?? null;
             $shiftIds = $shiftGroupId !== null ? ($shiftGroupShiftIdsMap[$shiftGroupId] ?? []) : [];
             if (empty($shiftIds)) {
                 continue;
             }
-
+ 
             $attendanceDate = "$year-" . sprintf("%02d", $month) . "-" . sprintf("%02d", $day);
             $nextDate = date('Y-m-d', strtotime($attendanceDate . ' +1 day'));
-
+ 
             $currentKey = $empId . '_' . $attendanceDate;
             $nextKey = $empId . '_' . $nextDate;
-
+ 
             $employeePunches = [];
             if (isset($deviceEmployeeStats[$currentKey]['punches'])) {
                 $employeePunches = array_merge($employeePunches, $deviceEmployeeStats[$currentKey]['punches']);
@@ -4736,17 +5235,17 @@ function handleGetReport($input) {
             if (isset($deviceEmployeeStats[$nextKey]['punches'])) {
                 $employeePunches = array_merge($employeePunches, $deviceEmployeeStats[$nextKey]['punches']);
             }
-
+ 
             if (empty($employeePunches)) {
                 continue;
             }
-
+ 
             usort($employeePunches, function ($a, $b) {
                 return $a['dateTime'] <=> $b['dateTime'];
             });
-
+ 
             $match = findNearShiftPunch($employeePunches, $empId, $attendanceDate, $shiftIds, $shiftDetailsMap);
-
+ 
             if ($match) {
                 $rec['forceSP'] = true;
             }
@@ -4759,7 +5258,7 @@ function handleGetReport($input) {
     $statusEmployeesByDay = [];
     $otEmployeesByDay = [];
     $leaveEmployeesByDay = [];
-
+ 
     $statusKeyMap = [
         'P' => 'present',
         'HD' => 'half_present',
@@ -4779,7 +5278,7 @@ function handleGetReport($input) {
             $status = resolveDayStatus($rec);       
             $attendanceShiftId = $rec['shiftId'] ?? null;
             $attendanceShift = $attendanceShiftId !== null ? ($shiftDetailsMap[$attendanceShiftId] ?? null) : null;
-
+ 
             if (!isset($liveData[$deptId][$day])) {
                 $liveData[$deptId][$day] = [
                     'present' => 0, 
@@ -4879,7 +5378,7 @@ function handleGetReport($input) {
     }
  
     $departments = [];
-
+ 
     $deptHeadcountByDay = [];
     for ($d = $fromDay; $d <= $toDay; $d++) {
         $dateStr = "$year-" . sprintf('%02d', $month) . "-" . sprintf('%02d', $d);
@@ -4897,10 +5396,10 @@ function handleGetReport($input) {
         foreach ($deptHeadcountByDay as $deptId => $days) {
             $daySum += $days[$d] ?? 0;
         }
-
+ 
         $summary['recruited_hc'][$d] = $daySum;
     }
-
+ 
     $allIds = $deptOrder;
     foreach (array_keys($liveData) as $id) {
         if (!in_array($id, $allIds)) $allIds[] = $id;
@@ -4920,18 +5419,18 @@ function handleGetReport($input) {
             $reportingDesigHcMap[$deptId][$reportDesigId] += intval($hc);
         }
     }
-
+ 
     // ---- Department Group mapping (active groups of the target user only) ----
     $deptGroupMap = [];
-
+ 
     $sqlGroupMap = "SELECT m.DepartmentId, g.GroupId, g.GroupName, g.SortOrder FROM DepartmentGroupMapping m WITH (NOLOCK) INNER JOIN DepartmentGroups g WITH (NOLOCK) ON g.GroupId = m.GroupId WHERE g.UserId = ? AND g.Status = 1 AND m.Status = 1 AND m.DepartmentId IN ($departmentList) ORDER BY g.SortOrder ASC, g.GroupId ASC";
-
+ 
     $stmtGroupMap = sqlsrv_query($sqlConn, $sqlGroupMap, [$targetUserId]);
-
+ 
     if ($stmtGroupMap) {
         while ($row = sqlsrv_fetch_array($stmtGroupMap, SQLSRV_FETCH_ASSOC)) {
             $gDeptId = intval($row['DepartmentId']);
-
+ 
             // A department belongs to only one active group, but keep the first match to be safe
             if (!isset($deptGroupMap[$gDeptId])) {
                 $deptGroupMap[$gDeptId] = [
@@ -5000,7 +5499,7 @@ function handleGetReport($input) {
                 if ($desigStdHc <= 0 && $employeeCount == 0) {
                     continue;
                 }
-
+ 
                 $desigSummary = [
                     'total_employees' => $employeeCount,
                     'total_present' => array_fill($fromDay, $numDays, 0),
@@ -5026,7 +5525,7 @@ function handleGetReport($input) {
                                     $desigSummary['total_present'][$d]++;
                                     $deptSummary['total_present'][$d]++;
                                     break;
-
+ 
                                 case 'SP':
                                     $desigSummary['total_single_punch'][$d]++;
                                     $deptSummary['total_single_punch'][$d]++;
@@ -5144,7 +5643,6 @@ function handleGetReport($input) {
         'total_running_machines' => $totalStdMachines
     ]);
 }
-
 
 /**
  * GET fixed STD machine total for a location
@@ -5337,13 +5835,15 @@ function resolveLocationFilter($scope, $input) {
     return ['isAll' => true, 'single' => null, 'list' => !empty($allowed) ? implode(',', $allowed) : '0'];
 }
 
-
 /**
- * Get simple list of Locations assigned to the selected admin
+ * Get individual Locations and eligible Custom Location Groups
+ * for the selected admin.
  */
 function handleGetLocations($input = []) {
+
     if (!empty($_SESSION['isMaster'])) {
         $targetUserId = intval($input['targetUserId'] ?? 0);
+
         if ($targetUserId <= 0) {
             echo json_encode([
                 'success' => false,
@@ -5352,7 +5852,6 @@ function handleGetLocations($input = []) {
             return;
         }
     } else {
-
         $targetUserId = intval($_SESSION['userId'] ?? 0);
 
         if ($targetUserId <= 0) {
@@ -5369,61 +5868,156 @@ function handleGetLocations($input = []) {
     $currentUserId = intval($_SESSION['userId'] ?? 0);
     $isMaster = !empty($_SESSION['isMaster']);
 
+    /*
+     * STEP 1: Fetch permitted individual locations
+     */
     if ($isMaster && $targetUserId === $currentUserId) {
-        $sql = "SELECT LocationId, LocationName FROM Locations WITH (NOLOCK) WHERE IsActive = 1 ORDER BY LocationName ASC";
+
+        $sql = "
+            SELECT LocationId, LocationName
+            FROM Locations WITH (NOLOCK)
+            WHERE IsActive = 1
+            ORDER BY LocationName ASC
+        ";
 
         $stmt = sqlsrv_query($conn, $sql);
 
-        if ($stmt === false) {
-            $errors = sqlsrv_errors();
-            error_log('handleGetLocations Master SQL error: ' . print_r($errors, true));
+    } else {
 
-            echo json_encode([
-                'success' => false,
-                'message' => 'Database query failed'
-            ]);
+        $sql = "
+            SELECT L.LocationId, L.LocationName
+            FROM UserLocations UL WITH (NOLOCK)
+            INNER JOIN Locations L WITH (NOLOCK)
+                ON UL.LocationId = L.LocationId
+            WHERE UL.UserId = ?
+              AND L.IsActive = 1
+            ORDER BY L.LocationName ASC
+        ";
 
-            return;
-        }
-
-        $data = [];
-
-        while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
-
-            $data[] = [
-                'location_id' => intval($row['LocationId']),
-                'location_name' => $row['LocationName']
-            ];
-        }
-
-        echo json_encode([
-            'success' => true,
-            'data' => $data
-        ]);
-
-        return;
+        $stmt = sqlsrv_query($conn, $sql, [$targetUserId]);
     }
 
-    $sql = "SELECT L.LocationId, L.LocationName FROM UserLocations UL WITH (NOLOCK) INNER JOIN Locations L WITH (NOLOCK) ON UL.LocationId = L.LocationId WHERE UL.UserId = ? AND L.IsActive = 1 ORDER BY L.LocationName ASC";
-
-    $stmt = sqlsrv_query($conn, $sql, [$targetUserId]);
-
     if ($stmt === false) {
-        $errors = sqlsrv_errors();
-        error_log('handleGetLocations SQL error: '. print_r($errors, true));
+        error_log(
+            'handleGetLocations Location SQL error: ' .
+            print_r(sqlsrv_errors(), true)
+        );
+
         echo json_encode([
             'success' => false,
-            'message' => 'Database query failed'
+            'message' => 'Database query failed while fetching locations.'
         ]);
 
         return;
     }
 
     $data = [];
+    $allowedLocationIds = [];
+
     while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+
+        $locationId = intval($row['LocationId']);
+
+        $allowedLocationIds[] = $locationId;
+
         $data[] = [
-            'location_id' => intval($row['LocationId']),
+            'type' => 'location',
+            'location_id' => $locationId,
             'location_name' => $row['LocationName']
+        ];
+    }
+
+    sqlsrv_free_stmt($stmt);
+
+    /*
+     * STEP 2: Fetch active Custom Location Groups
+     */
+    $groupSql = "
+        SELECT
+            G.GroupId,
+            G.GroupName,
+            M.LocationId
+        FROM CustomLocationGroups G WITH (NOLOCK)
+        INNER JOIN CustomLocationGroupMapping M WITH (NOLOCK)
+            ON G.GroupId = M.GroupId
+        INNER JOIN Locations L WITH (NOLOCK)
+            ON M.LocationId = L.LocationId
+        WHERE G.Status = 1
+          AND L.IsActive = 1
+        ORDER BY G.GroupName ASC
+    ";
+
+    $groupStmt = sqlsrv_query($conn, $groupSql);
+
+    if ($groupStmt === false) {
+        error_log(
+            'handleGetLocations Group SQL error: ' .
+            print_r(sqlsrv_errors(), true)
+        );
+
+        echo json_encode([
+            'success' => false,
+            'message' => 'Database query failed while fetching location groups.'
+        ]);
+
+        return;
+    }
+
+    /*
+     * STEP 3: Group mapped locations by GroupId
+     */
+    $groups = [];
+
+    while ($row = sqlsrv_fetch_array($groupStmt, SQLSRV_FETCH_ASSOC)) {
+
+        $groupId = intval($row['GroupId']);
+
+        if (!isset($groups[$groupId])) {
+            $groups[$groupId] = [
+                'group_id' => $groupId,
+                'group_name' => $row['GroupName'],
+                'location_ids' => []
+            ];
+        }
+
+        $groups[$groupId]['location_ids'][] = intval($row['LocationId']);
+    }
+
+    sqlsrv_free_stmt($groupStmt);
+
+    /*
+     * STEP 4: Show only groups whose ALL locations
+     * are permitted for the selected admin.
+     */
+    $allowedLocationLookup = array_flip($allowedLocationIds);
+
+    foreach ($groups as $group) {
+
+        $mappedLocationIds = array_unique($group['location_ids']);
+
+        // Do not show empty groups
+        if (empty($mappedLocationIds)) {
+            continue;
+        }
+
+        $allLocationsAllowed = true;
+
+        foreach ($mappedLocationIds as $locationId) {
+            if (!isset($allowedLocationLookup[$locationId])) {
+                $allLocationsAllowed = false;
+                break;
+            }
+        }
+
+        if (!$allLocationsAllowed) {
+            continue;
+        }
+
+        $data[] = [
+            'type' => 'group',
+            'group_id' => $group['group_id'],
+            'group_name' => $group['group_name'],
+            'location_ids' => array_values($mappedLocationIds)
         ];
     }
 
@@ -5432,7 +6026,6 @@ function handleGetLocations($input = []) {
         'data' => $data
     ]);
 }
-
 
 /**
  * Get simple list of departments filtered by Location 14

@@ -8,6 +8,7 @@ class AttendanceView {
             { id: "feature", label: "Dashboard", icon: "ph-house" },
             { id: "units", label: "Units List", icon: "ph-buildings", roles: ["master"] }, 
             { id: "dept_designation_mapping", label: "Dept-Designation Mapping", icon: "ph-map-trifold" },
+            { id: "custom_location_groups", label: "Custom Location Groups", icon: "ph-map-pin", roles: ["master"] },
             { id: "dept_group_mapping", label: "Dept Group Mapping", icon: "ph-squares-four" },
             { id: "all", label: "Attendance Logs", icon: "ph-list-dashes" },
             { id: "age", label: "Age Analysis", icon: "ph-user-circle" },
@@ -134,33 +135,34 @@ class AttendanceView {
                 <div class="main-content">
                     ${this._renderTopbar(state)}
                     <div class="content-body">
-                        ${(state.activeTab !== "feature" && state.activeTab !== "units" && state.activeTab !== "dept_designation_mapping" && state.activeTab !== "dept_group_mapping") ? this._renderFilters(state.filters, filterOpts, state) : ""}
+                        ${(state.activeTab !== "feature" && state.activeTab !== "units" && state.activeTab !== "dept_designation_mapping" && state.activeTab !== "custom_location_groups" && state.activeTab !== "dept_group_mapping") ? this._renderFilters(state.filters, filterOpts, state) : ""}
                         ${
                             state.activeTab === "designation"
-                                ? this._renderDesignationFamilySummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "age"
-                                ? this._renderAgeSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "company"
-                                ? this._renderCompanySummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "dept"
-                                ? this._renderDeptSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "gender"
-                                ? this._renderGenderSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "latein"
-                                ? this._renderLateInSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "earlyout"
-                                ? this._renderEarlyOutSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "shift"
-                                ? this._renderShiftSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "manual_punch"
-                                ? this._renderManualPunchSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "night"
-                                ? this._renderNightSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "staff"
-                                ? this._renderStaffSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "worker"
-                                ? this._renderWorkerSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "resigned"
-                                ? this._renderResignedSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "newjoined"
-                                ? this._renderNewJoinedSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "special"
-                                ? "" : state.activeTab === "data_quality"
-                                ? "" : state.activeTab === "designation_order"
-                                ? "" : state.activeTab === "sort_order"
-                                ? "" : state.activeTab === "designation_families"
-                                ? "" : state.activeTab === "dept_designation_mapping"
-                                ? "" : state.activeTab === "dept_group_mapping"
-                                ? "" : state.activeTab === "overtime"
-                                ? "" : state.activeTab === "units"
-                                ? "" : state.activeTab === "feature"
-                                ? this._renderDashboardSummaryCards(emps, stats, model, logs, empMap) : this._renderSummaryCards(stats, emps, logs, empMap, model)
+                            ? this._renderDesignationFamilySummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "age"
+                            ? this._renderAgeSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "company"
+                            ? this._renderCompanySummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "dept"
+                            ? this._renderDeptSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "gender"
+                            ? this._renderGenderSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "latein"
+                            ? this._renderLateInSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "earlyout"
+                            ? this._renderEarlyOutSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "shift"
+                            ? this._renderShiftSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "manual_punch"
+                            ? this._renderManualPunchSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "night"
+                            ? this._renderNightSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "staff"
+                            ? this._renderStaffSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "worker"
+                            ? this._renderWorkerSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "resigned"
+                            ? this._renderResignedSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "newjoined"
+                            ? this._renderNewJoinedSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "special"
+                            ? "" : state.activeTab === "data_quality"
+                            ? "" : state.activeTab === "designation_order"
+                            ? "" : state.activeTab === "sort_order"
+                            ? "" : state.activeTab === "designation_families"
+                            ? "" : state.activeTab === "dept_designation_mapping"
+                            ? "" : state.activeTab === "custom_location_groups"
+                            ? "" : state.activeTab === "dept_group_mapping"
+                            ? "" : state.activeTab === "overtime"
+                            ? "" : state.activeTab === "units"
+                            ? "" : state.activeTab === "feature"
+                            ? this._renderDashboardSummaryCards(emps, stats, model, logs, empMap) : this._renderSummaryCards(stats, emps, logs, empMap, model)
                         }
                         
                         <div id="stat-card-drilldown" class="stat-drilldown-panel" style="display:none;"></div>
@@ -6432,7 +6434,26 @@ class AttendanceView {
                         </div>
                     `,
                 };
-                break;            
+                break; 
+            case "custom_location_groups":
+                content = {
+                    html: `
+                        <div class="designation-order-container">
+                            <h2 class="section-title">
+                                <i class="ph-fill ph-map-pinned"></i>
+                                Custom Location Groups
+                            </h2>
+
+                            <div id="custom-location-groups-content">
+                                <div style="display:flex; align-items:center; gap:12px; padding:32px; color:#64748b;">
+                                    <div class="auth-spinner" style="width:24px; height:24px; border-width:2px; border-top-color:#6366f1;"></div>
+                                    <span>Loading custom location groups...</span>
+                                </div>
+                            </div>
+                        </div>
+                    `,
+                };
+                break;           
             case "dept_group_mapping":
                 content = {
                     html: `
@@ -6493,6 +6514,10 @@ class AttendanceView {
         }
         if (tabId === "dept_designation_mapping") {
             setTimeout(() => this._initDeptDesignationMappingTab(model), 50);
+            return;
+        }
+        if (tabId === "custom_location_groups") {
+            setTimeout(() => this._initCustomLocationGroupsTab(model), 50);
             return;
         }
         if (tabId === "dept_group_mapping") {
@@ -13178,7 +13203,7 @@ class AttendanceView {
 
         if (result && result.success) {
             this.showToast(`Group ${activate ? "activated" : "deactivated"} successfully`, "success");
-            await this._loadDeptGroups();
+            await this._loadDeptGroviups();
         } else {
             this.showToast((result && (result.message || result.error)) || `Failed to ${action} group`, "error");
         }

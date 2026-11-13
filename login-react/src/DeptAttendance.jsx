@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { generateDummyReport, DEFAULT_STD_HC } from "./dummyData";
 import "./DeptAttendance.css";
 
@@ -8,7 +8,7 @@ const DASH_URL = "/attendance-dashboard/index.html";
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 export default function DeptAttendance() {
-    const [locationId, setLocationId] = useState(null);
+    const [selectedLocation, setSelectedLocation] = useState(null);
     const [locationList, setLocationList] = useState([]);
     const [adminList, setAdminList] = useState([]);
     const [selectedAdminId, setSelectedAdminId] = useState(null);
@@ -20,13 +20,26 @@ export default function DeptAttendance() {
     const [year, setYear] = useState(() => yesterday.getFullYear());
     const [dayFrom, setDayFrom] = useState(() => yesterday.getDate());
     const [dayTo, setDayTo] = useState(() => yesterday.getDate());
-    
+
+    // Temporary states for the filter UI (only applied on button click)
+    const [tempMonth, setTempMonth] = useState(month);
+    const [tempYear, setTempYear] = useState(year);
+    const [tempDayFrom, setTempDayFrom] = useState(dayFrom);
+    const [tempDayTo, setTempDayTo] = useState(dayTo);
+    const [tempSelectedLocation, setTempSelectedLocation] = useState(selectedLocation);
+
+    // Forces a reload on every "Apply Filter" click, even when nothing changed
+    const [refreshKey, setRefreshKey] = useState(0);
+    // Used to ignore responses of outdated requests
+    const reportReqId = useRef(0);
+    const dailyReqId = useRef(0);
+
     const [reportData, setReportData] = useState(null);
     const [stdHcMap, setStdHcMap] = useState({});
     const [deptList, setDeptList] = useState([]);
     const [showDesigSettings, setShowDesigSettings] = useState(false);
-    const [desigStdHcMap, setDesigStdHcMap] = useState({});       
-    const [desigList, setDesigList] = useState([]);           
+    const [desigStdHcMap, setDesigStdHcMap] = useState({});
+    const [desigList, setDesigList] = useState([]);
     const [editDesigHc, setEditDesigHc] = useState({});
     const [loading, setLoading] = useState(true);
     const [toast, setToast] = useState(null);
@@ -34,8 +47,8 @@ export default function DeptAttendance() {
     const [unitName, setUnitName] = useState("PSF");
     const [loginName, setLoginName] = useState("");
     const [expandedDept, setExpandedDept] = useState(null);
-	const [expandedDesig, setExpandedDesig] = useState(null);
-	const [expandedSummary, setExpandedSummary] = useState(null);
+    const [expandedDesig, setExpandedDesig] = useState(null);
+    const [expandedSummary, setExpandedSummary] = useState(null);
     const [statusDetail, setStatusDetail] = useState(null);
     const [attendanceDetail, setAttendanceDetail] = useState(null);
     const [machineStd, setMachineStd] = useState(0);
@@ -45,6 +58,22 @@ export default function DeptAttendance() {
     const [editDailyMachines, setEditDailyMachines] = useState({});
     const [showDailyMachineSettings, setShowDailyMachineSettings] = useState(false);
     const [savingDesigStdHc, setSavingDesigStdHc] = useState(false);
+
+    const currentUserId = getCurrentUserId();
+
+    let runningMachinesLabel = "No. of Running Machines";
+    let labourPerMachineLabel = "Labour Per Machine Per Day";
+    let machineUnitSuffix = "M/C's";
+
+    if (currentUserId === 28 || currentUserId === 34 || currentUserId === 36 || currentUserId === 13 || currentUserId === 14) {
+        runningMachinesLabel = "Daily Production (In Tons)";
+        labourPerMachineLabel = "Labour per ton per day";
+        machineUnitSuffix = "Tons";
+    } else if (currentUserId === 33 || currentUserId === 35) {
+        runningMachinesLabel = "No. of running winder's";
+        labourPerMachineLabel = "Labour per winder per day";
+        machineUnitSuffix = "W's";
+    }
 
     const showToast = useCallback((msg, type = "success") => {
         setToast({ msg, type });
@@ -78,25 +107,47 @@ export default function DeptAttendance() {
     }, []);
 
     useEffect(() => {
-        if (locationId !== null && selectedAdminId !== null) {
+        if (selectedLocation !== null) {
+            setTempSelectedLocation(selectedLocation);
+        }
+    }, [selectedLocation]);
+
+    useEffect(() => {
+        if (selectedLocation !== null && selectedAdminId !== null) {
             fetchStdHc();
             fetchDesignationStdHc();
             fetchMachineStd();
         }
-    }, [locationId, selectedAdminId]);
+    }, [selectedLocation, selectedAdminId]);
 
     useEffect(() => {
-        if (locationId !== null && selectedAdminId !== null) {
+        if (selectedLocation !== null && selectedAdminId !== null) {
             loadReport();
             fetchDailyMachines();
         }
-    }, [month, year, dayFrom, dayTo, locationId, selectedAdminId]);
+    }, [month, year, dayFrom, dayTo, selectedLocation, selectedAdminId, refreshKey]);
 
-    useEffect(() => {
-        const maxDays = new Date(year, month, 0).getDate();
-        setDayFrom((prev) => Math.min(prev, maxDays));
-        setDayTo((prev) => Math.min(prev, maxDays));
-    }, [month, year]);
+    function applyFilters() {
+        if (tempDayTo < tempDayFrom) {
+            showToast("'To' date cannot be before 'From' date.", "error");
+            return;
+        }
+        setMonth(tempMonth);
+        setYear(tempYear);
+        setDayFrom(tempDayFrom);
+        setDayTo(tempDayTo);
+        if (tempSelectedLocation) setSelectedLocation(tempSelectedLocation);
+        setRefreshKey((k) => k + 1); 
+    }
+
+    function getCurrentUserId() {
+        try {
+            const user = JSON.parse(localStorage.getItem("hrms_user"));
+            return Number(user?.userId ?? user?.UserId ?? user?.id);
+        } catch {
+            return NaN;
+        }
+    }
 
     async function fetchSubAdmins() {
         try {
@@ -112,10 +163,7 @@ export default function DeptAttendance() {
             const data = await res.json();
 
             if (data.success && Array.isArray(data.data)) {
-                const userSession = localStorage.getItem("hrms_user");
-                const user = JSON.parse(userSession);
-
-                const currentUserId = Number(user.userId ?? user.UserId ?? user.id);
+                const currentUserId = getCurrentUserId();
 
                 const sortedAdmins = [...data.data].sort((a, b) => {
                     const aIsSelf = Number(a.id) === currentUserId;
@@ -157,18 +205,19 @@ export default function DeptAttendance() {
             if (data.success && Array.isArray(data.data)) {
                 setLocationList(data.data);
                 if (data.data.length === 1) {
-                    setLocationId(Number(data.data[0].location_id));
+                    const singleItem = data.data[0];
+                    setSelectedLocation({ type: singleItem.type, id: singleItem.type === 'group' ? singleItem.group_id : singleItem.location_id });
                 } else {
-                    setLocationId(0);
+                    setSelectedLocation({ type: 'all', id: 0 });
                 }
             } else {
                 setLocationList([]);
-                setLocationId(0);
+                setSelectedLocation({ type: 'all', id: 0 });
             }
         } catch (err) {
             console.error("fetchLocations error:", err);
             setLocationList([]);
-            setLocationId(0);
+            setSelectedLocation({ type: 'all', id: 0 });
         }
     }
 
@@ -177,7 +226,8 @@ export default function DeptAttendance() {
         setSelectedAdminId(adminId);
 
         // Reset current location
-        setLocationId(null);
+        setSelectedLocation(null);
+        setTempSelectedLocation(null);
         setLocationList([]);
 
         // Clear old Admin's data
@@ -242,9 +292,9 @@ export default function DeptAttendance() {
                     targetUserId: selectedAdminId
                 }),
             });
-            
+
             const data = await res.json();
-            
+
             if (data.success && data.data) {
                 const map = {};
                 data.data.forEach((d) => {
@@ -306,6 +356,7 @@ export default function DeptAttendance() {
     }
 
     async function fetchDailyMachines() {
+        const reqId = ++dailyReqId.current;
         setDailyMachines({});
 
         try {
@@ -322,6 +373,7 @@ export default function DeptAttendance() {
                 }),
             });
             const data = await res.json();
+            if (reqId !== dailyReqId.current) return; // outdated response
             if (data.success && data.data) {
                 setDailyMachines(data.data);
             }
@@ -360,23 +412,23 @@ export default function DeptAttendance() {
     }
 
     async function loadReport() {
-		setLoading(true);
+        const reqId = ++reportReqId.current;
+        setLoading(true);
         // Clear all data belonging to the previous filter selection
         setReportData(null);
-        setDailyMachines({});
         setStatusDetail(null);
         setAttendanceDetail(null);
-    
+
         // Reset expanded states from previous report
         setExpandedDept(null);
         setExpandedDesig(null);
         setExpandedSummary(null);
-    
-		try {
-			const res = await fetch(API_BASE, {
-				method: "POST",
-				credentials: "include",
-				headers: { "Content-Type": "application/json" },
+
+        try {
+            const res = await fetch(API_BASE, {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     action: "get_report",
                     month,
@@ -386,27 +438,31 @@ export default function DeptAttendance() {
                     location_id: locationId,
                     targetUserId: selectedAdminId
                 }),
-			});
-			
-			const data = await res.json();
+            });
 
-			if (data.success) {
-				setReportData(data);
-				setLoading(false);
-				return;
-			}
-            
-			console.error("get_report failed:", data.message, data.errors);
-			showToast(data.message || "Failed to load report — showing sample data", "error");
-		} catch (err) {
-			console.error("get_report request error:", err);
-			showToast("Network error — showing sample data", "error");
-		}
-		
-		const dummy = generateDummyReport(month, year, dayFrom, dayTo, stdHcMap);
-		setReportData(dummy);
-		setLoading(false);
-	}
+            const data = await res.json();
+
+            if (reqId !== reportReqId.current) return; // a newer request exists, ignore this one
+
+            if (data.success) {
+                setReportData(data);
+                setLoading(false);
+                return;
+            }
+
+            console.error("get_report failed:", data.message, data.errors);
+            showToast(data.message || "Failed to load report — showing sample data", "error");
+        } catch (err) {
+            if (reqId !== reportReqId.current) return;
+            console.error("get_report request error:", err);
+            showToast("Network error — showing sample data", "error");
+        }
+
+        if (reqId !== reportReqId.current) return;
+        const dummy = generateDummyReport(month, year, dayFrom, dayTo, stdHcMap);
+        setReportData(dummy);
+        setLoading(false);
+    }
 
     async function saveDesigStdHc() {
         setSavingDesigStdHc(true);
@@ -419,6 +475,7 @@ export default function DeptAttendance() {
 
         if (items.length === 0) {
             showToast("No designation data to save.", "error");
+            setSavingDesigStdHc(false);
             return false;
         }
 
@@ -443,7 +500,7 @@ export default function DeptAttendance() {
                 return false;
             }
 
-            return true; 
+            return true;
         } catch (err) {
             console.error("saveDesigStdHc error:", err);
             showToast("Network error saving designation STD HC", "error");
@@ -481,16 +538,36 @@ export default function DeptAttendance() {
     }
 
     const maxDays = new Date(year, month, 0).getDate();
-    const fromDateValue = `${year}-${String(month).padStart(2, "0")}-${String(dayFrom).padStart(2, "0")}`;
-    const toDateValue = `${year}-${String(month).padStart(2, "0")}-${String(dayTo).padStart(2, "0")}`;
-    const minDate = `${year}-${String(month).padStart(2, "0")}-01`;
-    const maxDate = `${year}-${String(month).padStart(2, "0")}-${String(maxDays).padStart(2, "0")}`;
+    const pad = (n) => String(n).padStart(2, "0");
 
+    const minDate = "2020-01-01";
+    const maxDate = "2030-12-31";
+
+    // Range is limited to the month of the "From" date (API takes a single month/year)
+    const tempMaxDays = new Date(tempYear, tempMonth, 0).getDate();
+    const maxToDateValue = `${tempYear}-${pad(tempMonth)}-${pad(tempMaxDays)}`;
 
     const days = [];
     const clampedFrom = Math.max(1, Math.min(dayFrom, maxDays));
     const clampedTo = Math.max(clampedFrom, Math.min(dayTo, maxDays));
-    for (let d = clampedFrom; d <= clampedTo; d++) days.push(d);
+
+    for (let d = clampedFrom; d <= clampedTo; d++) {
+        days.push(d);
+    }
+
+    let locationId = 0;
+    if (selectedLocation) {
+        if (selectedLocation.type === 'all') {
+            locationId = 0;
+        } else if (selectedLocation.type === 'location') {
+            locationId = selectedLocation.id;
+        } else if (selectedLocation.type === 'group') {
+            const selectedGroup = locationList.find((item) => item.type === 'group' && item.group_id === selectedLocation.id);
+            if (selectedGroup && selectedGroup.location_ids) {
+                locationId = selectedGroup.location_ids.join(',');
+            }
+        }
+    }
 
     return (
         <div className="da-page">
@@ -519,8 +596,7 @@ export default function DeptAttendance() {
                         <label>Admin</label>
                         <select value={selectedAdminId ?? ""} onChange={(e) => handleAdminChange(Number(e.target.value))}>
                             {adminList.map((admin) => {
-                                const currentUserId = Number(JSON.parse(localStorage.getItem("hrms_user"))?.id);
-                                const isSelf = Number(admin.id) === currentUserId;
+                                const isSelf = Number(admin.id) === getCurrentUserId();
                                 return (
                                     <option key={admin.id} value={admin.id}>
                                         {isSelf ? "Me (Self)" : admin.name}
@@ -530,88 +606,127 @@ export default function DeptAttendance() {
                         </select>
                     </div>
                 )}
-                
+
                 <div className="da-filter-group">
                     <label>Location</label>
-                    <select value={locationId ?? ""} onChange={(e) => setLocationId(Number(e.target.value))}>
+                    <select value={tempSelectedLocation ? (tempSelectedLocation.type === 'all' ? "all" : `${tempSelectedLocation.type}-${tempSelectedLocation.id}`) : "all"}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === "all") {
+                                setTempSelectedLocation({ type: 'all', id: 0 });
+                            } else if (val !== "separator") {
+                                const [type, id] = val.split('-');
+                                setTempSelectedLocation({ type, id: Number(id) });
+                            }
+                        }}
+                    >
                         {locationList.length !== 1 && (
-                            <option value={0}>All Locations</option>
+                            <option value="all">All Locations</option>
                         )}
 
-                        {locationList.map((loc) => (
-                            <option key={loc.location_id} value={loc.location_id}>
+                        {locationList.filter(item => item.type === 'location').map((loc) => (
+                            <option key={`loc-${loc.location_id}`} value={`location-${loc.location_id}`}>
                                 {loc.location_name}
                             </option>
                         ))}
-                    </select>
-                </div>
-                
-                <div className="da-filter-group">
-                    <label>Month</label>
-                    <select value={month} onChange={(e) => setMonth(Number(e.target.value))}>
-                        {MONTH_NAMES.map((m, i) => (
-                            <option key={i} value={i + 1}>
-                                {m}
+
+                        {locationList.filter(item => item.type === 'group').length > 0 && (
+                            <option disabled value="separator" style={{ color: "#94a3b8", fontSize: "12px", fontWeight: "bold" }}>
+                                ────────────────
+                            </option>
+                        )}
+
+                        {locationList.filter(item => item.type === 'group').map((group) => (
+                            <option key={`group-${group.group_id}`} value={`group-${group.group_id}`}>
+                                {group.group_name}
                             </option>
                         ))}
                     </select>
                 </div>
-                
-                <div className="da-filter-group">
-                    <label>Year</label>
-                    <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
-                        {[2024, 2025, 2026, 2027, 2028].map((y) => (
-                            <option key={y} value={y}>
-                                {y}
-                            </option>
-                        ))}
-                    </select>
+
+                <div className="da-filter-group" style={{ minWidth: "280px" }}>
+                    <label>Date Range (Within One Month)</label>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <input type="date" min={minDate} max={maxDate}
+                            value={`${tempYear}-${pad(tempMonth)}-${pad(tempDayFrom)}`}
+                            style={{ flex: 1, padding: "6px 8px", fontSize: "13px" }}
+                            onChange={(e) => {
+                                if (!e.target.value) return;
+                                const [y, m, d] = e.target.value.split("-").map(Number);
+                                const sameMonth = y === tempYear && m === tempMonth;
+                                setTempYear(y);
+                                setTempMonth(m);
+                                setTempDayFrom(d);
+                                // if the month changed or "to" is now before "from", reset "to"
+                                if (!sameMonth || tempDayTo < d) setTempDayTo(d);
+                            }}
+                        />
+                        <span style={{ color: "#64748b", fontSize: "13px", fontWeight: "bold" }}>to</span>
+                        <input type="date"
+                            min={`${tempYear}-${pad(tempMonth)}-${pad(tempDayFrom)}`}
+                            max={maxToDateValue}
+                            value={`${tempYear}-${pad(tempMonth)}-${pad(tempDayTo)}`}
+                            style={{ flex: 1, padding: "6px 8px", fontSize: "13px" }}
+                            onChange={(e) => {
+                                if (!e.target.value) return;
+                                const [y, m, d] = e.target.value.split("-").map(Number);
+                                if (y !== tempYear || m !== tempMonth) {
+                                    showToast("Date range must be within the same month.", "error");
+                                    return;
+                                }
+                                setTempDayTo(d);
+                            }}
+                        />
+                    </div>
                 </div>
-                
-                <div className="da-filter-group">
-                    <label>Day From</label>
-                    <input type="date" min={minDate} max={toDateValue} value={fromDateValue}
-                        onChange={(e) => {
-                            if (!e.target.value) return;
-                            const selectedDay = Number(e.target.value.split("-")[2]);
-                            setDayFrom(selectedDay);
-                        }}
-                    />
-                </div>
-                
-                <div className="da-filter-group">
-                    <label>Day To</label>
-                    <input type="date" min={fromDateValue} max={maxDate} value={toDateValue}
-                        onChange={(e) => {
-                            if (!e.target.value) return;
-                            const selectedDay = Number(e.target.value.split("-")[2]);
-                            setDayTo(selectedDay);
-                        }}
-                    />
-                </div>
-                
+
                 <div className="da-filter-group">
                     <label>&nbsp;</label>
-                    <button className="da-btn da-btn-sm" style={{ background: "#e2e8f0", color: "#475569" }} onClick={() => { setDayFrom(1); setDayTo(maxDays); }}>
+                    <button className="da-btn da-btn-sm" style={{ background: "#e2e8f0", color: "#475569" }} onClick={() => {
+                        setTempDayFrom(1);
+                        setTempDayTo(tempMaxDays); // uses the temp month, not the applied one
+                    }}>
                         📅 Full Month
                     </button>
                 </div>
-                
+
                 <div className="da-filter-actions">
-                    <button className="da-btn da-btn-primary" disabled={loading} onClick={loadReport}>
-                        {loading ? "⏳ Loading..." : "🔍 Generate"}
+                    <button className="da-btn da-btn-primary" disabled={loading} onClick={applyFilters}>
+                        {loading ? "⏳ Loading..." : "🔍 Apply Filter"}
                     </button>
-                
-                    <button className="da-btn da-btn-warning" disabled={locationId === null || locationId === 0} onClick={() => { setEditDesigHc(JSON.parse(JSON.stringify(desigStdHcMap))); setShowDesigSettings(true); }}>
-                        ⚙️ Designation STD HC
-                    </button>
-                
-                    <button className="da-btn da-btn-warning" disabled={locationId === null || locationId === 0} onClick={() => { setEditMachineStd(machineStd); setShowMachineStdSettings(true); }}>
-                        ⚙️ Total Machines
-                    </button>
-                
+
                     <button className="da-btn da-btn-warning" disabled={locationId === null || locationId === 0}
                         onClick={() => {
+                            if (selectedLocation && (selectedLocation.type === 'all' || selectedLocation.type === 'group')) {
+                                showToast("Please select a single location in the filter.", "error");
+                                return;
+                            }
+                            setEditDesigHc(JSON.parse(JSON.stringify(desigStdHcMap)));
+                            setShowDesigSettings(true);
+                        }}
+                    >
+                        ⚙️ Designation STD HC
+                    </button>
+
+                    <button className="da-btn da-btn-warning" disabled={locationId === null || locationId === 0}
+                        onClick={() => {
+                            if (selectedLocation && (selectedLocation.type === 'all' || selectedLocation.type === 'group')) {
+                                showToast("Please select a single location in the filter.", "error");
+                                return;
+                            }
+                            setEditMachineStd(machineStd);
+                            setShowMachineStdSettings(true);
+                        }}
+                    >
+                        ⚙️ Total Machines
+                    </button>
+
+                    <button className="da-btn da-btn-warning" disabled={locationId === null || locationId === 0}
+                        onClick={() => {
+                            if (selectedLocation && (selectedLocation.type === 'all' || selectedLocation.type === 'group')) {
+                                showToast("Please select a single location in the filter.", "error");
+                                return;
+                            }
                             const initial = {};
                             for (let d = clampedFrom; d <= clampedTo; d++) {
                                 const ds = dateStr(year, month, d);
@@ -623,11 +738,11 @@ export default function DeptAttendance() {
                     >
                         ⚙️ Daily Running Machines
                     </button>
-                    
+
                     <button className="da-btn da-btn-success" onClick={exportExcel}>
                         ⬇ Excel
                     </button>
-                    
+
                     <button className="da-btn da-btn-sm" style={{ background: "#475569", color: "#fff" }} onClick={() => window.print()}>
                         🖨 Print
                     </button>
@@ -642,19 +757,22 @@ export default function DeptAttendance() {
                     </div>
                 ) : reportData ? (
                     <ReportTable
-						data={reportData}
-						days={days}
-						unitName={unitName}
-						unitCapacity={unitCapacity}
+                        data={reportData}
+                        days={days}
+                        unitName={unitName}
+                        unitCapacity={unitCapacity}
                         loginName={loginName}
-						month={month}
-						year={year}
-						expandedDept={expandedDept}
-						onToggleDept={(id) => setExpandedDept((prev) => (prev === id ? null : id))}
-						expandedDesig={expandedDesig}
-						onToggleDesig={(key) => setExpandedDesig((prev) => (prev === key ? null : key))}
-						expandedSummary={expandedSummary}
-						onToggleSummary={(id) => setExpandedSummary((prev) => (prev === id ? null : id))}
+                        month={month}
+                        year={year}
+                        runningMachinesLabel={runningMachinesLabel}
+                        labourPerMachineLabel={labourPerMachineLabel}
+                        machineUnitSuffix={machineUnitSuffix}
+                        expandedDept={expandedDept}
+                        onToggleDept={(id) => setExpandedDept((prev) => (prev === id ? null : id))}
+                        expandedDesig={expandedDesig}
+                        onToggleDesig={(key) => setExpandedDesig((prev) => (prev === key ? null : key))}
+                        expandedSummary={expandedSummary}
+                        onToggleSummary={(id) => setExpandedSummary((prev) => (prev === id ? null : id))}
                         onViewStatus={(statusKey, statusLabel, date, employees) => {
                             setStatusDetail({
                                 statusKey,
@@ -666,7 +784,7 @@ export default function DeptAttendance() {
                         onViewAttendance={(statusKey, statusLabel, day, date, employees) => {
                             setAttendanceDetail({ statusKey, statusLabel, day, date, employees });
                         }}
-					/>
+                    />
                 ) : (
                     <div className="da-loading">
                         <p>No data available.</p>
@@ -780,14 +898,14 @@ function DeptSummaryRows({ summary, days }) {
 }
 
 
-function ReportTable({ data, days, unitName, unitCapacity, loginName, month, year, expandedDept, onToggleDept, expandedDesig, onToggleDesig, expandedSummary, onToggleSummary, onViewAttendance }) {
+function ReportTable({ data, days, unitName, unitCapacity, loginName, month, year, runningMachinesLabel, labourPerMachineLabel, machineUnitSuffix, expandedDept, onToggleDept, expandedDesig, onToggleDesig, expandedSummary, onToggleSummary, onViewAttendance }) {
     if (!data || !data.departments) return null;
     const departments = data.departments || [];
     const summary = data.summary || {};
     const summary_avg = data.summary_avg || {};
     const summary_employees = data.summary_employees || {};
     const total_std_hc = data.total_std_hc || 0;
-    const total_running_machines = data.total_running_machines || 0;   
+    const total_running_machines = data.total_running_machines || 0;
     const colSpan = days.length + 3;
     const totalMachinesNum = Number(total_running_machines) || 0;
     const stdLabourPerMachine = (totalLabour) =>
@@ -828,8 +946,8 @@ function ReportTable({ data, days, unitName, unitCapacity, loginName, month, yea
         const avg = group.depts.reduce((sum, dept) => sum + (Number(dept.avg_hc) || 0), 0);
         const dayTotals = {};
         const groupLaborPerMachine = {};
-        const machinesArray = {}; 
-        
+        const machinesArray = {};
+
         days.forEach((d) => {
             const dayPresentTotal = group.depts.reduce((sum, dept) => sum + (Number(dept.days && dept.days[d]) || 0), 0);
             dayTotals[d] = dayPresentTotal;
@@ -862,7 +980,7 @@ function ReportTable({ data, days, unitName, unitCapacity, loginName, month, yea
                             <th>Department</th>
                             <th>
                                 STD
-                                <br />({total_running_machines} M/C's)
+                                <br />({total_running_machines} {machineUnitSuffix})
                             </th>
                             {days.map((d) => (
                                 <th key={d}>{d}</th>
@@ -879,7 +997,7 @@ function ReportTable({ data, days, unitName, unitCapacity, loginName, month, yea
                             <React.Fragment key={dept.departmentId ?? i}>
                                 <tr
                                     onClick={() => dept.designations && dept.designations.length > 0 && onToggleDept(dept.departmentId)}
-                                    style={{ 
+                                    style={{
                                         cursor: dept.designations && dept.designations.length > 0 ? "pointer" : "default",
                                         borderTop: (i === 0 || orderedDepartments[i - 1]?.dept.groupId !== dept.groupId) && dept.groupId ? "2.5px solid #1e40af" : "none"
                                     }}
@@ -939,18 +1057,18 @@ function ReportTable({ data, days, unitName, unitCapacity, loginName, month, yea
                                     );
                                 })}
 
-								{expandedDept === dept.departmentId && dept.summary && (
-									<>
-										<tr className="da-summary-toggle-row" onClick={() => onToggleSummary(dept.departmentId)}>
-											<td colSpan={colSpan}>
-												{expandedSummary === dept.departmentId ? "▲ Hide Summary" : "▼ Show Summary"}
-											</td>
-										</tr>
-										{expandedSummary === dept.departmentId && (
-											<DeptSummaryRows summary={dept.summary} days={days} />
-										)}
-									</>
-								)}
+                                {expandedDept === dept.departmentId && dept.summary && (
+                                    <>
+                                        <tr className="da-summary-toggle-row" onClick={() => onToggleSummary(dept.departmentId)}>
+                                            <td colSpan={colSpan}>
+                                                {expandedSummary === dept.departmentId ? "▲ Hide Summary" : "▼ Show Summary"}
+                                            </td>
+                                        </tr>
+                                        {expandedSummary === dept.departmentId && (
+                                            <DeptSummaryRows summary={dept.summary} days={days} />
+                                        )}
+                                    </>
+                                )}
 
                                 {isGroupLast && (() => {
                                     const g = getGroupTotals(String(dept.groupId));
@@ -977,7 +1095,7 @@ function ReportTable({ data, days, unitName, unitCapacity, loginName, month, yea
                                             {/* Group Running Machines Row */}
                                             <tr className="da-group-total-row" style={{ backgroundColor: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
                                                 <td className="da-group-total-label" style={{ color: "#475569", fontSize: "11px", paddingLeft: "16px" }}>
-                                                    No. of Running Machines
+                                                    {runningMachinesLabel}
                                                 </td>
                                                 <td>{total_running_machines}</td>
                                                 {days.map((d) => {
@@ -990,10 +1108,10 @@ function ReportTable({ data, days, unitName, unitCapacity, loginName, month, yea
                                                 })}
                                                 <td>–</td>
                                             </tr>
-                                            
+
                                             <tr className="da-group-total-row" style={{ backgroundColor: "#f8fafc", borderBottom: "2.5px solid #1e40af" }}>
                                                 <td className="da-group-total-label" style={{ color: "#475569", fontSize: "11px", paddingLeft: "16px" }}>
-                                                    Labour Per Machine Per Day
+                                                    {labourPerMachineLabel}
                                                 </td>
                                                 <td>{stdLabourPerMachine(g.std)}</td>
                                                 {days.map((d) => {
@@ -1014,8 +1132,8 @@ function ReportTable({ data, days, unitName, unitCapacity, loginName, month, yea
                     </tbody>
                     <tfoot>
                         <SummaryRow label="Overall Present" stdValue={total_std_hc} dayValues={summary.total_present} avgValue={summary_avg.total_present} days={days} className="da-row-combined da-row-grand-total" />
-                        <SummaryRow label="No. of Running Machines" stdValue={total_running_machines} dayValues={summary.running_machines} avgValue={summary_avg.running_machines} days={days} className="da-row-heading" />
-                        <SummaryRow label="Labour Per Machine Per Day" stdValue={stdLabourPerMachine(total_std_hc)} dayValues={summary.labor_per_machine} avgValue={summary_avg.labor_per_machine} days={days} className="da-row-heading da-row-labor-border" />
+                        <SummaryRow label={runningMachinesLabel} stdValue={total_running_machines} dayValues={summary.running_machines} avgValue={summary_avg.running_machines} days={days} className="da-row-heading" />
+                        <SummaryRow label={labourPerMachineLabel} stdValue={stdLabourPerMachine(total_std_hc)} dayValues={summary.labor_per_machine} avgValue={summary_avg.labor_per_machine} days={days} className="da-row-heading da-row-labor-border" />
                         <SummaryRow label="Total Present" statusKey="present" stdValue="" dayValues={summary.present} avgValue={summary_avg.present} days={days} className="da-row-total" onDayClick={makeDayClickHandler("present", "Total Present")} />
                         <SummaryRow label="Total Half Present" statusKey="half_present" stdValue="" dayValues={summary.half_present} avgValue={summary_avg.half_present} days={days} className="da-row-heading" onDayClick={makeDayClickHandler("half_present", "Total Half Present")} />
                         <SummaryRow label="Total Weekly-Off Present" statusKey="wo_present" stdValue="" dayValues={summary.wo_present} avgValue={summary_avg.wo_present} days={days} className="da-row-heading" onDayClick={makeDayClickHandler("wo_present", "Total Weekly-Off Present")} />
@@ -1086,7 +1204,7 @@ function StatusSummary({ summary, summaryEmployees, days, month, year, onView })
             <div className="da-status-summary-grid">
                 {statusRows.map((status) => {
                     const statusValues = summary[status.key] || {};
-                    const dateRows = days.map((day) => ({day, count: Number(statusValues[day] || 0)})).filter((row) => row.count > 0);
+                    const dateRows = days.map((day) => ({ day, count: Number(statusValues[day] || 0) })).filter((row) => row.count > 0);
                     const totalRecords = dateRows.length;
                     const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE));
                     const requestedPage = currentPages[status.key] || 1;
@@ -1101,7 +1219,7 @@ function StatusSummary({ summary, summaryEmployees, days, month, year, onView })
                                     {status.icon}{" "}
                                     {status.label}
                                 </span>
-                                
+
                                 {totalRecords > 0 && (
                                     <span className="da-status-record-count">{totalRecords} records</span>
                                 )}
@@ -1138,7 +1256,7 @@ function StatusSummary({ summary, summaryEmployees, days, month, year, onView })
                                                                 <td>{formatDate(day)}</td>
                                                                 <td className="da-status-count">{count}</td>
                                                                 <td>
-                                                                    <button type="button" className="da-view-btn" title={`View ${status.label} employees`} onClick={() => onView(status.key, status.label, formatDate( day ), employees) }>
+                                                                    <button type="button" className="da-view-btn" title={`View ${status.label} employees`} onClick={() => onView(status.key, status.label, formatDate(day), employees)}>
                                                                         👁️
                                                                     </button>
                                                                 </td>
@@ -1152,25 +1270,25 @@ function StatusSummary({ summary, summaryEmployees, days, month, year, onView })
 
                                     {totalPages > 1 && (
                                         <div className="da-status-pagination">
-                                            <button type="button" className="da-page-btn" disabled={ currentPage === 1 } onClick={() => changePage(status.key, 1, totalPages) } title="First page">
+                                            <button type="button" className="da-page-btn" disabled={currentPage === 1} onClick={() => changePage(status.key, 1, totalPages)} title="First page">
                                                 &lt;&lt;
                                             </button>
 
-                                            <button type="button" className="da-page-btn" disabled={ currentPage === 1 } onClick={() => changePage( status.key, currentPage - 1, totalPages ) } title="Previous page">
+                                            <button type="button" className="da-page-btn" disabled={currentPage === 1} onClick={() => changePage(status.key, currentPage - 1, totalPages)} title="Previous page">
                                                 &lt;
                                             </button>
 
                                             {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
-                                                <button key={page} type="button" className={`da-page-btn ${ currentPage === page ? "da-page-btn-active" : "" }`} onClick={() => changePage(status.key, page, totalPages) }>
+                                                <button key={page} type="button" className={`da-page-btn ${currentPage === page ? "da-page-btn-active" : ""}`} onClick={() => changePage(status.key, page, totalPages)}>
                                                     {page}
                                                 </button>
                                             ))}
 
-                                            <button type="button" className="da-page-btn" disabled={ currentPage === totalPages } onClick={() => changePage(status.key, currentPage + 1, totalPages) } title="Next page">
+                                            <button type="button" className="da-page-btn" disabled={currentPage === totalPages} onClick={() => changePage(status.key, currentPage + 1, totalPages)} title="Next page">
                                                 &gt;
                                             </button>
 
-                                            <button type="button" className="da-page-btn" disabled={ currentPage === totalPages } onClick={() => changePage( status.key, totalPages, totalPages ) } title="Last page">
+                                            <button type="button" className="da-page-btn" disabled={currentPage === totalPages} onClick={() => changePage(status.key, totalPages, totalPages)} title="Last page">
                                                 &gt;&gt;
                                             </button>
                                         </div>
@@ -1193,7 +1311,7 @@ function AttendanceEmployeeReport({ statusLabel, date, employees, onClose }) {
     const PAGE_SIZE = 10;
 
     const employeeList = employees || [];
-    
+
     const filtered = employeeList.filter((emp) => {
         const nameQuery = employeeNameSearch.trim().toLowerCase();
         const codeQuery = employeeCodeSearch.trim().toLowerCase();
@@ -1289,9 +1407,9 @@ function AttendanceEmployeeReport({ statusLabel, date, employees, onClose }) {
                                     <th>Company</th>
                                     <th>Department</th>
                                     <th>Designation</th>
-                                    <th>Location</th> 
+                                    <th>Location</th>
                                     <th>Shift</th>
-                                    <th>Shift Start Time</th> 
+                                    <th>Shift Start Time</th>
                                     <th>Shift End Time</th>
                                     <th>In Time</th>
                                     <th>Out Time</th>
@@ -1310,12 +1428,12 @@ function AttendanceEmployeeReport({ statusLabel, date, employees, onClose }) {
                                         <td>{emp.designationName || "–"}</td>
                                         <td>{emp.locationName || "–"}</td>
                                         <td>{emp.shift || "–"}</td>
-                                        <td>{emp.shiftStartTime || "–"}</td> 
-                                        <td>{emp.shiftEndTime || "–"}</td> 
+                                        <td>{emp.shiftStartTime || "–"}</td>
+                                        <td>{emp.shiftEndTime || "–"}</td>
                                         <td>{emp.inTime || "–"}</td>
                                         <td>{emp.outTime || "–"}</td>
-                                        <td>{emp.status || statusLabel}</td> 
-                                        <td>{emp.detailStatus || "–"}</td> 
+                                        <td>{emp.status || statusLabel}</td>
+                                        <td>{emp.detailStatus || "–"}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -1338,7 +1456,7 @@ function AttendanceEmployeeReport({ statusLabel, date, employees, onClose }) {
                                 </button>
 
                                 {pageNumbers.map((p) => (
-                                    <button key={p} type="button" className={`da-page-btn ${ currentPage === p ? "da-page-btn-active" : "" }`} onClick={() => setPage(p)} >
+                                    <button key={p} type="button" className={`da-page-btn ${currentPage === p ? "da-page-btn-active" : ""}`} onClick={() => setPage(p)} >
                                         {p}
                                     </button>
                                 ))}
@@ -1429,7 +1547,7 @@ function DesigSettingsModal({ deptList, editDesigHc, setEditDesigHc, desigList, 
                     {relevantDepts.map((dept) => {
                         const desigs = desigByDept[dept.dept_id] || [];
                         const desigTotal = getDesigTotal(dept.dept_id);
-                        
+
                         return (
                             <div key={dept.dept_id} style={{ border: "1px solid #e2e8f0", borderRadius: 10, marginBottom: 14, overflow: "hidden", }}>
                                 {/* Department header — read-only here, just for context */}
@@ -1516,7 +1634,7 @@ function MachineStdModal({ value, setValue, onSave, onClose }) {
                 <p style={{ color: "#64748b", fontSize: 13, marginBottom: 16 }}>
                     Fixed total machine count for this location. Shown in the report header.
                 </p>
-                
+
                 <input type="number" min={0} step="0.01" inputMode="decimal" placeholder="0.00" value={value === 0 || value == null || value === "" ? "" : value}
                     onChange={(e) => {
                         const raw = e.target.value;
@@ -1676,7 +1794,7 @@ function StatusEmployeeModal({ statusLabel, date, employees, onClose }) {
 
                             <tbody>
                                 {employeeList.map((emp, index) => (
-                                    <tr key={ emp.employeeId ?? emp.employeeCode ?? index }>
+                                    <tr key={emp.employeeId ?? emp.employeeCode ?? index}>
                                         <td>{index + 1}</td>
                                         <td>{emp.employeeCode || "–"}</td>
                                         <td className="da-modal-employee-name">{emp.employeeName || "–"}</td>

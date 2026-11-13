@@ -56,14 +56,29 @@
 
 
         async fetchFilterOptions() {
-            if (this.state.filterLists) return { success: true };
+            if (
+                this.state.filterLists &&
+                Array.isArray(this.state.filterLists.locations) &&
+                Array.isArray(this.state.filterLists.locationGroups)
+            ) {
+                return { success: true };
+            }
+
             try {
                 const urlDepts = new URL(window.APP_CONFIG.API_URL, window.location.origin);
                 urlDepts.searchParams.set('action', 'get_depts');
+
                 const urlComps = new URL(window.APP_CONFIG.API_URL, window.location.origin);
                 urlComps.searchParams.set('action', 'get_companies');
+                
                 const urlShifts = new URL(window.APP_CONFIG.API_URL, window.location.origin);
                 urlShifts.searchParams.set('action', 'get_shifts');
+                
+                const urlLocs = new URL(window.APP_CONFIG.API_URL, window.location.origin);
+                urlLocs.searchParams.set('action', 'get_locations');
+
+                const ownUserId = Number((window.HRMS_USER || {}).id || (window.HRMS_USER || {}).userId || 0);
+                urlLocs.searchParams.set('targetUserId', this.state.filters.subadminUserId || ownUserId);
 
                 if (this.state.filters.subadminUserId) {
                     [urlDepts, urlComps, urlShifts].forEach(u => u.searchParams.set('subadmin_user_id', this.state.filters.subadminUserId));
@@ -80,24 +95,41 @@
                     }
                 };
 
-                const [deptRes, compRes, shiftRes] = await Promise.all([
+                const [deptRes, compRes, shiftRes, locRes] = await Promise.all([
                     fetch(urlDepts.toString(), { credentials: 'include' }).then(safeJson),
                     fetch(urlComps.toString(), { credentials: 'include' }).then(safeJson),
-                    fetch(urlShifts.toString(), { credentials: 'include' }).then(safeJson)
+                    fetch(urlShifts.toString(), { credentials: 'include' }).then(safeJson),
+                    fetch(urlLocs.toString(),   { credentials: 'include' }).then(safeJson)
                 ]);
+
+                const locationData = (locRes && locRes.success && Array.isArray(locRes.data)) ? locRes.data : [];
+
+                console.log('GET LOCATIONS RESPONSE:', locRes);
+                console.log('LOCATION GROUPS FROM API:', locationData.filter(item => item.type === 'group'));
 
                 this.state.filterLists = {
                     depts: Array.isArray(deptRes) ? deptRes.map(d => d.DepartmentName).filter(Boolean) : [],
                     companies: Array.isArray(compRes) ? compRes.map(c => c.CompanyName).filter(Boolean) : [],
-                    shifts: (Array.isArray(shiftRes) ? shiftRes.map(s => s.ShiftName).filter(Boolean) : []).concat('No Shift')
+                    shifts: (Array.isArray(shiftRes) ? shiftRes.map(s => s.ShiftName).filter(Boolean) : []).concat('No Shift'),
+
+                    locations: locationData.map(item => item.type === 'group' ? item.group_name : item.location_name).filter(Boolean),
+                    locationGroups: locationData.filter(item => item.type === 'group')
                 };
+                
+                console.log('SAVED LOCATION GROUPS:', this.state.filterLists.locationGroups);
 
                 this._commit();              // ← ADD THIS LINE
                 return { success: true };
 
             } catch (error) {
                 console.error('Fetch Filter Options Error:', error);
-                this.state.filterLists = { depts: [], companies: [], shifts: ['No Shift'] };   
+                this.state.filterLists = {
+                    depts: [],
+                    companies: [],
+                    shifts: ['No Shift'],
+                    locations: [],
+                    locationGroups: []
+                };
                 this._commit();
                 return { success: false, error: error.message };
             }
@@ -124,6 +156,9 @@
 
         async fetchData() {
             console.trace("fetchData called");
+            if (!this.state.filterLists || !Array.isArray(this.state.filterLists.locationGroups)) {
+                await this.fetchFilterOptions();
+            }
             try {
                 const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
                 url.searchParams.set('action', 'dashboard_data');
@@ -133,7 +168,43 @@
                 url.searchParams.set('dept', this.state.filters.dept);
                 url.searchParams.set('company', this.state.filters.company);
                 url.searchParams.set('shift', this.state.filters.shift);
-                url.searchParams.set('location', this.state.filters.location);
+                // url.searchParams.set('location', this.state.filters.location);
+
+                const selectedLocation = String(this.state.filters.location || '').trim();
+
+                const locationGroups = this.state.filterLists?.locationGroups || [];
+
+                console.log('Selected Location:', JSON.stringify(selectedLocation));
+                console.log('Available Location Groups:', locationGroups);
+
+                const selectedGroup = locationGroups.find(group =>
+                    String(group.group_name || '').trim() === selectedLocation
+                );
+
+                console.log('Matched Group:', selectedGroup);
+
+                if (selectedGroup) {
+                    const locationIds = selectedGroup.location_ids || [];
+
+                    if (!Array.isArray(locationIds) || locationIds.length === 0) {
+                        throw new Error('No locations found in the selected group.');
+                    }
+
+                    // Group selection: send only location IDs.
+                    url.searchParams.set('location_ids', JSON.stringify(locationIds));
+                    url.searchParams.delete('location');
+
+                    console.log('Selected Group:', selectedGroup.group_name);
+                    console.log('Selected Group IDs:', locationIds);
+
+                } else {
+                    // Individual location or All selection.
+                    url.searchParams.delete('location_ids');
+                    url.searchParams.set('location', selectedLocation);
+
+                    console.log('Selected Individual Location:', selectedLocation);
+                }
+
                 if (this.state.filters.subadminUserId) {
                     url.searchParams.set('subadmin_user_id', this.state.filters.subadminUserId);
                 }
@@ -717,7 +788,9 @@
             const companies = this.state.filterLists ? this.state.filterLists.companies : uniq(emps.map(e => e.company));
             const depts = this.state.filterLists ? this.state.filterLists.depts : uniq(emps.map(e => e.dept));
             const shifts = this.state.filterLists ? this.state.filterLists.shifts : uniq(emps.map(e => e.shift));
-            const locations = uniq(emps.map(e => e.location));
+            
+            const listedLocations = this.state.filterLists ? this.state.filterLists.locations : null;
+            const locations = (listedLocations && listedLocations.length) ? this.sortLocations(listedLocations) : uniq(emps.map(e => e.location));
             
             return { companies, depts, shifts, locations };
         }
@@ -1688,7 +1761,6 @@
                 return { success: false, message: error.message };
             }
         }
-
 
         async fetchDesignationGlobalOrder() {
             try {
