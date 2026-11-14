@@ -14950,7 +14950,6 @@ class AttendanceView {
         return `<a href="javascript:void(0)" class="rd-view-link" onclick="AppController.view._showRecordDetailModal(${id})">View</a>`;
     }
 
-
     _getAgeSortValue(dobRaw) {
         const age = this._calculateAge(dobRaw);
         return typeof age === "number" ? age : -Infinity; 

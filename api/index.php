@@ -5,7 +5,6 @@
  * Consolidated API for Attendance Dashboard
  * Handles all requests through a single entry point using actions.
  */
-
 // Suppress errors for clean JSON output
 ini_set('display_errors', 0);
 error_reporting(0);
