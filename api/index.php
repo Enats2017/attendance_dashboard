@@ -1457,9 +1457,16 @@ function handleDashboardData($input, $returnData = false) {
 
     // department as per location headcount
     $deptNameMap = [];
+    $deptSortOrderMap = [];
     $deptLocHcMap = [];
 
-    $sqlDeptLocHc = "SELECT DL.DepartmentId, DL.LocationId, DL.StandardHeadCount, D.DepartmentFName FROM DepartmentLocationHeadCount DL WITH (NOLOCK) INNER JOIN Departments D WITH (NOLOCK) ON DL.DepartmentId = D.DepartmentId WHERE DL.UserId = ? AND DL.LocationId IN ($employeeLocationList) AND DL.DepartmentId IN ($departmentList)";
+    $headcountLocationList = $locationList;
+    if ($locationFilter) {
+        $selectedLocationId = array_search($locationFilter, $locationNameMap);
+        $headcountLocationList = $selectedLocationId !== false ? (string)intval($selectedLocationId) : '0';
+    }
+
+    $sqlDeptLocHc = "SELECT DL.DepartmentId, DL.LocationId, DL.StandardHeadCount, D.DepartmentFName, D.SortOrder FROM DepartmentLocationHeadCount DL WITH (NOLOCK) INNER JOIN Departments D WITH (NOLOCK) ON DL.DepartmentId = D.DepartmentId WHERE DL.UserId = ? AND DL.LocationId IN ($headcountLocationList) AND DL.DepartmentId IN ($departmentList)";
 
     $stmtDeptLocHc = sqlsrv_query($conn, $sqlDeptLocHc, [$targetUserId]);
 
@@ -1469,6 +1476,7 @@ function handleDashboardData($input, $returnData = false) {
             $locId = (int)$row['LocationId'];
             $deptLocHcMap[$deptId][$locId] = (int)$row['StandardHeadCount'];
             $deptNameMap[$deptId] = $row['DepartmentFName'];
+            $deptSortOrderMap[$deptId] = $row['SortOrder'] !== null ? (int)$row['SortOrder'] : null;
         }
     }
     
@@ -2076,14 +2084,16 @@ function handleDashboardData($input, $returnData = false) {
             $requiredHeadcountByLocation[$locId]['departments'][$info['deptName']] = [
                 'required' => $info['required'],
                 'available' => $info['available'],
-                'gap' => $info['required'] - $info['available']
+                'gap' => $info['required'] - $info['available'],
+                'sortOrder' => $deptSortOrderMap[$deptId] ?? null
             ];
         }
 
         $requiredHeadcountByDept[$deptName] = [
             'required' => $deptReq,
             'available' => $deptAvail,
-            'gap' => $deptReq - $deptAvail
+            'gap' => $deptReq - $deptAvail,
+            'sortOrder' => $deptSortOrderMap[$deptId] ?? null
         ];
     }
 
@@ -4671,6 +4681,7 @@ function handleGetReport($input) {
     $departmentList = !empty($scope['departments']) ? implode(',', array_map('intval', $scope['departments'])) : '0';
     
     AutoDepartmentDesignationMappings($sqlConn, $targetUserId, $locationList, $companyList, $departmentList);
+<<<<<<< HEAD
  
     $allLocationsList = !empty($scope['locations']) ? implode(',', array_map('intval', $scope['locations'])) : '0';
  
@@ -4678,6 +4689,13 @@ function handleGetReport($input) {
  
     $sqlMachStd = "SELECT SUM(TotalMachines) as total FROM LocationMachineStdCount WITH (NOLOCK) WHERE UserId = ? AND LocationId IN ($locationList)";
  
+=======
+
+    $totalStdMachines = '0.00';
+
+    $sqlMachStd = "SELECT COALESCE(SUM(TotalMachines), 0) as total FROM LocationMachineStdCount WITH (NOLOCK) WHERE UserId = ? AND LocationId IN ($locationList)";
+
+>>>>>>> fb49bc1 ( index and view files)
     $stmtMachStd = sqlsrv_query($sqlConn, $sqlMachStd, [$targetUserId]);
  
     if ($stmtMachStd && $rowMS = sqlsrv_fetch_array($stmtMachStd, SQLSRV_FETCH_ASSOC)) {
@@ -4685,9 +4703,15 @@ function handleGetReport($input) {
     }
  
     $dailyMachMap = [];
+<<<<<<< HEAD
  
     $sqlMachDaily = "SELECT MachineDate, SUM(RunningMachines) as total FROM LocationDailyMachineCount WITH (NOLOCK) WHERE UserId = ? AND LocationId IN ($locationList) AND MachineDate >= ? AND MachineDate <= ? GROUP BY MachineDate";
  
+=======
+
+    $sqlMachDaily = "SELECT CAST(MachineDate AS DATE) AS MachineDate, SUM(RunningMachines) as total FROM LocationDailyMachineCount WITH (NOLOCK) WHERE UserId = ? AND LocationId IN ($locationList) AND MachineDate >= ? AND MachineDate < DATEADD(day, 1, ?) GROUP BY CAST(MachineDate AS DATE)";
+
+>>>>>>> fb49bc1 ( index and view files)
     $stmtMachDaily = sqlsrv_query($sqlConn, $sqlMachDaily, [$targetUserId, $dayFrom, $dayTo]);
  
     if ($stmtMachDaily) {
@@ -4698,10 +4722,14 @@ function handleGetReport($input) {
         }
     }
  
+<<<<<<< HEAD
     // ---- Departments: Working employees (original query) + departments with STD headcount ----
  
     // 1) Departments that have Working employees (original query, ORDER BY removed - sorting is done in PHP below)
     $sqlD = "SELECT D.DepartmentId, D.DepartmentFName as DepartmentName, D.SortOrder FROM Departments D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON D.DepartmentId = E.DepartmentId WHERE E.Location IN ($allLocationsList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working' GROUP BY D.DepartmentId, D.DepartmentFName, D.SortOrder";
+=======
+    $sqlD = "SELECT D.DepartmentId, D.DepartmentFName as DepartmentName, D.SortOrder FROM Departments D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON D.DepartmentId = E.DepartmentId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working' GROUP BY D.DepartmentId, D.DepartmentFName, D.SortOrder ORDER BY CASE WHEN D.SortOrder IS NULL OR D.SortOrder = 0 THEN 1 ELSE 0 END, D.SortOrder ASC, D.DepartmentFName ASC";
+>>>>>>> fb49bc1 ( index and view files)
  
     $stmtD = sqlsrv_query($sqlConn, $sqlD);
  
@@ -4753,19 +4781,38 @@ function handleGetReport($input) {
         $deptSortOrder[$deptId] = $row['SortOrder'];
         $deptOrder[] = $deptId;
     }
+<<<<<<< HEAD
  
     $hcMap = [];
  
     $sqlHc = "SELECT DepartmentId, SUM(StandardHeadCount) AS std_hc FROM DepartmentLocationHeadCount WITH (NOLOCK) WHERE UserId = ? AND LocationId IN ($locationList) AND DepartmentId IN ($departmentList) GROUP BY DepartmentId";
  
+=======
+
+    $hcByDeptLocation = [];
+
+    $sqlHc = "SELECT DepartmentId, LocationId, SUM(StandardHeadCount) AS std_hc FROM DepartmentLocationHeadCount WITH (NOLOCK) WHERE UserId = ? AND LocationId IN ($locationList) AND DepartmentId IN ($departmentList) GROUP BY DepartmentId, LocationId";
+
+>>>>>>> fb49bc1 ( index and view files)
     $stmtHc = sqlsrv_query($sqlConn, $sqlHc, [$targetUserId]);
     
     if ($stmtHc) {
         while ($row = sqlsrv_fetch_array($stmtHc, SQLSRV_FETCH_ASSOC)) {
-            $hcMap[$row['DepartmentId']] = intval($row['std_hc']);
+            $deptId = intval($row['DepartmentId']);
+            $locationId = intval($row['LocationId']);
+            $hcByDeptLocation[$deptId][$locationId] = intval($row['std_hc']);
         }
     }
+<<<<<<< HEAD
  
+=======
+
+    $hcMap = [];
+    foreach ($hcByDeptLocation as $deptId => $locationHcMap) {
+        $hcMap[$deptId] = array_sum($locationHcMap);
+    }
+
+>>>>>>> fb49bc1 ( index and view files)
     $desigHcMap = [];
  
     $sqlDesigHc = "SELECT DepartmentId, DesignationId, SUM(StandardHeadCount) AS std_hc FROM DepartmentDesignationLocationHeadCount WITH (NOLOCK) WHERE UserId = ? AND LocationId IN ($locationList) AND DepartmentId IN ($departmentList) GROUP BY DepartmentId, DesignationId";

@@ -14326,7 +14326,17 @@ class AttendanceView {
 
         this._hcContext = { type, locationId, byDept, designationsRaw, locationName };
 
-        const depts = Object.keys(byDept).sort();
+        const depts = Object.keys(byDept).sort((a, b) => {
+            const sortOrderA = Number(byDept[a].sortOrder);
+            const sortOrderB = Number(byDept[b].sortOrder);
+            const hasSortOrderA = byDept[a].sortOrder != null && Number.isFinite(sortOrderA) && sortOrderA !== 0;
+            const hasSortOrderB = byDept[b].sortOrder != null && Number.isFinite(sortOrderB) && sortOrderB !== 0;
+
+            if (hasSortOrderA !== hasSortOrderB) return hasSortOrderA ? -1 : 1;
+            if (hasSortOrderA && sortOrderA !== sortOrderB) return sortOrderA - sortOrderB;
+
+            return a.localeCompare(b);
+        });
         let totalRequired = 0, totalAvailable = 0, totalGap = 0;
 
         const rows = depts.map((d, idx) => {
