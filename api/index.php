@@ -1456,9 +1456,10 @@ function handleDashboardData($input, $returnData = false) {
 
     // department as per location headcount
     $deptNameMap = [];
+    $deptSortOrderMap = [];
     $deptLocHcMap = [];
 
-    $sqlDeptLocHc = "SELECT DL.DepartmentId, DL.LocationId, DL.StandardHeadCount, D.DepartmentFName FROM DepartmentLocationHeadCount DL WITH (NOLOCK) INNER JOIN Departments D WITH (NOLOCK) ON DL.DepartmentId = D.DepartmentId WHERE DL.UserId = ? AND DL.LocationId IN ($employeeLocationList) AND DL.DepartmentId IN ($departmentList)";
+    $sqlDeptLocHc = "SELECT DL.DepartmentId, DL.LocationId, DL.StandardHeadCount, D.DepartmentFName, D.SortOrder FROM DepartmentLocationHeadCount DL WITH (NOLOCK) INNER JOIN Departments D WITH (NOLOCK) ON DL.DepartmentId = D.DepartmentId WHERE DL.UserId = ? AND DL.LocationId IN ($locationList) AND DL.DepartmentId IN ($departmentList)";
 
     $stmtDeptLocHc = sqlsrv_query($conn, $sqlDeptLocHc, [$targetUserId]);
 
@@ -1468,6 +1469,7 @@ function handleDashboardData($input, $returnData = false) {
             $locId = (int)$row['LocationId'];
             $deptLocHcMap[$deptId][$locId] = (int)$row['StandardHeadCount'];
             $deptNameMap[$deptId] = $row['DepartmentFName'];
+            $deptSortOrderMap[$deptId] = $row['SortOrder'];
         }
     }
     
@@ -2075,14 +2077,16 @@ function handleDashboardData($input, $returnData = false) {
             $requiredHeadcountByLocation[$locId]['departments'][$info['deptName']] = [
                 'required' => $info['required'],
                 'available' => $info['available'],
-                'gap' => $info['required'] - $info['available']
+                'gap' => $info['required'] - $info['available'],
+                'sortOrder' => $deptSortOrderMap[$deptId] ?? 0
             ];
         }
 
         $requiredHeadcountByDept[$deptName] = [
             'required' => $deptReq,
             'available' => $deptAvail,
-            'gap' => $deptReq - $deptAvail
+            'gap' => $deptReq - $deptAvail,
+            'sortOrder' => $deptSortOrderMap[$deptId] ?? 0
         ];
     }
 
@@ -4671,8 +4675,6 @@ function handleGetReport($input) {
     
     AutoDepartmentDesignationMappings($sqlConn, $targetUserId, $locationList, $companyList, $departmentList);
  
-    $allLocationsList = !empty($scope['locations']) ? implode(',', array_map('intval', $scope['locations'])) : '0';
- 
     $totalStdMachines = '0.00';
  
     $sqlMachStd = "SELECT SUM(TotalMachines) as total FROM LocationMachineStdCount WITH (NOLOCK) WHERE UserId = ? AND LocationId IN ($locationList)";
@@ -4699,8 +4701,8 @@ function handleGetReport($input) {
  
     // ---- Departments: Working employees (original query) + departments with STD headcount ----
  
-    // 1) Departments that have Working employees (original query, ORDER BY removed - sorting is done in PHP below)
-    $sqlD = "SELECT D.DepartmentId, D.DepartmentFName as DepartmentName, D.SortOrder FROM Departments D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON D.DepartmentId = E.DepartmentId WHERE E.Location IN ($allLocationsList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working' GROUP BY D.DepartmentId, D.DepartmentFName, D.SortOrder";
+    // 1) Departments that have Working employees in the selected locations
+    $sqlD = "SELECT D.DepartmentId, D.DepartmentFName as DepartmentName, D.SortOrder FROM Departments D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON D.DepartmentId = E.DepartmentId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND E.Status = 'Working' GROUP BY D.DepartmentId, D.DepartmentFName, D.SortOrder";
  
     $stmtD = sqlsrv_query($sqlConn, $sqlD);
  
