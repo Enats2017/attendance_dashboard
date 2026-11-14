@@ -14448,7 +14448,17 @@ class AttendanceView {
             (ctx.designationsRaw || []).forEach((d) => {
                 if (d.deptName !== deptName) return;
                 if (!map[d.designationName]) {
-                    map[d.designationName] = { designationName: d.designationName, required: 0, available: 0 };
+                    map[d.designationName] = {
+                        designationName: d.designationName,
+                        sortOrder: Number(d.sortOrder) || 0,
+                        required: 0,
+                        available: 0
+                    };
+                } else {
+                    const sortOrder = Number(d.sortOrder) || 0;
+                    if (sortOrder && (!map[d.designationName].sortOrder || sortOrder < map[d.designationName].sortOrder)) {
+                        map[d.designationName].sortOrder = sortOrder;
+                    }
                 }
                 map[d.designationName].required += Number(d.required || 0);
                 map[d.designationName].available += Number(d.available || 0);
@@ -14460,7 +14470,16 @@ class AttendanceView {
 
         designations = designations.filter((d) => Number(d.required || 0) > 0 || Number(d.available || 0) > 0);
 
-        designations.sort((a, b) => String(a.designationName).localeCompare(String(b.designationName)));
+        designations.sort((a, b) => {
+            const sortOrderA = Number(a.sortOrder) || 0;
+            const sortOrderB = Number(b.sortOrder) || 0;
+            const hasSortOrderA = sortOrderA !== 0;
+            const hasSortOrderB = sortOrderB !== 0;
+
+            if (hasSortOrderA !== hasSortOrderB) return hasSortOrderA ? -1 : 1;
+            if (hasSortOrderA && sortOrderA !== sortOrderB) return sortOrderA - sortOrderB;
+            return a.designationName < b.designationName ? -1 : a.designationName > b.designationName ? 1 : 0;
+        });
 
         if (!designations.length) {
             const emptyRow = document.createElement("tr");

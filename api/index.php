@@ -1967,8 +1967,9 @@ function handleDashboardData($input, $returnData = false) {
 
     $desigLocHcMap = [];
     $designationNameMap = [];
+    $designationSortOrderMap = [];
 
-    $sqlDesigLocHc = "SELECT DDL.DepartmentId, DDL.DesignationId, DDL.LocationId, DDL.StandardHeadCount, DG.DesignationsName FROM DepartmentDesignationLocationHeadCount DDL WITH (NOLOCK) INNER JOIN Designations DG ON DDL.DesignationId = DG.DesignationId WHERE DDL.UserId = ? AND DDL.LocationId IN ($employeeLocationList) AND DDL.DepartmentId IN ($departmentList)";
+    $sqlDesigLocHc = "SELECT DDL.DepartmentId, DDL.DesignationId, DDL.LocationId, DDL.StandardHeadCount, DG.DesignationsName, DG.SortOrder AS DesignationSortOrder FROM DepartmentDesignationLocationHeadCount DDL WITH (NOLOCK) INNER JOIN Designations DG ON DDL.DesignationId = DG.DesignationId WHERE DDL.UserId = ? AND DDL.LocationId IN ($employeeLocationList) AND DDL.DepartmentId IN ($departmentList)";
 
     $stmtDesigLocHc = sqlsrv_query($conn, $sqlDesigLocHc, [$targetUserId]);
 
@@ -1990,6 +1991,7 @@ function handleDashboardData($input, $returnData = false) {
             if ($stdHc > 0 || isset($empHasDesigLoc[$key])) {
                 $desigLocHcMap[$deptId][$desigId][$locId] = $stdHc;
                 $designationNameMap[$desigId] = $row['DesignationsName'];
+                $designationSortOrderMap[$desigId] = (int)($row['DesignationSortOrder'] ?? 0);
             }
         }
     }
@@ -2003,6 +2005,9 @@ function handleDashboardData($input, $returnData = false) {
             $desigLocHcMap[$dId][$gId][$lId] = 0;
             if (!isset($designationNameMap[$gId])) {
                 $designationNameMap[$gId] = $emp['designation'] ?? ('Designation ' . $gId);
+            }
+            if (!isset($designationSortOrderMap[$gId])) {
+                $designationSortOrderMap[$gId] = (int)($emp['designationSortOrder'] ?? 0);
             }
         }
     }
@@ -2038,6 +2043,7 @@ function handleDashboardData($input, $returnData = false) {
                     $desigLocHeadcountMap[$deptId][$desigId][$locId] = [
                         'deptName'        => $deptNameMap[$deptId] ?? ('Dept ' . $deptId),
                         'designationName' => $designationNameMap[$desigId] ?? ('Designation ' . $desigId),
+                        'sortOrder'       => $designationSortOrderMap[$desigId] ?? 0,
                         'locationName'    => $locationNameMap[$locId] ?? ('Location ' . $locId),
                         'required'        => $req,
                         'available'       => $avail
@@ -2100,6 +2106,7 @@ function handleDashboardData($input, $returnData = false) {
                 $requiredHeadcountByLocation[$locId]['designations'][] = [
                     'deptName' => $info['deptName'],
                     'designationName' => $info['designationName'],
+                    'sortOrder' => $designationSortOrderMap[$desigId] ?? 0,
                     'required' => $info['required'],
                     'available' => $info['available'],
                     'gap' => $info['required'] - $info['available']
