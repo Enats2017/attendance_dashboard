@@ -14272,6 +14272,10 @@ class AttendanceView {
         const colorCls = ["info", "success", "warning", "accent", "danger"];
         const cardsHtml = byLocation.map((loc, i) => {
             const val = type === "required" ? loc.required : loc.gap;
+            const locationName = loc.locationName;
+            const hasLocationName = locationName != null &&
+                String(locationName).trim() !== "" &&
+                String(locationName).trim().toLowerCase() !== "undefined";
             const machinesLine = type === "required" ? `<span class="stat-card-sub" style="color:#334155;font-weight:600;">(${loc.machines || 0} m/c's)</span>` : "";
             return `
                 <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
@@ -14279,7 +14283,7 @@ class AttendanceView {
                     onclick="AppController.view._showHeadcountDeptTable('${type}', ${loc.locationId})">
                     <div class="stat-icon"><i class="ph ph-map-pin"></i></div>
                     <div class="stat-content">
-                        <span class="stat-label">${this._escapeAttr(loc.locationName)}</span>
+                        ${hasLocationName ? `<span class="stat-label">${this._escapeAttr(locationName)}</span>` : ""}
                         <span class="stat-value">${val}</span>
                         ${machinesLine}
                         <span class="stat-card-hint">↓ click to view</span>
