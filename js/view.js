@@ -12061,6 +12061,30 @@ class AttendanceView {
         attachSearchFilter("search-designations", "designations-list");
         attachSearchFilter("search-locations", "locations-list");
 
+        const sortOrderEntries = (listContainer, inputSelector) => {
+            const entries = Array.from(listContainer.querySelectorAll(".sort-order-item")).map((item) => ({
+                item,
+                input: item.querySelector(inputSelector),
+            }));
+
+            entries.sort((a, b) => {
+                const orderA = a.input && a.input.value !== "" ? Number(a.input.value) : Infinity;
+                const orderB = b.input && b.input.value !== "" ? Number(b.input.value) : Infinity;
+
+                if (orderA !== orderB) return orderA - orderB;
+
+                const nameA = a.item.querySelector(".sort-order-item-name")?.textContent.trim() || "";
+                const nameB = b.item.querySelector(".sort-order-item-name")?.textContent.trim() || "";
+
+                return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
+            });
+
+            entries.forEach(({ item, input }) => {
+                listContainer.appendChild(item);
+                if (input) input.dataset.originalOrder = input.value;
+            });
+        };
+
         // ---- Feature 2: Ordered Sort (Insert & Shift) ----
         const performOrderedSort = (listContainerId, inputSelector) => {
             const listContainer = document.getElementById(listContainerId);
@@ -12077,54 +12101,37 @@ class AttendanceView {
                 ({ input }) => input && input.value !== (input.dataset.originalOrder || "")
             );
 
-            if (changed.length > 1) {
-                alert("Change one order value at a time, then click Sort.");
-                return;
-            }
-
             if (changed.length === 1) {
                 const movedInput = changed[0].input;
-                const newOrder = Number(movedInput.value);
+                const newOrder = movedInput.value === "" ? null : Number(movedInput.value);
 
-                if (!Number.isInteger(newOrder) || newOrder < 1) {
+                if (newOrder !== null && (!Number.isInteger(newOrder) || newOrder < 1)) {
                     alert("Enter a whole-number order of 1 or higher.");
                     return;
                 }
 
-                // 2. Shift everyone else down
-                entries.forEach(({ input }) => {
+                const oldOrderValue = movedInput.dataset.originalOrder || "";
+                const oldOrder = oldOrderValue !== "" ? Number(oldOrderValue) : null;
+
+                // 2. Shift only the priorities between the old and new positions.
+                if (newOrder !== null) entries.forEach(({ input }) => {
                     if (!input || input === movedInput || input.value === "") return;
-                    
+
                     const currentOrder = Number(input.value);
-                    
-                    // If someone's number is greater than or equal to the new number, 
-                    // push them down by 1.
-                    if (currentOrder >= newOrder) {
+
+                    if (oldOrder === null && currentOrder >= newOrder) {
                         input.value = currentOrder + 1;
+                    } else if (oldOrder !== null && newOrder < oldOrder
+                        && currentOrder >= newOrder && currentOrder < oldOrder) {
+                        input.value = currentOrder + 1;
+                    } else if (oldOrder !== null && newOrder > oldOrder
+                        && currentOrder > oldOrder && currentOrder <= newOrder) {
+                        input.value = currentOrder - 1;
                     }
                 });
             }
 
-            // 3. Sort the list by the new numbers
-            entries.sort((a, b) => {
-                const orderA = a.input && a.input.value !== "" ? Number(a.input.value) : Infinity;
-                const orderB = b.input && b.input.value !== "" ? Number(b.input.value) : Infinity;
-
-                if (orderA !== orderB) return orderA - orderB;
-
-                const nameA = a.item.querySelector(".sort-order-item-name")?.textContent.trim() || "";
-                const nameB = b.item.querySelector(".sort-order-item-name")?.textContent.trim() || "";
-
-                return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
-            });
-
-            // 4. Put the rows back into the DOM and update the "original" tracking number
-            entries.forEach(({ item, input }) => {
-                listContainer.appendChild(item);
-                if (input) {
-                    input.dataset.originalOrder = input.value;
-                }
-            });
+            sortOrderEntries(listContainer, inputSelector);
         };
 
         document.getElementById("btn-sort-companies").addEventListener("click", () => {
@@ -12156,6 +12163,7 @@ class AttendanceView {
             this.hideOverlay();
 
             if (res && res.success) {
+                sortOrderEntries(contentEl.querySelector("#companies-list"), ".company-order-input");
                 alert("Company sort order saved successfully!");
                 model.state.filterLists = null;
             } else {
@@ -12178,6 +12186,7 @@ class AttendanceView {
             this.hideOverlay();
 
             if (res && res.success) {
+                sortOrderEntries(contentEl.querySelector("#departments-list"), ".dept-order-input");
                 alert("Department sort order saved successfully!");
                 model.state.filterLists = null;
             } else {
@@ -12202,6 +12211,7 @@ class AttendanceView {
                 this.showOverlay("Refreshing data...");
                 await model.fetchData();
                 this.hideOverlay();
+                sortOrderEntries(contentEl.querySelector("#designations-list"), ".designation-order-input");
                 alert("Designation sort order saved successfully!");
                 model.state.filterLists = null;
             } else {
@@ -12227,6 +12237,7 @@ class AttendanceView {
             if (res && res.success) {
                 await model.fetchData();
                 this.hideOverlay();
+                sortOrderEntries(contentEl.querySelector("#locations-list"), ".location-order-input");
                 alert("Location sort order saved successfully!");
             } else {
                 this.hideOverlay();
