@@ -5393,7 +5393,7 @@ function handleGetReport($input) {
         $deptActiveToday = [];
         foreach ($empDateRows as $emp) {
             if (!$emp['doj'] || $emp['doj'] > $dateStr) continue;
-            $wasActive = ($emp['status'] === 'Working') || ($emp['status'] === 'Resigned' && $emp['dor'] && $emp['dor'] > $dateStr);
+           $wasActive = ($emp['status'] === 'Working' && (!$emp['dor'] || $emp['dor'] >= $dateStr)) || ($emp['status'] === 'Resigned' && $emp['dor'] && $emp['dor'] >= $dateStr);
             if ($wasActive) {
                 $deptActiveToday[$emp['deptId']] = true;
                 $deptHeadcountByDay[$emp['deptId']][$d] = ($deptHeadcountByDay[$emp['deptId']][$d] ?? 0) + 1;
