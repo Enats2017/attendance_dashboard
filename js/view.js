@@ -12085,6 +12085,25 @@ class AttendanceView {
             });
         };
 
+        const hasDuplicateSortOrders = (inputs) => {
+            const assignedOrders = new Set();
+
+            for (const input of inputs) {
+                if (input.value === "") continue;
+
+                const sortOrder = parseInt(input.value, 10);
+                if (assignedOrders.has(sortOrder)) {
+                    alert(`Sort order number ${sortOrder} is already assigned. Please change the sort order number.`);
+                    input.focus();
+                    return true;
+                }
+
+                assignedOrders.add(sortOrder);
+            }
+
+            return false;
+        };
+
         // ---- Feature 2: Ordered Sort (Insert & Shift) ----
         const performOrderedSort = (listContainerId, inputSelector) => {
             const listContainer = document.getElementById(listContainerId);
@@ -12150,6 +12169,8 @@ class AttendanceView {
         // ---- Save Handlers ----
         document.getElementById("btn-save-companies").addEventListener("click", async () => {
             const inputs = contentEl.querySelectorAll(".company-order-input",);
+            if (hasDuplicateSortOrders(inputs)) return;
+
             const items = [];
             inputs.forEach((input) => {
                 items.push({
@@ -12173,6 +12194,8 @@ class AttendanceView {
 
         document.getElementById("btn-save-departments").addEventListener("click", async () => {
             const inputs = contentEl.querySelectorAll(".dept-order-input");
+            if (hasDuplicateSortOrders(inputs)) return;
+
             const items = [];
             inputs.forEach((input) => {
                 items.push({
@@ -12196,6 +12219,8 @@ class AttendanceView {
 
         document.getElementById("btn-save-designations").addEventListener("click", async () => {
             const inputs = contentEl.querySelectorAll(".designation-order-input");
+            if (hasDuplicateSortOrders(inputs)) return;
+
             const items = [];
             inputs.forEach((input) => {
                 items.push({
@@ -12222,6 +12247,8 @@ class AttendanceView {
 
         document.getElementById("btn-save-locations").addEventListener("click", async () => {
             const inputs = contentEl.querySelectorAll(".location-order-input");
+            if (hasDuplicateSortOrders(inputs)) return;
+
             const items = [];
 
             inputs.forEach((input) => {
