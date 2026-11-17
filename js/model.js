@@ -153,6 +153,17 @@
             }
         }
 
+        async fetchLocationsOrder() {
+            try {
+                const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
+                url.searchParams.set("action", "get_locations_order");
+                const response = await fetch(url.toString(), { credentials: "include" });
+                return await response.json();
+            } catch (error) {
+                console.error("Fallback Fetch Locations Order Error:", error);
+                return { success: false, data: [] };
+            }
+        }
 
         async fetchData() {
             console.trace("fetchData called");
@@ -223,7 +234,13 @@
                 const data = JSON.parse(responseText);
 
                 if (data.success) {
-                    const locationOrderRes = await this.fetchLocationsOrder();
+                    let locationOrderRes = { success: false, data: [] };
+                    
+                    if (typeof this.fetchLocationsOrder === "function") {
+                        locationOrderRes = await this.fetchLocationsOrder();
+                    } else {
+                        console.warn("SortOrder module not loaded yet. Location order will be alphabetical.");
+                    }
 
                     this.state.locationOrder = locationOrderRes && locationOrderRes.success ? (locationOrderRes.data || []) : [];
 
@@ -1188,40 +1205,6 @@
             }).sort((a, b) => (b.doj || '').localeCompare(a.doj || '')).map(emp => ({ log: null, emp }));
         }
 
-
-        async fetchDesignationsOrder() {
-            try {
-                const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
-                url.searchParams.set('action', 'get_designations_order');
-                const response = await fetch(url.toString(), { credentials: 'include' });
-                const data = await response.json();
-                return data;
-            } catch (error) {
-                console.error('Fetch Designations Order Error:', error);
-                return { success: false, error: error.message };
-            }
-        }
-
-
-        async saveDesignationsOrder(items) {
-            try {
-                const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
-                url.searchParams.set('action', 'save_designations_order');
-                const response = await fetch(url.toString(), {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'save_designations_order', items })
-                });
-                const data = await response.json();
-                return data;
-            } catch (error) {
-                console.error('Save Designations Order Error:', error);
-                return { success: false, error: error.message };
-            }
-        }
-
-
         async fetchDesignationFamilies() {
             try {
                 const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
@@ -1519,105 +1502,6 @@
             return dates;
         }
 
-
-        async fetchCompaniesOrder() {
-            try {
-                const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
-                url.searchParams.set('action', 'get_companies_order');
-                const response = await fetch(url.toString(), { credentials: 'include' });
-                return await response.json();
-            } catch (error) {
-                console.error('Fetch Companies Order Error:', error);
-                return { success: false, error: error.message };
-            }
-        }
-
-
-        async saveCompaniesOrder(items) {
-            try {
-                const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
-                url.searchParams.set('action', 'save_companies_order');
-                const response = await fetch(url.toString(), {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'save_companies_order', items })
-                });
-                return await response.json();
-            } catch (error) {
-                console.error('Save Companies Order Error:', error);
-                return { success: false, error: error.message };
-            }
-        }
-
-        async fetchLocationsOrder() {
-            try {
-                const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
-                url.searchParams.set("action", "get_locations_order");
-
-                const response = await fetch(url.toString(), {
-                    credentials: "include"
-                });
-
-                return await response.json();
-            } catch (error) {
-                console.error("Fetch Locations Order Error:", error);
-                return { success: false, message: error.message };
-            }
-        }
-
-        async saveLocationsOrder(items) {
-            try {
-                const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
-                url.searchParams.set("action", "save_locations_order");
-
-                const response = await fetch(url.toString(), {
-                    method: "POST",
-                    credentials: "include",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        action: "save_locations_order",
-                        items
-                    })
-                });
-
-                return await response.json();
-            } catch (error) {
-                console.error("Save Locations Order Error:", error);
-                return { success: false, message: error.message };
-            }
-        }
-
-        async fetchDepartmentsOrder() {
-            try {
-                const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
-                url.searchParams.set('action', 'get_departments_order');
-                const response = await fetch(url.toString(), { credentials: 'include' });
-                return await response.json();
-            } catch (error) {
-                console.error('Fetch Departments Order Error:', error);
-                return { success: false, error: error.message };
-            }
-        }
-
-
-        async saveDepartmentsOrder(items) {
-            try {
-                const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
-                url.searchParams.set('action', 'save_departments_order');
-                const response = await fetch(url.toString(), {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'save_departments_order', items })
-                });
-                return await response.json();
-            } catch (error) {
-                console.error('Save Departments Order Error:', error);
-                return { success: false, error: error.message };
-            }
-        }
-
         // Fetch department groups
         async fetchDepartmentGroups(targetUserId = null) {
             try {
@@ -1761,37 +1645,6 @@
                 return { success: false, message: error.message };
             }
         }
-
-        async fetchDesignationGlobalOrder() {
-            try {
-                const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
-                url.searchParams.set('action', 'get_designation_global_order');
-                const response = await fetch(url.toString(), { credentials: 'include' });
-                return await response.json();
-            } catch (error) {
-                console.error('Fetch Designation Global Order Error:', error);
-                return { success: false, error: error.message };
-            }
-        }
-
-
-        async saveDesignationGlobalOrder(items) {
-            try {
-                const url = new URL(window.APP_CONFIG.API_URL, window.location.origin);
-                url.searchParams.set('action', 'save_designation_global_order');
-                const response = await fetch(url.toString(), {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'save_designation_global_order', items })
-                });
-                return await response.json();
-            } catch (error) {
-                console.error('Save Designation Global Order Error:', error);
-                return { success: false, error: error.message };
-            }
-        }
-
 
         async fetchDepartmentDesignationMapping(targetUserId = null) {
             try {
