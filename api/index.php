@@ -4431,27 +4431,27 @@ function handleGetDesignationStdHC($input = []) {
 }
 
 /**
- * Recalculates the Master (16) Designation and Department Headcounts
- * for a specific Location and Department based on all sub-admins.
+ * Recalculates Master (16) globally, and User 37 only for their assigned locations.
  */
 function recalculateMasterHeadcount($sqlConn, $locationId, $deptId) {
-    $sqlDesigs = "SELECT DISTINCT DesignationId FROM DepartmentDesignationLocationHeadCount WHERE LocationId = ? AND DepartmentId = ? AND UserId <> 16";
-    $stmtDesigs = sqlsrv_query($sqlConn, $sqlDesigs, [$locationId, $deptId]);
+    $userFilter16 = "UserId <> 16";
     
-    if ($stmtDesigs) {
-        while ($row = sqlsrv_fetch_array($stmtDesigs, SQLSRV_FETCH_ASSOC)) {
+    $sqlDesigs16 = "SELECT DISTINCT DesignationId FROM DepartmentDesignationLocationHeadCount WHERE LocationId = ? AND DepartmentId = ? AND $userFilter16";
+    $stmtDesigs16 = sqlsrv_query($sqlConn, $sqlDesigs16, [$locationId, $deptId]);
+    
+    if ($stmtDesigs16) {
+        while ($row = sqlsrv_fetch_array($stmtDesigs16, SQLSRV_FETCH_ASSOC)) {
             $desigId = (int)$row['DesignationId'];
 
-            $sqlSumDesig = "SELECT ISNULL(SUM(StandardHeadCount), 0) AS Total FROM DepartmentDesignationLocationHeadCount WHERE LocationId = ? AND DepartmentId = ? AND DesignationId = ? AND UserId <> 16";
-            $stmtSumDesig = sqlsrv_query($sqlConn, $sqlSumDesig, [$locationId, $deptId, $desigId]);
+            $sqlSumDesig16 = "SELECT ISNULL(SUM(StandardHeadCount), 0) AS Total FROM DepartmentDesignationLocationHeadCount WHERE LocationId = ? AND DepartmentId = ? AND DesignationId = ? AND $userFilter16";
+            $stmtSumDesig16 = sqlsrv_query($sqlConn, $sqlSumDesig16, [$locationId, $deptId, $desigId]);
             
-            if ($stmtSumDesig) {
-                $sumRow = sqlsrv_fetch_array($stmtSumDesig, SQLSRV_FETCH_ASSOC);
+            if ($stmtSumDesig16) {
+                $sumRow = sqlsrv_fetch_array($stmtSumDesig16, SQLSRV_FETCH_ASSOC);
                 $masterDesigTotal = intval($sumRow['Total']);
-                sqlsrv_free_stmt($stmtSumDesig);
+                sqlsrv_free_stmt($stmtSumDesig16);
 
                 $checkMasterDesig = sqlsrv_query($sqlConn, "SELECT Id FROM DepartmentDesignationLocationHeadCount WHERE UserId = 16 AND LocationId = ? AND DepartmentId = ? AND DesignationId = ?", [$locationId, $deptId, $desigId]);
-                
                 $masterDesigExists = null;
                 if ($checkMasterDesig) {
                     $masterDesigExists = sqlsrv_fetch_array($checkMasterDesig, SQLSRV_FETCH_ASSOC);
@@ -4465,20 +4465,18 @@ function recalculateMasterHeadcount($sqlConn, $locationId, $deptId) {
                 }
             }
         }
-        
-        sqlsrv_free_stmt($stmtDesigs);
+        sqlsrv_free_stmt($stmtDesigs16);
     }
 
-    $sqlSumDept = "SELECT ISNULL(SUM(StandardHeadCount), 0) AS Total FROM DepartmentLocationHeadCount WHERE LocationId = ? AND DepartmentId = ? AND UserId <> 16";
-    $stmtSumDept = sqlsrv_query($sqlConn, $sqlSumDept, [$locationId, $deptId]);
+    $sqlSumDept16 = "SELECT ISNULL(SUM(StandardHeadCount), 0) AS Total FROM DepartmentLocationHeadCount WHERE LocationId = ? AND DepartmentId = ? AND $userFilter16";
+    $stmtSumDept16 = sqlsrv_query($sqlConn, $sqlSumDept16, [$locationId, $deptId]);
     
-    if ($stmtSumDept) {
-        $sumRowDept = sqlsrv_fetch_array($stmtSumDept, SQLSRV_FETCH_ASSOC);
+    if ($stmtSumDept16) {
+        $sumRowDept = sqlsrv_fetch_array($stmtSumDept16, SQLSRV_FETCH_ASSOC);
         $masterDeptTotal = intval($sumRowDept['Total']);
-        sqlsrv_free_stmt($stmtSumDept);
+        sqlsrv_free_stmt($stmtSumDept16);
 
         $checkMasterDept = sqlsrv_query($sqlConn, "SELECT Id FROM DepartmentLocationHeadCount WHERE UserId = 16 AND LocationId = ? AND DepartmentId = ?", [$locationId, $deptId]);
-        
         $masterDeptExists = null;
         if ($checkMasterDept) {
             $masterDeptExists = sqlsrv_fetch_array($checkMasterDept, SQLSRV_FETCH_ASSOC);
@@ -4489,6 +4487,73 @@ function recalculateMasterHeadcount($sqlConn, $locationId, $deptId) {
             sqlsrv_query($sqlConn, "UPDATE DepartmentLocationHeadCount SET StandardHeadCount = ?, UpdatedOn = GETDATE() WHERE UserId = 16 AND LocationId = ? AND DepartmentId = ?", [$masterDeptTotal, $locationId, $deptId]);
         } else {
             sqlsrv_query($sqlConn, "INSERT INTO DepartmentLocationHeadCount (UserId, LocationId, DepartmentId, StandardHeadCount, CreatedOn) VALUES (16, ?, ?, ?, GETDATE())", [$locationId, $deptId, $masterDeptTotal]);
+        }
+    }
+
+    $isLocationAssignedTo37 = false;
+    $stmtCheck37 = sqlsrv_query($sqlConn, "SELECT LocationId FROM UserLocations WHERE UserId = 37 AND LocationId = ?", [$locationId]);
+    if ($stmtCheck37) {
+        if (sqlsrv_fetch_array($stmtCheck37, SQLSRV_FETCH_ASSOC)) {
+            $isLocationAssignedTo37 = true;
+        }
+        sqlsrv_free_stmt($stmtCheck37);
+    }
+
+    if ($isLocationAssignedTo37) {
+        $userFilter37 = "UserId <> 37";
+
+        $sqlDesigs37 = "SELECT DISTINCT DesignationId FROM DepartmentDesignationLocationHeadCount WHERE LocationId = ? AND DepartmentId = ? AND $userFilter37";
+        $stmtDesigs37 = sqlsrv_query($sqlConn, $sqlDesigs37, [$locationId, $deptId]);
+        
+        if ($stmtDesigs37) {
+            while ($row = sqlsrv_fetch_array($stmtDesigs37, SQLSRV_FETCH_ASSOC)) {
+                $desigId = (int)$row['DesignationId'];
+
+                $sqlSumDesig37 = "SELECT ISNULL(SUM(StandardHeadCount), 0) AS Total FROM DepartmentDesignationLocationHeadCount WHERE LocationId = ? AND DepartmentId = ? AND DesignationId = ? AND $userFilter37";
+                $stmtSumDesig37 = sqlsrv_query($sqlConn, $sqlSumDesig37, [$locationId, $deptId, $desigId]);
+                
+                if ($stmtSumDesig37) {
+                    $sumRow37 = sqlsrv_fetch_array($stmtSumDesig37, SQLSRV_FETCH_ASSOC);
+                    $master37DesigTotal = intval($sumRow37['Total']);
+                    sqlsrv_free_stmt($stmtSumDesig37);
+
+                    $check37Desig = sqlsrv_query($sqlConn, "SELECT Id FROM DepartmentDesignationLocationHeadCount WHERE UserId = 37 AND LocationId = ? AND DepartmentId = ? AND DesignationId = ?", [$locationId, $deptId, $desigId]);
+                    $master37DesigExists = null;
+                    if ($check37Desig) {
+                        $master37DesigExists = sqlsrv_fetch_array($check37Desig, SQLSRV_FETCH_ASSOC);
+                        sqlsrv_free_stmt($check37Desig);
+                    }
+
+                    if ($master37DesigExists) {
+                        sqlsrv_query($sqlConn, "UPDATE DepartmentDesignationLocationHeadCount SET StandardHeadCount = ?, UpdatedOn = GETDATE() WHERE UserId = 37 AND LocationId = ? AND DepartmentId = ? AND DesignationId = ?", [$master37DesigTotal, $locationId, $deptId, $desigId]);
+                    } else {
+                        sqlsrv_query($sqlConn, "INSERT INTO DepartmentDesignationLocationHeadCount (UserId, LocationId, DepartmentId, DesignationId, StandardHeadCount, CreatedOn) VALUES (37, ?, ?, ?, ?, GETDATE())", [$locationId, $deptId, $desigId, $master37DesigTotal]);
+                    }
+                }
+            }
+            sqlsrv_free_stmt($stmtDesigs37);
+        }
+
+        $sqlSumDept37 = "SELECT ISNULL(SUM(StandardHeadCount), 0) AS Total FROM DepartmentLocationHeadCount WHERE LocationId = ? AND DepartmentId = ? AND $userFilter37";
+        $stmtSumDept37 = sqlsrv_query($sqlConn, $sqlSumDept37, [$locationId, $deptId]);
+        
+        if ($stmtSumDept37) {
+            $sumRowDept37 = sqlsrv_fetch_array($stmtSumDept37, SQLSRV_FETCH_ASSOC);
+            $master37DeptTotal = intval($sumRowDept37['Total']);
+            sqlsrv_free_stmt($stmtSumDept37);
+
+            $check37Dept = sqlsrv_query($sqlConn, "SELECT Id FROM DepartmentLocationHeadCount WHERE UserId = 37 AND LocationId = ? AND DepartmentId = ?", [$locationId, $deptId]);
+            $master37DeptExists = null;
+            if ($check37Dept) {
+                $master37DeptExists = sqlsrv_fetch_array($check37Dept, SQLSRV_FETCH_ASSOC);
+                sqlsrv_free_stmt($check37Dept);
+            }
+
+            if ($master37DeptExists) {
+                sqlsrv_query($sqlConn, "UPDATE DepartmentLocationHeadCount SET StandardHeadCount = ?, UpdatedOn = GETDATE() WHERE UserId = 37 AND LocationId = ? AND DepartmentId = ?", [$master37DeptTotal, $locationId, $deptId]);
+            } else {
+                sqlsrv_query($sqlConn, "INSERT INTO DepartmentLocationHeadCount (UserId, LocationId, DepartmentId, StandardHeadCount, CreatedOn) VALUES (37, ?, ?, ?, GETDATE())", [$locationId, $deptId, $master37DeptTotal]);
+            }
         }
     }
 }
@@ -5974,38 +6039,69 @@ function handleUpdateMachineStd($input) {
         sqlsrv_free_stmt($stmtInsert);
     }
 
-    if ($targetUserId !== 16) {
-        $stmtSum = sqlsrv_query($sqlConn, "SELECT ISNULL(SUM(TotalMachines), 0) AS Total FROM LocationMachineStdCount WHERE LocationId = ? AND UserId <> 16", [$locationId]);
+    if ($targetUserId !== 16 && $targetUserId !== 37) {
+        $stmtSum16 = sqlsrv_query($sqlConn, "SELECT ISNULL(SUM(TotalMachines), 0) AS Total FROM LocationMachineStdCount WHERE LocationId = ? AND UserId <> 16", [$locationId]);
 
-        if (!$stmtSum) {
+        if (!$stmtSum16) {
             echo json_encode(['success' => false, 'message' => 'Failed to calculate master total', 'errors' => sqlsrv_errors()]);
             return;
         }
 
-        $row = sqlsrv_fetch_array($stmtSum, SQLSRV_FETCH_ASSOC);
-        $masterTotal = number_format((float)$row['Total'], 2, '.', '');
-        sqlsrv_free_stmt($stmtSum);
+        $row16 = sqlsrv_fetch_array($stmtSum16, SQLSRV_FETCH_ASSOC);
+        $masterTotal16 = number_format((float)$row16['Total'], 2, '.', '');
+        sqlsrv_free_stmt($stmtSum16);
 
-        // Update Master (16)
-        $stmtUpdateMaster = sqlsrv_query($sqlConn, "UPDATE LocationMachineStdCount SET TotalMachines = ?, UpdatedAt = GETDATE() WHERE UserId = 16 AND LocationId = ?", [$masterTotal, $locationId]);
+        $stmtUpdate16 = sqlsrv_query($sqlConn, "UPDATE LocationMachineStdCount SET TotalMachines = ?, UpdatedAt = GETDATE() WHERE UserId = 16 AND LocationId = ?", [$masterTotal16, $locationId]);
 
-        if (!$stmtUpdateMaster) {
+        if (!$stmtUpdate16) {
             echo json_encode(['success' => false, 'message' => 'Failed to update master total', 'errors' => sqlsrv_errors()]);
             return;
         }
         
-        $rowsUpdatedMaster = sqlsrv_rows_affected($stmtUpdateMaster);
-        sqlsrv_free_stmt($stmtUpdateMaster);
+        $rowsUpdated16 = sqlsrv_rows_affected($stmtUpdate16);
+        sqlsrv_free_stmt($stmtUpdate16);
 
-        // Insert Master (16) if it didn't exist
-        if ($rowsUpdatedMaster === 0) {
-            $stmtInsertMaster = sqlsrv_query($sqlConn, "INSERT INTO LocationMachineStdCount (UserId, LocationId, TotalMachines, UpdatedAt) VALUES (16, ?, ?, GETDATE())", [$locationId, $masterTotal]);
+        if ($rowsUpdated16 === 0) {
+            $stmtInsert16 = sqlsrv_query($sqlConn, "INSERT INTO LocationMachineStdCount (UserId, LocationId, TotalMachines, UpdatedAt) VALUES (16, ?, ?, GETDATE())", [$locationId, $masterTotal16]);
 
-            if (!$stmtInsertMaster) {
+            if (!$stmtInsert16) {
                 echo json_encode(['success' => false, 'message' => 'Failed to insert master total', 'errors' => sqlsrv_errors()]);
                 return;
             }
-            sqlsrv_free_stmt($stmtInsertMaster);
+            sqlsrv_free_stmt($stmtInsert16);
+        }
+
+        $isAssigned37 = false;
+        $stmtCheck37 = sqlsrv_query($sqlConn, "SELECT LocationId FROM UserLocations WHERE UserId = 37 AND LocationId = ?", [$locationId]);
+        if ($stmtCheck37) {
+            if (sqlsrv_fetch_array($stmtCheck37, SQLSRV_FETCH_ASSOC)) {
+                $isAssigned37 = true;
+            }
+            sqlsrv_free_stmt($stmtCheck37);
+        }
+
+        if ($isAssigned37) {
+            $stmtSum37 = sqlsrv_query($sqlConn, "SELECT ISNULL(SUM(TotalMachines), 0) AS Total FROM LocationMachineStdCount WHERE LocationId = ? AND UserId <> 37", [$locationId]);
+
+            if ($stmtSum37) {
+                $row37 = sqlsrv_fetch_array($stmtSum37, SQLSRV_FETCH_ASSOC);
+                $masterTotal37 = number_format((float)$row37['Total'], 2, '.', '');
+                sqlsrv_free_stmt($stmtSum37);
+
+                $stmtUpdate37 = sqlsrv_query($sqlConn, "UPDATE LocationMachineStdCount SET TotalMachines = ?, UpdatedAt = GETDATE() WHERE UserId = 37 AND LocationId = ?", [$masterTotal37, $locationId]);
+                
+                if ($stmtUpdate37) {
+                    $rowsUpdated37 = sqlsrv_rows_affected($stmtUpdate37);
+                    sqlsrv_free_stmt($stmtUpdate37);
+
+                    if ($rowsUpdated37 === 0) {
+                        $stmtInsert37 = sqlsrv_query($sqlConn, "INSERT INTO LocationMachineStdCount (UserId, LocationId, TotalMachines, UpdatedAt) VALUES (37, ?, ?, GETDATE())", [$locationId, $masterTotal37]);
+                        if ($stmtInsert37) {
+                            sqlsrv_free_stmt($stmtInsert37);
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -6085,7 +6181,6 @@ function handleBulkUpdateDailyMachines($input) {
         $date = $item['date'];
         $count = $item['running_machines'] ?? null;
 
-        // Validate the number
         if (!is_numeric($count) || !is_finite((float)$count) || (float)$count < 0 || (float)$count > 99999999.99) {
             $errors[] = [
                 'date' => $item['date'] ?? null,
@@ -6094,7 +6189,6 @@ function handleBulkUpdateDailyMachines($input) {
         } else {
             $count = number_format((float)$count, 2, '.', '');
 
-            // 1. Upsert the row for the current user (sub-admin OR master)
             $stmt1 = sqlsrv_query($sqlConn, "UPDATE LocationDailyMachineCount SET RunningMachines = ?, UpdatedAt = GETDATE() WHERE UserId = ? AND LocationId = ? AND MachineDate = ?", [$count, $targetUserId, $locationId, $date]);
 
             if (!$stmt1) {
@@ -6113,36 +6207,71 @@ function handleBulkUpdateDailyMachines($input) {
                     }
                 }
 
-                // 2. If a SUB-ADMIN saved, recompute the master (16) row for this specific date
-                if ($targetUserId !== 16) {
-                    $stmtSum = sqlsrv_query($sqlConn, "SELECT ISNULL(SUM(RunningMachines), 0) AS Total FROM LocationDailyMachineCount WHERE LocationId = ? AND MachineDate = ? AND UserId <> 16", [$locationId, $date]);
+                if ($targetUserId !== 16 && $targetUserId !== 37) {
+                    $stmtSum16 = sqlsrv_query($sqlConn, "SELECT ISNULL(SUM(RunningMachines), 0) AS Total FROM LocationDailyMachineCount WHERE LocationId = ? AND MachineDate = ? AND UserId <> 16", [$locationId, $date]);
 
-                    if (!$stmtSum) {
-                        $errors[] = ['date' => $date, 'sum' => sqlsrv_errors()];
+                    if (!$stmtSum16) {
+                        $errors[] = ['date' => $date, 'sum_16' => sqlsrv_errors()];
                     } else {
-                        $row = sqlsrv_fetch_array($stmtSum, SQLSRV_FETCH_ASSOC);
-                        $masterTotal = number_format((float)$row['Total'], 2, '.', '');
-                        sqlsrv_free_stmt($stmtSum);
+                        $row16 = sqlsrv_fetch_array($stmtSum16, SQLSRV_FETCH_ASSOC);
+                        $masterTotal16 = number_format((float)$row16['Total'], 2, '.', '');
+                        sqlsrv_free_stmt($stmtSum16);
 
-                        // Update Master (16)
-                        $stmtUpdateMaster = sqlsrv_query($sqlConn, "UPDATE LocationDailyMachineCount SET RunningMachines = ?, UpdatedAt = GETDATE() WHERE UserId = 16 AND LocationId = ? AND MachineDate = ?", [$masterTotal, $locationId, $date]);
+                        $stmtUpdate16 = sqlsrv_query($sqlConn, "UPDATE LocationDailyMachineCount SET RunningMachines = ?, UpdatedAt = GETDATE() WHERE UserId = 16 AND LocationId = ? AND MachineDate = ?", [$masterTotal16, $locationId, $date]);
 
-                        if (!$stmtUpdateMaster) {
-                            $errors[] = ['date' => $date, 'update_master' => sqlsrv_errors()];
+                        if (!$stmtUpdate16) {
+                            $errors[] = ['date' => $date, 'update_master_16' => sqlsrv_errors()];
                         } else {
-                            $rowsUpdatedMaster = sqlsrv_rows_affected($stmtUpdateMaster);
-                            sqlsrv_free_stmt($stmtUpdateMaster);
+                            $rowsUpdated16 = sqlsrv_rows_affected($stmtUpdate16);
+                            sqlsrv_free_stmt($stmtUpdate16);
 
-                            // Insert Master (16) if it didn't exist
-                            if ($rowsUpdatedMaster === 0) {
-                                $stmtInsertMaster = sqlsrv_query($sqlConn, "INSERT INTO LocationDailyMachineCount (UserId, LocationId, MachineDate, RunningMachines, UpdatedAt) VALUES (16, ?, ?, ?, GETDATE())", [$locationId, $date, $masterTotal]);
-
-                                if (!$stmtInsertMaster) {
-                                    $errors[] = ['date' => $date, 'insert_master' => sqlsrv_errors()];
+                            if ($rowsUpdated16 === 0) {
+                                $stmtInsert16 = sqlsrv_query($sqlConn, "INSERT INTO LocationDailyMachineCount (UserId, LocationId, MachineDate, RunningMachines, UpdatedAt) VALUES (16, ?, ?, ?, GETDATE())", [$locationId, $date, $masterTotal16]);
+                                if (!$stmtInsert16) {
+                                    $errors[] = ['date' => $date, 'insert_master_16' => sqlsrv_errors()];
                                 } else {
-                                    sqlsrv_free_stmt($stmtInsertMaster);
+                                    sqlsrv_free_stmt($stmtInsert16);
                                 }
                             }
+                        }
+                    }
+
+                    $isAssigned37 = false;
+                    $stmtCheck37 = sqlsrv_query($sqlConn, "SELECT LocationId FROM UserLocations WHERE UserId = 37 AND LocationId = ?", [$locationId]);
+                    if ($stmtCheck37) {
+                        if (sqlsrv_fetch_array($stmtCheck37, SQLSRV_FETCH_ASSOC)) {
+                            $isAssigned37 = true;
+                        }
+                        sqlsrv_free_stmt($stmtCheck37);
+                    }
+
+                    if ($isAssigned37) {
+                        $stmtSum37 = sqlsrv_query($sqlConn, "SELECT ISNULL(SUM(RunningMachines), 0) AS Total FROM LocationDailyMachineCount WHERE LocationId = ? AND MachineDate = ? AND UserId <> 37", [$locationId, $date]);
+
+                        if ($stmtSum37) {
+                            $row37 = sqlsrv_fetch_array($stmtSum37, SQLSRV_FETCH_ASSOC);
+                            $masterTotal37 = number_format((float)$row37['Total'], 2, '.', '');
+                            sqlsrv_free_stmt($stmtSum37);
+
+                            $stmtUpdate37 = sqlsrv_query($sqlConn, "UPDATE LocationDailyMachineCount SET RunningMachines = ?, UpdatedAt = GETDATE() WHERE UserId = 37 AND LocationId = ? AND MachineDate = ?", [$masterTotal37, $locationId, $date]);
+                            
+                            if ($stmtUpdate37) {
+                                $rowsUpdated37 = sqlsrv_rows_affected($stmtUpdate37);
+                                sqlsrv_free_stmt($stmtUpdate37);
+
+                                if ($rowsUpdated37 === 0) {
+                                    $stmtInsert37 = sqlsrv_query($sqlConn, "INSERT INTO LocationDailyMachineCount (UserId, LocationId, MachineDate, RunningMachines, UpdatedAt) VALUES (37, ?, ?, ?, GETDATE())", [$locationId, $date, $masterTotal37]);
+                                    if (!$stmtInsert37) {
+                                        $errors[] = ['date' => $date, 'insert_master_37' => sqlsrv_errors()];
+                                    } else {
+                                        sqlsrv_free_stmt($stmtInsert37);
+                                    }
+                                }
+                            } else {
+                                $errors[] = ['date' => $date, 'update_master_37' => sqlsrv_errors()];
+                            }
+                        } else {
+                            $errors[] = ['date' => $date, 'sum_37' => sqlsrv_errors()];
                         }
                     }
                 }
