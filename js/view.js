@@ -7070,7 +7070,16 @@ class AttendanceView {
         const singlePunchData = window.AppController && AppController.model ? AppController.model.state.data.singlePunchData || {} : {};
 
         emps.forEach((e) => {
+            const doj = e.doj ? String(e.doj).slice(0, 10) : null;
+            const dor = e.dor ? String(e.dor).slice(0, 10) : null;
+
             dates.forEach((date) => {
+                if (!doj || doj > date) {
+                    return;
+                }     
+                if (dor && dor < date) {
+                    return;
+                }      
                 const key = e.id + "_" + date;
                 const log = logMap[key];
                 if (singlePunchKeys.has(key)) {
@@ -7176,7 +7185,17 @@ class AttendanceView {
         const singlePunchData = window.AppController?.model?.state?.data?.singlePunchData || {};
 
         emps.forEach((emp) => {
+            const doj = emp.doj ? String(emp.doj).slice(0, 10) : null;
+            const dor = emp.dor ? String(emp.dor).slice(0, 10) : null;
+
             dates.forEach((date) => {
+                if (!doj || doj > date) {
+                    return;
+                }
+                if (dor && dor < date) {
+                    return;
+                }
+
                 const key = `${emp.id}_${date}`;
                 const log = logMap[key];
 
@@ -13641,19 +13660,20 @@ class AttendanceView {
 
         const colorCls = ["info", "success", "warning", "accent", "danger"];
         const cardsHtml = byLocation.map((loc, i) => {
-            const val = type === "required" ? loc.required : loc.gap;
-            const locationName = loc.locationName;
-            const hasLocationName = locationName != null &&
-                String(locationName).trim() !== "" &&
-                String(locationName).trim().toLowerCase() !== "undefined";
-            const machinesLine = type === "required" ? `<span class="stat-card-sub" style="color:#334155;font-weight:600;">(${loc.machines || 0} m/c's)</span>` : "";
+            const rawValue = type === "required" ? loc.required : loc.gap;
+            const numericValue = Number(rawValue);
+            const val = Number.isFinite(numericValue) ? numericValue : 0;
+            const rawLocationName = loc.locationName;
+            const locationName = rawLocationName == null || String(rawLocationName).trim() === "" ? "undefined" : String(rawLocationName).trim();
+            const machinesLine = `<span class="stat-card-sub" style="color:#334155;font-weight:600;">(${loc.machines || 0} m/c's)</span>`;
+            
             return `
                 <div class="stat-card ${colorCls[i % colorCls.length]} stat-card-clickable"
                     data-headcount-location="${loc.locationId}"
                     onclick="AppController.view._showHeadcountDeptTable('${type}', ${loc.locationId})">
                     <div class="stat-icon"><i class="ph ph-map-pin"></i></div>
                     <div class="stat-content">
-                        ${hasLocationName ? `<span class="stat-label">${this._escapeAttr(locationName)}</span>` : ""}
+                        <span class="stat-label">${this._escapeAttr(locationName)}</span>
                         <span class="stat-value">${val}</span>
                         ${machinesLine}
                         <span class="stat-card-hint">↓ click to view</span>

@@ -698,7 +698,16 @@
             };
 
             emps.forEach(emp => {
+                const doj = emp.doj ? String(emp.doj).slice(0, 10) : null;
+                const dor = emp.dor ? String(emp.dor).slice(0, 10) : null;
+
                 dateRange.forEach(dateStr => {
+                    if (!doj || doj > dateStr) {
+                        return;
+                    }
+                    if (dor && dor < dateStr) {
+                        return;
+                    }
                     const key = emp.id + '_' + dateStr;
                     const status = statusKeyMap[key] || 'absent';
                     if (Object.prototype.hasOwnProperty.call(counts, status)) {
