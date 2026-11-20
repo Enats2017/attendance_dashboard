@@ -102,6 +102,10 @@ switch ($action) {
     case 'dashboard_data':
         handleDashboardData($input);
         break;
+    
+    case 'overtime_data':
+        handleOvertimeData($input);
+        break;
 
     case 'get_subadmins':
         if (!checkModulePermission('get_subadmins')) return;
@@ -2809,6 +2813,608 @@ function handleDashboardData($input, $returnData = false) {
     ]);
 }
 
+/**
+ * Handle Overtime Data Fetch
+ * Runs for all users. Logic branches by $loggedInUserId.
+ */
+function handleOvertimeData($input) {
+    $loggedInUserId = intval($_SESSION['userId'] ?? 0);
+
+    if ($loggedInUserId <= 0) {
+        echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+        return;
+    }
+
+    if (isset($input['date_from']) && isset($input['date_to'])) {
+        $dayFrom = $input['date_from'];
+        $dayTo = $input['date_to'];
+        $deviceFrom = (new DateTime($dayFrom))->modify('-1 day')->format('Y-m-d');
+        $deviceTo = (new DateTime($dayTo))->modify('+1 day')->format('Y-m-d');
+    } else {
+        $month = intval(date('n'));
+        if (isset($input['month'])) {
+            $month = intval($input['month']);
+        }
+
+        $year = intval(date('Y'));
+        if (isset($input['year'])) {
+            $year = intval($input['year']);
+        }
+
+        $fromDay = 1;
+        if (isset($input['day_from'])) {
+            $fromDay = intval($input['day_from']);
+        }
+
+        $toDay = date('t', strtotime("$year-$month-01"));
+        if (isset($input['day_to'])) {
+            $toDay = intval($input['day_to']);
+        }
+
+        $dayFrom = "$year-" . sprintf("%02d", $month) . "-" . sprintf("%02d", $fromDay);
+        $dayTo = "$year-" . sprintf("%02d", $month) . "-" . sprintf("%02d", $toDay);
+
+        $deviceFrom = (new DateTime($dayFrom))->modify('-1 day')->format('Y-m-d');
+        $deviceTo = (new DateTime($dayTo))->modify('+1 day')->format('Y-m-d');
+    }
+
+    $deptName = null;
+    if (isset($input['dept']) && $input['dept'] !== 'All') {
+        $deptName = $input['dept'];
+    }
+
+    $compName = null;
+    if (isset($input['company']) && $input['company'] !== 'All') {
+        $compName = $input['company'];
+    }
+
+    $shiftName = null;
+    if (isset($input['shift']) && $input['shift'] !== 'All') {
+        $shiftName = $input['shift'];
+    }
+
+    $locationFilter = null;
+    if (isset($input['location']) && $input['location'] !== 'All') {
+        $locationFilter = $input['location'];
+    }
+
+    $conn = getSQLServer();
+
+    $scope = resolveScope($conn, $input);
+    $userLocations = $scope['locations'];
+    $userCompanies = $scope['companies'];
+    $userDepartments = $scope['departments'];
+
+    $locationList = '0';
+    if (!empty($userLocations)) {
+        $locationList = implode(',', array_map('intval', $userLocations));
+    }
+
+    $companyList = '0';
+    if (!empty($userCompanies)) {
+        $companyList = implode(',', array_map('intval', $userCompanies));
+    }
+
+    $departmentList = '0';
+    if (!empty($userDepartments)) {
+        $departmentList = implode(',', array_map('intval', $userDepartments));
+    }
+
+    if (isset($input['location_ids']) && $input['location_ids'] !== '') {
+        $requestedLocationIds = json_decode($input['location_ids'], true);
+
+        if (!is_array($requestedLocationIds) || empty($requestedLocationIds)) {
+            echo json_encode(['success' => false, 'message' => 'Invalid or empty location IDs.']);
+            return;
+        }
+
+        $requestedLocationIds = array_values(array_unique(array_filter(
+            array_map('intval', $requestedLocationIds),
+            function ($id) { return $id > 0; }
+        )));
+
+        if (empty($requestedLocationIds)) {
+            echo json_encode(['success' => false, 'message' => 'No valid locations selected.']);
+            return;
+        }
+
+        $allowedLocationIds = array_map('intval', $userLocations);
+        $unauthorizedIds = array_diff($requestedLocationIds, $allowedLocationIds);
+
+        if (!empty($unauthorizedIds)) {
+            echo json_encode(['success' => false, 'message' => 'Access denied for selected locations.']);
+            return;
+        }
+
+        $locationList   = implode(',', $requestedLocationIds);
+        $locationFilter = null;
+    }
+
+    $allTableNames = [];
+
+    $stmtAllTables = sqlsrv_query($conn, "SELECT name FROM sys.tables WHERE name LIKE 'DeviceLogs_%'");
+
+    if ($stmtAllTables) {
+        while ($rowT = sqlsrv_fetch_array($stmtAllTables, SQLSRV_FETCH_ASSOC)) {
+            $allTableNames[$rowT['name']] = true;
+        }
+    }
+
+    $sqlEmp = "SELECT E.EmployeeId, E.CompanyId, E.DepartmentId, E.Location AS locationId, E.ShiftGroupId, E.EmployeeName, E.EmployeeCode, E.EmployeeCodeInDevice, E.Designation, E.DOJ, E.DOR, E.Status, C.CompanyFName AS company, D.DepartmentFName AS dept FROM Employees E WITH (NOLOCK) LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId WHERE E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND ((E.DOJ <= ? AND (E.Status = 'Working' OR (E.Status = 'Resigned' AND E.DOR > ?))) OR (E.DOJ <= ? AND (E.Status = 'Working' OR (E.Status = 'Resigned' AND E.DOR > ?))))";
+
+    $dashboardToday = date('Y-m-d');
+    
+    $paramsEmp = [$dayTo, $dayTo, $dashboardToday, $dashboardToday];
+
+    $stmtEmp = sqlsrv_query($conn, $sqlEmp, $paramsEmp);
+
+    $employees = [];
+    
+    if ($stmtEmp) {
+        while ($row = sqlsrv_fetch_array($stmtEmp, SQLSRV_FETCH_ASSOC)) {
+            $doj = null;
+            if (!empty($row['DOJ'])) {
+                $doj = $row['DOJ']->format('Y-m-d');
+            }
+
+            $dor = null;
+            if (!empty($row['DOR'])) {
+                $dor = $row['DOR']->format('Y-m-d');
+            }
+
+            $status = trim($row['Status'] ?? '');
+
+            $isAttendanceEmployee = false;
+
+            if ($doj !== null && $doj <= $dayTo) {
+                if ($status === 'Working' && ($dor === null || $dor >= $dayTo)) {
+                    $isAttendanceEmployee = true;
+                } elseif ($status === 'Resigned' && $dor !== null && $dor >= $dayTo) {
+                    $isAttendanceEmployee = true;
+                }
+            }
+
+            if ($isAttendanceEmployee) {
+                if (!$deptName || $row['dept'] === $deptName) {
+                    if (!$compName || $row['company'] === $compName) {
+                        $employees[] = [
+                            'id' => (string)$row['EmployeeId'],
+                            'code' => $row['EmployeeCode'],
+                            'name' => $row['EmployeeName'],
+                            'deviceCode' => $row['EmployeeCodeInDevice'],
+                            'designation' => $row['Designation'],
+                            'dept' => $row['dept'] ?: ('Dept ' . $row['DepartmentId']),
+                            'company' => $row['company'] ?: 'Unknown',
+                            'locationId' => (int)$row['locationId'],
+                            'shiftGroupId' => (int)$row['ShiftGroupId'],
+                            'doj' => $doj,
+                            'dor' => $dor,
+                            'otDays' => 0,
+                            'dates' => [],
+                        ];
+                    }
+                }
+            }
+        }
+    }
+
+    $shiftGroupIds = [];
+
+    foreach ($employees as $employee) {
+        $shiftGroupId = (int)$employee['shiftGroupId'];
+        if ($shiftGroupId > 0) {
+            $shiftGroupIds[] = $shiftGroupId;
+        }
+    }
+
+    $shiftGroupIds = array_values(array_unique($shiftGroupIds));
+
+    $shiftGroups = [];
+    $allShiftIds = [];
+
+    if (!empty($shiftGroupIds)) {
+        $shiftGroupList = implode(',', $shiftGroupIds);
+
+        $sqlShiftGroups = "SELECT ShiftGroupId, ShiftGroupName, ShiftIds FROM ShiftGroups WITH (NOLOCK) WHERE ShiftGroupId IN ($shiftGroupList)";
+
+        $stmtShiftGroups = sqlsrv_query($conn, $sqlShiftGroups);
+
+        if ($stmtShiftGroups) {
+            while ($row = sqlsrv_fetch_array($stmtShiftGroups, SQLSRV_FETCH_ASSOC)) {
+                $groupShiftIds = [];
+                if (!empty($row['ShiftIds'])) {
+                    $groupShiftIds = array_values(array_filter(array_map('intval', explode(',', $row['ShiftIds']))));
+                }
+
+                $shiftGroups[(int)$row['ShiftGroupId']] = [
+                    'shiftGroupName' => $row['ShiftGroupName'],
+                    'shiftIds' => $groupShiftIds
+                ];
+
+                $allShiftIds = array_merge($allShiftIds, $groupShiftIds);
+            }
+        }
+    }
+
+    $allShiftIds = array_values(array_unique($allShiftIds));
+
+    $shifts = [];
+
+    if (!empty($allShiftIds)) {
+        $shiftIdList = implode(',', array_map('intval', $allShiftIds));
+
+        $sqlShifts = "SELECT ShiftId, ShiftName, ShiftCode, BeginTime, EndTime FROM Shifts WITH (NOLOCK) WHERE ShiftId IN ($shiftIdList)";
+
+        $stmtShifts = sqlsrv_query($conn, $sqlShifts);
+
+        if ($stmtShifts) {
+            while ($row = sqlsrv_fetch_array($stmtShifts, SQLSRV_FETCH_ASSOC)) {
+                $shifts[(int)$row['ShiftId']] = [
+                    'shiftName' => $row['ShiftName'],
+                    'shiftCode' => $row['ShiftCode'],
+                    'beginTime' => $row['BeginTime'],
+                    'endTime' => $row['EndTime'],
+                ];
+            }
+        }
+    }
+
+    $deviceLogs = [];
+
+    $employeeFilterList = null; 
+
+    $rangeEnd = new DateTime($deviceTo);
+    $rangeEnd->modify('+1 day');
+
+    $cursor = new DateTime($deviceFrom);
+    $cursor->modify('first day of this month');
+
+    $monthTables = [];
+    while ($cursor < $rangeEnd) {
+        $tbl = 'DeviceLogs_' . $cursor->format('n') . '_' . $cursor->format('Y');
+        if (isset($allTableNames[$tbl])) {
+            $monthTables[] = '[' . $tbl . ']';
+        }
+        $cursor->modify('+1 month');
+    }
+
+    if (!empty($monthTables)) {
+        $logStart = $deviceFrom . ' 00:00:00';
+        $logEnd = $rangeEnd->format('Y-m-d') . ' 00:00:00';
+
+        foreach ($monthTables as $tbl) {
+            $empFilterSql = '';
+            if ($employeeFilterList !== null && $employeeFilterList !== '') {
+                $empFilterSql = " AND E.EmployeeId IN ($employeeFilterList) ";
+            }
+
+            $sqlLogs = "SELECT D.DeviceLogId, D.UserId, D.LogDate, D.AttDirection FROM $tbl D WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON TRY_CONVERT(int, D.UserId) = E.EmployeeId WHERE D.LogDate >= ? AND D.LogDate < ? AND D.AttDirection IS NOT NULL AND LTRIM(RTRIM(D.AttDirection)) <> '' AND E.RecordStatus = 1 AND E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) $empFilterSql";
+
+            $stmtLogs = sqlsrv_query($conn, $sqlLogs, [$logStart, $logEnd]);
+
+            if ($stmtLogs) {
+                while ($row = sqlsrv_fetch_array($stmtLogs, SQLSRV_FETCH_ASSOC)) {
+                    $empId = (int)$row['UserId'];
+                    if (!isset($deviceLogs[$empId])) {
+                        $deviceLogs[$empId] = [];
+                    }
+                    $deviceLogs[$empId][] = [
+                        'deviceLogId' => (int)$row['DeviceLogId'],
+                        'logDate' => $row['LogDate'] instanceof DateTime ? $row['LogDate']->format('Y-m-d H:i:s') : (string)$row['LogDate'],
+                        'attDirection' => strtoupper(trim($row['AttDirection'])),
+                    ];
+                }
+                sqlsrv_free_stmt($stmtLogs);
+            }
+        }
+
+        foreach ($deviceLogs as $empId => &$punches) {
+            usort($punches, function ($a, $b) {
+                return strcmp($a['logDate'], $b['logDate']);
+            });
+        }
+
+        unset($punches);
+    }
+
+    $parseTimeOfDay = function ($str) {
+        if ($str === null) {
+            return null;
+        }
+
+        $str = trim((string)$str);
+        
+        if ($str === '') {
+            return null;
+        }
+        
+        foreach (['H:i:s', 'H:i', 'h:i A', 'h:iA', 'g:i A', 'g:iA'] as $fmt) {
+            $dt = DateTime::createFromFormat($fmt, $str);
+            if ($dt !== false) {
+                return [(int)$dt->format('H'), (int)$dt->format('i'), (int)$dt->format('s')];
+            }
+        }
+        
+        $ts = strtotime($str);
+        
+        if ($ts === false) {
+            return null;
+        }
+        
+        return [(int)date('H', $ts), (int)date('i', $ts), (int)date('s', $ts)];
+    };
+
+    $combineDateTime = function ($ymd, $hms) {
+        if ($hms === null) {
+            return null;
+        }
+
+        return new DateTime(sprintf('%s %02d:%02d:%02d', $ymd, $hms[0], $hms[1], $hms[2]));
+    };
+
+    $shiftTemplatesByGroup = [];
+
+    foreach ($shiftGroups as $groupId => $group) {
+        $templates = [];
+        foreach ($group['shiftIds'] as $sid) {
+            if (isset($shifts[$sid])) {
+                $sh = $shifts[$sid];
+                $beginHms = $parseTimeOfDay($sh['beginTime']);
+                $endHms = $parseTimeOfDay($sh['endTime']);
+
+                if ($beginHms !== null && $endHms !== null) {
+                    $bSec = $beginHms[0] * 3600 + $beginHms[1] * 60 + $beginHms[2];
+                    $eSec = $endHms[0] * 3600 + $endHms[1] * 60 + $endHms[2];
+
+                    $endNextDay = ($eSec <= $bSec);
+
+                    $templates[] = [
+                        'shiftId' => $sid,
+                        'shiftName' => $sh['shiftName'],
+                        'shiftCode' => $sh['shiftCode'],
+                        'beginHms' => $beginHms,
+                        'endHms' => $endHms, 
+                        'endNextDay' => $endNextDay,
+                    ];
+                }
+            }
+        }
+
+        $shiftTemplatesByGroup[$groupId] = $templates;
+    }
+
+        // --- DEBUG START ---
+    $debugOutput = "--- OVERTIME API DEBUG ---\n";
+    $debugOutput .= "Date Range: $dayFrom to $dayTo\n\n";
+    $debugOutput .= "Total Employees Fetched: " . count($employees) . "\n";
+    $debugOutput .= "Total Unique Device Logs Fetched: " . count($deviceLogs) . " employees have punches\n\n";
+
+    // Check Kamesh specifically
+    $kameshId = null;
+    foreach ($employees as $emp) {
+        if ($emp['code'] == '750500') {
+            $kameshId = $emp['id'];
+            $debugOutput .= "Kamesh Found! ID: $kameshId | Group ID: {$emp['shiftGroupId']}\n";
+            
+            // Does he have templates?
+            $groupId = (int)$emp['shiftGroupId'];
+            if (isset($shiftTemplatesByGroup[$groupId])) {
+                $debugOutput .= "Templates for his group:\n";
+                $debugOutput .= print_r($shiftTemplatesByGroup[$groupId], true) . "\n";
+            } else {
+                $debugOutput .= "CRITICAL: NO TEMPLATES FOUND FOR GROUP $groupId\n\n";
+            }
+
+            // Does he have punches?
+            if (isset($deviceLogs[$kameshId])) {
+                $debugOutput .= "Punches for Kamesh: " . count($deviceLogs[$kameshId]) . "\n";
+                $debugOutput .= print_r($deviceLogs[$kameshId], true) . "\n";
+            } else {
+                $debugOutput .= "CRITICAL: NO PUNCHES FOUND FOR KAMESH ID $kameshId\n\n";
+            }
+            break;
+        }
+    }
+    
+    if (!$kameshId) {
+        $debugOutput .= "CRITICAL: KAMESH (750500) WAS NOT FOUND IN THE EMPLOYEES ARRAY!\n";
+    }
+
+    file_put_contents(__DIR__ . '/night_debug.txt', $debugOutput);
+
+    // PSFF - Double Shift (Day 8-20 + Night 20-8)
+    if ($loggedInUserId === 28) {
+        $overtimeRecords = [];
+        foreach ($employees as $emp) {
+            $empId   = (int)$emp['id'];
+            $groupId = (int)$emp['shiftGroupId'];
+            $templates = $shiftTemplatesByGroup[$groupId] ?? [];
+
+            if (empty($templates) || empty($deviceLogs[$empId])) {
+                continue;
+            }
+
+            // Separate Day and Night templates
+            $dayTemplates   = [];
+            $nightTemplates = [];
+
+            foreach ($templates as $tpl) {
+                if ($tpl['endNextDay']) {
+                    $nightTemplates[] = $tpl;   // ends next day → Night
+                } else {
+                    $dayTemplates[] = $tpl;     // ends same day → Day
+                }
+            }
+
+            if (empty($dayTemplates) || empty($nightTemplates)) {
+                continue; // this shift group does not have both Day + Night
+            }
+
+            $punches = $deviceLogs[$empId];
+            $used = []; // mark punches already used
+
+            // We will check every date in the requested range
+            $periodStart = new DateTime($dayFrom);
+            $periodEnd   = new DateTime($dayTo);
+            $periodEnd->modify('+1 day');
+
+            for ($d = clone $periodStart; $d < $periodEnd; $d->modify('+1 day')) {
+                $dateStr = $d->format('Y-m-d');
+
+                $dayCycle   = null;
+                $nightCycle = null;
+
+                // ---------- 1. Find Day shift on this date ----------
+                foreach ($dayTemplates as $tpl) {
+                    $shiftStart = $combineDateTime($dateStr, $tpl['beginHms']);
+                    $shiftEnd   = $combineDateTime($dateStr, $tpl['endHms']);
+
+                    if (!$shiftStart || !$shiftEnd) continue;
+
+                    // Wider windows for real-world punches
+                    $inLo  = (clone $shiftStart)->modify('-90 minutes');
+                    $inHi  = (clone $shiftStart)->modify('+3 hours');
+                    $outLo = (clone $shiftEnd)->modify('-90 minutes');
+                    $outHi = (clone $shiftEnd)->modify('+3 hours');
+
+                    foreach ($punches as $iIdx => $inPunch) {
+                        if (isset($used[$iIdx]) || $inPunch['attDirection'] !== 'IN') continue;
+
+                        $inDt = new DateTime($inPunch['logDate']);
+                        if ($inDt < $inLo || $inDt > $inHi) continue;
+
+                        // Find matching OUT
+                        foreach ($punches as $oIdx => $outPunch) {
+                            if (isset($used[$oIdx]) || $oIdx === $iIdx || $outPunch['attDirection'] !== 'OUT') continue;
+
+                            $outDt = new DateTime($outPunch['logDate']);
+                            if ($outDt > $inDt && $outDt >= $outLo && $outDt <= $outHi) {
+                                $dayCycle = [
+                                    'shiftName'      => $tpl['shiftName'],
+                                    'shiftCode'      => $tpl['shiftCode'],
+                                    'attendanceDate' => $dateStr,
+                                    'inTime'         => $inDt->format('Y-m-d H:i:s'),
+                                    'outTime'        => $outDt->format('Y-m-d H:i:s'),
+                                    'inIdx'          => $iIdx,
+                                    'outIdx'         => $oIdx,
+                                ];
+                                break 2; // found day cycle
+                            }
+                        }
+                    }
+                }
+
+                // ---------- 2. Find Night shift that starts on this date ----------
+                foreach ($nightTemplates as $tpl) {
+                    $shiftStart = $combineDateTime($dateStr, $tpl['beginHms']);
+                    $shiftEnd   = $combineDateTime($dateStr, $tpl['endHms']);
+                    $shiftEnd->modify('+1 day'); // night ends next day
+
+                    if (!$shiftStart || !$shiftEnd) continue;
+
+                    $inLo  = (clone $shiftStart)->modify('-90 minutes');
+                    $inHi  = (clone $shiftStart)->modify('+3 hours');
+                    $outLo = (clone $shiftEnd)->modify('-90 minutes');
+                    $outHi = (clone $shiftEnd)->modify('+3 hours');
+
+                    foreach ($punches as $iIdx => $inPunch) {
+                        if (isset($used[$iIdx]) || $inPunch['attDirection'] !== 'IN') continue;
+
+                        $inDt = new DateTime($inPunch['logDate']);
+                        if ($inDt < $inLo || $inDt > $inHi) continue;
+
+                        // Find matching OUT (next morning)
+                        foreach ($punches as $oIdx => $outPunch) {
+                            if (isset($used[$oIdx]) || $oIdx === $iIdx || $outPunch['attDirection'] !== 'OUT') continue;
+
+                            $outDt = new DateTime($outPunch['logDate']);
+                            if ($outDt > $inDt && $outDt >= $outLo && $outDt <= $outHi) {
+                                $nightCycle = [
+                                    'shiftName'      => $tpl['shiftName'],
+                                    'shiftCode'      => $tpl['shiftCode'],
+                                    'attendanceDate' => $dateStr,
+                                    'inTime'         => $inDt->format('Y-m-d H:i:s'),
+                                    'outTime'        => $outDt->format('Y-m-d H:i:s'),
+                                    'inIdx'          => $iIdx,
+                                    'outIdx'         => $oIdx,
+                                ];
+                                break 2;
+                            }
+                        }
+                    }
+                }
+
+                // ---------- 3. If both Day + Night found → Double Shift ----------
+                if ($dayCycle && $nightCycle) {
+                    // mark punches as used
+                    $used[$dayCycle['inIdx']]   = true;
+                    $used[$dayCycle['outIdx']]  = true;
+                    $used[$nightCycle['inIdx']] = true;
+                    $used[$nightCycle['outIdx']]= true;
+
+                    // Add both records (or you can add only one summary record — your choice)
+                    $overtimeRecords[] = [
+                        'employeeCode'  => $emp['code'],
+                        'name'          => $emp['name'],
+                        'company'       => $emp['company'],
+                        'department'    => $emp['dept'],
+                        'designation'   => $emp['designation'] ?? '',
+                        'shift'         => $dayCycle['shiftName'] . ' + ' . $nightCycle['shiftName'],
+                        'attendanceDate'=> $dateStr,
+                        'inTime'        => $dayCycle['inTime'],
+                        'outTime'       => $nightCycle['outTime'],   // full span
+                        'dayIn'         => $dayCycle['inTime'],
+                        'dayOut'        => $dayCycle['outTime'],
+                        'nightIn'       => $nightCycle['inTime'],
+                        'nightOut'      => $nightCycle['outTime'],
+                        'type'          => 'Double Shift',
+                    ];
+                }
+            }
+        }
+
+        // Summary
+        $seenEmpCodes = [];
+        foreach ($overtimeRecords as $r) {
+            $seenEmpCodes[$r['employeeCode']] = true;
+        }
+
+        echo json_encode([
+            'success' => true,
+            'overtime' => [
+                'summary' => [
+                    'overtimeRecords' => count($overtimeRecords),
+                    'employeeCount'   => count($seenEmpCodes),
+                ],
+                'records' => $overtimeRecords,
+                'filtersApplied' => [
+                    'date_from' => $dayFrom,
+                    'date_to'   => $dayTo,
+                    'dept'      => $deptName,
+                    'company'   => $compName,
+                    'shift'     => $shiftName,
+                    'location'  => $locationFilter,
+                ],
+                'scope' => 'pilot',
+                'generatedAt' => date('Y-m-d H:i:s'),
+            ],
+        ]);
+        return;
+    }
+
+    // =====================================================================
+    // OTHER USERS — different logic added later (elseif blocks).
+    // For now: no data.
+    // =====================================================================
+    echo json_encode([
+        'success'  => true,
+        'overtime' => [
+            'summary'   => ['overtimeDays' => 0, 'employeeCount' => 0],
+            'employees' => [],
+        ],
+    ]);
+}
+
 function getSubAdmins() {
     if (empty($_SESSION['isMaster'])) {
         echo json_encode([
@@ -4376,133 +4982,346 @@ function handleGetDesignationStdHC($input = []) {
     ]);
 }
 
+
 /**
- * Recalculates Master (16) globally, and User 37 only for their assigned locations.
+ * Recalculates Master (16) for all locations and departments.
+ * Recalculates User 37 only for locations assigned in UserLocations.
  */
-function recalculateMasterHeadcount($sqlConn, $locationId, $deptId) {
-    $userFilter16 = "UserId <> 16";
-    
-    $sqlDesigs16 = "SELECT DISTINCT DesignationId FROM DepartmentDesignationLocationHeadCount WHERE LocationId = ? AND DepartmentId = ? AND $userFilter16";
-    $stmtDesigs16 = sqlsrv_query($sqlConn, $sqlDesigs16, [$locationId, $deptId]);
-    
-    if ($stmtDesigs16) {
-        while ($row = sqlsrv_fetch_array($stmtDesigs16, SQLSRV_FETCH_ASSOC)) {
-            $desigId = (int)$row['DesignationId'];
 
-            $sqlSumDesig16 = "SELECT ISNULL(SUM(StandardHeadCount), 0) AS Total FROM DepartmentDesignationLocationHeadCount WHERE LocationId = ? AND DepartmentId = ? AND DesignationId = ? AND $userFilter16";
-            $stmtSumDesig16 = sqlsrv_query($sqlConn, $sqlSumDesig16, [$locationId, $deptId, $desigId]);
-            
-            if ($stmtSumDesig16) {
-                $sumRow = sqlsrv_fetch_array($stmtSumDesig16, SQLSRV_FETCH_ASSOC);
-                $masterDesigTotal = intval($sumRow['Total']);
-                sqlsrv_free_stmt($stmtSumDesig16);
+function recalculateMasterHeadcount($sqlConn) {
 
-                $checkMasterDesig = sqlsrv_query($sqlConn, "SELECT Id FROM DepartmentDesignationLocationHeadCount WHERE UserId = 16 AND LocationId = ? AND DepartmentId = ? AND DesignationId = ?", [$locationId, $deptId, $desigId]);
-                $masterDesigExists = null;
-                if ($checkMasterDesig) {
-                    $masterDesigExists = sqlsrv_fetch_array($checkMasterDesig, SQLSRV_FETCH_ASSOC);
-                    sqlsrv_free_stmt($checkMasterDesig);
+    $excludedUserIds = [16, 37];
+
+    // Get all location and department combinations from department headcount.
+    $sqlGroups = "
+        SELECT DISTINCT LocationId, DepartmentId
+        FROM DepartmentLocationHeadCount
+        WHERE UserId NOT IN (16, 37)
+    ";
+
+    $stmtGroups = sqlsrv_query($sqlConn, $sqlGroups);
+
+    if ($stmtGroups === false) {
+        error_log("Department groups query failed: " . print_r(sqlsrv_errors(), true));
+        return false;
+    }
+
+    $groups = [];
+
+    while ($row = sqlsrv_fetch_array($stmtGroups, SQLSRV_FETCH_ASSOC)) {
+        $locationId = (int)$row['LocationId'];
+        $deptId = (int)$row['DepartmentId'];
+
+        $key = $locationId . '_' . $deptId;
+
+        $groups[$key] = [
+            'locationId' => $locationId,
+            'deptId' => $deptId
+        ];
+    }
+
+    sqlsrv_free_stmt($stmtGroups);
+
+
+    // Get additional location and department combinations from designation headcount.
+    $sqlGroups = "
+        SELECT DISTINCT LocationId, DepartmentId
+        FROM DepartmentDesignationLocationHeadCount
+        WHERE UserId NOT IN (16, 37)
+    ";
+
+    $stmtGroups = sqlsrv_query($sqlConn, $sqlGroups);
+
+    if ($stmtGroups === false) {
+        error_log("Designation groups query failed: " . print_r(sqlsrv_errors(), true));
+        return false;
+    }
+
+    while ($row = sqlsrv_fetch_array($stmtGroups, SQLSRV_FETCH_ASSOC)) {
+        $locationId = (int)$row['LocationId'];
+        $deptId = (int)$row['DepartmentId'];
+
+        $key = $locationId . '_' . $deptId;
+
+        $groups[$key] = [
+            'locationId' => $locationId,
+            'deptId' => $deptId
+        ];
+    }
+
+    sqlsrv_free_stmt($stmtGroups);
+
+
+    // Get all locations assigned to User 37.
+    $sqlUser37 = "
+        SELECT DISTINCT LocationId
+        FROM UserLocations
+        WHERE UserId = 37
+    ";
+
+    $stmtUser37 = sqlsrv_query($sqlConn, $sqlUser37);
+
+    if ($stmtUser37 === false) {
+        error_log("User 37 locations query failed: " . print_r(sqlsrv_errors(), true));
+        return false;
+    }
+
+    $user37Locations = [];
+
+    while ($row = sqlsrv_fetch_array($stmtUser37, SQLSRV_FETCH_ASSOC)) {
+        $user37Locations[] = (int)$row['LocationId'];
+    }
+
+    sqlsrv_free_stmt($stmtUser37);
+
+
+    // Recalculate every location and department.
+    foreach ($groups as $group) {
+
+        $locationId = $group['locationId'];
+        $deptId = $group['deptId'];
+
+        $departmentTotals = 0;
+        $designationTotals = [];
+
+
+        // Calculate department total from subadmin records.
+        $sqlDepartment = "
+            SELECT UserId, StandardHeadCount
+            FROM DepartmentLocationHeadCount
+            WHERE LocationId = ? AND DepartmentId = ?
+        ";
+
+        $stmtDepartment = sqlsrv_query(
+            $sqlConn,
+            $sqlDepartment,
+            [$locationId, $deptId]
+        );
+
+        if ($stmtDepartment === false) {
+            error_log("Department source query failed: " . print_r(sqlsrv_errors(), true));
+            return false;
+        }
+
+        while ($row = sqlsrv_fetch_array($stmtDepartment, SQLSRV_FETCH_ASSOC)) {
+
+            $sourceUserId = (int)$row['UserId'];
+
+            if (!in_array($sourceUserId, $excludedUserIds, true)) {
+                $departmentTotals += (float)$row['StandardHeadCount'];
+            }
+        }
+
+        sqlsrv_free_stmt($stmtDepartment);
+
+
+        // Calculate designation totals from subadmin records.
+        $sqlDesignation = "
+            SELECT UserId, DesignationId, StandardHeadCount
+            FROM DepartmentDesignationLocationHeadCount
+            WHERE LocationId = ? AND DepartmentId = ?
+        ";
+
+        $stmtDesignation = sqlsrv_query(
+            $sqlConn,
+            $sqlDesignation,
+            [$locationId, $deptId]
+        );
+
+        if ($stmtDesignation === false) {
+            error_log("Designation source query failed: " . print_r(sqlsrv_errors(), true));
+            return false;
+        }
+
+        while ($row = sqlsrv_fetch_array($stmtDesignation, SQLSRV_FETCH_ASSOC)) {
+
+            $sourceUserId = (int)$row['UserId'];
+
+            if (!in_array($sourceUserId, $excludedUserIds, true)) {
+
+                $designationId = (int)$row['DesignationId'];
+
+                if (!isset($designationTotals[$designationId])) {
+                    $designationTotals[$designationId] = 0;
                 }
+
+                $designationTotals[$designationId] += (float)$row['StandardHeadCount'];
+            }
+        }
+
+        sqlsrv_free_stmt($stmtDesignation);
+
+
+        // User 16 gets all locations.
+        // User 37 gets only assigned locations.
+        $masterUsers = [16];
+
+        if (in_array($locationId, $user37Locations, true)) {
+            $masterUsers[] = 37;
+        }
+
+
+        // Insert or update department headcount for master users.
+        foreach ($masterUsers as $masterUserId) {
+
+            $checkMasterDept = sqlsrv_query(
+                $sqlConn,
+                "SELECT Id
+                 FROM DepartmentLocationHeadCount
+                 WHERE UserId = ? AND LocationId = ? AND DepartmentId = ?",
+                [$masterUserId, $locationId, $deptId]
+            );
+
+            if ($checkMasterDept === false) {
+                error_log("Department master check failed: " . print_r(sqlsrv_errors(), true));
+                return false;
+            }
+
+            $masterDeptExists = sqlsrv_fetch_array($checkMasterDept, SQLSRV_FETCH_ASSOC);
+
+            sqlsrv_free_stmt($checkMasterDept);
+
+            if ($masterDeptExists) {
+
+                $stmtUpdateDept = sqlsrv_query(
+                    $sqlConn,
+                    "UPDATE DepartmentLocationHeadCount
+                     SET StandardHeadCount = ?, UpdatedOn = GETDATE()
+                     WHERE UserId = ? AND LocationId = ? AND DepartmentId = ?",
+                    [$departmentTotals, $masterUserId, $locationId, $deptId]
+                );
+
+                if ($stmtUpdateDept === false) {
+                    error_log("Department master update failed: " . print_r(sqlsrv_errors(), true));
+                    return false;
+                }
+
+            } else {
+
+                $stmtInsertDept = sqlsrv_query(
+                    $sqlConn,
+                    "INSERT INTO DepartmentLocationHeadCount
+                     (UserId, LocationId, DepartmentId, StandardHeadCount, CreatedOn)
+                     VALUES (?, ?, ?, ?, GETDATE())",
+                    [$masterUserId, $locationId, $deptId, $departmentTotals]
+                );
+
+                if ($stmtInsertDept === false) {
+                    error_log("Department master insert failed: " . print_r(sqlsrv_errors(), true));
+                    return false;
+                }
+            }
+        }
+
+
+        // Collect designation IDs from calculated totals and existing master records.
+        $allDesignationIds = array_keys($designationTotals);
+
+        foreach ($masterUsers as $masterUserId) {
+
+            $sqlExistingDesignations = "
+                SELECT DesignationId
+                FROM DepartmentDesignationLocationHeadCount
+                WHERE UserId = ? AND LocationId = ? AND DepartmentId = ?
+            ";
+
+            $stmtExistingDesignations = sqlsrv_query(
+                $sqlConn,
+                $sqlExistingDesignations,
+                [$masterUserId, $locationId, $deptId]
+            );
+
+            if ($stmtExistingDesignations === false) {
+                error_log("Existing designation lookup failed: " . print_r(sqlsrv_errors(), true));
+                return false;
+            }
+
+            while ($row = sqlsrv_fetch_array($stmtExistingDesignations, SQLSRV_FETCH_ASSOC)) {
+                $allDesignationIds[] = (int)$row['DesignationId'];
+            }
+
+            sqlsrv_free_stmt($stmtExistingDesignations);
+        }
+
+        $allDesignationIds = array_unique($allDesignationIds);
+
+
+        // Insert or update designation headcount for master users.
+        foreach ($masterUsers as $masterUserId) {
+
+            foreach ($allDesignationIds as $designationId) {
+
+                $designationId = (int)$designationId;
+                $designationTotal = $designationTotals[$designationId] ?? 0;
+
+                $checkMasterDesig = sqlsrv_query(
+                    $sqlConn,
+                    "SELECT Id
+                     FROM DepartmentDesignationLocationHeadCount
+                     WHERE UserId = ? AND LocationId = ? AND DepartmentId = ? AND DesignationId = ?",
+                    [$masterUserId, $locationId, $deptId, $designationId]
+                );
+
+                if ($checkMasterDesig === false) {
+                    error_log("Designation master check failed: " . print_r(sqlsrv_errors(), true));
+                    return false;
+                }
+
+                $masterDesigExists = sqlsrv_fetch_array($checkMasterDesig, SQLSRV_FETCH_ASSOC);
+
+                sqlsrv_free_stmt($checkMasterDesig);
 
                 if ($masterDesigExists) {
-                    sqlsrv_query($sqlConn, "UPDATE DepartmentDesignationLocationHeadCount SET StandardHeadCount = ?, UpdatedOn = GETDATE() WHERE UserId = 16 AND LocationId = ? AND DepartmentId = ? AND DesignationId = ?", [$masterDesigTotal, $locationId, $deptId, $desigId]);
+
+                    $stmtUpdateDesig = sqlsrv_query(
+                        $sqlConn,
+                        "UPDATE DepartmentDesignationLocationHeadCount
+                         SET StandardHeadCount = ?, UpdatedOn = GETDATE()
+                         WHERE UserId = ? AND LocationId = ? AND DepartmentId = ? AND DesignationId = ?",
+                        [$designationTotal, $masterUserId, $locationId, $deptId, $designationId]
+                    );
+
+                    if ($stmtUpdateDesig === false) {
+                        error_log("Designation master update failed: " . print_r(sqlsrv_errors(), true));
+                        return false;
+                    }
+
                 } else {
-                    sqlsrv_query($sqlConn, "INSERT INTO DepartmentDesignationLocationHeadCount (UserId, LocationId, DepartmentId, DesignationId, StandardHeadCount, CreatedOn) VALUES (16, ?, ?, ?, ?, GETDATE())", [$locationId, $deptId, $desigId, $masterDesigTotal]);
-                }
-            }
-        }
-        sqlsrv_free_stmt($stmtDesigs16);
-    }
 
-    $sqlSumDept16 = "SELECT ISNULL(SUM(StandardHeadCount), 0) AS Total FROM DepartmentLocationHeadCount WHERE LocationId = ? AND DepartmentId = ? AND $userFilter16";
-    $stmtSumDept16 = sqlsrv_query($sqlConn, $sqlSumDept16, [$locationId, $deptId]);
-    
-    if ($stmtSumDept16) {
-        $sumRowDept = sqlsrv_fetch_array($stmtSumDept16, SQLSRV_FETCH_ASSOC);
-        $masterDeptTotal = intval($sumRowDept['Total']);
-        sqlsrv_free_stmt($stmtSumDept16);
+                    $stmtInsertDesig = sqlsrv_query(
+                        $sqlConn,
+                        "INSERT INTO DepartmentDesignationLocationHeadCount
+                         (UserId, LocationId, DepartmentId, DesignationId, StandardHeadCount, CreatedOn)
+                         VALUES (?, ?, ?, ?, ?, GETDATE())",
+                        [$masterUserId, $locationId, $deptId, $designationId, $designationTotal]
+                    );
 
-        $checkMasterDept = sqlsrv_query($sqlConn, "SELECT Id FROM DepartmentLocationHeadCount WHERE UserId = 16 AND LocationId = ? AND DepartmentId = ?", [$locationId, $deptId]);
-        $masterDeptExists = null;
-        if ($checkMasterDept) {
-            $masterDeptExists = sqlsrv_fetch_array($checkMasterDept, SQLSRV_FETCH_ASSOC);
-            sqlsrv_free_stmt($checkMasterDept);
-        }
-
-        if ($masterDeptExists) {
-            sqlsrv_query($sqlConn, "UPDATE DepartmentLocationHeadCount SET StandardHeadCount = ?, UpdatedOn = GETDATE() WHERE UserId = 16 AND LocationId = ? AND DepartmentId = ?", [$masterDeptTotal, $locationId, $deptId]);
-        } else {
-            sqlsrv_query($sqlConn, "INSERT INTO DepartmentLocationHeadCount (UserId, LocationId, DepartmentId, StandardHeadCount, CreatedOn) VALUES (16, ?, ?, ?, GETDATE())", [$locationId, $deptId, $masterDeptTotal]);
-        }
-    }
-
-    $isLocationAssignedTo37 = false;
-    $stmtCheck37 = sqlsrv_query($sqlConn, "SELECT LocationId FROM UserLocations WHERE UserId = 37 AND LocationId = ?", [$locationId]);
-    if ($stmtCheck37) {
-        if (sqlsrv_fetch_array($stmtCheck37, SQLSRV_FETCH_ASSOC)) {
-            $isLocationAssignedTo37 = true;
-        }
-        sqlsrv_free_stmt($stmtCheck37);
-    }
-
-    if ($isLocationAssignedTo37) {
-        $userFilter37 = "UserId <> 37";
-
-        $sqlDesigs37 = "SELECT DISTINCT DesignationId FROM DepartmentDesignationLocationHeadCount WHERE LocationId = ? AND DepartmentId = ? AND $userFilter37";
-        $stmtDesigs37 = sqlsrv_query($sqlConn, $sqlDesigs37, [$locationId, $deptId]);
-        
-        if ($stmtDesigs37) {
-            while ($row = sqlsrv_fetch_array($stmtDesigs37, SQLSRV_FETCH_ASSOC)) {
-                $desigId = (int)$row['DesignationId'];
-
-                $sqlSumDesig37 = "SELECT ISNULL(SUM(StandardHeadCount), 0) AS Total FROM DepartmentDesignationLocationHeadCount WHERE LocationId = ? AND DepartmentId = ? AND DesignationId = ? AND $userFilter37";
-                $stmtSumDesig37 = sqlsrv_query($sqlConn, $sqlSumDesig37, [$locationId, $deptId, $desigId]);
-                
-                if ($stmtSumDesig37) {
-                    $sumRow37 = sqlsrv_fetch_array($stmtSumDesig37, SQLSRV_FETCH_ASSOC);
-                    $master37DesigTotal = intval($sumRow37['Total']);
-                    sqlsrv_free_stmt($stmtSumDesig37);
-
-                    $check37Desig = sqlsrv_query($sqlConn, "SELECT Id FROM DepartmentDesignationLocationHeadCount WHERE UserId = 37 AND LocationId = ? AND DepartmentId = ? AND DesignationId = ?", [$locationId, $deptId, $desigId]);
-                    $master37DesigExists = null;
-                    if ($check37Desig) {
-                        $master37DesigExists = sqlsrv_fetch_array($check37Desig, SQLSRV_FETCH_ASSOC);
-                        sqlsrv_free_stmt($check37Desig);
-                    }
-
-                    if ($master37DesigExists) {
-                        sqlsrv_query($sqlConn, "UPDATE DepartmentDesignationLocationHeadCount SET StandardHeadCount = ?, UpdatedOn = GETDATE() WHERE UserId = 37 AND LocationId = ? AND DepartmentId = ? AND DesignationId = ?", [$master37DesigTotal, $locationId, $deptId, $desigId]);
-                    } else {
-                        sqlsrv_query($sqlConn, "INSERT INTO DepartmentDesignationLocationHeadCount (UserId, LocationId, DepartmentId, DesignationId, StandardHeadCount, CreatedOn) VALUES (37, ?, ?, ?, ?, GETDATE())", [$locationId, $deptId, $desigId, $master37DesigTotal]);
+                    if ($stmtInsertDesig === false) {
+                        error_log("Designation master insert failed: " . print_r(sqlsrv_errors(), true));
+                        return false;
                     }
                 }
             }
-            sqlsrv_free_stmt($stmtDesigs37);
         }
 
-        $sqlSumDept37 = "SELECT ISNULL(SUM(StandardHeadCount), 0) AS Total FROM DepartmentLocationHeadCount WHERE LocationId = ? AND DepartmentId = ? AND $userFilter37";
-        $stmtSumDept37 = sqlsrv_query($sqlConn, $sqlSumDept37, [$locationId, $deptId]);
-        
-        if ($stmtSumDept37) {
-            $sumRowDept37 = sqlsrv_fetch_array($stmtSumDept37, SQLSRV_FETCH_ASSOC);
-            $master37DeptTotal = intval($sumRowDept37['Total']);
-            sqlsrv_free_stmt($stmtSumDept37);
 
-            $check37Dept = sqlsrv_query($sqlConn, "SELECT Id FROM DepartmentLocationHeadCount WHERE UserId = 37 AND LocationId = ? AND DepartmentId = ?", [$locationId, $deptId]);
-            $master37DeptExists = null;
-            if ($check37Dept) {
-                $master37DeptExists = sqlsrv_fetch_array($check37Dept, SQLSRV_FETCH_ASSOC);
-                sqlsrv_free_stmt($check37Dept);
-            }
-
-            if ($master37DeptExists) {
-                sqlsrv_query($sqlConn, "UPDATE DepartmentLocationHeadCount SET StandardHeadCount = ?, UpdatedOn = GETDATE() WHERE UserId = 37 AND LocationId = ? AND DepartmentId = ?", [$master37DeptTotal, $locationId, $deptId]);
-            } else {
-                sqlsrv_query($sqlConn, "INSERT INTO DepartmentLocationHeadCount (UserId, LocationId, DepartmentId, StandardHeadCount, CreatedOn) VALUES (37, ?, ?, ?, GETDATE())", [$locationId, $deptId, $master37DeptTotal]);
-            }
-        }
+        error_log(
+            "Master headcount recalculated. " .
+            "LocationId: $locationId, DepartmentId: $deptId, " .
+            "DepartmentTotal: $departmentTotals, " .
+            "DesignationTotals: " . json_encode($designationTotals)
+        );
     }
+
+    error_log(
+        "Global master headcount recalculation completed. " .
+        "Total combinations: " . count($groups)
+    );
+
+    return true;
 }
+
+
 
 /**
  * Bulk Update designations STD Headcounts
@@ -4617,9 +5436,19 @@ function handleBulkUpdateDesignationStdHC($input) {
             $stmtDept = sqlsrv_query($sqlConn, "INSERT INTO DepartmentLocationHeadCount (UserId, DepartmentId, LocationId, StandardHeadCount, CreatedOn) VALUES (?, ?, ?, ?, GETDATE())", [$targetUserId, $deptId, $locationId, $totalStdHC]);
         }
         if ($stmtDept) sqlsrv_free_stmt($stmtDept);
+    }
 
-        if ($targetUserId !== 16) {
-            recalculateMasterHeadcount($sqlConn, $locationId, $deptId);
+    if ($targetUserId !== 16) {
+        $recalculationResult = recalculateMasterHeadcount($sqlConn);
+
+        if ($recalculationResult === false) {
+            error_log("Global master headcount recalculation failed.");
+
+            echo json_encode([
+                'success' => false,
+                'message' => 'Headcount saved, but master headcount recalculation failed.'
+            ]);
+            return;
         }
     }
 
