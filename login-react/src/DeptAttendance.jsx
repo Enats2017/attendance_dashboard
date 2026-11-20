@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import ExcelJS from "exceljs";
 import { generateDummyReport, DEFAULT_STD_HC } from "./dummyData";
 import "./DeptAttendance.css";
 
@@ -469,7 +470,14 @@ export default function DeptAttendance() {
         const items = [];
         Object.entries(editDesigHc).forEach(([deptId, desigMap]) => {
             Object.entries(desigMap).forEach(([desigId, hc]) => {
-                items.push({ dept_id: deptId, designation_id: desigId, location_id: locationId, std_hc: hc });
+                items.push({
+                    dept_id: deptId,
+                    designation_id: desigId,
+                    location_id: locationId,
+                    std_hc: hc === "" || hc === null || hc === undefined
+                        ? null
+                        : Number(hc)
+                });
             });
         });
 
@@ -510,31 +518,555 @@ export default function DeptAttendance() {
         }
     }
 
-    function exportExcel() {
-        const table = document.getElementById("da-report-table");
-        if (!table) return;
-        const html = `
-            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
-                <head>
-                    <meta charset="utf-8">
-                    <style>
-                        td,th{border:1px solid #ccc;padding:4px 8px;font-family:Calibri;font-size:11pt;}
-                        th{background:#fbbf24;font-weight:bold;}
-                    </style>
-                </head>
-                <body>
-                    ${table.outerHTML}
-                </body>
-            </html>
-        `;
-        const blob = new Blob([html], { type: "application/vnd.ms-excel" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `Dept_HC_Report_${MONTH_NAMES[month - 1]}_${year}.xls`;
-        a.click();
-        URL.revokeObjectURL(url);
-        showToast("Excel exported!", "success");
+    async function exportExcel() {
+        if (loading || !reportData) {
+            showToast("Please wait until the report loads.", "error");
+            return;
+        }
+
+        try {
+            const workbook = new ExcelJS.Workbook();
+
+            workbook.creator = "Department Attendance";
+            workbook.created = new Date();
+
+            const worksheet = workbook.addWorksheet("Attendance", {
+                properties: {
+                    outlineLevelRow: 2,
+                    outlineProperties: {
+                        summaryBelow: false
+                    }
+                }
+            });
+
+            const departments = reportData.departments || [];
+            const summary = reportData.summary || {};
+            const summaryAvg = reportData.summary_avg || {};
+
+            const totalMachines = Number(reportData.total_running_machines) || 0;
+            const totalStdHc = Number(reportData.total_std_hc) || 0;
+
+            const columnCount = days.length + 6;
+
+            // ---------------------------------------
+            // Report title
+            // ---------------------------------------
+            worksheet.mergeCells(1, 1, 1, columnCount);
+
+            const titleCell = worksheet.getCell(1, 1);
+
+            titleCell.value =
+                `${loginName} Unit Per Day Actual Head Count (HC) Report ` +
+                `${MONTH_NAMES[month - 1]} ${year}`;
+
+            titleCell.font = {
+                bold: true,
+                size: 15,
+                color: { argb: "FFFFFFFF" }
+            };
+
+            titleCell.fill = {
+                type: "pattern",
+                pattern: "solid",
+                fgColor: { argb: "F59E0B" }
+            };
+
+            titleCell.alignment = {
+                horizontal: "center",
+                vertical: "middle"
+            };
+
+            worksheet.getRow(1).height = 30;
+
+            // ---------------------------------------
+            // Column headers
+            // ---------------------------------------
+            const headers = [
+                "Department",
+                "Designation",
+                "Employee Code",
+                "Employee Name",
+                `STD HC (${totalMachines} ${machineUnitSuffix})`,
+                ...days.map(d => String(d)),
+                "Avg. HC"
+            ];
+
+            const headerRow = worksheet.addRow(headers);
+
+            headerRow.height = 32;
+
+            headerRow.eachCell((cell) => {
+                cell.font = { bold: true, color: { argb: "FF000000" } };
+                cell.fill = {
+                    type: "pattern",
+                    pattern: "solid",
+                    fgColor: { argb: "FFFBBF24" }
+                };
+                cell.alignment = {
+                    horizontal: "center",
+                    vertical: "middle",
+                    wrapText: true
+                };
+                cell.border = {
+                    top: { style: "thin", color: { argb: "FFCCCCCC" } },
+                    bottom: { style: "thin", color: { argb: "FFCCCCCC" } },
+                    left: { style: "thin", color: { argb: "FFCCCCCC" } },
+                    right: { style: "thin", color: { argb: "FFCCCCCC" } }
+                };
+            });
+
+            // ---------------------------------------
+            // Helper to create report rows
+            // ---------------------------------------
+            function addReportRow({
+                department = "",
+                designation = "",
+                employeeCode = "",
+                employeeName = "",
+                std = "",
+                dayValues = {},
+                avg = "",
+                level = 0,
+                hidden = false,
+                type = ""
+            }) {
+                const rowData = [
+                    department,
+                    designation,
+                    employeeCode,
+                    employeeName,
+                    std,
+                    ...days.map(d => {
+                        const value = dayValues && dayValues[d] !== undefined
+                            ? dayValues[d]
+                            : "";
+
+                        return value === 0 ? "" : value;
+                    }),
+                    avg
+                ];
+
+                const row = worksheet.addRow(rowData);
+
+                // Excel row grouping:
+                // Level 0 = Department
+                // Level 1 = Designation
+                // Level 2 = Employee
+                row.outlineLevel = level;
+                row.hidden = hidden;
+
+                row.eachCell((cell) => {
+                    cell.border = {
+                        top: { style: "thin", color: { argb: "FFD1D5DB" } },
+                        bottom: { style: "thin", color: { argb: "FFD1D5DB" } },
+                        left: { style: "thin", color: { argb: "FFD1D5DB" } },
+                        right: { style: "thin", color: { argb: "FFD1D5DB" } }
+                    };
+
+                    cell.alignment = {
+                        vertical: "middle",
+                        horizontal: "center"
+                    };
+                });
+
+                // Department styling
+                if (type === "department") {
+                    row.font = { bold: true };
+                    row.fill = {
+                        type: "pattern",
+                        pattern: "solid",
+                        fgColor: { argb: "FFEFF6FF" }
+                    };
+                    row.height = 22;
+                }
+
+                // Designation styling
+                if (type === "designation") {
+                    row.getCell(2).font = {
+                        bold: true,
+                        color: { argb: "FF1E40AF" }
+                    };
+                    row.getCell(2).alignment = {
+                        horizontal: "left",
+                        indent: 1,
+                        vertical: "middle"
+                    };
+                    row.height = 20;
+                }
+
+                // Employee styling
+                if (type === "employee") {
+                    row.getCell(4).alignment = {
+                        horizontal: "left",
+                        indent: 1,
+                        vertical: "middle"
+                    };
+                    row.getCell(3).font = {
+                        color: { argb: "FF64748B" }
+                    };
+                }
+
+                // Department summary styling
+                if (type === "dept-summary") {
+                    row.getCell(1).font = {
+                        italic: true,
+                        color: { argb: "FF475569" }
+                    };
+                }
+
+                // Overall and group total styling
+                // Overall and group total styling
+                if (type === "total") {
+                    row.eachCell((cell) => {
+                        cell.font = {
+                            bold: true,
+                            color: { argb: "FF1E40AF" }
+                        };
+
+                        cell.fill = {
+                            type: "pattern",
+                            pattern: "solid",
+                            fgColor: { argb: "FFDBEAFE" }
+                        };
+
+                        cell.alignment = {
+                            horizontal: "center",
+                            vertical: "middle"
+                        };
+                    });
+
+                    row.height = 22;
+                }
+
+                if (type === "summary-heading") {
+                    row.getCell(1).font = { bold: true };
+                    row.getCell(1).fill = {
+                        type: "pattern",
+                        pattern: "solid",
+                        fgColor: { argb: "FFE2E8F0" }
+                    };
+                }
+
+                return row;
+            }
+
+            // ---------------------------------------
+            // Department ordering (same as frontend)
+            // ---------------------------------------
+            const groupDeptMap = {};
+
+            departments.forEach((dept, index) => {
+                if (dept.groupId === null || dept.groupId === undefined) {
+                    return;
+                }
+
+                const gid = String(dept.groupId);
+
+                if (!groupDeptMap[gid]) {
+                    groupDeptMap[gid] = {
+                        name: dept.groupName,
+                        sortOrder: Number(dept.groupSortOrder) || 0,
+                        firstIndex: index,
+                        depts: []
+                    };
+                }
+
+                groupDeptMap[gid].depts.push(dept);
+            });
+
+            const orderedDepartments = Object.values(groupDeptMap)
+                .sort((a, b) =>
+                    a.sortOrder - b.sortOrder ||
+                    a.firstIndex - b.firstIndex
+                )
+                .flatMap(group =>
+                    group.depts.map((dept, index) => ({
+                        dept,
+                        isGroupLast: index === group.depts.length - 1
+                    }))
+                )
+                .concat(
+                    departments
+                        .filter(dept =>
+                            dept.groupId === null ||
+                            dept.groupId === undefined
+                        )
+                        .map(dept => ({
+                            dept,
+                            isGroupLast: false
+                        }))
+                );
+
+            // ---------------------------------------
+            // Export departments and nested rows
+            // ---------------------------------------
+            orderedDepartments.forEach(({ dept, isGroupLast }) => {
+
+                // Department row (always visible)
+                addReportRow({
+                    department: dept.department,
+                    std: dept.std_hc,
+                    dayValues: dept.days,
+                    avg: dept.avg_hc,
+                    level: 0,
+                    hidden: false,
+                    type: "department"
+                });
+
+                // Designation rows (initially collapsed)
+                (dept.designations || []).forEach(desig => {
+
+                    addReportRow({
+                        designation: desig.designationName,
+                        std: desig.std_hc ?? 0,
+                        dayValues: desig.days,
+                        avg: desig.avg_hc,
+                        level: 1,
+                        hidden: true,
+                        type: "designation"
+                    });
+
+                    // Employee rows (nested inside designation)
+                    (desig.employees || []).forEach(emp => {
+
+                        addReportRow({
+                            employeeCode: emp.employeeCode || "",
+                            employeeName: emp.employeeName || "",
+                            dayValues: emp.days,
+                            level: 2,
+                            hidden: true,
+                            type: "employee"
+                        });
+                    });
+                });
+
+                // Department summary
+                if (dept.summary) {
+                    addReportRow({
+                        department: "Department Summary",
+                        level: 1,
+                        hidden: true,
+                        type: "summary-heading"
+                    });
+
+                    const deptSummaryRows = [
+                        ["total_present", "Total Present"],
+                        ["total_half_present", "Total Half Present"],
+                        ["total_wo_present", "Total Weekly-Off Present"],
+                        ["total_wo_half_present", "Total Weekly-Off Half Present"],
+                        ["total_single_punch", "Total Single Punches"],
+                        ["total_weekly_off", "Total Weekly Off"],
+                        ["total_absent", "Total Absent"]
+                    ];
+
+                    deptSummaryRows.forEach(([key, label]) => {
+                        addReportRow({
+                            department: label,
+                            dayValues: dept.summary[key],
+                            level: 2,
+                            hidden: true,
+                            type: "dept-summary"
+                        });
+                    });
+                }
+
+                // Group totals (same calculation as frontend)
+                if (
+                    isGroupLast &&
+                    dept.groupId !== null &&
+                    dept.groupId !== undefined
+                ) {
+                    const group = groupDeptMap[String(dept.groupId)];
+
+                    const groupStd = group.depts.reduce(
+                        (sum, item) => sum + (Number(item.std_hc) || 0),
+                        0
+                    );
+
+                    const groupAvg = group.depts.reduce(
+                        (sum, item) => sum + (Number(item.avg_hc) || 0),
+                        0
+                    );
+
+                    const groupDayTotals = {};
+
+                    days.forEach(d => {
+                        groupDayTotals[d] = group.depts.reduce(
+                            (sum, item) =>
+                                sum + (Number(item.days?.[d]) || 0),
+                            0
+                        );
+                    });
+
+                    addReportRow({
+                        department: "Total Present",
+                        std: groupStd,
+                        dayValues: groupDayTotals,
+                        avg: groupAvg,
+                        type: "total"
+                    });
+                }
+            });
+
+            // ---------------------------------------
+            // Overall report summary
+            // ---------------------------------------
+            const stdLabourPerMachine = (totalLabour) =>
+                totalMachines > 0
+                    ? (Number(totalLabour) / totalMachines).toFixed(1)
+                    : "";
+
+            const overallRows = [
+                {
+                    label: "Overall Present",
+                    std: totalStdHc,
+                    values: summary.total_present,
+                    avg: summaryAvg.total_present
+                },
+                {
+                    label: runningMachinesLabel,
+                    std: totalMachines,
+                    values: summary.running_machines,
+                    avg: summaryAvg.running_machines
+                },
+                {
+                    label: labourPerMachineLabel,
+                    std: stdLabourPerMachine(totalStdHc),
+                    values: summary.labor_per_machine,
+                    avg: summaryAvg.labor_per_machine
+                },
+                {
+                    label: "Total Present",
+                    values: summary.present,
+                    avg: summaryAvg.present
+                },
+                {
+                    label: "Total Half Present",
+                    values: summary.half_present,
+                    avg: summaryAvg.half_present
+                },
+                {
+                    label: "Total Weekly-Off Present",
+                    values: summary.wo_present,
+                    avg: summaryAvg.wo_present
+                },
+                {
+                    label: "Total Weekly-Off Half Present",
+                    values: summary.wo_half_present,
+                    avg: summaryAvg.wo_half_present
+                },
+                {
+                    label: "Total Single Punches",
+                    values: summary.single_punch,
+                    avg: summaryAvg.single_punch
+                },
+                {
+                    label: "Total Weekly Off",
+                    values: summary.weekly_off,
+                    avg: summaryAvg.weekly_off
+                },
+                {
+                    label: "Total Absent",
+                    values: summary.total_absent,
+                    avg: summaryAvg.total_absent
+                },
+                {
+                    label: "Over-Time Paid",
+                    values: summary.overtime_paid,
+                    avg: summaryAvg.overtime_paid
+                },
+                {
+                    label: "On Leave",
+                    values: summary.on_leave,
+                    avg: summaryAvg.on_leave
+                },
+                {
+                    label: "Total New Joinee",
+                    values: summary.new_joinee,
+                    avg: summaryAvg.new_joinee
+                },
+                {
+                    label: "Total Resigned",
+                    values: summary.left,
+                    avg: summaryAvg.left
+                },
+                {
+                    label: "Recruited Head Count",
+                    values: summary.recruited_hc,
+                    avg: summaryAvg.recruited_hc
+                }
+            ];
+
+            overallRows.forEach(item => {
+                addReportRow({
+                    department: item.label,
+                    std: item.std ?? "",
+                    dayValues: item.values,
+                    avg: item.avg ?? "",
+                    type: "total"
+                });
+            });
+
+            // ---------------------------------------
+            // Column widths and Excel outline
+            // ---------------------------------------
+            worksheet.getColumn(1).width = 25;
+            worksheet.getColumn(2).width = 24;
+            worksheet.getColumn(3).width = 18;
+            worksheet.getColumn(4).width = 28;
+            worksheet.getColumn(5).width = 16;
+
+            days.forEach((d, index) => {
+                worksheet.getColumn(index + 6).width = 12;
+            });
+
+            worksheet.getColumn(columnCount).width = 12;
+
+            // Freeze title, header and first four identity columns
+            worksheet.views = [{
+                state: "frozen",
+                xSplit: 4,
+                ySplit: 2,
+                topLeftCell: "E3"
+            }];
+
+            // Show Excel's outline controls
+            worksheet.properties.outlineLevelRow = 2;
+            worksheet.properties.outlineProperties = {
+                summaryBelow: false
+            };
+
+            // ---------------------------------------
+            // Download genuine XLSX file
+            // ---------------------------------------
+            const buffer = await workbook.xlsx.writeBuffer();
+
+            const blob = new Blob(
+                [buffer],
+                {
+                    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                }
+            );
+
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+
+            link.href = url;
+            link.download =
+                `Dept_HC_Report_${MONTH_NAMES[month - 1]}_${year}.xlsx`;
+
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+            showToast("Excel exported successfully!", "success");
+
+        } catch (error) {
+            console.error("Excel export error:", error);
+            showToast("Unable to export Excel report.", "error");
+        }
     }
 
     const maxDays = new Date(year, month, 0).getDate();
@@ -701,7 +1233,20 @@ export default function DeptAttendance() {
                                 showToast("Please select a single location in the filter.", "error");
                                 return;
                             }
-                            setEditDesigHc(JSON.parse(JSON.stringify(desigStdHcMap)));
+                            const initialData = JSON.parse(JSON.stringify(desigStdHcMap));
+
+                            Object.keys(initialData).forEach((deptId) => {
+                                Object.keys(initialData[deptId]).forEach((desigId) => {
+                                    if (
+                                        initialData[deptId][desigId] === 0 ||
+                                        initialData[deptId][desigId] === "0"
+                                    ) {
+                                        initialData[deptId][desigId] = null;
+                                    }
+                                });
+                            });
+
+                            setEditDesigHc(initialData);
                             setShowDesigSettings(true);
                         }}
                     >
@@ -1585,17 +2130,17 @@ function DesigSettingsModal({ deptList, editDesigHc, setEditDesigHc, desigList, 
                                                         },
                                                     }));
                                                 }}
-                                                onBlur={(e) => {
-                                                    if (e.target.value === "") {
-                                                        setEditDesigHc((prev) => ({
-                                                            ...prev,
-                                                            [dept.dept_id]: {
-                                                                ...(prev[dept.dept_id] || {}),
-                                                                [d.designation_id]: 0,
-                                                            },
-                                                        }));
-                                                    }
-                                                }}
+                                                // onBlur={(e) => {
+                                                //     if (e.target.value === "") {
+                                                //         setEditDesigHc((prev) => ({
+                                                //             ...prev,
+                                                //             [dept.dept_id]: {
+                                                //                 ...(prev[dept.dept_id] || {}),
+                                                //                 [d.designation_id]: 0,
+                                                //             },
+                                                //         }));
+                                                //     }
+                                                // }}
                                             />
                                         </div>
                                     ))}
