@@ -1650,7 +1650,7 @@ function handleDashboardData($input, $returnData = false) {
         $tableExists = isset($allTableNames[$logTable]);
 
         if ($tableExists) {
-            $sqlLogs = "SELECT A.EmployeeId, A.AttendanceDate, A.InTime, A.OutTime, A.Status, A.DetailedStatus, A.DetailedStatusCode, A.Duration, A.LateBy, A.EarlyBy, A.ComplinFreeLateBy, A.ComplinFreeEarlyBy, A.Present, A.Absent, A.WeeklyOff, A.Holiday, A.IsOnLeave, A.IsPartialDay, A.MissedInPunch, A.MissedOutPunch, A.PunchRecords, A.ReportPunchRecords, A.PunchDirections, A.ShiftId, A.InDeviceId, A.OutDeviceId, A.PunchDevicesName, A.LastUpdatedOn, A.OverTime, S.ShiftCode, S.ShiftName, S.BeginTime, S.EndTime FROM $logTable A WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON A.EmployeeId = E.EmployeeId LEFT JOIN Shifts S WITH (NOLOCK) ON A.ShiftId = S.ShiftId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND A.AttendanceDate >= '$dayFrom' AND A.AttendanceDate <= '$dayTo 23:59:59' AND (E.Status = 'Working' OR (E.Status = 'Resigned' AND E.DOR > ?))";
+            $sqlLogs = "SELECT A.EmployeeId, A.AttendanceDate, A.InTime, A.OutTime, A.Status, A.DetailedStatus, A.DetailedStatusCode, A.Duration, A.LateBy, A.EarlyBy, A.ComplinFreeLateBy, A.ComplinFreeEarlyBy, A.Present, A.Absent, A.WeeklyOff, A.Holiday, A.IsOnLeave, A.IsPartialDay, A.MissedInPunch, A.MissedOutPunch, A.PunchRecords, A.ReportPunchRecords, A.PunchDirections, A.ShiftId, A.InDeviceId, A.OutDeviceId, A.PunchDevicesName, A.LastUpdatedOn, S.ShiftCode, S.ShiftName, S.BeginTime, S.EndTime FROM $logTable A WITH (NOLOCK) INNER JOIN Employees E WITH (NOLOCK) ON A.EmployeeId = E.EmployeeId LEFT JOIN Shifts S WITH (NOLOCK) ON A.ShiftId = S.ShiftId LEFT JOIN Departments D WITH (NOLOCK) ON E.DepartmentId = D.DepartmentId LEFT JOIN Companies C WITH (NOLOCK) ON E.CompanyId = C.CompanyId WHERE E.Location IN ($locationList) AND E.CompanyId IN ($companyList) AND E.DepartmentId IN ($departmentList) AND A.AttendanceDate >= '$dayFrom' AND A.AttendanceDate <= '$dayTo 23:59:59' AND (E.Status = 'Working' OR (E.Status = 'Resigned' AND E.DOR > ?))";
 
             $paramsLogs = [$dayTo];
 
@@ -1745,7 +1745,6 @@ function handleDashboardData($input, $returnData = false) {
                         'punchDevicesName' => $punchDevicesName,
                         'lastUpdatedOn' => $lastUpdated ? (is_object($lastUpdated) ? $lastUpdated->format('Y-m-d H:i:s') : $lastUpdated) : null,
                         'isManualPunch' => ($inDeviceId === 5 || $outDeviceId === 5) ? 1 : 0,
-                        'overtime' => (int)($row['OverTime'] ?? 0),
                     ];
                 }
             }
@@ -2149,74 +2148,21 @@ function handleDashboardData($input, $returnData = false) {
     $totalGapHeadcount = $totalRequiredHeadcount - $dashboardEmployeeCount;
     $totalGapHeadcount = $totalRequiredHeadcount - $dashboardEmployeeCount;
 
-    $devicePresentDayCount = 0;
     $counts = ['in' => 0, 'out' => 0];
     foreach ($deviceEmployeeStats as $key => $stat) {
         list($empId, $date) = explode('_', $key, 2);
-
-        // user's actually-selected range — not the padded deviceFrom/deviceTo window
-        if ($date < $dayFrom || $date > $dayTo) {
-            continue;
+        if ($date >= $dayFrom && $date <= $dayTo) {
+            if (isset($validEmpIdSet[$empId])) {
+                $counts['in'] += $stat['inCount'] ?? 0;
+                $counts['out'] += $stat['outCount'] ?? 0;
+            }
         }
-
-        if (!isset($validEmpIdSet[$empId])) {
-            continue;
-        }
-
-        // Device IN/OUT counts
-        if (isset($validEmpIdSet[$empId]) && $date >= $dayFrom && $date <= $dayTo) {
-            $counts['in'] += $stat['inCount'] ?? 0;
-            $counts['out'] += $stat['outCount'] ?? 0;
-        }
-
-        // Skip if attendance already exists
-        if (isset($employeesInAttendanceLogs[$key])) {
-            continue;
-        }
-
-        // Skip incomplete punches
-        if (($stat['inCount'] ?? 0) < 1 || ($stat['outCount'] ?? 0) < 1) {
-            continue;
-        }
-
-        /*
-        $hasOut = ($stat['outCount'] ?? 0) >= 1;
-        $devInTime = $stat['firstIn'] ? $stat['firstIn']->format('H:i') : null;
-
-        $logs[] = [
-            'empId' => $empId,
-            'date' => $date,
-            'inTime' => $devInTime,
-            'outTime' => $hasOut ? $stat['lastOut']->format('H:i') : null,
-            'status' => 'Device Present',
-            'detailedStatus' => 'Device Present',
-            'detailedStatusCode' => 'D.P',
-            'present' => 1,
-            'weeklyOff' => 0,
-            'holiday' => 0,
-            'isOnLeave' => 0,
-            'absent' => 0,
-            'isPartialDay' => 0,
-            'hoursWorked' => ($hasOut && $stat['firstIn']) ? round(($stat['lastOut']->getTimestamp() - $stat['firstIn']->getTimestamp()) / 3600, 2) : 0,
-            'lateBy' => 0,
-            'earlyBy' => 0,
-            'missedInPunch' => 0,
-            'missedOutPunch' => 0,
-            'shiftId' => 3,
-            'shiftName' => 'No Shift',
-            'shiftCode' => 'NS',
-            'shiftStart' => null,
-            'shiftEnd' => null,
-            'overtime' => 0,
-        ];
-
-        $employeesInAttendanceLogs[$key] = true;
-        $devicePresentDayCount++;
-        */
     }
 
-    $presentEmployees = $presentRecordCount + $devicePresentDayCount;
-    $dataSource = 'attendance+device';
+    // $presentEmployees = $presentRecordCount + $devicePresentDayCount;
+    $presentEmployees = $presentRecordCount;
+    // $dataSource = 'attendance+device';
+    $dataSource = "attendance";
 
     $singlePunch = 0;
     $singlePunchKeys = [];

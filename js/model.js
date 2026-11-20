@@ -1006,55 +1006,6 @@
             return result;
         }
 
-
-        getOvertimeEmployees() {
-            const { filters } = this.state;
-            const { logs, emps } = this.getFilteredData();
-            const fromStr = filters.dateFrom;
-            const toStr = filters.dateTo;
-
-            const logMap = {};
-            logs.forEach(l => {
-                if ((l.overtime || 0) > 0) {
-                    logMap[l.empId + '_' + l.date] = l;
-                }
-            });
-
-            const result = [];
-            const dateRange = this._getDateRangeUTC(fromStr, toStr);
-            emps.forEach(emp => {
-                dateRange.forEach(dateStr => {
-                    const log = logMap[emp.id + '_' + dateStr];
-                    if (log) result.push({ log, emp, date: dateStr });
-                });
-            });
-
-            result.sort((a, b) => b.date.localeCompare(a.date));
-            return result;
-        }
-
-        getOvertimeByShift() {
-            const items = this.getOvertimeEmployees();
-            const groups = {};
-            items.forEach(({ log, emp }) => {
-                const shiftName = log.shiftName || emp.shift || 'No Shift';
-                if (!groups[shiftName]) {
-                    groups[shiftName] = { shiftName, totalMinutes: 0, empSet: new Set(), recordCount: 0 };
-                }
-                groups[shiftName].totalMinutes += (log.overtime || 0);
-                groups[shiftName].empSet.add(emp.id);
-                groups[shiftName].recordCount++;
-            });
-            return Object.values(groups).map(g => ({
-                shiftName: g.shiftName,
-                totalMinutes: g.totalMinutes,
-                totalHours: +(g.totalMinutes / 60).toFixed(2),
-                empCount: g.empSet.size,
-                recordCount: g.recordCount
-            })).sort((a, b) => b.totalMinutes - a.totalMinutes);
-        }
-
-
         getManualPunchByShift() {
             const items = this.getManualPunchEmployees(); 
             const groups = {};

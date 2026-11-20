@@ -11,6 +11,7 @@ class AttendanceView {
             { id: "custom_location_groups", label: "Custom Location Groups", icon: "ph-map-pin", roles: ["master"] },
             { id: "dept_group_mapping", label: "Dept Group Mapping", icon: "ph-squares-four" },
             { id: "all", label: "Attendance Logs", icon: "ph-list-dashes" },
+            { id: "overtime", label: "Overtime", icon: "ph-clock-user" },
             { id: "age", label: "Age Analysis", icon: "ph-user-circle" },
             { id: "company", label: "Company Stats", icon: "ph-buildings" },
             { id: "dept", label: "Department Stats", icon: "ph-briefcase" },
@@ -25,7 +26,6 @@ class AttendanceView {
             { id: "worker", label: "Workmen", icon: "ph-hard-hat" },
             { id: "resigned", label: "Resigned Employees", icon: "ph-user-minus", },
             { id: "newjoined", label: "New Joined", icon: "ph-user-plus" },
-            { id: "overtime", label: "Overtime", icon: "ph-hourglass-high" },
             { id: "special", label: "Critical Alerts", icon: "ph-warning-circle", },
             { id: "data_quality", label: "Employee Data Alerts", icon: "ph-database", },
             { id: "designation_order", label: "Designations Order", icon: "ph-sliders", roles: ["master"] },
@@ -37,6 +37,7 @@ class AttendanceView {
         this._renderToken = 0;
         this.LATE_THRESHOLD = 3;
         this._fullAvailableItems = [];
+        this.overtimeModule = new window.OvertimeView(); 
     }
 
     showToast(message, type = "success") {
@@ -117,6 +118,8 @@ class AttendanceView {
                 weeklyOff: 0, absent: 0, total: emps.length, singlePunch: 0,
                 lateIn: 0, earlyOut: 0, avgHours: 0, resigned: 0, newJoined: 0
             };
+        } else if (state.activeTab === "overtime") {
+            stats = {}; logs = []; emps = []; empMap = {};
         } else {
             stats = model.getSummaryStats();
             if (state.activeTab === "night") {
@@ -159,12 +162,12 @@ class AttendanceView {
                             ? "" : state.activeTab === "dept_designation_mapping"
                             ? "" : state.activeTab === "custom_location_groups"
                             ? "" : state.activeTab === "dept_group_mapping"
-                            ? "" : state.activeTab === "overtime"
                             ? "" : state.activeTab === "units"
                             ? "" : state.activeTab === "feature"
                             ? this._renderDashboardSummaryCards(emps, stats, model, logs, empMap) : this._renderSummaryCards(stats, emps, logs, empMap, model)
                         }
                         
+                        <div id="overtime-module-container"></div>
                         <div id="stat-card-drilldown" class="stat-drilldown-panel" style="display:none;"></div>
                         <div class="tab-pane-container">
                             ${this._renderTabContent(state.activeTab, logs, emps, empMap, state.filters, state.data.counts, model)}
@@ -176,7 +179,14 @@ class AttendanceView {
         `;
 
         this._restoreFilterValues(state.filters);
-        this._initChartRendering(state.activeTab, logs, emps, empMap, state.filters, state.data.counts, model, myToken);
+        if (state.activeTab === "overtime") {
+            const container = document.getElementById("overtime-module-container");
+            if (container) {
+                this.overtimeModule.render(container, state.filters);
+            }
+        } else {
+            this._initChartRendering(state.activeTab, logs, emps, empMap, state.filters, state.data.counts, model, myToken);
+        }
         this._scrollActiveSidebarItem();
     }
 
@@ -6381,9 +6391,6 @@ class AttendanceView {
             case "newjoined":
                 content = this._renderJoinExitTab(model, "newjoined");
                 break;
-            case "overtime":
-                content = this._renderOvertime(logs, emps, empMap, model);
-                break;
             case "special":
                 content = this._renderSpecial(logs, emps, empMap, filters, model);
                 break;
@@ -7468,7 +7475,6 @@ class AttendanceView {
                 EarlyOut: Number(l.earlyBy) > 0 ? "Yes" : "No",
                 Status: this._getDisplayStatus(l),
                 DetailedStatus: l.detailedStatus,
-                Overtime: l.overtime || 0,
             };
         });
 
@@ -7730,7 +7736,6 @@ class AttendanceView {
                 Early: (l.earlyBy || 0) > 0 ? "Yes" : "No",
                 Status: l.status,
                 DetailedStatus: l.detailedStatus,
-                Overtime: l.overtime || 0,
             };
         });
 
@@ -7876,7 +7881,6 @@ class AttendanceView {
                 <td>${log.outTime || "–"}</td>
                 <td>${log.punchDevicesName || "–"}</td>
                 <td>${this._formatDate(emp.dobRaw)}</td>
-                <td>${(log.overtime || 0) > 0 ? this._fmtMins(log.overtime) : "–"}</td>
                 <td>${this._actionViewLink(log, emp, date)}</td>
             </tr>
         `).join("");
@@ -7887,7 +7891,6 @@ class AttendanceView {
             In: log.inTime,
             Out: log.outTime,
             Device: log.punchDevicesName,
-            Overtime: log.overtime || 0,
         }));
 
         let pageButtons = "";
@@ -7934,7 +7937,6 @@ class AttendanceView {
                                 <th>Out</th>
                                 <th>Device</th>
                                 <th>DOB</th>
-                                <th>Overtime</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
@@ -9632,54 +9634,6 @@ class AttendanceView {
         };
     }
 
-
-    _renderOvertime(logs, emps, empMap, model, page = 1) {
-        this._currentOvertimeItems = model.getOvertimeEmployees();
-        this._currentOvertimeEmpMap = empMap;
-        const shiftOT = model.getOvertimeByShift();
-
-        this._lastData["overtime"] = this._currentOvertimeItems.map(({ log, emp, date }) => ({
-            ...this._commonCols(emp),
-            Shift: log.shiftName || emp.shift || 'No Shift',
-            Date: this._formatDate(date),
-            In: log.inTime,
-            Out: log.outTime,
-            OvertimeMinutes: log.overtime,
-            OvertimeHours: (log.overtime / 60).toFixed(2)
-        }));
-
-        const rows = shiftOT.map(s => [s.shiftName, s.empCount, s.recordCount, s.totalHours + 'h']);
-
-        return {
-            html: `
-                <h2 class="section-title"><i class="ph-fill ph-hourglass-high"></i> Overtime</h2>
-                <div class="charts-grid">
-                    ${this._chartCard("ch-ot-shift", '<i class="ph-fill ph-chart-bar"></i>', "warning", "Overtime Hours by Shift", "Click bar for employee list")}
-                </div>
-                <div id="main-table-wrap">
-                    ${this._tableHTML("tbl-ot", ["Shift", "Employees", "OT Records", "Total OT Hours"], rows, "overtime")}
-                </div>
-                <div id="drilldown-table" style="margin-top:16px"></div>
-            `,
-            renderCharts: () => {
-                Charts.stacked(
-                    "ch-ot-shift",
-                    shiftOT.map(s => s.shiftName),
-                    [{ name: "OT Hours", data: shiftOT.map(s => s.totalHours) }],
-                    "Overtime by Shift",
-                    (shiftName) => {
-                        const shiftItems = this._currentOvertimeItems.filter(it =>
-                            (it.log.shiftName || it.emp.shift || 'No Shift') === shiftName
-                        );
-                        const shiftLogs = shiftItems.map(it => it.log);
-                        this._renderDrillDown(shiftLogs, `Overtime — Shift: ${shiftName}`, empMap);
-                    }
-                );
-            }
-        };
-    }
-
-
     _renderManualPunchesTab(logs, emps, empMap, model) {
         this._currentManualPunchItems = model.getManualPunchEmployees();
         this._currentManualPunchEmpMap = empMap;
@@ -10975,7 +10929,7 @@ class AttendanceView {
                     EarlyBy: log?.earlyBy ?? "",
                     Status: key === "weeklyOff" ? "Weekly Off" : log?.status || "",
                     DetailedStatus: log?.detailedStatus || "",
-                    Overtime: log?.overtime || 0 };
+            };
         });
 
         panel.style.display = "block";
@@ -13308,8 +13262,7 @@ class AttendanceView {
                             ${row("Hours Worked", log?.hoursWorked)}
                         </div>
 
-                        <div class="rd-grid-3col" style="margin-top:8px;">
-                            ${row("Overtime", (log?.overtime || 0) > 0 ? this._fmtMins(log.overtime) : "-")}
+                        <div class="rd-grid" style="margin-top:8px;">
                             ${row("Late By", (log?.lateBy || 0) > 0 ? this._fmtMins(log.lateBy) : "-")}
                             ${row("Early By", (log?.earlyBy || 0) > 0 ? this._fmtMins(log.earlyBy) : "-")}
                         </div>

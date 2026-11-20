@@ -7,16 +7,16 @@
     Object.assign(AttendanceView.prototype, {
         _renderDeptGroupMappingPage() {
             return { html: `
-                        <div class="designation-order-container">
-                            <h2 class="section-title"><i class="ph-fill ph-squares-four"></i> Department Group Mapping</h2>
-                            <div id="dept-group-mapping-content">
-                                <div style="display:flex; align-items:center; gap:12px; padding:32px; color:#64748b;">
-                                    <div class="auth-spinner" style="width:24px; height:24px; border-width:2px; border-top-color:#6366f1;"></div>
-                                    <span>Loading department groups...</span>
-                                </div>
-                            </div>
+                <div class="designation-order-container">
+                    <h2 class="section-title"><i class="ph-fill ph-squares-four"></i> Department Group Mapping</h2>
+                    <div id="dept-group-mapping-content">
+                        <div style="display:flex; align-items:center; gap:12px; padding:32px; color:#64748b;">
+                            <div class="auth-spinner" style="width:24px; height:24px; border-width:2px; border-top-color:#6366f1;"></div>
+                            <span>Loading department groups...</span>
                         </div>
-                    ` };
+                    </div>
+                </div>
+            ` };
         },
     _dgmOwnUserId() {
         const user = window.HRMS_USER || {};
