@@ -568,7 +568,7 @@ export default function DeptAttendance() {
             titleCell.fill = {
                 type: "pattern",
                 pattern: "solid",
-                fgColor: { argb: "F59E0B" }
+                fgColor: { argb: "FFF59E0B" }
             };
 
             titleCell.alignment = {
@@ -714,7 +714,6 @@ export default function DeptAttendance() {
                     };
                 }
 
-                // Overall and group total styling
                 // Overall and group total styling
                 if (type === "total") {
                     row.eachCell((cell) => {
@@ -1006,6 +1005,74 @@ export default function DeptAttendance() {
                     type: "total"
                 });
             });
+
+            // ---------------------------------------
+            // Highlight STD HC column (column E)
+            // Runs after all rows exist, and uses getCell()
+            // so empty cells are styled too.
+            // ---------------------------------------
+            const STD_COL = 5;
+            const firstDataRow = 3;               // row 1 = title, row 2 = header
+            const lastRow = worksheet.rowCount;
+
+            const AMBER_HEADER = "FFF59E0B";      // header
+            const AMBER_DEPT   = "FFFDE68A";      // department rows
+            const AMBER_LIGHT  = "FFFEF3C7";      // designation / employee / summary rows
+            const TOTAL_BLUE   = "FFDBEAFE";      // existing total rows (kept as is)
+
+            // Header cell
+            const stdHeader = worksheet.getRow(2).getCell(STD_COL);
+            stdHeader.fill = {
+                type: "pattern",
+                pattern: "solid",
+                fgColor: { argb: AMBER_HEADER }
+            };
+            stdHeader.font = { bold: true, color: { argb: "FF000000" } };
+            stdHeader.alignment = {
+                horizontal: "center",
+                vertical: "middle",
+                wrapText: true
+            };
+            stdHeader.border = {
+                top:    { style: "thin",   color: { argb: "FFCCCCCC" } },
+                bottom: { style: "thin",   color: { argb: "FFCCCCCC" } },
+                left:   { style: "medium", color: { argb: AMBER_HEADER } },
+                right:  { style: "medium", color: { argb: AMBER_HEADER } }
+            };
+
+            // Body cells
+            for (let r = firstDataRow; r <= lastRow; r++) {
+                const cell = worksheet.getRow(r).getCell(STD_COL);
+
+                const currentColor = cell.fill?.fgColor?.argb;
+                const isTotalRow = currentColor === TOTAL_BLUE;
+                const isDeptRow = currentColor === "FFEFF6FF";
+
+                if (!isTotalRow) {
+                    cell.fill = {
+                        type: "pattern",
+                        pattern: "solid",
+                        fgColor: { argb: isDeptRow ? AMBER_DEPT : AMBER_LIGHT }
+                    };
+                }
+
+                cell.font = {
+                    bold: true,
+                    color: { argb: isTotalRow ? "FF1E40AF" : "FF92400E" }
+                };
+
+                cell.alignment = {
+                    horizontal: "center",
+                    vertical: "middle"
+                };
+
+                cell.border = {
+                    top:    { style: "thin",   color: { argb: "FFD1D5DB" } },
+                    bottom: { style: "thin",   color: { argb: "FFD1D5DB" } },
+                    left:   { style: "medium", color: { argb: AMBER_HEADER } },
+                    right:  { style: "medium", color: { argb: AMBER_HEADER } }
+                };
+            }
 
             // ---------------------------------------
             // Column widths and Excel outline

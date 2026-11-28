@@ -87,7 +87,6 @@ class AttendanceView {
         return this.TABS.filter(tab => !tab.roles || (tab.roles.includes("master") && isMaster));
     }
 
-
     render(state, model) {
         this._renderToken++;
         const myToken = this._renderToken;
@@ -114,23 +113,75 @@ class AttendanceView {
             empMap = {};
             emps.forEach((e) => { empMap[e.id] = e; });
             stats = dash.todayStats || {
-                present: 0, halfPresent: 0, weeklyOffPresent: 0, weeklyOffHalfPresent: 0,
-                weeklyOff: 0, absent: 0, total: emps.length, singlePunch: 0,
-                lateIn: 0, earlyOut: 0, avgHours: 0, resigned: 0, newJoined: 0
+                present: 0, 
+                halfPresent: 0, 
+                weeklyOffPresent: 0, 
+                weeklyOffHalfPresent: 0,
+                weeklyOff: 0, 
+                absent: 0, 
+                total: emps.length, 
+                singlePunch: 0,
+                lateIn: 0, 
+                earlyOut: 0, 
+                avgHours: 0, 
+                resigned: 0, 
+                newJoined: 0
             };
         } else if (state.activeTab === "overtime") {
             stats = {}; logs = []; emps = []; empMap = {};
         } else {
             stats = model.getSummaryStats();
+            
             if (state.activeTab === "night") {
                 stats = model.getNightShiftStats();
             }
+
             ({ logs, emps, empMap } = model.getFilteredData());
         }
 
         const filterOpts = model.getFilterOptions();
 
         this._staffWorkerStats = { ...(state.staffWorkerStats || {}) };
+
+        const emptySummaryTabs = ["special", "data_quality", "designation_order", "sort_order", "designation_families", "dept_designation_mapping", "custom_location_groups", "dept_group_mapping", "units", "overtime"];
+
+        let summaryCards = "";
+
+        if (state.activeTab === "designation") {
+            summaryCards = this._renderDesignationFamilySummaryCards(emps, stats, model, logs, empMap);
+        } else if (state.activeTab === "age") {
+            summaryCards = this._renderAgeSummaryCards(emps, stats, model, logs, empMap);
+        } else if (state.activeTab === "company") {
+            summaryCards = this._renderCompanySummaryCards(emps, stats, model, logs, empMap);
+        } else if (state.activeTab === "dept") {
+            summaryCards = this._renderDeptSummaryCards(emps, stats, model, logs, empMap);
+        } else if (state.activeTab === "gender") {
+            summaryCards = this._renderGenderSummaryCards(emps, stats, model, logs, empMap);
+        } else if (state.activeTab === "latein") {
+            summaryCards = this._renderLateInSummaryCards(emps, stats, model, logs, empMap);
+        } else if (state.activeTab === "earlyout") {
+            summaryCards = this._renderEarlyOutSummaryCards(emps, stats, model, logs, empMap);
+        } else if (state.activeTab === "shift") {
+            summaryCards = this._renderShiftSummaryCards(emps, stats, model, logs, empMap);
+        } else if (state.activeTab === "manual_punch") {
+            summaryCards = this._renderManualPunchSummaryCards(emps, stats, model, logs, empMap);
+        } else if (state.activeTab === "night") {
+            summaryCards = this._renderNightSummaryCards(emps, stats, model, logs, empMap);
+        } else if (state.activeTab === "staff") {
+            summaryCards = this._renderStaffSummaryCards(emps, stats, model, logs, empMap);
+        } else if (state.activeTab === "worker") {
+            summaryCards = this._renderWorkerSummaryCards(emps, stats, model, logs, empMap);
+        } else if (state.activeTab === "resigned") {
+            summaryCards = this._renderResignedSummaryCards(emps, stats, model, logs, empMap);
+        } else if (state.activeTab === "newjoined") {
+            summaryCards = this._renderNewJoinedSummaryCards(emps, stats, model, logs, empMap);
+        } else if (emptySummaryTabs.includes(state.activeTab)) {
+            summaryCards = "";
+        } else if (state.activeTab === "feature") {
+            summaryCards = this._renderDashboardSummaryCards(emps, stats, model, logs, empMap);
+        } else {
+            summaryCards = this._renderSummaryCards(stats, emps, logs, empMap, model);
+        }
 
         this.app.innerHTML = `
             <div class="dashboard-layout">
@@ -139,34 +190,9 @@ class AttendanceView {
                     ${this._renderTopbar(state)}
                     <div class="content-body">
                         ${(state.activeTab !== "feature" && state.activeTab !== "units" && state.activeTab !== "dept_designation_mapping" && state.activeTab !== "custom_location_groups" && state.activeTab !== "dept_group_mapping") ? this._renderFilters(state.filters, filterOpts, state) : ""}
-                        ${
-                            state.activeTab === "designation"
-                            ? this._renderDesignationFamilySummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "age"
-                            ? this._renderAgeSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "company"
-                            ? this._renderCompanySummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "dept"
-                            ? this._renderDeptSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "gender"
-                            ? this._renderGenderSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "latein"
-                            ? this._renderLateInSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "earlyout"
-                            ? this._renderEarlyOutSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "shift"
-                            ? this._renderShiftSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "manual_punch"
-                            ? this._renderManualPunchSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "night"
-                            ? this._renderNightSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "staff"
-                            ? this._renderStaffSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "worker"
-                            ? this._renderWorkerSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "resigned"
-                            ? this._renderResignedSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "newjoined"
-                            ? this._renderNewJoinedSummaryCards(emps, stats, model, logs, empMap) : state.activeTab === "special"
-                            ? "" : state.activeTab === "data_quality"
-                            ? "" : state.activeTab === "designation_order"
-                            ? "" : state.activeTab === "sort_order"
-                            ? "" : state.activeTab === "designation_families"
-                            ? "" : state.activeTab === "dept_designation_mapping"
-                            ? "" : state.activeTab === "custom_location_groups"
-                            ? "" : state.activeTab === "dept_group_mapping"
-                            ? "" : state.activeTab === "units"
-                            ? "" : state.activeTab === "feature"
-                            ? this._renderDashboardSummaryCards(emps, stats, model, logs, empMap) : this._renderSummaryCards(stats, emps, logs, empMap, model)
-                        }
-                        
+
+                        ${summaryCards}
+
                         <div id="overtime-module-container"></div>
                         <div id="stat-card-drilldown" class="stat-drilldown-panel" style="display:none;"></div>
                         <div class="tab-pane-container">
@@ -189,7 +215,6 @@ class AttendanceView {
         }
         this._scrollActiveSidebarItem();
     }
-
 
     _handleDeptAccordionClick(e) {
         const catItem = e.target.closest(".stat-category-item");
@@ -1068,10 +1093,12 @@ class AttendanceView {
         })).join("");
 
         // --- Headcount: Required / Available / Gap ---
-        const requiredCount = model.getRequiredHeadcount();
+        const requiredCountRaw = model.getRequiredHeadcount();
+        const requiredCount = (requiredCountRaw === null || requiredCountRaw === undefined) ? '-' : requiredCountRaw;
         const totalMachines = model.getTotalMachines(); 
         const availableCount = emps.length;
-        const gapCount = model.getGapHeadcount();
+        const gapCountRaw = model.getGapHeadcount();
+        const gapCount = (gapCountRaw === null || gapCountRaw === undefined) ? '-' : gapCountRaw;
 
         const availableCard = `
             <div class="stat-card success stat-card-clickable" data-headcount="available" onclick="AppController.view._handleAvailableCardClick()" style="position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;">

@@ -247,7 +247,7 @@
                     this.state.dashboardData = {
                         employees: data.dashboardEmployees || [],
                         todayStats: data.todayStats || {},
-                        requiredHeadcount: data.requiredHeadcount ?? 0,
+                        requiredHeadcount: data.requiredHeadcount ?? null,
                         totalMachines: data.totalMachines ?? 0,
                         gapHeadcount: data.gapHeadcount ?? 0,
                         requiredHeadcountByDept: data.requiredHeadcountByDept || {},
@@ -729,7 +729,8 @@
 
     
         getRequiredHeadcount() {
-            return (this.state.dashboardData?.requiredHeadcount) || 0;
+            const val = this.state.dashboardData?.requiredHeadcount;
+            return (val === undefined || val === null) ? null : val;
         }
 
         getTotalMachines() {                                          
@@ -745,9 +746,14 @@
         }
 
         getRequiredHeadcountByLocation() {
-            const locations = (this.state.dashboardData?.requiredHeadcountByLocation || []).slice();
+            // 1. Get the raw list
+            let locations = (this.state.dashboardData?.requiredHeadcountByLocation || []).slice();
 
-            const orderById = new Map((this.state.locationOrder || []).map((location, index) => [Number(location.id),index]));
+            // 2. Filter out any location where 'required' is null
+            locations = locations.filter(loc => loc.required !== null && loc.required !== undefined);
+
+            // 3. Sort the remaining locations
+            const orderById = new Map((this.state.locationOrder || []).map((location, index) => [Number(location.id), index]));
 
             return locations.sort((a, b) => {
                 const indexA = orderById.get(Number(a.locationId)) ?? Infinity;
