@@ -1,0 +1,58 @@
+--- OVERTIME API DEBUG ---
+Date Range: 2026-11-01 to 2026-11-01
+
+Total Employees Fetched: 160
+Total Unique Device Logs Fetched: 1 employees have punches
+
+Kamesh Found! ID: 38290 | Group ID: 62
+Templates for his group:
+Array
+(
+    [0] => Array
+        (
+            [shiftId] => 7
+            [shiftName] => DSTD
+            [shiftCode] => DSTD
+            [beginHms] => Array
+                (
+                    [0] => 8
+                    [1] => 0
+                    [2] => 0
+                )
+
+            [endHms] => Array
+                (
+                    [0] => 20
+                    [1] => 0
+                    [2] => 0
+                )
+
+            [endNextDay] => 
+        )
+
+    [1] => Array
+        (
+            [shiftId] => 8
+            [shiftName] => DSTN
+            [shiftCode] => DSTN
+            [beginHms] => Array
+                (
+                    [0] => 20
+                    [1] => 0
+                    [2] => 0
+                )
+
+            [endHms] => Array
+                (
+                    [0] => 8
+                    [1] => 0
+                    [2] => 0
+                )
+
+            [endNextDay] => 1
+        )
+
+)
+
+CRITICAL: NO PUNCHES FOUND FOR KAMESH ID 38290
+
