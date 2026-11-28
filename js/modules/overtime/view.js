@@ -2,9 +2,11 @@ class OvertimeView {
     constructor() {
         this.model = new OvertimeModel();
 
-        // Pagination state (main table = OT Records)
+        // Main department summary state
         this.currentPage = 1;
         this.pageSize = 25;
+        this._departments = [];
+        this._expandedSummaryDepartments = new Set();
 
         // Latest data returned by the model
         this.currentData = null;
@@ -14,6 +16,8 @@ class OvertimeView {
 
         // Active drilldown: { cardKey: "otRecords" | "mightBeOT" | "all", category: "CC" | null }
         this._drill = null;
+        this._chartDrill = null;
+        this._expandedDepartment = null;
 
         // Bound handlers
         this._boundClickHandler = null;
@@ -52,7 +56,14 @@ class OvertimeView {
 
         this.currentPage = 1;
         this._drill = null;
+        this._chartDrill = null;
+        this._expandedDepartment = null;
+        this._expandedSummaryDepartments.clear();
         this.currentData = this.model.getData();
+        this._departments = this._groupDepartmentRecords([
+            { key: "otRecords", records: this.model.getOTRecords() },
+            { key: "mightBeOT", records: this.model.getMightBeOTRecords() },
+        ]);
 
         container.innerHTML = this._renderDashboard(this.currentData);
     }
@@ -67,6 +78,23 @@ class OvertimeView {
 
         this._boundClickHandler = (event) => {
             const target = event.target;
+
+            if (target.closest("[data-ot-action='close-chart-drill']")) {
+                this._chartDrill = null;
+                this._refreshTable();
+                return;
+            }
+
+            if (target.closest("[data-ot-action='download-chart-drill']")) {
+                this._downloadCsv(this._getDrillRecords(this._chartDrill), "Overtime_Chart_Drilldown");
+                return;
+            }
+
+            const chart = target.closest(".ot-dept-chart");
+            if (chart && container.contains(chart)) {
+                this._handleDepartmentChartClick(chart, target);
+                return;
+            }
 
             // 1. Category chip inside a card (e.g. CC under OT Records)
             const chip = target.closest(".stat-category-item");
@@ -104,9 +132,31 @@ class OvertimeView {
                 return;
             }
 
-            // 5. Download main table (OT Records)
+            const toggle = target.closest("[data-ot-summary-toggle]");
+            if (toggle && container.contains(toggle)) {
+                const department = toggle.dataset.otSummaryToggle;
+                const expanded = !this._expandedSummaryDepartments.delete(department);
+                if (expanded) {
+                    this._expandedSummaryDepartments.add(department);
+                }
+                toggle.setAttribute("aria-expanded", expanded);
+                toggle.closest("table").querySelector("#" + toggle.getAttribute("aria-controls")).hidden = !expanded;
+                return;
+            }
+
+            // 5. Download main department summary
             if (target.closest("#downloadExcelBtn")) {
-                this._downloadCsv(this.model.getOTRecords(), "Overtime_Records");
+                const rows = this._departments.flatMap(({ name, counts, designations }) => [
+                    ["Department", name, "", counts.otRecords || 0, counts.mightBeOT || 0],
+                    ...designations.map(([designation, child]) =>
+                        ["Designation", name, designation, child.otRecords || 0, child.mightBeOT || 0]
+                    ),
+                ]);
+                this._downloadCsvRows(
+                    ["Row Type", "Department", "Designation", "Overtime Records", "Might be Overtime Records"],
+                    rows,
+                    "Overtime_Department_Summary"
+                );
                 return;
             }
 
@@ -193,49 +243,53 @@ class OvertimeView {
         return [...ot, ...mb];
     }
 
-    _getDrillRecords() {
-        if (!this._drill) {
+    _getDrillRecords(drill = this._drill) {
+        if (!drill) {
             return [];
         }
 
-        const source = this._getDrillSource(this._drill.cardKey);
+        const { cardKey, group, category } = drill;
+        const source = this._getDrillSource(cardKey);
 
-        if (!this._drill.category) {
+        if (group) {
+            return source.filter((record) =>
+                this._chartGroupName(record.department) === group.department &&
+                (group.designation === undefined || this._chartGroupName(record.designation) === group.designation)
+            );
+        }
+
+        if (!category) {
             return source;
         }
 
-        return source.filter((r) => this.model.mergeCat(r.companyCategory) === this._drill.category);
+        return source.filter((r) => this.model.mergeCat(r.companyCategory) === category);
     }
 
-    _getDrillTitle() {
-        if (!this._drill) {
+    _getDrillTitle(drill) {
+        if (!drill) {
             return "";
         }
 
         let base = "All";
 
-        if (this._drill.cardKey === "otRecords") {
+        if (drill.cardKey === "otRecords") {
             base = "OT Records";
-        } else if (this._drill.cardKey === "mightBeOT") {
+        } else if (drill.cardKey === "mightBeOT") {
             base = "Might Be OT";
         }
 
-        if (this._drill.category) {
-            return `${base} - ${this._drill.category}`;
+        if (drill.category) {
+            return `${base} - ${drill.category}`;
         }
 
-        return base;
+        const group = drill.group;
+        return group ? [base, group.department, group.designation].filter(Boolean).join(" - ") : base;
     }
 
     /* =========================================================
      * CSV download
      * ========================================================= */
     _downloadCsv(records, filePrefix) {
-        if (!records || !records.length) {
-            alert("No data to download.");
-            return;
-        }
-
         const headers = [
             "Employee Code",
             "Employee Name",
@@ -257,11 +311,7 @@ class OvertimeView {
             "Out Time",
         ];
 
-        const csvRows = [];
-        csvRows.push(headers.map((h) => `"${h}"`).join(","));
-
-        records.forEach((r) => {
-            const row = [
+        const rows = records.map((r) => [
                 r.employeeCode,
                 r.name,
                 r.companyCategory,
@@ -280,15 +330,22 @@ class OvertimeView {
                 r.shift2EndTime,
                 r.NewAttendanceLogsInTime,
                 r.NewAttendanceLogsOutTime,
-            ];
+        ]);
+        this._downloadCsvRows(headers, rows, filePrefix);
+    }
 
-            const escapedRow = row.map((val) => {
+    _downloadCsvRows(headers, rows, filePrefix) {
+        if (!rows.length) {
+            alert("No data to download.");
+            return;
+        }
+
+        const csvRows = [headers, ...rows].map((row) =>
+            row.map((val) => {
                 const safeVal = val === null || val === undefined ? "" : String(val);
                 return `"${safeVal.replace(/"/g, '""')}"`;
-            });
-
-            csvRows.push(escapedRow.join(","));
-        });
+            }).join(",")
+        );
 
         // BOM so Excel opens UTF-8 correctly
         const csvString = "\uFEFF" + csvRows.join("\r\n");
@@ -312,8 +369,7 @@ class OvertimeView {
      * Pagination helpers
      * ========================================================= */
     _getTotalPages() {
-        const records = this.model.getOTRecords();
-        return Math.max(1, Math.ceil(records.length / this.pageSize));
+        return Math.max(1, Math.ceil(this._departments.length / this.pageSize));
     }
 
     /* =========================================================
@@ -393,9 +449,176 @@ class OvertimeView {
                 ${this._renderDrilldown()}
             </div>
 
-            ${this._renderRecordsTable(otRecords)}
+            ${this._renderDepartmentChart()}
+            <div id="overtime-chart-detail-container">
+                ${this._chartDrill ? this._renderDrilldown(this._chartDrill, "chart-drill") : this._renderRecordsTable()}
+            </div>
             ${this._renderFooterMeta(data)}
         `;
+    }
+
+    _chartGroupName(value) {
+        return String(value ?? "").trim() || "Unassigned";
+    }
+
+    _groupDepartmentRecords(series) {
+        const departments = new Map();
+        for (const { key, records } of series) {
+            for (const record of records) {
+                const name = this._chartGroupName(record.department);
+                const designation = this._chartGroupName(record.designation);
+                if (!departments.has(name)) {
+                    departments.set(name, { name, counts: {}, designations: new Map() });
+                }
+                const { counts, designations } = departments.get(name);
+                if (!designations.has(designation)) {
+                    designations.set(designation, {});
+                }
+                const designationCounts = designations.get(designation);
+                counts[key] = (counts[key] || 0) + 1;
+                designationCounts[key] = (designationCounts[key] || 0) + 1;
+            }
+        }
+
+        // Present by Dept uses the order in which departments appear in the employee list.
+        const order = new Map();
+        for (const employee of window.AppController?.model?.state?.data?.employees || []) {
+            const name = this._chartGroupName(employee.dept);
+            if (!order.has(name)) {
+                order.set(name, { index: order.size, designations: new Map() });
+            }
+            order.get(name).designations.set(
+                this._chartGroupName(employee.designationNameRaw ?? employee.designation),
+                Number(employee.designationSortOrder) || 0
+            );
+        }
+
+        return [...departments.values()].sort((a, b) =>
+            (order.get(a.name)?.index ?? Infinity) - (order.get(b.name)?.index ?? Infinity) ||
+            a.name.localeCompare(b.name)
+        ).map(({ name, counts, designations }) => {
+            const designationOrder = order.get(name)?.designations;
+            return {
+                name,
+                counts,
+                designations: [...designations].sort(([a], [b]) =>
+                    (designationOrder?.get(a) || 0) - (designationOrder?.get(b) || 0) || a.localeCompare(b)
+                ),
+            };
+        });
+    }
+
+    _renderDepartmentChart() {
+        const series = [
+            { key: "otRecords", label: "OT Records", color: "blue" },
+            { key: "mightBeOT", label: "Might Be OT", color: "amber" },
+        ];
+        const departments = this._departments;
+        const max = departments.reduce((largest, { counts }) =>
+            Math.max(largest, (counts.otRecords || 0) + (counts.mightBeOT || 0)), 0);
+        const rawStep = Math.max(1, max / 5);
+        const magnitude = 10 ** Math.floor(Math.log10(rawStep));
+        const step = [1, 2, 5, 10].map((n) => n * magnitude).find((n) => n >= rawStep);
+        const intervals = Math.ceil(max / step);
+        const axisMax = intervals * step;
+
+        let tooltipIndex = 0;
+        const renderBar = (name, counts, designation = false) => {
+            const label = this._escapeHtml(name);
+            const tooltipId = `ot-chart-tooltip-${tooltipIndex++}`;
+            const ot = counts.otRecords || 0;
+            const mightBeOT = counts.mightBeOT || 0;
+            return `
+            <div class="ot-chart-track">
+                ${series.filter(({ key }) => counts[key]).map(({ key, label, color }) => `
+                    <button type="button" class="ot-chart-segment ot-chart-${color}" data-ot-series="${key}"
+                        ${designation ? `data-ot-designation="${this._escapeHtml(name)}"` : ""}
+                        style="width:${counts[key] / axisMax * 100}%"
+                        aria-label="${label}, ${this._escapeHtml(name)}, ${counts[key]} records"
+                        aria-describedby="${tooltipId}">${counts[key]}</button>
+                `).join("")}
+                <div class="ot-chart-tooltip" id="${tooltipId}" role="tooltip">
+                    <strong>${label}</strong>
+                    <span><span><i class="ot-chart-blue" aria-hidden="true"></i> OT Records:</span> <b>${ot}</b></span>
+                    <span><span><i class="ot-chart-amber" aria-hidden="true"></i> Might be OT Records:</span> <b>${mightBeOT}</b></span>
+                    <span class="ot-chart-tooltip-total"><span>Total:</span> <b>${ot + mightBeOT}</b></span>
+                </div>
+            </div>
+            `;
+        };
+
+        return `
+            <section class="ot-panel ot-dept-chart" aria-labelledby="ot-dept-chart-title">
+                <div class="ot-panel-header ot-chart-header">
+                    <h3 id="ot-dept-chart-title" class="ot-drill-title">
+                        <i class="ph-fill ph-chart-bar" aria-hidden="true"></i> Overtime by Department
+                    </h3>
+                    <div class="ot-chart-legend">
+                        ${series.map(({ label, color }) => `<span data-ot-legend="${color}"><i class="ot-chart-${color}" aria-hidden="true"></i>${label}</span>`).join("")}
+                    </div>
+                </div>
+                ${max ? `
+                    <div class="ot-chart-body" style="--ot-chart-grid-step:${100 / intervals}%">
+                        ${departments.map(({ name, counts, designations }, index) => {
+                            const expanded = this._expandedDepartment === name;
+                            const label = this._escapeHtml(name);
+                            return `
+                                <div class="ot-chart-department" data-ot-department="${label}">
+                                    <div class="ot-chart-row">
+                                        <button type="button" class="ot-chart-label" data-ot-chart-toggle
+                                            aria-expanded="${expanded}" aria-controls="ot-chart-designations-${index}">
+                                            <i class="ph ph-caret-right" aria-hidden="true"></i> ${label}
+                                        </button>
+                                        ${renderBar(name, counts)}
+                                    </div>
+                                    <div id="ot-chart-designations-${index}" class="ot-chart-designations" ${expanded ? "" : "hidden"}>
+                                        ${designations.map(([designation, totals]) => `
+                                            <div class="ot-chart-row">
+                                                <span class="ot-chart-designation">${this._escapeHtml(designation)}</span>
+                                                ${renderBar(designation, totals, true)}
+                                            </div>
+                                        `).join("")}
+                                    </div>
+                                </div>
+                            `;
+                        }).join("")}
+                        <div class="ot-chart-row" aria-hidden="true">
+                            <div class="ot-chart-axis">
+                                ${Array.from({ length: intervals + 1 }, (_, i) => `<span>${i * step}</span>`).join("")}
+                            </div>
+                        </div>
+                    </div>
+                ` : '<p class="ot-drill-empty">No overtime records for the selected filters.</p>'}
+            </section>
+        `;
+    }
+
+    _handleDepartmentChartClick(chart, target) {
+        const row = target.closest(".ot-chart-department");
+        if (!row) {
+            return;
+        }
+
+        const department = row.dataset.otDepartment;
+        const segment = target.closest("[data-ot-series]");
+        if (segment) {
+            const { otSeries, otDesignation } = segment.dataset;
+            this._chartDrill = { cardKey: otSeries, group: { department, designation: otDesignation } };
+            this._refreshTable();
+            this.container.querySelector("#overtime-chart-detail-container")?.scrollIntoView?.({
+                behavior: "smooth", block: "nearest",
+            });
+            return;
+        }
+
+        if (target.closest("[data-ot-chart-toggle]")) {
+            this._expandedDepartment = this._expandedDepartment === department ? null : department;
+            chart.querySelectorAll(".ot-chart-department").forEach((departmentRow) => {
+                const expanded = departmentRow.dataset.otDepartment === this._expandedDepartment;
+                departmentRow.querySelector("[data-ot-chart-toggle]").setAttribute("aria-expanded", expanded);
+                departmentRow.querySelector(".ot-chart-designations").hidden = !expanded;
+            });
+        }
     }
 
     _renderSummaryCards(summary, otRecords, mightBeOT) {
@@ -473,13 +696,13 @@ class OvertimeView {
     /* =========================================================
      * Drilldown panel
      * ========================================================= */
-    _renderDrilldown() {
-        if (!this._drill) {
+    _renderDrilldown(drill = this._drill, action = "drill") {
+        if (!drill) {
             return "";
         }
 
-        const records = this._getDrillRecords();
-        const title = this._getDrillTitle();
+        const records = this._getDrillRecords(drill);
+        const title = this._getDrillTitle(drill);
 
         return `
             <div class="ot-panel">
@@ -491,10 +714,10 @@ class OvertimeView {
                     </div>
 
                     <div class="ot-actions">
-                        <button type="button" class="ot-btn ot-btn--sm ot-btn--excel" data-ot-action="download-drill">
+                        <button type="button" class="ot-btn ot-btn--sm ot-btn--excel" data-ot-action="download-${action}">
                             <i class="ph ph-file-xls"></i> Excel
                         </button>
-                        <button type="button" class="ot-btn ot-btn--sm ot-btn--close" data-ot-action="close-drill">
+                        <button type="button" class="ot-btn ot-btn--sm ot-btn--close" data-ot-action="close-${action}">
                             <i class="ph ph-x"></i> Close
                         </button>
                     </div>
@@ -588,25 +811,50 @@ class OvertimeView {
     /* =========================================================
      * Main records table (OT Records, paginated)
      * ========================================================= */
-    _renderRecordsTable(records) {
-        const totalRecords = records.length;
-        const totalPages = Math.max(1, Math.ceil(totalRecords / this.pageSize));
+    _renderRecordsTable() {
+        const totalDepartments = this._departments.length;
+        const totalPages = this._getTotalPages();
 
         this.currentPage = Math.min(Math.max(1, this.currentPage), totalPages);
 
         const startIndex = (this.currentPage - 1) * this.pageSize;
-        const endIndex = Math.min(startIndex + this.pageSize, totalRecords);
-
-        const paginatedRecords = records.slice(startIndex, endIndex);
-
-        const rows = paginatedRecords.map((r) => this._renderRecordRow(r)).join("");
-        const columnCount = this._getTableHeaders().length;
+        const endIndex = Math.min(startIndex + this.pageSize, totalDepartments);
+        const countCells = (counts) => `
+            <td class="ot-summary-count">${counts.otRecords || 0}</td>
+            <td class="ot-summary-count">${counts.mightBeOT || 0}</td>
+        `;
+        const groups = this._departments.slice(startIndex, endIndex).map(({ name, counts, designations }, index) => {
+            const expanded = this._expandedSummaryDepartments.has(name);
+            const childId = `ot-summary-designations-${startIndex + index}`;
+            const label = this._escapeHtml(name);
+            return `
+                <tbody>
+                    <tr>
+                        <td>
+                            <button type="button" class="ot-summary-toggle" data-ot-summary-toggle="${label}"
+                                aria-expanded="${expanded}" aria-controls="${childId}">
+                                <i class="ph ph-caret-right" aria-hidden="true"></i> ${label}
+                            </button>
+                        </td>
+                        ${countCells(counts)}
+                    </tr>
+                </tbody>
+                <tbody id="${childId}" ${expanded ? "" : "hidden"}>
+                    ${designations.map(([designation, child]) => `
+                        <tr>
+                            <td class="ot-summary-designation">${this._escapeHtml(designation)}</td>
+                            ${countCells(child)}
+                        </tr>
+                    `).join("")}
+                </tbody>
+            `;
+        }).join("");
 
         return `
             <div class="ot-panel">
 
                 <div class="ot-panel-header">
-                    <div class="ot-panel-title">Overtime Records</div>
+                    <div class="ot-panel-title">Overtime Department Summary</div>
 
                     <div class="ot-actions">
                         <button type="button" id="downloadExcelBtn" class="ot-btn ot-btn--excel">
@@ -617,32 +865,31 @@ class OvertimeView {
                 </div>
 
                 <div class="ot-table-wrap">
-                    <table class="ot-table">
+                    <table class="ot-table ot-summary-table">
                         <thead>
                             <tr>
-                                ${this._renderTableHeaders()}
+                                <th scope="col">Departments</th>
+                                <th scope="col" class="ot-summary-count">Overtime Records</th>
+                                <th scope="col" class="ot-summary-count">Might be Overtime Records</th>
                             </tr>
                         </thead>
 
-                        <tbody>
-                            ${
-                                rows ||
-                                `
+                        ${groups || `
+                            <tbody>
                                 <tr>
-                                    <td colspan="${columnCount}" class="ot-empty-cell">No records found.</td>
+                                    <td colspan="3" class="ot-empty-cell">No records found.</td>
                                 </tr>
-                            `
-                            }
-                        </tbody>
+                            </tbody>
+                        `}
                     </table>
                 </div>
 
-                ${this._renderPagination(totalRecords, totalPages, startIndex, endIndex)}
+                ${this._renderPagination(totalDepartments, totalPages, startIndex, endIndex)}
             </div>
         `;
     }
 
-    _renderPagination(totalRecords, totalPages, startIndex, endIndex) {
+    _renderPagination(totalDepartments, totalPages, startIndex, endIndex) {
         const pageButtons = this._renderPageButtons(totalPages);
 
         const prevDisabled = this.currentPage <= 1;
@@ -652,7 +899,7 @@ class OvertimeView {
             <div class="ot-pagination">
 
                 <div class="ot-pagination-info">
-                    ${totalRecords === 0 ? "Showing 0 records" : `Showing ${startIndex + 1}–${endIndex} of ${totalRecords} records`}
+                    ${totalDepartments === 0 ? "Showing 0 departments" : `Showing ${startIndex + 1}–${endIndex} of ${totalDepartments} departments`}
                 </div>
 
                 <div class="ot-pagination-controls">
