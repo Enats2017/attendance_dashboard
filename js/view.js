@@ -217,7 +217,12 @@ class AttendanceView {
     }
 
     _handleDeptAccordionClick(e) {
+        if (e.target.closest("#overtime-module-container")) {
+            return; 
+        }
+
         const catItem = e.target.closest(".stat-category-item");
+        
         if (catItem) {
             e.stopPropagation();
             const cardKey = catItem.dataset.cardKey;

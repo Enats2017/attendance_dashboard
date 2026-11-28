@@ -2,27 +2,26 @@ class OvertimeView {
     constructor() {
         this.model = new OvertimeModel();
 
-        // Pagination state
+        // Pagination state (main table = OT Records)
         this.currentPage = 1;
         this.pageSize = 25;
 
-        // Store current records for pagination
+        // Latest data returned by the model
         this.currentData = null;
 
-        // Keep track of the container
+        // Container this view renders into
         this.container = null;
 
-        // Bound handlers (initialized on attach)
-        this._boundClickHandler = null;
-        this._boundChangeHandler = null;
+        // Active drilldown: { cardKey: "otRecords" | "mightBeOT" | "all", category: "CC" | null }
+        this._drill = null;
 
-        this._filteredRecords = null;
-        this._filteredCatLabel = "";
+        // Bound handlers
+        this._boundClickHandler = null;
     }
 
-    /**
-     * Main Render Function
-     */
+    /* =========================================================
+     * Main render
+     * ========================================================= */
     async render(container, parentFilters) {
         if (!container) {
             return;
@@ -30,10 +29,8 @@ class OvertimeView {
 
         this.container = container;
 
-        // Attach event listeners
-        this._attachPaginationEvents(container);
+        this._attachEvents(container);
 
-        // Access validation
         if (!this.model.canView()) {
             container.innerHTML = this._renderComingSoon();
             return;
@@ -50,47 +47,71 @@ class OvertimeView {
             }
 
             container.innerHTML = this._renderError(result.message || "Unable to load overtime data.");
-
             return;
         }
 
-        const data = this.model.getData();
-
-        // Reset pagination whenever new data is fetched
         this.currentPage = 1;
-        this.currentData = data;
+        this._drill = null;
+        this.currentData = this.model.getData();
 
-        container.innerHTML = this._renderDashboard(data);
+        container.innerHTML = this._renderDashboard(this.currentData);
     }
 
-    /**
-     * Attach Pagination & Download Events
-     */
-    _attachPaginationEvents(container) {
-        // Remove old listeners if they exist
+    /* =========================================================
+     * Events
+     * ========================================================= */
+    _attachEvents(container) {
         if (this._boundClickHandler) {
             container.removeEventListener("click", this._boundClickHandler);
         }
-        if (this._boundChangeHandler) {
-            container.removeEventListener("change", this._boundChangeHandler);
-        }
 
-        // Define the click handler
         this._boundClickHandler = (event) => {
-            const catItem = event.target.closest(".stat-category-item");
-            if (catItem && container.contains(catItem)) {
+            const target = event.target;
+
+            // 1. Category chip inside a card (e.g. CC under OT Records)
+            const chip = target.closest(".stat-category-item");
+            if (chip && container.contains(chip)) {
+                event.preventDefault();
                 event.stopPropagation();
-                this._handleCategoryChipClick(catItem.dataset.cardKey, catItem.dataset.category);
+                event.stopImmediatePropagation();
+
+                this._openDrilldown(chip.dataset.otCard, chip.dataset.category);
                 return;
             }
 
-            const downloadBtn = event.target.closest("#downloadExcelBtn");
-            if (downloadBtn) {
-                this._downloadOvertimeExcel();
+            // 2. Whole card click (OT Records / Might Be OT)
+            const card = target.closest(".ot-card-clickable");
+            if (card && container.contains(card)) {
+                event.preventDefault();
+                event.stopPropagation();
+                event.stopImmediatePropagation();
+
+                this._openDrilldown(card.dataset.otCard, null);
                 return;
             }
 
-            const button = event.target.closest("[data-pagination-action]");
+            // 3. Close drilldown
+            if (target.closest("[data-ot-action='close-drill']")) {
+                this._drill = null;
+                this._refreshTable();
+                return;
+            }
+
+            // 4. Download drilldown records
+            if (target.closest("[data-ot-action='download-drill']")) {
+                const records = this._getDrillRecords();
+                this._downloadCsv(records, "Overtime_Drilldown");
+                return;
+            }
+
+            // 5. Download main table (OT Records)
+            if (target.closest("#downloadExcelBtn")) {
+                this._downloadCsv(this.model.getOTRecords(), "Overtime_Records");
+                return;
+            }
+
+            // 6. Pagination
+            const button = target.closest("[data-pagination-action]");
             if (!button || !container.contains(button)) {
                 return;
             }
@@ -102,8 +123,7 @@ class OvertimeView {
                     this.currentPage--;
                 }
             } else if (action === "next") {
-                const totalPages = this._getTotalPages();
-                if (this.currentPage < totalPages) {
+                if (this.currentPage < this._getTotalPages()) {
                     this.currentPage++;
                 }
             } else if (action === "page") {
@@ -116,47 +136,110 @@ class OvertimeView {
             this._refreshTable();
         };
 
-        // Define the change handler (kept for safety, though dropdown is removed)
-        this._boundChangeHandler = (event) => {
-            const select = event.target.closest("[data-pagination-size]");
-            if (!select || !container.contains(select)) {
-                return;
-            }
-            const newSize = Number(select.value);
-            if (Number.isInteger(newSize) && newSize > 0) {
-                this.pageSize = newSize;
-                this.currentPage = 1;
-                this._refreshTable();
-            }
-        };
-
         container.addEventListener("click", this._boundClickHandler);
-        container.addEventListener("change", this._boundChangeHandler);
     }
 
-    _downloadOvertimeExcel() {
-        let source = [];
+    _openDrilldown(cardKey, category) {
+        if (!this.currentData) {
+            return;
+        }
 
-        if (this._filteredRecords) {
-            source = this._filteredRecords;
-        } else {
-            if (this.currentData && Array.isArray(this.currentData.otRecords)) {
-                source = this.currentData.otRecords;
-            } else {
-                source = [];
+        let cat = null;
+
+        if (category) {
+            cat = this.model.mergeCat(category);
+            if (!cat) {
+                return;
             }
         }
 
-        if (!source.length) {
+        this._drill = {
+            cardKey: cardKey || "all",
+            category: cat,
+        };
+
+        this._refreshTable();
+
+        // Bring the drilldown into view
+        const box = this.container && this.container.querySelector("#overtime-drilldown-container");
+        if (box && typeof box.scrollIntoView === "function") {
+            box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+    }
+
+    _refreshTable() {
+        if (!this.container || !this.currentData) {
+            return;
+        }
+
+        this.container.innerHTML = this._renderDashboard(this.currentData);
+    }
+
+    /* =========================================================
+     * Drilldown data
+     * ========================================================= */
+    _getDrillSource(cardKey) {
+        const ot = this.model.getOTRecords();
+        const mb = this.model.getMightBeOTRecords();
+
+        if (cardKey === "otRecords") {
+            return ot;
+        }
+
+        if (cardKey === "mightBeOT") {
+            return mb;
+        }
+
+        return [...ot, ...mb];
+    }
+
+    _getDrillRecords() {
+        if (!this._drill) {
+            return [];
+        }
+
+        const source = this._getDrillSource(this._drill.cardKey);
+
+        if (!this._drill.category) {
+            return source;
+        }
+
+        return source.filter((r) => this.model.mergeCat(r.companyCategory) === this._drill.category);
+    }
+
+    _getDrillTitle() {
+        if (!this._drill) {
+            return "";
+        }
+
+        let base = "All";
+
+        if (this._drill.cardKey === "otRecords") {
+            base = "OT Records";
+        } else if (this._drill.cardKey === "mightBeOT") {
+            base = "Might Be OT";
+        }
+
+        if (this._drill.category) {
+            return `${base} - ${this._drill.category}`;
+        }
+
+        return base;
+    }
+
+    /* =========================================================
+     * CSV download
+     * ========================================================= */
+    _downloadCsv(records, filePrefix) {
+        if (!records || !records.length) {
             alert("No data to download.");
             return;
         }
 
-        const records = source;
-
         const headers = [
             "Employee Code",
             "Employee Name",
+            "Company Category",
             "Company",
             "Department",
             "Designation",
@@ -180,8 +263,8 @@ class OvertimeView {
         records.forEach((r) => {
             const row = [
                 r.employeeCode,
-                r.companyCategory,
                 r.name,
+                r.companyCategory,
                 r.company,
                 r.department,
                 r.designation,
@@ -207,16 +290,16 @@ class OvertimeView {
             csvRows.push(escapedRow.join(","));
         });
 
-        const csvString = csvRows.join("\r\n");
+        // BOM so Excel opens UTF-8 correctly
+        const csvString = "\uFEFF" + csvRows.join("\r\n");
         const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
 
         const link = document.createElement("a");
         const url = URL.createObjectURL(blob);
-        const now = new Date();
-        const dateStr = now.toISOString().slice(0, 10);
+        const dateStr = new Date().toISOString().slice(0, 10);
 
         link.setAttribute("href", url);
-        link.setAttribute("download", `Overtime_Records_${dateStr}.csv`);
+        link.setAttribute("download", `${filePrefix}_${dateStr}.csv`);
         link.style.visibility = "hidden";
 
         document.body.appendChild(link);
@@ -225,74 +308,22 @@ class OvertimeView {
         URL.revokeObjectURL(url);
     }
 
-    _refreshTable() {
-        if (!this.container || !this.currentData) {
-            return;
-        }
-
-        this.container.innerHTML = this._renderDashboard(this.currentData);
-    }
-
-    _handleCategoryChipClick(cardKey, category) {
-        if (!this.currentData) {
-            return;
-        }
-
-        const target = this._mergeCat(category);
-
-        if (!target) {
-            return;
-        }
-
-        const ot = Array.isArray(this.currentData.otRecords) ? this.currentData.otRecords : [];
-        const mb = Array.isArray(this.currentData.mightBeOT) ? this.currentData.mightBeOT : [];
-
-        let source;
-        if (cardKey === "otRecords") {
-            source = ot;
-        } else if (cardKey === "mightBeOT") {
-            source = mb;
-        } else {
-            source = [...ot, ...mb];
-        }
-
-        const filtered = source.filter((r) => this._mergeCat(r.companyCategory) === target);
-
-        this._filteredRecords = filtered;
-        this._filteredCatLabel = target;
-        this.currentPage = 1;
-
-        this._refreshTable();
-    }
-
-    _clearCategoryFilter() {
-        this._filteredRecords = null;
-        this._filteredCatLabel = "";
-        this.currentPage = 1;
-        this._refreshTable();
-    }
-
+    /* =========================================================
+     * Pagination helpers
+     * ========================================================= */
     _getTotalPages() {
-        let records = [];
-
-        if (this._filteredRecords) {
-            records = this._filteredRecords;
-        } else {
-            if (this.currentData && Array.isArray(this.currentData.otRecords)) {
-                records = this.currentData.otRecords;
-            } else {
-                records = [];
-            }
-        }
-
+        const records = this.model.getOTRecords();
         return Math.max(1, Math.ceil(records.length / this.pageSize));
     }
 
+    /* =========================================================
+     * Simple states
+     * ========================================================= */
     _renderLoading() {
         return `
-            <div style="padding:40px; text-align:center; color:#64748b;">
-                <i class="ph ph-spinner ph-spin" style="font-size:32px;"></i>
-                <p style="margin-top:8px;">Loading Overtime Data...</p>
+            <div class="ot-loading">
+                <i class="ph ph-spinner ph-spin"></i>
+                <p>Loading Overtime Data...</p>
             </div>
         `;
     }
@@ -301,37 +332,45 @@ class OvertimeView {
         const safe = this._escapeHtml(message || "Unknown error");
 
         return `
-            <div style="padding:24px; text-align:center; color:#b91c1c; background:#fef2f2; border:1px solid #fecaca; border-radius:8px;">
-                <i class="ph ph-warning-circle" style="font-size:28px;"></i>
-                <p style="margin:8px 0 0; font-weight:600;">Error</p>
-                <p style="margin:4px 0 0; font-size:14px;">${safe}</p>
+            <div class="ot-error">
+                <i class="ph ph-warning-circle"></i>
+                <p class="ot-error-title">Error</p>
+                <p class="ot-error-text">${safe}</p>
             </div>
         `;
     }
 
     _renderComingSoon() {
         return `
-            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:80px 20px; text-align:center;">
-                <div style="background:#f1f5f9; width:80px; height:80px; border-radius:50%; display:flex; align-items:center; justify-content:center; margin-bottom:20px;">
-                    <i class="ph ph-clock-user" style="font-size:40px; color:#64748b;"></i>
+            <div class="ot-soon">
+                <div class="ot-soon-icon">
+                    <i class="ph ph-clock-user"></i>
                 </div>
 
-                <h2 style="font-size:24px; font-weight:700; color:#1e293b; margin:0 0 8px;">
-                    Overtime Module
-                </h2>
+                <h2 class="ot-soon-title">Overtime Module</h2>
 
-                <p style="color:#64748b; font-size:16px; max-width:400px; margin:0 0 24px;">
+                <p class="ot-soon-text">
                     We are currently perfecting the new Overtime calculations.
                     This module will be available for your account soon!
                 </p>
 
-                <span style="background:#fef08a; color:#854d0e; padding:6px 16px; border-radius:20px; font-weight:600; font-size:14px;">
-                    Coming Soon
-                </span>
+                <span class="ot-soon-badge">Coming Soon</span>
             </div>
         `;
     }
-    
+
+    _renderEmpty(message) {
+        return `
+            <div class="ot-empty">
+                <i class="ph ph-info"></i>
+                <p>${this._escapeHtml(message)}</p>
+            </div>
+        `;
+    }
+
+    /* =========================================================
+     * Dashboard
+     * ========================================================= */
     _renderDashboard(data) {
         if (!data) {
             return this._renderEmpty("No overtime data available.");
@@ -340,56 +379,30 @@ class OvertimeView {
         const summary = data.summary || {
             otRecordsCount: 0,
             mightBeOTCount: 0,
-            employeeCount: 0
+            employeeCount: 0,
         };
 
-        let otRecords = [];
-
-        if (Array.isArray(data.otRecords)) {
-            otRecords = data.otRecords;
-        }
-
-        const totalPages = Math.max(1, Math.ceil(otRecords.length / this.pageSize));
-
-        if (this.currentPage > totalPages) {
-            this.currentPage = totalPages;
-        }
-
+        const otRecords = Array.isArray(data.otRecords) ? data.otRecords : [];
         const mightBeOT = Array.isArray(data.mightBeOT) ? data.mightBeOT : [];
-
-        const tableRecords = this._filteredRecords || otRecords;
-
-        const filterBanner = this._filteredRecords ? `
-            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin:0 0 12px; padding:10px 14px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px;">
-                <div style="font-size:13px; font-weight:600; color:#1e3a8a;">
-                    Filtered by category: <span style="color:#2563eb;">${this._escapeHtml(this._filteredCatLabel)}</span>
-                    · ${this._filteredRecords.length} record(s)
-                </div>
-                <button type="button" id="otClearCategoryFilter"
-                    style="padding:6px 12px; border:1px solid #93c5fd; border-radius:6px; background:#fff; color:#1e3a8a; cursor:pointer; font-size:12px; font-weight:600;">
-                    <i class="ph ph-x"></i> Clear Filter
-                </button>
-            </div>
-        ` : "";
 
         return `
             ${this._renderSummaryCards(summary, otRecords, mightBeOT)}
-            ${filterBanner}
-            ${this._renderRecordsTable(tableRecords)}
+
+            <!-- Drilldown opens here when a card or chip is clicked -->
+            <div id="overtime-drilldown-container" class="ot-drilldown ${this._drill ? "ot-drilldown--open" : ""}">
+                ${this._renderDrilldown()}
+            </div>
+
+            ${this._renderRecordsTable(otRecords)}
             ${this._renderFooterMeta(data)}
         `;
     }
 
-    _renderSummaryCards(summary, otRecords = [], mightBeOT = []) {
-        const categoryOrder = ["ON-ROLL", "CC", "CONTRACTOR", "OUTSOURCE"];
+    _renderSummaryCards(summary, otRecords, mightBeOT) {
+        const categoryOrder = this.model.getCategoryOrder();
 
-        const otCatCounts    = this._countByCategory(otRecords);
-        const mbCatCounts    = this._countByCategory(mightBeOT);
-
-        const totalCatCounts = this._emptyCatCounts();
-        categoryOrder.forEach((cat) => {
-            totalCatCounts[cat] = otCatCounts[cat] + mbCatCounts[cat];
-        });
+        const otCatCounts = this.model.countByCategory(otRecords);
+        const mbCatCounts = this.model.countByCategory(mightBeOT);
 
         const cards = [
             {
@@ -410,22 +423,19 @@ class OvertimeView {
                 catCounts: mbCatCounts,
                 hint: true,
             },
-            {
-                key: null,
-                label: "Employees",
-                val: Number(summary.employeeCount || 0),
-                icon: "ph-users",
-                cls: "",
-                catCounts: totalCatCounts,
-                hint: false,
-            },
         ];
 
         return `
             <div class="summary-grid summary-grid-category">
-                ${cards.map((c) => `
-                    <div class="stat-card ${c.cls} ${c.key ? "stat-card-clickable" : ""}"
-                        ${c.key ? `data-card-key="${c.key}"` : ""}>
+                ${cards
+                    .map((c) => {
+                        const isActive = this._drill && c.key && this._drill.cardKey === c.key;
+
+                        const cardClasses = ["stat-card", c.cls, c.key ? "ot-card-clickable" : "", isActive ? "ot-card-active" : ""].filter(Boolean).join(" ");
+
+                        return `
+                    <div class="${cardClasses}" ${c.key ? `data-ot-card="${c.key}"` : ""}>
+
                         <div class="stat-card-top">
                             <div class="stat-card-top-left">
                                 <div class="stat-icon"><i class="ph ${c.icon}"></i></div>
@@ -437,28 +447,149 @@ class OvertimeView {
                             ${c.key && c.hint ? '<span class="stat-card-hint">↓ click to view</span>' : ""}
                         </div>
 
-                        ${c.catCounts ? `
-                            <div class="stat-category-row">
-                                ${categoryOrder.map((cat) => `
-                                    <div class="stat-category-item"
-                                        data-card-key="${c.key || ""}"
-                                        data-category="${cat}"
-                                        title="View ${cat} only">
-                                        <span class="cat-label">${cat}</span>
-                                        <span class="cat-value">${c.catCounts[cat] || 0}</span>
-                                    </div>
-                                `).join("")}
-                            </div>
-                        ` : ""}
+                        <div class="stat-category-row ot-chip-row">
+                            ${categoryOrder
+                                .map(
+                                    (cat) => `
+                                <div class="stat-category-item ot-chip"
+                                    data-ot-card="${c.key || "all"}"
+                                    data-category="${cat}"
+                                    title="View ${cat} only">
+                                    <span class="cat-label">${cat}</span>
+                                    <span class="cat-value">${c.catCounts[cat] || 0}</span>
+                                </div>
+                            `,
+                                )
+                                .join("")}
+                        </div>
                     </div>
-                `).join("")}
+                `;
+                    })
+                    .join("")}
             </div>
         `;
     }
 
+    /* =========================================================
+     * Drilldown panel
+     * ========================================================= */
+    _renderDrilldown() {
+        if (!this._drill) {
+            return "";
+        }
+
+        const records = this._getDrillRecords();
+        const title = this._getDrillTitle();
+
+        return `
+            <div class="ot-panel">
+                <div class="ot-panel-header ot-panel-header--drill">
+                    <div class="ot-drill-title">
+                        <i class="ph ph-list-dashes"></i>
+                        Viewing <span>${this._escapeHtml(title)}</span>
+                        <span class="ot-drill-count">(${records.length} found)</span>
+                    </div>
+
+                    <div class="ot-actions">
+                        <button type="button" class="ot-btn ot-btn--sm ot-btn--excel" data-ot-action="download-drill">
+                            <i class="ph ph-file-xls"></i> Excel
+                        </button>
+                        <button type="button" class="ot-btn ot-btn--sm ot-btn--close" data-ot-action="close-drill">
+                            <i class="ph ph-x"></i> Close
+                        </button>
+                    </div>
+                </div>
+
+                <div class="ot-drill-scroll">
+                    ${this._renderDrilldownTable(records)}
+                </div>
+            </div>
+        `;
+    }
+
+    _renderDrilldownTable(records) {
+        if (!records || records.length === 0) {
+            return `<div class="ot-drill-empty">No records found.</div>`;
+        }
+
+        const rows = records.map((r) => this._renderRecordRow(r)).join("");
+
+        return `
+            <div class="ot-table-wrap">
+                <table class="ot-table">
+                    <thead>
+                        <tr>
+                            ${this._renderTableHeaders()}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    /* =========================================================
+     * Shared table pieces (used by drilldown and main table)
+     * ========================================================= */
+    _getTableHeaders() {
+        return [
+            "Employee Code",
+            "Employee Name",
+            "Company",
+            "Department",
+            "Designation",
+            "Location",
+            "Date",
+            "First Shift",
+            "Begin Time",
+            "End Time",
+            "In Time",
+            "Out Time",
+            "Second Shift",
+            "Begin Time",
+            "End Time",
+            "In Time",
+            "Out Time",
+        ];
+    }
+
+    _renderTableHeaders() {
+        return this._getTableHeaders()
+            .map((h) => `<th>${this._escapeHtml(h)}</th>`)
+            .join("");
+    }
+
+    _renderRecordRow(r) {
+        return `
+            <tr>
+                <td>${this._escapeHtml(r.employeeCode)}</td>
+                <td>${this._escapeHtml(r.name)}</td>
+                <td>${this._escapeHtml(r.company)}</td>
+                <td>${this._escapeHtml(r.department)}</td>
+                <td>${this._escapeHtml(r.designation)}</td>
+                <td>${this._escapeHtml(r.location)}</td>
+                <td>${this._escapeHtml(r.attendanceDate)}</td>
+                <td>${this._escapeHtml(r.shift1)}</td>
+                <td>${this._escapeHtml(r.shift1BeginTime)}</td>
+                <td>${this._escapeHtml(r.shift1EndTime)}</td>
+                <td>${this._escapeHtml(r.AttendanceLogsInTime)}</td>
+                <td>${this._escapeHtml(r.AttendanceLogsOutTime)}</td>
+                <td>${this._escapeHtml(r.shift2)}</td>
+                <td>${this._escapeHtml(r.shift2BeginTime)}</td>
+                <td>${this._escapeHtml(r.shift2EndTime)}</td>
+                <td>${this._escapeHtml(r.NewAttendanceLogsInTime)}</td>
+                <td>${this._escapeHtml(r.NewAttendanceLogsOutTime)}</td>
+            </tr>
+        `;
+    }
+
+    /* =========================================================
+     * Main records table (OT Records, paginated)
+     * ========================================================= */
     _renderRecordsTable(records) {
         const totalRecords = records.length;
-
         const totalPages = Math.max(1, Math.ceil(totalRecords / this.pageSize));
 
         this.currentPage = Math.min(Math.max(1, this.currentPage), totalPages);
@@ -468,157 +599,28 @@ class OvertimeView {
 
         const paginatedRecords = records.slice(startIndex, endIndex);
 
-        const rows = paginatedRecords.map(
-            (r) => `
-                <tr>
-                    <!-- Employee Code -->
-                    <td style="padding:12px; border-bottom:1px solid #f1f5f9; white-space:nowrap;">
-                        ${this._escapeHtml(r.employeeCode)}
-                    </td>
-
-                    <!-- Employee Name -->
-                    <td style="padding:12px; border-bottom:1px solid #f1f5f9; white-space:nowrap;">
-                        ${this._escapeHtml(r.name)}
-                    </td>
-
-                    <!-- Company -->
-                    <td style="padding:12px; border-bottom:1px solid #f1f5f9; white-space:nowrap;">
-                        ${this._escapeHtml(r.company)}
-                    </td>
-
-                    <!-- Department -->
-                    <td style="padding:12px; border-bottom:1px solid #f1f5f9; white-space:nowrap;">
-                        ${this._escapeHtml(r.department)}
-                    </td>
-
-                    <!-- Designation -->
-                    <td style="padding:12px; border-bottom:1px solid #f1f5f9; white-space:nowrap;">
-                        ${this._escapeHtml(r.designation)}
-                    </td>
-
-                    <!-- Location -->
-                    <td style="padding:12px; border-bottom:1px solid #f1f5f9; white-space:nowrap;">
-                        ${this._escapeHtml(r.location)}
-                    </td>
-
-                    <!-- Date -->
-                    <td style="padding:12px; border-bottom:1px solid #f1f5f9; white-space:nowrap;">
-                        ${this._escapeHtml(r.attendanceDate)}
-                    </td>
-
-                    <!-- First Shift -->
-                    <td style="padding:12px; border-bottom:1px solid #f1f5f9; white-space:nowrap;">
-                        ${this._escapeHtml(r.shift1)}
-                    </td>
-
-                    <!-- First Shift Begin Time -->
-                    <td style="padding:12px; border-bottom:1px solid #f1f5f9; white-space:nowrap;">
-                        ${this._escapeHtml(r.shift1BeginTime)}
-                    </td>
-
-                    <!-- First Shift End Time -->
-                    <td style="padding:12px; border-bottom:1px solid #f1f5f9; white-space:nowrap;">
-                        ${this._escapeHtml(r.shift1EndTime)}
-                    </td>
-
-                    <!-- First Shift In Time -->
-                    <td style="padding:12px; border-bottom:1px solid #f1f5f9; white-space:nowrap;">
-                        ${this._escapeHtml(r.AttendanceLogsInTime)}
-                    </td>
-
-                    <!-- First Shift Out Time -->
-                    <td style="padding:12px; border-bottom:1px solid #f1f5f9; white-space:nowrap;">
-                        ${this._escapeHtml(r.AttendanceLogsOutTime)}
-                    </td>
-
-                    <!-- Second Shift -->
-                    <td style="padding:12px; border-bottom:1px solid #f1f5f9; white-space:nowrap;">
-                        ${this._escapeHtml(r.shift2)}
-                    </td>
-
-                    <!-- Second Shift Begin Time -->
-                    <td style="padding:12px; border-bottom:1px solid #f1f5f9; white-space:nowrap;">
-                        ${this._escapeHtml(r.shift2BeginTime)}
-                    </td>
-
-                    <!-- Second Shift End Time -->
-                    <td style="padding:12px; border-bottom:1px solid #f1f5f9; white-space:nowrap;">
-                        ${this._escapeHtml(r.shift2EndTime)}
-                    </td>
-
-                    <!-- Second Shift In Time -->
-                    <td style="padding:12px; border-bottom:1px solid #f1f5f9; white-space:nowrap;">
-                        ${this._escapeHtml(r.NewAttendanceLogsInTime)}
-                    </td>
-
-                    <!-- Second Shift Out Time -->
-                    <td style="padding:12px; border-bottom:1px solid #f1f5f9; white-space:nowrap;">
-                        ${this._escapeHtml(r.NewAttendanceLogsOutTime)}
-                    </td>
-
-                </tr>
-            `,
-        ).join("");
-
-        const headers = [
-            "Employee Code", 
-            "Employee Name", 
-            "Company", 
-            "Department", 
-            "Designation", 
-            "Location", 
-            "Date", 
-            "First Shift", 
-            "Begin Time", 
-            "End Time", 
-            "In Time", "Out Time", 
-            "Second Shift", 
-            "Begin Time", 
-            "End Time", 
-            "In Time", 
-            "Out Time",
-        ];
+        const rows = paginatedRecords.map((r) => this._renderRecordRow(r)).join("");
+        const columnCount = this._getTableHeaders().length;
 
         return `
-            <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden;">
+            <div class="ot-panel">
 
-                <!-- Table Header Controls -->
-                <div style="display:flex; flex-wrap:wrap; gap:12px; justify-content:space-between; align-items:center; padding:16px; border-bottom:1px solid #e2e8f0;">
+                <div class="ot-panel-header">
+                    <div class="ot-panel-title">Overtime Records</div>
 
-                    <div style="font-size:14px; font-weight:600; color:#334155;">
-                        Overtime Records
-                    </div>
-
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <button
-                            type="button"
-                            id="downloadExcelBtn"
-                            style="display:flex; align-items:center; gap:6px; padding:7px 14px; border:1px solid #10b981; border-radius:6px; background:#10b981; color:#fff; font-size:13px; font-weight:600; cursor:pointer; transition: background 0.2s;"
-                            onmouseover="this.style.background='#059669'"
-                            onmouseout="this.style.background='#10b981'"
-                        >
-                            <i class="ph ph-file-xls" style="font-size:16px;"></i>
+                    <div class="ot-actions">
+                        <button type="button" id="downloadExcelBtn" class="ot-btn ot-btn--excel">
+                            <i class="ph ph-file-xls"></i>
                             Download Excel
                         </button>
                     </div>
-
                 </div>
 
-                <!-- Table -->
-                <div style="overflow-x:auto;">
-                    <table style="width:100%; border-collapse:collapse; font-size:14px; min-width:1800px;">
-
-                        <thead style="background:#f8fafc;">
+                <div class="ot-table-wrap">
+                    <table class="ot-table">
+                        <thead>
                             <tr>
-                                ${headers
-                                    .map(
-                                        (header) => `
-                                            <th style="text-align:left; padding:12px; border-bottom:1px solid #e2e8f0; font-weight:600; color:#475569; white-space:nowrap;">
-                                                ${this._escapeHtml(header)}
-                                            </th>
-                                        `,
-                                    )
-                                    .join("")}
+                                ${this._renderTableHeaders()}
                             </tr>
                         </thead>
 
@@ -626,69 +628,58 @@ class OvertimeView {
                             ${
                                 rows ||
                                 `
-                                    <tr>
-                                        <td colspan="${headers.length}" style="padding:24px; text-align:center; color:#64748b;">
-                                            No records found.
-                                        </td>
-                                    </tr>
-                                `
+                                <tr>
+                                    <td colspan="${columnCount}" class="ot-empty-cell">No records found.</td>
+                                </tr>
+                            `
                             }
                         </tbody>
-
                     </table>
                 </div>
 
-                <!-- Pagination Footer -->
                 ${this._renderPagination(totalRecords, totalPages, startIndex, endIndex)}
-
             </div>
         `;
     }
 
-    /**
-     * Pagination Controls
-     */
     _renderPagination(totalRecords, totalPages, startIndex, endIndex) {
         const pageButtons = this._renderPageButtons(totalPages);
 
-        return `
-            <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px; padding:14px 16px; border-top:1px solid #e2e8f0;">
+        const prevDisabled = this.currentPage <= 1;
+        const nextDisabled = this.currentPage >= totalPages;
 
-                <!-- Record Count -->
-                <div style="font-size:13px; color:#64748b;">
+        return `
+            <div class="ot-pagination">
+
+                <div class="ot-pagination-info">
                     ${totalRecords === 0 ? "Showing 0 records" : `Showing ${startIndex + 1}–${endIndex} of ${totalRecords} records`}
                 </div>
 
-                <!-- Pagination Buttons -->
-                <div style="display:flex; flex-wrap:wrap; align-items:center; gap:6px;">
+                <div class="ot-pagination-controls">
 
-                    <!-- Previous -->
                     <button
                         type="button"
+                        class="ot-page-btn ot-page-btn--nav"
                         data-pagination-action="previous"
-                        ${this.currentPage <= 1 ? "disabled" : ""}
-                        style="padding:7px 12px; border:1px solid #e2e8f0; border-radius:6px; background:${this.currentPage <= 1 ? "#f1f5f9" : "#fff"}; color:${this.currentPage <= 1 ? "#94a3b8" : "#334155"}; cursor:${this.currentPage <= 1 ? "not-allowed" : "pointer"};"
+                        ${prevDisabled ? "disabled" : ""}
                     >
                         <i class="ph ph-caret-left"></i>
                         Previous
                     </button>
 
-                    <!-- Page Numbers -->
                     ${pageButtons}
 
-                    <!-- Next -->
                     <button
                         type="button"
+                        class="ot-page-btn ot-page-btn--nav"
                         data-pagination-action="next"
-                        ${this.currentPage >= totalPages ? "disabled" : ""}
-                        style="padding:7px 12px; border:1px solid #e2e8f0; border-radius:6px; background:${this.currentPage >= totalPages ? "#f1f5f9" : "#fff"}; color:${this.currentPage >= totalPages ? "#94a3b8" : "#334155"}; cursor:${this.currentPage >= totalPages ? "not-allowed" : "pointer"};"
+                        ${nextDisabled ? "disabled" : ""}
                     >
                         Next
                         <i class="ph ph-caret-right"></i>
                     </button>
 
                 </div>
-
             </div>
         `;
     }
@@ -713,10 +704,10 @@ class OvertimeView {
             pages.push(`
                 <button
                     type="button"
+                    class="ot-page-btn ${isActive ? "ot-page-btn--active" : ""}"
                     data-pagination-action="page"
                     data-page="${page}"
                     aria-current="${isActive ? "page" : "false"}"
-                    style="min-width:36px; padding:7px 10px; border:1px solid ${isActive ? "#3b82f6" : "#e2e8f0"}; border-radius:6px; background:${isActive ? "#3b82f6" : "#fff"}; color:${isActive ? "#fff" : "#334155"}; font-weight:${isActive ? "600" : "400"}; cursor:pointer;"
                 >
                     ${page}
                 </button>
@@ -726,23 +717,8 @@ class OvertimeView {
         return pages.join("");
     }
 
-    /**
-     * Empty State
-     */
-    _renderEmpty(message) {
-        return `
-            <div style="padding:40px; text-align:center; color:#64748b; background:#f8fafc; border:1px dashed #cbd5e1; border-radius:10px;">
-                <i class="ph ph-info" style="font-size:28px;"></i>
-                <p style="margin:8px 0 0;">
-                    ${this._escapeHtml(message)}
-                </p>
-            </div>
-        `;
-    }
-
     _renderFooterMeta(data) {
         const generatedAt = data.generatedAt ? `Generated at ${this._escapeHtml(data.generatedAt)}` : "";
-
         const scope = data.scope ? `Scope: ${this._escapeHtml(data.scope)}` : "";
 
         const meta = [scope, generatedAt].filter(Boolean).join(" · ");
@@ -751,63 +727,18 @@ class OvertimeView {
             return "";
         }
 
-        return `
-            <p style="margin-top:12px; font-size:12px; color:#94a3b8; text-align:right;">
-                ${meta}
-            </p>
-        `;
+        return `<p class="ot-footer-meta">${meta}</p>`;
     }
 
+    /* =========================================================
+     * Utils
+     * ========================================================= */
     _escapeHtml(v) {
         if (v === null || v === undefined) {
             return "";
         }
 
         return String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-    }
-
-    _mergeCat(rawCat) {
-        if (!rawCat) {
-            return null;
-        }
-
-        const c = String(rawCat).toUpperCase().trim();
-        
-        if (c === "ON-ROLL" || c === "ONROLL") {
-            return "ON-ROLL";
-        }
-
-        if (c === "CC" || c === "COMPANY CONTRACT" || c === "COMPANY CONTRACT (CC)") {
-            return "CC";
-        }
-        
-        if (c === "CONTRACTOR") {
-            return "CONTRACTOR";
-        }
-        
-        if (c === "OUTSOURCE") {
-            return "OUTSOURCE";
-        }
-        
-        return null;
-    }
-
-    _emptyCatCounts() {
-        return { "ON-ROLL": 0, "CC": 0, "CONTRACTOR": 0, "OUTSOURCE": 0 };
-    }
-
-    _countByCategory(records) {
-        const counts = this._emptyCatCounts();
-     
-        (records || []).forEach((r) => {
-            const cat = this._mergeCat(r && r.companyCategory);
-     
-            if (cat) {
-                counts[cat]++;
-            }
-        });
-     
-        return counts;
     }
 }
 

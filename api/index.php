@@ -2931,9 +2931,26 @@ function handleOvertimeData($input) {
         $userCompanies = $scope['companies'];
         $userDepartments = $scope['departments'];
 
-        $locationList = !empty($userLocations) ? implode(',', array_map('intval', $userLocations)) : '0';
-        $companyList = !empty($userCompanies) ? implode(',', array_map('intval', $userCompanies)) : '0';
-        $departmentList = !empty($userDepartments) ? implode(',', array_map('intval', $userDepartments)) : '0';
+        $locationList = '0';
+        if (!empty($userLocations)) {
+            $locationList = implode(',', array_map('intval', $userLocations));
+        } else {
+            $locationList = '0';
+        }
+
+        $companyList = '0';
+        if (!empty($userCompanies)) {
+            $companyList = implode(',', array_map('intval', $userCompanies));
+        } else {
+            $companyList = '0';
+        }
+
+        $departmentList = '0';
+        if (!empty($userDepartments)) {
+            $departmentList = implode(',', array_map('intval', $userDepartments));
+        } else {
+            $departmentList = '0';
+        }
 
         overtimeDebugLog("========== OVERTIME DEBUG START ==========");
         overtimeDebugLog("User ID: " . $loggedInUserId);

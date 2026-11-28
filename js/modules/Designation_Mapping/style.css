@@ -1,0 +1,367 @@
+/* ---------------------------------------------------------
+ * Summary cards
+ * --------------------------------------------------------- */
+.ot-card-clickable {
+    cursor: pointer;
+}
+
+.ot-card-active {
+    box-shadow: 0 0 0 2px #3b82f6;
+}
+
+/* Category chip row inside each card (overrides global .stat-category-row) */
+.stat-category-row.ot-chip-row {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 8px;
+    padding-bottom: 8px;
+}
+
+.stat-category-item.ot-chip {
+    cursor: pointer;
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.stat-category-item.ot-chip .cat-label {
+    font-size: 10px;
+    white-space: nowrap;
+}
+
+/* ---------------------------------------------------------
+ * Drilldown container
+ * --------------------------------------------------------- */
+.ot-drilldown {
+    margin-bottom: 0;
+}
+
+.ot-drilldown--open {
+    margin-bottom: 24px;
+}
+
+.ot-drill-scroll {
+    max-height: 400px;
+    overflow: auto;
+}
+
+/* ---------------------------------------------------------
+ * Panel (used by both drilldown and main records table)
+ * --------------------------------------------------------- */
+.ot-panel {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.ot-panel-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.ot-panel-header--drill {
+    flex-wrap: nowrap;
+    background: #f8fafc;
+}
+
+.ot-panel-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #334155;
+}
+
+.ot-drill-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.ot-drill-title i {
+    color: #64748b;
+}
+
+.ot-drill-count {
+    font-size: 13px;
+    font-weight: 500;
+    color: #64748b;
+    margin-left: 8px;
+}
+
+.ot-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ---------------------------------------------------------
+ * Buttons
+ * --------------------------------------------------------- */
+.ot-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.ot-btn i {
+    font-size: 16px;
+}
+
+.ot-btn--sm {
+    gap: 4px;
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+.ot-btn--sm i {
+    font-size: inherit;
+}
+
+.ot-btn--excel {
+    border: 1px solid #10b981;
+    background: #10b981;
+    color: #fff;
+}
+
+.ot-btn--excel:hover {
+    background: #059669;
+}
+
+.ot-btn--close {
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    color: #475569;
+}
+
+.ot-btn--close:hover {
+    background: #f1f5f9;
+}
+
+/* ---------------------------------------------------------
+ * Tables
+ * --------------------------------------------------------- */
+.ot-table-wrap {
+    overflow-x: auto;
+}
+
+.ot-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    min-width: 1800px;
+}
+
+.ot-table thead {
+    background: #f8fafc;
+}
+
+.ot-table th {
+    text-align: left;
+    padding: 12px;
+    border-bottom: 1px solid #e2e8f0;
+    font-weight: 600;
+    color: #475569;
+    white-space: nowrap;
+    background: #f8fafc;
+}
+
+.ot-table td {
+    padding: 12px;
+    border-bottom: 1px solid #f1f5f9;
+    white-space: nowrap;
+}
+
+.ot-table td.ot-empty-cell {
+    padding: 24px;
+    text-align: center;
+    color: #64748b;
+}
+
+.ot-drill-empty {
+    padding: 24px;
+    text-align: center;
+    color: #64748b;
+}
+
+/* ---------------------------------------------------------
+ * Pagination
+ * --------------------------------------------------------- */
+.ot-pagination {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.ot-pagination-info {
+    font-size: 13px;
+    color: #64748b;
+}
+
+.ot-pagination-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.ot-page-btn {
+    min-width: 36px;
+    padding: 7px 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    background: #fff;
+    color: #334155;
+    font-weight: 400;
+    cursor: pointer;
+}
+
+.ot-page-btn--nav {
+    min-width: 0;
+    padding: 7px 12px;
+}
+
+.ot-page-btn--active {
+    border-color: #3b82f6;
+    background: #3b82f6;
+    color: #fff;
+    font-weight: 600;
+}
+
+.ot-page-btn:disabled {
+    background: #f1f5f9;
+    color: #94a3b8;
+    cursor: not-allowed;
+}
+
+/* ---------------------------------------------------------
+ * Loading / Error / Empty / Coming Soon
+ * --------------------------------------------------------- */
+.ot-loading {
+    padding: 40px;
+    text-align: center;
+    color: #64748b;
+}
+
+.ot-loading i {
+    font-size: 32px;
+}
+
+.ot-loading p {
+    margin-top: 8px;
+}
+
+.ot-error {
+    padding: 24px;
+    text-align: center;
+    color: #b91c1c;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+}
+
+.ot-error i {
+    font-size: 28px;
+}
+
+.ot-error-title {
+    margin: 8px 0 0;
+    font-weight: 600;
+}
+
+.ot-error-text {
+    margin: 4px 0 0;
+    font-size: 14px;
+}
+
+.ot-empty {
+    padding: 40px;
+    text-align: center;
+    color: #64748b;
+    background: #f8fafc;
+    border: 1px dashed #cbd5e1;
+    border-radius: 10px;
+}
+
+.ot-empty i {
+    font-size: 28px;
+}
+
+.ot-empty p {
+    margin: 8px 0 0;
+}
+
+.ot-soon {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 20px;
+    text-align: center;
+}
+
+.ot-soon-icon {
+    background: #f1f5f9;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.ot-soon-icon i {
+    font-size: 40px;
+    color: #64748b;
+}
+
+.ot-soon-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 8px;
+}
+
+.ot-soon-text {
+    color: #64748b;
+    font-size: 16px;
+    max-width: 400px;
+    margin: 0 0 24px;
+}
+
+.ot-soon-badge {
+    background: #fef08a;
+    color: #854d0e;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+/* ---------------------------------------------------------
+ * Footer meta
+ * --------------------------------------------------------- */
+.ot-footer-meta {
+    margin-top: 12px;
+    font-size: 12px;
+    color: #94a3b8;
+    text-align: right;
+}
